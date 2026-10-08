@@ -1,14 +1,14 @@
 """
 BlueNexus - Entscheidungslogik
 =================================================
-1:1-Portierung von victron_steuerung_v39.4.js (ioBroker) nach Python.
+Die bewährte, über viele Monate im Dauerbetrieb erprobte Ladelogik von BlueNexus.
 
 REIN & TESTBAR: keine Hardware, kein Netz. Die Funktion decide() bekommt
 alle Eingaben als Argumente plus einen persistenten State-Dict und gibt
 die Entscheidung + aktualisierten State zurück. I/O (Modbus, Tibber, PV,
 Speicherung) liegt außerhalb.
 
-ESS-Mode:  9 = laden erlaubt · 10 = nicht laden (wie in V39.4).
+ESS-Mode:  9 = laden erlaubt · 10 = nicht laden (bewährter Standard).
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-# --- PARAMETER (aus V39.4) ---
+# --- PARAMETER (bewährte Standardwerte) ---
 PV_KORREKTUR_FAKTOR = 0.68
 PV_TOM_MORNING_FACTOR = 0.15   # Saisonal: Winter 0.05 / Sommer 0.25
 DAILY_USAGE_KWH = 30.0
@@ -44,7 +44,7 @@ ESS_IDLE = 10
 
 @dataclass
 class Params:
-    """Alle anlagenspezifischen Steuerungs-Parameter. Defaults = V39.4 (Michael).
+    """Alle anlagenspezifischen Steuerungs-Parameter. Die Defaults sind die bewährten Werte aus dem Dauerbetrieb.
     Über die Web-App pro Anlage anpassbar."""
     battery_usable_kwh: float = BATTERY_USABLE_KWH
     daily_usage_kwh: float = DAILY_USAGE_KWH
@@ -98,7 +98,7 @@ class Slot:
 
 @dataclass
 class PersistentState:
-    """Ersetzt die internen ioBroker-States (0_userdata.0.Victron.Intern_*)."""
+    """Der gemerkte Zustand der Ladelogik zwischen zwei Durchläufen (Tageswerte, Sperren, Merker)."""
     day_stamp: str = ""
     slots_charged: int = 0
     last_counted_slot: str = ""
@@ -152,7 +152,7 @@ def slot_name_from_date(d: datetime) -> str:
 
 def build_slots(price_entries: list, now: datetime) -> list:
     """price_entries: [{'startsAt': iso, 'total': EUR/kWh}, ...] (heute + morgen).
-    Filtert auf ab-jetzt und dedupliziert - wie readAllPrices() in V39.4."""
+    Filtert auf ab-jetzt und dedupliziert - jede Viertelstunde genau einmal."""
     now_q = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
     slots: list[Slot] = []
     seen = set()

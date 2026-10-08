@@ -10,7 +10,7 @@ Nutzung (im selben Ordner wie config.json):
   python tibber_test.py
 
 Ausgabe: Anzahl Preis-Slots heute/morgen, aktueller Preis, Min/Max.
-Preise werden in ct/kWh angezeigt (wie in V39.4).
+Preise werden in ct/kWh angezeigt (wie in der App).
 """
 import argparse
 import json

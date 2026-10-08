@@ -327,7 +327,7 @@ Weitere Energie-Funktionen:
 
 ### Die Lade-Strategie im Detail
 
-Die Logik ist eine 1:1-Portierung des über viele Iterationen erprobten ioBroker-Skripts (V39.4) nach Python.
+Die Ladelogik ist über viele Monate im Dauerbetrieb einer echten Anlage gereift und fest in BlueNexus integriert.
 Sie arbeitet in drei Schritten und einem klaren Prioritätsbaum.
 
 #### Schritt 1 – Bedarf ermitteln (Prioritätsbaum)
@@ -537,7 +537,7 @@ deploy/          install.sh / update.sh / uninstall.sh
 ```
 
 Die Trennung von **Logik** (rein, deterministisch, testbar) und **I/O** (Modbus, HTTP, Speicherung) macht die
-Steuerung ohne Hardware testbar – die V39.4-Portierung ist durch Tests abgesichert. Daten liegen als JSON-Dateien
+Steuerung ohne Hardware testbar – die Ladelogik ist durch Tests abgesichert. Daten liegen als JSON-Dateien
 und einer SQLite-Datenbank im Ordner `app/` und sind **nicht in Git**.
 
 ---

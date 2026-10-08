@@ -1,5 +1,5 @@
 """
-Tests für die portierte V39.4-Logik.
+Tests für die Ladelogik (logic.py).
 Ausführen:  python test_logic.py
 """
 from datetime import datetime, timedelta

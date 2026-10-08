@@ -12,7 +12,7 @@ Nutzung (auf dem Raspberry Pi oder einem PC im selben LAN):
   pip install pymodbus
   python3 cerbo_test.py --host 192.168.X.X
 
-Die Register/Unit-IDs entsprechen den ioBroker-Datenpunkten aus V39.4:
+Die Register/Unit-IDs der bewährten Standardkonfiguration:
   SOC (BMS)  : Unit 225, InputRegister  266   (uint16, %)
   ESS-Mode   : Unit 100, HoldingRegister 2900  (uint16)  -> wird NUR gelesen
   Batt.-SOC  : Unit 100, InputRegister  843    (system SOC, Gegencheck)
