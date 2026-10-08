@@ -256,6 +256,67 @@ def _cam_stream(item: dict, quality=None):
         raise camera.CameraError(str(e))
 
 
+# ---- Wetter (im Format von Open-Meteo, laeuft durch weather._parse) ---------------------------------------------------
+def _weather_forecast(force: bool = False) -> dict:
+    import weather
+    from datetime import timedelta
+    from demo import _day_factor, _season
+    now = datetime.now()
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    code_for = lambda f: 0 if f >= 0.95 else 1 if f >= 0.75 else 2 if f >= 0.6 else 3 if f >= 0.4 else 61
+    hourly = {k: [] for k in ("time", "temperature_2m", "precipitation_probability", "precipitation", "weather_code", "cloud_cover", "wind_speed_10m")}
+    daily = {k: [] for k in ("time", "weather_code", "temperature_2m_max", "temperature_2m_min", "precipitation_sum",
+                             "precipitation_probability_max", "wind_speed_10m_max", "sunrise", "sunset", "sunshine_duration")}
+
+    def at(t):
+        f, s = _day_factor(t.date()), _season(t.date())
+        mean = 3 + 16 * (s - 0.3) / 0.7 - (1.5 if f < 0.5 else 0)
+        amp = 2.5 + 4 * f
+        temp = mean + amp * math.sin(2 * math.pi * (t.hour + t.minute / 60.0 - 9) / 24.0)
+        return f, temp
+
+    for d in range(7):
+        base = day0 + timedelta(days=d)
+        f, s = _day_factor(base.date()), _season(base.date())
+        length = 7.5 + 9.0 * s
+        rise = 13.0 - length / 2.0
+        temps = []
+        for h in range(24):
+            t = base + timedelta(hours=h)
+            _, temp = at(t)
+            temps.append(temp)
+            rain = f < 0.4
+            hourly["time"].append(t.strftime("%Y-%m-%dT%H:00"))
+            hourly["temperature_2m"].append(round(temp, 1))
+            hourly["precipitation_probability"].append(70 if rain else 10 if f >= 0.75 else 30)
+            hourly["precipitation"].append(round(0.4 + 0.3 * math.sin(h), 1) if rain and 8 <= h <= 18 else 0.0)
+            hourly["weather_code"].append(code_for(f))
+            hourly["cloud_cover"].append(int(100 - f * 90))
+            hourly["wind_speed_10m"].append(round(8 + 8 * (1 - f) + 2 * math.sin(h / 3.0), 1))
+        daily["time"].append(base.strftime("%Y-%m-%d"))
+        daily["weather_code"].append(code_for(f))
+        daily["temperature_2m_max"].append(round(max(temps), 1))
+        daily["temperature_2m_min"].append(round(min(temps), 1))
+        daily["precipitation_sum"].append(5.5 if f < 0.4 else 0.0)
+        daily["precipitation_probability_max"].append(70 if f < 0.4 else 10 if f >= 0.75 else 30)
+        daily["wind_speed_10m_max"].append(round(18 + 10 * (1 - f), 1))
+        daily["sunrise"].append((base + timedelta(hours=rise)).strftime("%Y-%m-%dT%H:%M"))
+        daily["sunset"].append((base + timedelta(hours=rise + length)).strftime("%Y-%m-%dT%H:%M"))
+        daily["sunshine_duration"].append(round(length * 3600 * f * 0.9))
+    f, temp = at(now)
+    h = _h(now)
+    s = _season(now.date())
+    length = 7.5 + 9.0 * s
+    rise = 13.0 - length / 2.0
+    current = {"time": now.strftime("%Y-%m-%dT%H:%M"), "temperature_2m": round(temp, 1), "apparent_temperature": round(temp - 1.5, 1),
+               "relative_humidity_2m": int(85 - 25 * f), "is_day": int(rise <= h <= rise + length), "precipitation": 0.0,
+               "weather_code": code_for(f), "cloud_cover": int(100 - f * 90), "wind_speed_10m": round(8 + 8 * (1 - f), 1), "wind_direction_10m": 250}
+    loc = weather.get_location()
+    data = weather._parse({"current": current, "hourly": hourly, "daily": daily}, loc.get("name") or "Demo")
+    data.update(configured=True, error=None, updated=now.isoformat(timespec="seconds"))
+    return data
+
+
 # ---- Einhaengen ----------------------------------------------------------------------------------------------------
 def activate() -> None:
     """Ersetzt die Netzwerk-Zugriffe auf Geraete/Kameras/CCU durch die Simulation (nur wenn BLUENEXUS_DEMO=1)."""
@@ -328,6 +389,8 @@ def activate() -> None:
     zigbee.set_setpoint = lambda sp, value: min(float(sp.get("max", 30)), max(float(sp.get("min", 5)), float(value)))
 
     wol.is_up = lambda ip: True
+    import weather
+    weather.forecast = _weather_forecast
 
     camera.ffmpeg_path = lambda: "demo"          # Live-Ansicht verfuegbar melden (der Demo-Strom braucht kein ffmpeg)
     camera.snapshot = _cam_snapshot
