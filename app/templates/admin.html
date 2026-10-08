@@ -37,15 +37,16 @@
   #shelly-found > div:nth-child(odd) { background: var(--card2); border-color: var(--border); }
   #shelly-found > div:hover { border-color: var(--accent); }
   .card.savebar { position: sticky; bottom: 12px; z-index: 25; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
-  .tgl { width: 44px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
+  .tgl { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
     background: var(--card2); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: .75; }
   .tgl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .tgl.on, .tgl.dirty { background: var(--green); border-color: var(--green); color: #0d141b; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
+  .tgl.on { background: var(--on); border-color: var(--on); color: #0d141b; opacity: 1; }          /* an = Victron-Blau */
+  .tgl.dirty { background: var(--green); border-color: var(--green); color: #0d141b; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
   .tgl.del { color: var(--red); }
   .icon-pick.fixed { cursor: default; } .icon-pick.fixed:hover { border-color: var(--border); filter: none; }      /* Symbol fest (NFC-Knopf): gleiche Groesse wie die anderen, aber ohne Hover-Wirkung */
   /* Alle kleinen Aktionsknoepfe einer Zeile (PIN, Sichtbarkeit, Bearbeiten, Ein/Aus, Test) gleich gross */
   .tgl, .dev-power, button[onclick*="editToggle("], button[onclick*="soundTest("], button[onclick*="ntRecipientTest("], button[onclick*="poTest("] {
-    box-sizing: border-box; width: 44px; height: 40px; min-width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    box-sizing: border-box; width: 44px; height: 44px; min-width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
     border-radius: 10px; font-size: 17px; line-height: 1; flex: none; }
   /* Verwalten (umbenennen, Symbol, Sichtbarkeit, entfernen, anlegen) nur fuer Administratoren; Bedienen darf jeder mit Recht */
   html:not(.is-admin) .admin-only, html:not(.is-admin) .edit-panel { display: none !important; }
@@ -1520,7 +1521,7 @@ function uiDialog({ title, message, html, info, label, value = '', type = 'text'
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyIcons = [];
 const PWR_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:middle"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg>';
-const POWER_ON_STYLE = 'background:var(--green);border-color:var(--green);color:#0b1f14';
+const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#0d141b';          // eingeschaltet = Victron-Blau
 async function shellyApi(url, method, body) {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined });
