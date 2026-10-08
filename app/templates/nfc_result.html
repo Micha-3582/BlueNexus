@@ -7,16 +7,19 @@
   <title>{{ title }}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <meta name="theme-color" content="#1b1f24">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <style>
-    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: #f2f3f5;
+    :root { --bg: #121519; --card: #1b1f24; --fg: #f2f3f5; --muted: #a3a9b0; --border: #363c44; }
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
-      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), #121519; }
-    .card { max-width: 380px; width: 100%; background: #1b1f24; border: 1px solid #363c44; border-radius: 18px; padding: 34px 26px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), var(--bg); }
+    .card { max-width: 380px; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 34px 26px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
     .sym { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 700; }
     .ok .sym { background: rgba(60,162,203,.16); color: #4b9be6; box-shadow: 0 0 24px rgba(60,162,203,.35); }
     .no .sym { background: rgba(229,84,74,.14); color: #e5544a; }
     button { width: 100%; padding: 13px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #1c1105; background: linear-gradient(180deg,#f79b3d,#f48c24); cursor: pointer; }
-    h1 { font-size: 22px; margin: 0 0 8px; } p { color: #a3a9b0; font-size: 15px; line-height: 1.5; margin: 0; }
+    h1 { font-size: 22px; margin: 0 0 8px; } p { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0; }
   </style>
 </head>
 <body>

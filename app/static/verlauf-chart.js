@@ -35,7 +35,7 @@ window.VLChart = (function () {
 
   function draw(inst, c, series, d, t0, t1, cv, opts) {
     opts = opts || {};
-    var light = opts.theme === 'light';
+    var light = (opts.theme || document.documentElement.getAttribute('data-theme')) === 'light';
     var TICK = light ? '#444b57' : '#9aa4b5', GRIDC = light ? 'rgba(0,0,0,.14)' : 'rgba(255,255,255,.08)', LEG = light ? '#222a35' : '#c8d0dc';
     var kind = ['line', 'area', 'bar', 'step', 'points', 'stackarea', 'stackbar'].indexOf(c.kind) >= 0 ? c.kind : 'line';
     var isBar = kind === 'bar' || kind === 'stackbar', stacked = kind === 'stackarea' || kind === 'stackbar';          // gestapelt: Reihen derselben Achse werden aufeinandergelegt

@@ -20,7 +20,7 @@
   .card:nth-of-type(11) h2 svg.h2i { color: var(--red); }    /* Netz-Zähler  */
   /* Reiter (Tabs) */
   .tabbar { position: sticky; top: var(--hdr-h, 56px); z-index: 9; display: flex; gap: 6px; overflow-x: auto;
-    padding: 8px 0; margin-bottom: 14px; background: rgba(18,21,25,.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
+    padding: 8px 0; margin-bottom: 14px; background: var(--navbg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* base.html setzt am Handy overflow-x:hidden auf <main> - das wuerde 'sticky' ausschalten; clip verhindert Seitenueberlauf ohne */
   @media (max-width: 640px) { main { overflow-x: clip; } }
@@ -138,6 +138,14 @@
   <div style="display:flex;align-items:center;gap:14px">
     <label class="switch" style="margin:0"><input type="checkbox" id="chart_flow_hourly"><span class="slider"></span></label>
     <div><b>Energieflüsse stündlich</b> <span class="qhelp" role="button" tabindex="0" data-help="Fasst das Energiefluss-Diagramm stündlich zusammen wie im VRM-Portal. Aus = jede Viertelstunde einzeln.">?</span><div class="muted">Stündlich statt im 15-Minuten-Raster.</div></div>
+  </div>
+</div>
+
+<div class="card" data-tab="anzeige" data-area="always" id="theme-card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Darstellung <span class="qhelp" role="button" tabindex="0" data-help="Hell oder dunkel – wie es dir besser gefällt. „Automatisch“ folgt der Einstellung deines Geräts (Handy oder Computer). Die Wahl gilt nur für dieses Gerät und diesen Browser; jedes Gerät kann anders eingestellt sein.">?</span></h2>
+  <div class="sub">Dunkel, hell oder automatisch – gilt nur für dieses Gerät.</div>
+  <div class="seg" id="theme-seg" role="group" aria-label="Darstellung" style="display:inline-flex;font-size:15px"><style>#theme-seg button{padding:10px 18px;font-size:15px}</style>
+    <button type="button" data-t="dark">🌙 Dunkel</button><button type="button" data-t="light">☀️ Hell</button><button type="button" data-t="auto">🖥️ Automatisch</button>
   </div>
 </div>
 
@@ -3141,6 +3149,12 @@ loadShellyAdmin(true).then(refreshShellyStatus);                         // erst
 if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
 
 /* --- Reiter: jede Karte gehoert zu genau einem Reiter (Zuordnung ueber die Ueberschrift) --- */
+(function () {                                   // Darstellung (hell/dunkel): gilt pro Geraet (localStorage), siehe static/theme.js
+  const seg = document.getElementById('theme-seg'); if (!seg || !window.HNTheme) return;
+  const mark = () => seg.querySelectorAll('button').forEach(b => { const on = b.dataset.t === HNTheme.get(); b.classList.toggle('on', on); b.classList.toggle('read', on); });
+  seg.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; HNTheme.set(b.dataset.t); mark(); });
+  mark();
+})();
 const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'wol', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
 const IS_SH = window.PAGE_MODE === 'smarthome';
 const ADMIN_TABS = [

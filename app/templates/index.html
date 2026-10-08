@@ -163,10 +163,10 @@
   #weather-card .wx-right { text-align: right; }
   #weather-card .wx-icon { font-size: 40px; line-height: 1.1; }
   #wx-hours { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 6px; -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin; scrollbar-color: #4a5059 transparent; }
+    scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
   #wx-hours::-webkit-scrollbar { height: 8px; }
   #wx-hours::-webkit-scrollbar-track { background: transparent; }
-  #wx-hours::-webkit-scrollbar-thumb { background: #4a5059; border-radius: 4px; }
+  #wx-hours::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
   #wx-hours .h { flex: 0 0 auto; min-width: 58px; text-align: center; padding: 8px 6px; border-radius: 10px;
     background: var(--card2, rgba(255,255,255,.04)); font-size: 13px; }
   #wx-hours .h .t { font-weight: 600; font-size: 15px; }
@@ -174,7 +174,7 @@
   #wx-days { margin-top: 8px; }
   #wx-days .d { display: grid; grid-template-columns: 78px 30px 84px 1fr; align-items: center; gap: 8px; padding: 7px 6px;
     font-size: 14px; }
-  #wx-days .d:nth-child(even) { background: rgba(255,255,255,.04); }
+  #wx-days .d:nth-child(even) { background: var(--tint); }
   #wx-days .d .m { color: var(--muted); font-size: 12px; }
   @media (max-width: 560px) { #wx-days .d { grid-template-columns: 64px 28px 76px 1fr; font-size: 13px; } }
 
@@ -255,6 +255,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='verlauf-chart.js') }}"></script>
 <script>
+const TH = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();          // Themenfarbe (dunkel/hell) fuer die Diagramme
 const MODULES = {{ modules | tojson }};              // Module der Installation (Energie / Smart Home / Kameras)
 const DASHBOARD_LEVEL = {{ (user_perms.dashboard or 'none') | tojson }};   // 'none' | 'read' | 'write' - siehe Einstellungen -> System -> Weitere Benutzer
 const LEVEL_COLORS = {
@@ -375,7 +376,7 @@ const bandPlugin = {
       : -1;
     if (ni >= 0) {
       const px = x.getPixelForValue(ni);
-      ctx.strokeStyle = '#f2f3f5'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = TH('--fg'); ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.moveTo(px, area.top); ctx.lineTo(px, area.bottom); ctx.stroke(); ctx.setLineDash([]);
     }
     ctx.restore();
@@ -398,10 +399,10 @@ function buildChart() {
         } }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#a3a9b0', autoSkip: false, maxRotation: 0,
+        x: { grid: { display: false }, ticks: { color: TH('--muted'), autoSkip: false, maxRotation: 0,
           callback(v, i) { const p = prices[i]; if (!p || !p.label.endsWith(':00')) return '';
             const step = (chart && chart.width > 900) ? 4 : 8; return i % step === 0 ? p.label : ''; } } },
-        y: { grid: { color: '#363c44' }, ticks: { color: '#a3a9b0', callback: v => v + ' ct' } }
+        y: { grid: { color: TH('--border') }, ticks: { color: TH('--muted'), callback: v => v + ' ct' } }
       }
     },
     plugins: [bandPlugin]
@@ -467,12 +468,12 @@ function buildEnergyChart() {
         } }
       },
       scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { color: '#a3a9b0', autoSkip: false, maxRotation: 0,
+        x: { stacked: true, grid: { display: false }, ticks: { color: TH('--muted'), autoSkip: false, maxRotation: 0,
           callback(v) { const lab = this.getLabelForValue(v); if (!lab.endsWith(':00')) return ''; const hr = parseInt(lab, 10); const step = (energyChart && energyChart.width > 900) ? 2 : 3; return hr % step === 0 ? lab : ''; } } },
-        y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: 'kWh', color: '#a3a9b0' },
-          grid: { color: '#363c44' }, ticks: { color: '#a3a9b0' } },
-        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: '%', color: '#a3a9b0' },
-          grid: { drawOnChartArea: false }, ticks: { color: '#a3a9b0', callback: v => v + ' %' } }
+        y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: 'kWh', color: TH('--muted') },
+          grid: { color: TH('--border') }, ticks: { color: TH('--muted') } },
+        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: '%', color: TH('--muted') },
+          grid: { drawOnChartArea: false }, ticks: { color: TH('--muted'), callback: v => v + ' %' } }
       }
     }
   });
@@ -614,10 +615,10 @@ function buildFlowChart() {
         } }
       },
       scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { color: '#a3a9b0', autoSkip: false, maxRotation: 0,
+        x: { stacked: true, grid: { display: false }, ticks: { color: TH('--muted'), autoSkip: false, maxRotation: 0,
           callback(v) { const lab = this.getLabelForValue(v); if (!lab.endsWith(':00')) return ''; const hr = parseInt(lab, 10); const step = (flowChart && flowChart.width > 900) ? 2 : 3; return hr % step === 0 ? lab : ''; } } },
-        y: { stacked: true, title: { display: true, text: 'kWh', color: '#a3a9b0' },
-          grid: { color: '#363c44' }, ticks: { color: '#a3a9b0' } }
+        y: { stacked: true, title: { display: true, text: 'kWh', color: TH('--muted') },
+          grid: { color: TH('--border') }, ticks: { color: TH('--muted') } }
       }
     }
   });
@@ -1856,10 +1857,10 @@ function renderPlansim() {
         label: it => it.dataset.label === 'Simulation lädt' ? (it.parsed.y ? `Simulation lädt: ${it.parsed.y.toFixed(2)} kWh` : null) : `${it.dataset.label}: ${it.parsed.y.toFixed(0)} %`,
         footer: it => { const i = it[0].dataIndex, x = psData.result; return `Preis ${x.prices[i]} ct · Solar ${x.pv_kwh[i]} kWh · Verbrauch ${x.cons_kwh[i]} kWh`; } } } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#a3a9b0', autoSkip: false, maxRotation: 0,
+        x: { grid: { display: false }, ticks: { color: TH('--muted'), autoSkip: false, maxRotation: 0,
           callback(v) { const l = this.getLabelForValue(v); if (!l.endsWith(':00')) return ''; return parseInt(l, 10) % 4 === 0 ? l : ''; } } },
-        y: { position: 'left', min: 0, max: 100, title: { display: true, text: 'Akku %', color: '#a3a9b0' }, grid: { color: '#363c44' }, ticks: { color: '#a3a9b0', callback: v => v + ' %' } },
-        y2: { position: 'right', beginAtZero: true, suggestedMax: 1, title: { display: true, text: 'Laden kWh', color: '#a3a9b0' }, grid: { drawOnChartArea: false }, ticks: { color: '#a3a9b0' } } } } });
+        y: { position: 'left', min: 0, max: 100, title: { display: true, text: 'Akku %', color: TH('--muted') }, grid: { color: TH('--border') }, ticks: { color: TH('--muted'), callback: v => v + ' %' } },
+        y2: { position: 'right', beginAtZero: true, suggestedMax: 1, title: { display: true, text: 'Laden kWh', color: TH('--muted') }, grid: { drawOnChartArea: false }, ticks: { color: TH('--muted') } } } } });
   if (!psChart) psChart = setup();
   psChart.data.labels = labels;
   psChart.data.datasets[0].data = r.sim.charge_kwh.map(v => v > 0 ? v : null);

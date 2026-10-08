@@ -1,0 +1,12 @@
+/* Helles Theme: ueberschreibt nur die Farbvariablen (dunkel = Standard in den Seiten selbst). */
+:root { color-scheme: dark; }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f4f7; --card: #ffffff; --card2: #eef1f5; --fg: #1d2630; --muted: #5d6978; --border: #d6dce4;
+  --accent: #005fbe; --accent-t: #0a58b4; --brand: #e07a10; --brand2: #005fbe; --on: #005fbe; --glow: rgba(0,95,190,.28);
+  --green: #1e9e5b; --blue: #0a58b4; --red: #d23a2f; --cheap: #1e9e5b; --normal: #2f7fb8; --exp: #e07a10; --vexp: #d23a2f;
+  --plan: #8a4fd6; --timer: #b98200;
+  --tint: rgba(0,0,0,.035); --navbg: rgba(242,244,247,.8); --sheen: rgba(255,255,255,0); --scroll: #b9c2cd;
+}
+:root[data-theme="light"] .card { box-shadow: 0 4px 16px rgba(20,40,70,.08); }
+:root[data-theme="light"] header { box-shadow: 0 1px 0 rgba(20,40,70,.04); }

@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
   <script src="{{ url_for('static', filename='sortable.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ app_display_name }}{% endblock %}</title>
@@ -11,6 +12,7 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
   <meta name="theme-color" content="#1b1f24">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,7 +20,7 @@
   <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
   <style>
     :root {
-      --bg: #121519; --card: #1b1f24; --card2: #252a30;
+      --bg: #121519; --card: #1b1f24; --card2: #252a30; --tint: rgba(255,255,255,.04); --sheen: rgba(255,255,255,.025); --scroll: #4a5059; --navbg: rgba(18,21,25,.35);
       --fg: #f2f3f5; --muted: #a3a9b0; --accent: #005fbe; --accent-t: #4b9be6; --border: #363c44;
       /* Signaturfarben: Orange (MA-Multiservice) + Victron-Blau. Orange = Hauptaktion/Warnung, Blau = aktiv/Auswahl/Links */
       --brand: #f48c24; --brand2: #005fbe; --on: #005fbe; --glow: rgba(0,95,190,.5);
@@ -63,7 +65,7 @@
       header { padding: 12px 14px; }
       .card { padding: 14px; }
     }
-    .card { background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0) 60px), var(--card); border: 1px solid var(--border);
+    .card { background: linear-gradient(180deg, var(--sheen), rgba(255,255,255,0) 60px), var(--card); border: 1px solid var(--border);
       border-radius: 16px; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.22);
       overflow: hidden; min-width: 0; }   /* breite Inhalte (Graph/Tabellen) einsperren */
     .card h2 { margin: 0 0 12px; font-size: 14px; color: var(--muted);
@@ -119,7 +121,7 @@
     #week-table td, #month-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #week-table td:first-child, #month-table td:first-child { width: 20%; }
     tr.clickable { cursor: pointer; }
-    tr.clickable:hover td { background: rgba(255,255,255,.04); }
+    tr.clickable:hover td { background: var(--tint); }
     tr.clickable.sel td { background: rgba(60,162,203,.14); }
     #flow-card { scroll-margin-top: 70px; }
     tr.total td { border-top: 2px solid var(--muted); border-bottom: none;
@@ -128,10 +130,10 @@
       font-size: 12px; letter-spacing: .04em; }
     /* Tabellen auf dem Handy horizontal scrollbar statt gequetscht */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin; scrollbar-color: #4a5059 transparent; }
+      scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
     .table-scroll::-webkit-scrollbar { height: 8px; }
     .table-scroll::-webkit-scrollbar-track { background: transparent; }
-    .table-scroll::-webkit-scrollbar-thumb { background: #4a5059; border-radius: 4px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
     @media (max-width: 640px) {
       #charge-log, #ev-list { table-layout: auto; font-size: 12px; }
       #charge-log { min-width: 0; }          /* passt meist ohne Scrollen */
@@ -164,10 +166,10 @@
     .sw-plan { background: transparent; border: 2px solid var(--plan); }
     /* Kurve mit Scroll (schmale Ansicht) + Drag-Auswahl */
     .chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
-      margin-top: 12px; max-width: 100%; scrollbar-width: thin; scrollbar-color: #4a5059 transparent; }
+      margin-top: 12px; max-width: 100%; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
     .chart-scroll::-webkit-scrollbar { height: 8px; }
     .chart-scroll::-webkit-scrollbar-track { background: transparent; }
-    .chart-scroll::-webkit-scrollbar-thumb { background: #4a5059; border-radius: 4px; }
+    .chart-scroll::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
     .chart-inner { height: 300px; width: 100%; }
     /* Handy: Kurve doppelt so breit -> ~12 h sichtbar, Rest seitlich scrollen.
        Feste CSS-Breite statt JS verhindert das Aufschaukeln von Chart.js. */
@@ -181,7 +183,7 @@
       background: #e5544a; color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px var(--bg, #121519); }
     .log-badge[hidden] { display: none; }
     input[type=range] { padding: 0; margin: 0; border: 0; background: transparent; height: 24px; accent-color: var(--accent, #005fbe); cursor: pointer; }      /* Schieberegler: volle Laenge, links = Minimum, rechts = Maximum (nicht wie ein Textfeld mit Innenabstand) */
-    input, select, textarea { color-scheme: dark; }      /* native Bedienelemente (Zeit-/Zahlenfelder, Auswahllisten) im dunklen Stil */
+    input, select, textarea { color-scheme: inherit; }      /* native Bedienelemente (Zeit-/Zahlenfelder, Auswahllisten) im dunklen Stil */
     .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
     .chip input { display:none; }
     .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
