@@ -7,6 +7,11 @@
   <title>{{ title }}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <meta name="theme-color" content="#1b1f24">
+  {% if og %}<meta name="description" content="{{ og.text }}">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ app_display_name }}">
+  <meta property="og:title" content="{{ og.title }}"><meta property="og:description" content="{{ og.text }}">
+  <meta property="og:image" content="{{ og.image }}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">{% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <style>

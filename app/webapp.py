@@ -592,6 +592,12 @@ def _nfc_cookie(resp, token: str):
     return resp
 
 
+def _og(title: str, text: str) -> dict:
+    """Vorschau fuer Link-Vorschauen (WhatsApp, Telegram, Signal ...): Titel, kurzer Text, Bild - ohne personenbezogene Angaben."""
+    base = ("https" if request_is_https() else "http") + "://" + request.host
+    return {"title": title, "text": text, "image": base + "/static/og-image.png"}
+
+
 def _nfc_page(ok: bool, title: str, text: str, code: int = 200):
     resp = make_response(render_template("nfc_result.html", ok=ok, title=title, text=text), code)
     resp.headers["Cache-Control"] = "no-store"
@@ -602,7 +608,8 @@ def _nfc_page(ok: bool, title: str, text: str, code: int = 200):
 def nfc_index():
     """Oeffentliche Einrichtungsseite fuer Handys, die nur NFC-Tags nutzen: App installieren (ohne Anmeldung) und sehen, ob dieses Handy registriert ist."""
     phone = nfc.identify(request.cookies.get(nfc.COOKIE, ""))
-    resp = make_response(render_template("nfc_install.html", phone=phone["name"] if phone else None, smarthome=store.module_on("smarthome")))
+    resp = make_response(render_template("nfc_install.html", phone=phone["name"] if phone else None, smarthome=store.module_on("smarthome"),
+                                           og=_og(f"{store.default_app_name()} – NFC einrichten", "App installieren und Handy für NFC-Tags nutzen: Handy an den Tag halten, fertig.")))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -640,7 +647,8 @@ def nfc_pair(code):
         info = nfc.pair_peek(code)
         if not info:
             return _nfc_page(False, "Link ungültig", "Der Registrierungs-Link ist abgelaufen oder wurde schon benutzt. Bitte in der App einen neuen erzeugen.", 410)
-        resp = make_response(render_template("nfc_result.html", ok=True, title="Handy registrieren?", text=f"Dieses Handy als „{info}“ für NFC-Tags registrieren.", confirm=True))
+        resp = make_response(render_template("nfc_result.html", ok=True, title="Handy registrieren?", text=f"Dieses Handy als „{info}“ für NFC-Tags registrieren.", confirm=True,
+                                           og=_og(f"{store.default_app_name()} – Handy registrieren", "Mit diesem persönlichen Link registrierst du dein Handy für NFC-Tags. Der Link ist 15 Minuten gültig und nur einmal benutzbar.")))
         resp.headers["Cache-Control"] = "no-store"
         return resp
     got = nfc.pair_use(code)
