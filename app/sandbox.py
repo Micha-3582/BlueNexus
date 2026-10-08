@@ -8,7 +8,7 @@ import ipaddress
 import os
 import socket
 
-ACTIVE = "1" in (os.environ.get("BLUENEXUS_SANDBOX"), os.environ.get("HOMENEXUS_SANDBOX"))
+ACTIVE = os.environ.get("BLUENEXUS_SANDBOX") == "1"
 _done = False
 
 

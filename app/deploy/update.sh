@@ -6,10 +6,7 @@
 #   sudo /opt/bluenexus/app/deploy/update.sh
 #
 set -euo pipefail
-# Alte Installationen (vor der Umbenennung) behalten ihre bisherigen Namen
-if [ ! -d /opt/bluenexus ] && [ -d /opt/homenexus ]; then DEF_DIR=/opt/homenexus; DEF_USER=homenexus; DEF_SVC=homenexus          # frühere Installation unter altem Namen
-elif [ ! -d /opt/bluenexus ] && [ -d /opt/victron-steuerung ]; then DEF_DIR=/opt/victron-steuerung; DEF_USER=victron; DEF_SVC=victron-steuerung
-else DEF_DIR=/opt/bluenexus; DEF_USER=bluenexus; DEF_SVC=bluenexus; fi
+DEF_DIR=/opt/bluenexus; DEF_USER=bluenexus; DEF_SVC=bluenexus
 INSTALL_DIR="${INSTALL_DIR:-$DEF_DIR}"
 SERVICE_USER="${SERVICE_USER:-$DEF_USER}"
 SERVICE="$DEF_SVC"

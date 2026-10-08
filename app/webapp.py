@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Victron Standalone Steuerung - Web-App
+BlueNexus - Web-App
 ======================================
 Mobile Web-Oberfläche + integrierter Regler (Scheduler-Thread).
 - Dashboard: Status, Preis-Kurve, Plan, manueller Override, E-Auto-Termine
@@ -815,14 +815,14 @@ def service_worker():
 def manifest():
     """PWA-Manifest mit personalisiertem Namen, damit mehrere installierte
     Instanzen (eigene Anlage, Anlage der Mutter, ...) auf dem Homescreen
-    unterscheidbar sind - statt bei allen "Victron Steuerung" zu zeigen."""
+    unterscheidbar sind - statt bei allen "BlueNexus" zu zeigen."""
     path = os.path.join(app.static_folder, "manifest.webmanifest")
     with open(path, encoding="utf-8") as f:
         m = json.load(f)
     name = store.default_app_name()
     m["name"] = name
     # Voller Name auch als Kurzname - eigenmaechtiges Abschneiden (z.B. auf
-    # 12 Zeichen) reisst bei "Mamas Victron Steuerung" nur "Mamas" heraus.
+    # 12 Zeichen) reisst bei "Mamas BlueNexus" nur "Mamas" heraus.
     # Das Betriebssystem bricht/kuerzt lange Homescreen-Labels selbst sinnvoll.
     m["short_name"] = name
     resp = jsonify(m)

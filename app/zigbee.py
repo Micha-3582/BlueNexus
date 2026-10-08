@@ -243,7 +243,7 @@ def pair(host: str, name: str = "", gw_id: str = "") -> str:
     """Schluessel vom Gateway holen (in Phoscon vorher "App autorisieren"). Speichert Adresse und Schluessel."""
     ip, port = _split_host(host)
     try:
-        r = _http.post(f"http://{ip}:{port}/api", json={"devicetype": "victron-steuerung"}, timeout=CALL_TIMEOUT)
+        r = _http.post(f"http://{ip}:{port}/api", json={"devicetype": "bluenexus"}, timeout=CALL_TIMEOUT)
     except requests.RequestException as e:
         raise ZigbeeError(f"Gateway nicht erreichbar: {e}")
     try:

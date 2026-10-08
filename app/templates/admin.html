@@ -754,7 +754,7 @@
   <h3 style="margin:18px 0 6px;font-size:14px">Sicherung einspielen</h3>
   <div class="muted" style="margin-bottom:8px">Ersetzt alle aktuellen Einstellungen und Konten <span class="qhelp" role="button" tabindex="0" data-help="Der bisherige Stand wird vorher im Ordner app/backups abgelegt. Danach startet die App neu und du meldest dich mit den Konten der Sicherung an.">?</span></div>
   <div class="grid2">
-    <div><label>Sicherungsdatei <span class="qhelp" role="button" tabindex="0" data-help="Datei mit der Endung .hnx aus einer früheren Sicherung.">?</span></label><input id="bk-file" type="file" accept=".hnx,application/octet-stream"></div>
+    <div><label>Sicherungsdatei <span class="qhelp" role="button" tabindex="0" data-help="Datei mit der Endung .bnx aus einer früheren Sicherung.">?</span></label><input id="bk-file" type="file" accept=".hnx,application/octet-stream"></div>
     <div><label>Passwort der Sicherung <span class="qhelp" role="button" tabindex="0" data-help="Das Passwort, das beim Erstellen der Sicherung vergeben wurde.">?</span></label><div class="pw-wrap"><input id="bk-pw2" type="password" autocomplete="off"><button type="button" class="pw-toggle" data-for="bk-pw2" aria-label="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
   </div>
   <div style="margin-top:10px"><button id="bk-import" class="ghost" type="button">Prüfen und einspielen …</button></div>
@@ -2925,7 +2925,7 @@ document.getElementById('bk-export').addEventListener('click', async () => {
   try {
     const r = await fetch('/api/backup/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw, include_data: document.getElementById('bk-data').checked }) });
     if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || ('Fehler ' + r.status)); }
-    const name = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'Sicherung.hnx';
+    const name = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'Sicherung.bnx';
     const url = URL.createObjectURL(await r.blob());
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);

@@ -1,7 +1,7 @@
 """Sicherung und Wiederherstellung aller Einstellungen als EINE verschluesselte Datei (ohne Terminal/SSH).
 
 Die Sicherung enthaelt Konten, Zugangsdaten, Geraete, Regeln usw. - deshalb ist sie immer mit einem Passwort verschluesselt
-(AES-256-GCM, Schluessel per scrypt aus dem Passwort). Format: b"HNXB1" + Salz(16) + Nonce(12) + verschluesselter ZIP + Tag(16).
+(AES-256-GCM, Schluessel per scrypt aus dem Passwort). Format: b"BNXB1" + Salz(16) + Nonce(12) + verschluesselter ZIP + Tag(16).
 """
 import io
 import json
@@ -16,7 +16,8 @@ from datetime import datetime
 
 import store
 
-MAGIC = b"HNXB1"
+MAGIC = b"BNXB1"
+LEGACY_MAGIC = b"HNXB1"                      # Sicherungen aus der Zeit vor der Umbenennung bleiben einspielbar
 FORMAT = 1
 MIN_PASSWORD = 8
 MAX_UNPACKED = 2 * 1024 ** 3                      # Schutz vor ZIP-Bomben
@@ -69,12 +70,13 @@ def _encrypt(data: bytes, password: str) -> bytes:
 
 def _decrypt(blob: bytes, password: str) -> bytes:
     AES, _, _ = _crypto()
-    if len(blob) < len(MAGIC) + 16 + 12 + 16 or not blob.startswith(MAGIC):
+    magic = MAGIC if blob.startswith(MAGIC) else (LEGACY_MAGIC if blob.startswith(LEGACY_MAGIC) else None)
+    if magic is None or len(blob) < len(magic) + 16 + 12 + 16:
         raise BackupError("Das ist keine Sicherungsdatei dieser App.")
     salt, nonce = blob[5:21], blob[21:33]
     ct, tag = blob[33:-16], blob[-16:]
     c = AES.new(_key(password, salt), AES.MODE_GCM, nonce=nonce)
-    c.update(MAGIC)
+    c.update(magic)
     try:
         return c.decrypt_and_verify(ct, tag)
     except ValueError:
@@ -129,7 +131,7 @@ def create_backup(password: str, include_data: bool, base_dir: str) -> tuple:
         z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1))
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     safe = re.sub(r"[^A-Za-z0-9]+", "-", store.default_app_name(cfg)).strip("-") or "BlueNexus"
-    return _encrypt(buf.getvalue(), password), "%s-Sicherung-%s.hnx" % (safe, stamp)
+    return _encrypt(buf.getvalue(), password), "%s-Sicherung-%s.bnx" % (safe, stamp)
 
 
 def _version(base_dir: str) -> str:

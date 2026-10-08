@@ -1,19 +1,19 @@
-// pm2-Konfiguration - gleiches Muster wie Tibbertimer/Chogan auf demselben Server.
-// Start:  cd /root/Victron_Steuerung/app && pm2 start ecosystem.config.js && pm2 save
+// pm2-Konfiguration fuer BlueNexus (laeuft an jedem Ort, an dem das Repo liegt).
+// Start:  cd <Ordner>/app && pm2 start ecosystem.config.js && pm2 save
 //
-// Voraussetzung: Code per git nach /root/Victron_Steuerung geklont und venv
-// unter /root/Victron_Steuerung/app/venv angelegt (siehe DEPLOY-Proxmox.md).
+// Voraussetzung: Code per git geklont und die Python-Umgebung unter app/venv angelegt (siehe app/DEPLOY-Proxmox.md).
+const path = require('path');
 
 module.exports = {
   apps: [
     {
-      name: 'victron-steuerung',
-      cwd: '/root/Victron_Steuerung/app',
+      name: 'bluenexus',
+      cwd: __dirname,
       script: 'webapp.py',
-      interpreter: '/root/Victron_Steuerung/app/venv/bin/python',
+      interpreter: path.join(__dirname, 'venv', 'bin', 'python'),
       env: {
         PORT: 5005,
-        // Container laeuft auf UTC. Ohne das zeigen Preis-/Termin-Zeiten
+        // Server laufen oft auf UTC. Ohne das zeigen Preis-/Termin-Zeiten
         // verschoben an. Setzt die Zeitzone nur fuer diesen Prozess.
         TZ: 'Europe/Berlin',
       },

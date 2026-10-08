@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Passwort fuer die Victron-Steuerung-App zuruecksetzen")
+    ap = argparse.ArgumentParser(description="Passwort fuer BlueNexus zuruecksetzen")
     ap.add_argument("--user", help="Benutzername (bei nur einem Konto nicht noetig)")
     ap.add_argument("--password", help="Neues Passwort (sonst interaktive, versteckte Eingabe)")
     args = ap.parse_args()

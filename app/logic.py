@@ -1,5 +1,5 @@
 """
-Victron Standalone Steuerung - Entscheidungslogik
+BlueNexus - Entscheidungslogik
 =================================================
 1:1-Portierung von victron_steuerung_v39.4.js (ioBroker) nach Python.
 
