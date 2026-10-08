@@ -323,6 +323,7 @@ def activate() -> None:
 
     wol.is_up = lambda ip: True
 
+    camera.ffmpeg_path = lambda: "demo"          # Live-Ansicht verfuegbar melden (der Demo-Strom braucht kein ffmpeg)
     camera.snapshot = _cam_snapshot
     camera.stream = _cam_stream
     camera.motion_states = lambda item, force=False: {"md": False, "people": False, "vehicle": False, "dog_cat": False,
