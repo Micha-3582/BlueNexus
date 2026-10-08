@@ -539,7 +539,8 @@
   <div id="virtual-list" style="display:flex;flex-direction:column;gap:6px"></div>
   <div class="admin-only" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input id="virt-name" placeholder="Name, z.B. Warmwasser-Timer" style="flex:1;min-width:200px" autocomplete="off">
-    <span class="qhelp" role="button" tabindex="0" data-help="Schalter bleibt an oder aus. Knopf wird gedrückt. Nachlauf-Timer läuft X Minuten und lässt sich neu starten.">?</span> <select id="virt-kind" style="width:auto"><option value="switch">Schalter (bleibt an/aus)</option><option value="button">Knopf (wird gedrückt)</option><option value="timer">Nachlauf-Timer (läuft X Minuten, neu startbar)</option></select>
+    <span class="qhelp" role="button" tabindex="0" data-help="Schalter bleibt an oder aus. Knopf wird gedrückt. Nachlauf-Timer läuft X Minuten und lässt sich neu starten.">?</span> <select id="virt-kind" style="width:auto"><option value="switch">Schalter (bleibt an/aus)</option><option value="button">Knopf (wird gedrückt)</option><option value="webhook">Knopf mit Web-Aufruf (ruft eine Adresse auf)</option><option value="timer">Nachlauf-Timer (läuft X Minuten, neu startbar)</option></select>
+    <span id="virt-url-wrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:260px"><input id="virt-url" type="password" placeholder="Adresse, die aufgerufen wird (bleibt geheim)" autocomplete="new-password" style="flex:1;min-width:200px"> <select id="virt-method" style="width:auto" title="Art des Aufrufs"><option value="GET">GET</option><option value="POST">POST</option></select></span>
     <span id="virt-min-wrap" style="display:none;align-items:center;gap:6px"><input id="virt-min" type="number" min="1" max="1440" step="1" value="3" style="width:80px" title="Nachlaufzeit in Minuten"> <span class="muted">Minuten</span></span>
     <button id="virt-add" class="ghost">Anlegen</button>
   </div>
@@ -2200,7 +2201,7 @@ async function loadVirtualAdmin() {
   document.getElementById('virtual-list').innerHTML = list.length ? list.map(v => { const vid = escH(v.id), isSw = v.kind === 'switch' || v.kind === 'timer'; return `<div data-sort-id="${vid}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${v.nfc ? `<button type="button" class="ghost icon-pick fixed" style="font-size:22px;padding:4px 10px" title="NFC-Tag – das Symbol ist fest" aria-disabled="true" tabindex="-1">${escH(v.icon)}</button>` : `<button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="virtPickIcon('${vid}')">${escH(v.icon)}</button>`}
-      <div style="flex:1;min-width:150px"><b>${escH(v.name)}</b><div class="muted">${VIRT_KIND[v.kind]}${v.kind === 'timer' ? ` · ${v.minutes} Min Nachlauf · ${v.on ? 'läuft noch ' + fmtMin(v.remaining_s || 0) : 'aus'}` : (isSw ? ' · ' + (v.on ? 'an' : 'aus') : '')}${v.pin_set ? ' · 🔒 PIN geschützt' : ''}</div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(v.name)}</b><div class="muted">${VIRT_KIND[v.kind]}${v.kind === 'timer' ? ` · ${v.minutes} Min Nachlauf · ${v.on ? 'läuft noch ' + fmtMin(v.remaining_s || 0) : 'aus'}` : (isSw ? ' · ' + (v.on ? 'an' : 'aus') : '')}${v.has_url ? ' · 🔗 Web-Aufruf' : ''}${v.pin_set ? ' · 🔒 PIN geschützt' : ''}</div></div>
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`virtPin('${vid}', ${v.pin_set ? 'true' : 'false'})`, !!v.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('vedit-${vid}')" title="Bearbeiten: Name, Dashboard, Entfernen">✎</button>
@@ -2211,6 +2212,9 @@ async function loadVirtualAdmin() {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="virtRenameSave('${vid}')">${I_CHECK}</button></div>`}
         ${v.kind === 'timer' ? `<div class="edit-row" style="margin-top:10px"><span class="muted">Nachlaufzeit</span><input id="vmin-${vid}" type="number" min="1" max="1440" step="1" value="${v.minutes}" style="width:80px"><span class="muted">Minuten</span>
           <button type="button" class="tgl" title="Nachlaufzeit speichern" aria-label="Nachlaufzeit speichern" onclick="virtPatch('${vid}', { minutes: document.getElementById('vmin-${vid}').value })">${I_CHECK}</button></div>` : ''}
+        ${v.kind === 'button' && !v.nfc ? `<div class="edit-row" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="muted">🔗 Web-Aufruf: ${v.has_url ? 'Adresse hinterlegt (aus Sicherheitsgründen nicht sichtbar)' : 'keine Adresse hinterlegt'}</span>
+          <button type="button" class="ghost" onclick="virtUrl('${vid}', ${v.has_url ? 'true' : 'false'})">${v.has_url ? 'Adresse ändern …' : 'Adresse hinterlegen …'}</button>
+          ${v.has_url ? `<select style="width:auto" title="Art des Aufrufs" onchange="virtPatch('${vid}', { method: this.value })"><option value="GET"${v.method !== 'POST' ? ' selected' : ''}>GET</option><option value="POST"${v.method === 'POST' ? ' selected' : ''}>POST</option></select>` : ''}</div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(v.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'virtual','${vid}','show','Dashboard')`)}
           ${visBtn('virtual', vid, v.users)}
@@ -2225,6 +2229,13 @@ function virtPickIcon(id) { const el = document.getElementById('vicons-' + id); 
 async function virtPatch(id, body) {
   try { await shellyApi('/api/virtual/' + encodeURIComponent(id), 'PATCH', body); savedToast(); } catch (e) { shellyMsg(e.message, true); }
   loadVirtualAdmin();
+}
+async function virtUrl(id, has) {
+  const url = await uiDialog({ title: 'Web-Aufruf', message: 'Beim Drücken ruft die Zentrale diese Adresse auf (GET oder POST), zum Beispiel einen Webhook oder ein anderes Smart-Home-System. Die Adresse wird nie angezeigt und steht auch nicht im Logbuch.' + (has ? ' Leer lassen und bestätigen entfernt den Aufruf.' : ''),
+    label: 'Adresse (http:// oder https://)', type: 'password', okText: has ? 'Speichern' : 'Hinterlegen' });
+  if (url === null) return;
+  if (!url.trim()) { if (has) await virtPatch(id, { clear_url: true }); return; }
+  await virtPatch(id, { url: url.trim() });
 }
 async function virtPin(id, has) {
   const pin = await uiDialog({ title: 'Sicherheits-PIN', message: 'Ist eine PIN gesetzt, fragt das Dashboard sie ab, bevor der Knopf bzw. Schalter reagiert. Regeln und Abläufe brauchen die PIN nicht.' + (has ? ' Leer lassen und bestätigen entfernt die PIN.' : ''),
@@ -2254,11 +2265,14 @@ async function virtRemove(id) {
   if (!await uiDialog({ title: 'Entfernen?', message: 'Regeln, die diesen Schalter benutzen, laufen dann nicht mehr, bis du sie anpasst.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/virtual/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadVirtualAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('virt-kind').addEventListener('change', e => { document.getElementById('virt-min-wrap').style.display = e.target.value === 'timer' ? 'inline-flex' : 'none'; });
+document.getElementById('virt-kind').addEventListener('change', e => { document.getElementById('virt-min-wrap').style.display = e.target.value === 'timer' ? 'inline-flex' : 'none'; document.getElementById('virt-url-wrap').style.display = e.target.value === 'webhook' ? 'inline-flex' : 'none'; });
 document.getElementById('virt-add').addEventListener('click', async () => {
   const name = document.getElementById('virt-name').value.trim();
   if (!name) { document.getElementById('virt-name').focus(); return; }
-  try { await shellyApi('/api/virtual', 'POST', { name, kind: document.getElementById('virt-kind').value, minutes: document.getElementById('virt-min').value }); document.getElementById('virt-name').value = ''; savedToast('Angelegt ✓'); }
+  const kind = document.getElementById('virt-kind').value, isHook = kind === 'webhook';
+  if (isHook && !document.getElementById('virt-url').value.trim()) { document.getElementById('virt-url').focus(); shellyMsg('Bitte die Adresse eintragen, die der Knopf aufrufen soll.', true); return; }
+  try { await shellyApi('/api/virtual', 'POST', { name, kind: isHook ? 'button' : kind, minutes: document.getElementById('virt-min').value, ...(isHook ? { url: document.getElementById('virt-url').value.trim(), method: document.getElementById('virt-method').value } : {}) });
+    document.getElementById('virt-name').value = ''; document.getElementById('virt-url').value = ''; savedToast('Angelegt ✓'); }
   catch (e) { shellyMsg(e.message, true); }
   loadVirtualAdmin();
 });

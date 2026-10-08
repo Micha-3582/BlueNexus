@@ -48,6 +48,7 @@ import virtual
 import visibility
 import camera
 import nfc
+import webhook
 import alexa
 import sun
 import wol
@@ -3799,7 +3800,9 @@ def api_virtual_add():
         return denied
     body = request.get_json(silent=True) or {}
     try:
-        return jsonify(virtual.add(body.get("name"), body.get("kind"), body.get("icon"), body.get("minutes"))), 201
+        return jsonify(virtual.public(virtual.add(body.get("name"), body.get("kind"), body.get("icon"), body.get("minutes"),
+                                                  url=body.get("url") if isinstance(body.get("url"), str) else None,
+                                                  method=body.get("method") if isinstance(body.get("method"), str) else None))), 201
     except virtual.VirtualError as e:
         return jsonify(error=str(e)), 400
 
@@ -4183,7 +4186,10 @@ def api_virtual_modify(vid):
             ok = virtual.update(vid, name=body.get("name") if isinstance(body.get("name"), str) else None,
                                 icon=body.get("icon") if isinstance(body.get("icon"), str) else None,
                                 show=body.get("show") if isinstance(body.get("show"), bool) else None,
-                                minutes=body.get("minutes") if body.get("minutes") not in (None, "") else None)
+                                minutes=body.get("minutes") if body.get("minutes") not in (None, "") else None,
+                                url=body.get("url") if isinstance(body.get("url"), str) and body.get("url").strip() else None,
+                                clear_url=body.get("clear_url") is True,
+                                method=body.get("method") if isinstance(body.get("method"), str) else None)
         except virtual.VirtualError as e:
             return jsonify(error=str(e)), 400
     return jsonify(ok=True) if ok else (jsonify(error="nicht gefunden"), 404)
@@ -4227,10 +4233,14 @@ def api_virtual_press(vid):
     blocked = _pin_gate(vid)
     if blocked:
         return blocked
+    t0 = time.time()
     if not virtual.press(vid):
         return jsonify(error="Knopf nicht gefunden"), 404
     opslog.log("rules", f"Eigener Knopf {next((v['name'] for v in virtual.load() if v['id'] == vid), vid)} gedrückt", dry=False)
     ctrl._rules_wake.set()
+    if any(v["id"] == vid and v.get("url") for v in virtual.load()):         # Knopf mit Web-Aufruf: kurz auf das Ergebnis warten (Adresse bleibt geheim)
+        res = webhook.result_since(vid, t0, 4.0)
+        return jsonify(ok=True, call=("läuft" if res is None else "ok" if res[0] else "fehler"), call_text=("" if res is None else res[1]))
     return jsonify(ok=True)
 
 

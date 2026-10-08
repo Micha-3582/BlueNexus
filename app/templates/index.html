@@ -1616,6 +1616,7 @@ function tickVirtual() {                          // Restzeit sekundengenau heru
 setInterval(tickVirtual, 1000);
 const fmtRemain = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : s >= 120 ? `${Math.floor(s / 60)} min` : `${s} s`;
 /* askPin(): PIN-Zahlenfeld, steht gemeinsam in base.html (auch fuer die Smart-Home-Verwaltung) */
+let virtualLastCall = null;                                   // Antwort des letzten Aufrufs (fuer Knoepfe mit Web-Aufruf)
 async function virtualCall(url, body, el, name, needsPin) {
   if (DASHBOARD_LEVEL !== 'write') { showToast('Dieses Konto darf nur ansehen, nicht schalten.'); loadVirtual(); return false; }
   body = body || {};
@@ -1629,7 +1630,7 @@ async function virtualCall(url, body, el, name, needsPin) {
     el.disabled = true; virtualTouched = Date.now();
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (r.ok) { virtualTouched = 0; loadVirtual(); return true; }
+      if (r.ok) { virtualLastCall = await r.json().catch(() => null); virtualTouched = 0; loadVirtual(); return true; }
       const j = await r.json().catch(() => ({}));
       if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; hint = 'Falsche PIN – bitte erneut'; needsPin = true; continue; }
       showToast(j.error || `Fehlgeschlagen (Server-Antwort ${r.status})`, true);
@@ -1641,7 +1642,13 @@ async function virtualCall(url, body, el, name, needsPin) {
 }
 const virtualItem = id => (virtualCache || []).find(v => v.id === id) || (wolCache || []).find(v => v.id === id) || {};
 const wolWake = (id, el) => virtualCall('/api/wol/' + encodeURIComponent(id) + '/wake', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => { if (ok) showToast('Aufwecken gesendet ✓'); });
-const virtualPress = (id, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/press', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => { if (ok) showToast('Gedrückt ✓'); });
+const virtualPress = (id, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/press', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => {
+  if (!ok) return;
+  const c = virtualLastCall && virtualLastCall.call;          // Knopf mit Web-Aufruf: Ergebnis zeigen (die Adresse selbst bleibt geheim)
+  if (c === 'fehler') showToast('Aufruf fehlgeschlagen' + (virtualLastCall.call_text ? ' – ' + virtualLastCall.call_text : ''), true);
+  else if (c === 'läuft') showToast('Aufruf gesendet …');
+  else showToast(c === 'ok' ? 'Ausgelöst ✓' : 'Gedrückt ✓');
+});
 const virtualSet = (id, on, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/set', { on }, el, virtualItem(id).name, !!virtualItem(id).pin_set);
 /* Meldungen im eigenen Stil statt Browser-Dialog (Fehler bleiben laenger stehen) */
 function showToast(text, isErr) {

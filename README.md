@@ -120,7 +120,7 @@ Smart Home. Die App läuft auch **ganz ohne Victron** als reines Smart-Home-Syst
 | **Zigbee** (Phoscon / deCONZ) | Aktoren, Sensoren, Thermostate | **Mehrere Gateways** (z. B. eins pro Haus) möglich |
 | **Klimaanlagen** (Midea, NetHome Plus; auch Comfee, Inventor, Pioneer u. a.) | Ein/Aus, Modus, Solltemperatur, Lüfter, Schwenken, Temperaturen | Lokal über die Gerätebibliothek, alternativ über die NetHome-Plus-Cloud (eigenes Konto) |
 | **Wake-on-LAN** | PC, NAS, Server aufwecken | Magic Packet, mit Erreichbarkeitsanzeige |
-| **Eigene Schalter und Knöpfe** | Merker, Auslöser, **Nachlauf-Timer** | Software-Schalter ohne Gerät dahinter, zum Verketten von Regeln |
+| **Eigene Schalter und Knöpfe** | Merker, Auslöser, **Nachlauf-Timer**, Knopf mit **geheimem Web-Aufruf** | Software-Schalter ohne Gerät dahinter, zum Verketten von Regeln |
 | **Kameras** | Standbild, Live-Bild, Bewegung, Klingel | Reolink und RTSP (siehe unten) |
 
 Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.

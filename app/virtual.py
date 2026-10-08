@@ -2,6 +2,7 @@
 Eigene Schalter und Knoepfe (reine Software, kein Geraet dahinter).
 
   button   Knopf: wird gedrueckt (Dashboard oder Regel-Aktion). Fuer Regeln ist "wird gedrueckt" ein kurzer Impuls.
+           Optional mit hinterlegter Web-Adresse (url, geheim, nie im Klartext an den Browser): beim Druecken wird sie aufgerufen (webhook.py).
   switch   Schalter mit Zustand an/aus (bleibt, bis jemand oder eine Regel ihn umschaltet).
   timer    Nachlauf-Timer: "an" = laeuft die eingestellte Zeit (Minuten), danach von selbst "aus". Jedes erneute Einschalten/Druecken startet die
            Zeit NEU (nachtriggerbar). Gemeinsamer Nachlauf fuer mehrere Ausloeser: viele Regeln starten den Timer, EINE Regel "Zustand halten"
@@ -9,7 +10,7 @@ Eigene Schalter und Knoepfe (reine Software, kein Geraet dahinter).
 
 Sie haben ihr eigenes Register (virtual.json) und erscheinen auf dem Dashboard in einer eigenen Kachel - getrennt von den
 Hardware-Geraeten. Regeln der Art "Ablauf" (flows.py) koennen sie als Ausloeser (WENN) und als Aktion (DANN) benutzen.
-Reine Logik ohne Netzwerk.
+Das Register selbst ist reine Logik; nur der optionale Web-Aufruf eines Knopfs geht ueber webhook.py (im Hintergrund).
 """
 from __future__ import annotations
 
@@ -64,7 +65,14 @@ def _running(it: dict, now: float | None = None) -> bool:
     return it.get("kind") == "timer" and float(it.get("until") or 0) > (now if now is not None else time.time())
 
 
-def add(name: str, kind: str, icon: str | None = None, minutes=None) -> dict:
+def _method(m) -> str:
+    m = str(m or "GET").strip().upper()
+    if m not in ("GET", "POST"):
+        raise VirtualError("Aufruf-Art: GET oder POST")
+    return m
+
+
+def add(name: str, kind: str, icon: str | None = None, minutes=None, url: str | None = None, method: str | None = None) -> dict:
     name = (name or "").strip()[:60]
     if not name:
         raise VirtualError("Name eingeben")
@@ -76,12 +84,25 @@ def add(name: str, kind: str, icon: str | None = None, minutes=None) -> dict:
                 "show": True, "on": False, "users": []}        # users=[]: zunaechst nur Administratoren (siehe visibility.py)
         if kind == "timer":
             item.update(minutes=_minutes(minutes), until=0.0)
+        if url:
+            if kind != "button":
+                raise VirtualError("Ein Web-Aufruf geht nur bei einem Knopf")
+            item.update(url=_url(url), method=_method(method))
         items.append(item)
         _save(items)
     return item
 
 
-def update(vid: str, name: str | None = None, icon: str | None = None, show: bool | None = None, minutes=None) -> bool:
+def _url(url: str) -> str:
+    import webhook
+    try:
+        return webhook.validate(url)
+    except webhook.WebhookError as e:
+        raise VirtualError(str(e))
+
+
+def update(vid: str, name: str | None = None, icon: str | None = None, show: bool | None = None, minutes=None,
+           url: str | None = None, clear_url: bool = False, method: str | None = None) -> bool:
     with _lock:
         items = load()
         for it in items:
@@ -94,6 +115,16 @@ def update(vid: str, name: str | None = None, icon: str | None = None, show: boo
                     it["show"] = bool(show)
                 if minutes is not None and it.get("kind") == "timer":
                     it["minutes"] = _minutes(minutes)
+                if (url or clear_url or method) and it.get("kind") != "button":
+                    raise VirtualError("Ein Web-Aufruf geht nur bei einem Knopf")
+                if url:
+                    it["url"] = _url(url)
+                    it.setdefault("method", "GET")
+                if clear_url:
+                    it.pop("url", None)
+                    it.pop("method", None)
+                if method and it.get("url"):
+                    it["method"] = _method(method)
                 _save(items)
                 return True
     return False
@@ -146,7 +177,13 @@ def check_pin(vid: str, pin) -> bool:
 
 
 def public(item: dict) -> dict:
-    return pins.strip(item)
+    """Fuer den Browser: ohne PIN-Hash und ohne die geheime Web-Adresse (nur "has_url" und die Art)."""
+    out = pins.strip(item)
+    if out.pop("url", None):
+        out["has_url"] = True
+    else:
+        out.pop("method", None)
+    return out
 
 
 def press(vid: str) -> bool:
@@ -159,6 +196,9 @@ def press(vid: str) -> bool:
         if not it or it["kind"] != "button":
             return False
         _pressed[vid] = time.time()
+        if it.get("url"):                                    # hinterlegte Web-Adresse aufrufen (im Hintergrund, Ergebnis im Logbuch)
+            import webhook
+            webhook.fire(vid, it["name"], it["url"], it.get("method", "GET"))
         return True
 
 
