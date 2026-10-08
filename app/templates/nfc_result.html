@@ -16,6 +16,7 @@
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <style>
     :root { --bg: #121519; --card: #1b1f24; --fg: #f2f3f5; --muted: #a3a9b0; --border: #363c44; }
+    *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
       background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), var(--bg); }

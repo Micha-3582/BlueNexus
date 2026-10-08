@@ -240,8 +240,10 @@ def set_base_url(url: str) -> str:
 
 
 # ---------------------------------------------------------------- Ausloesen
-def trigger(tid: str, token: str) -> dict:
-    """Ergebnis {ok, text, tag, phone, why}; 'why' = Grund bei Ablehnung: unknown_tag | unknown_phone | not_allowed | no_target | pin | debounced."""
+def trigger(tid: str, token: str, pin_ok=None) -> dict:
+    """Ergebnis {ok, text, tag, phone, why}; 'why' = Grund bei Ablehnung: unknown_tag | unknown_phone | not_allowed | no_target | need_pin | bad_pin | debounced.
+    Hat das Ziel eine PIN: ohne `pin_ok` -> why "need_pin" (die Seite fragt die PIN ab); mit `pin_ok(knopf_id) -> (ok, meldung)` wird sie geprueft
+    (Zaehler/Sperre liegen beim Aufrufer). Das Handy wird immer zuerst geprueft - ein fremdes Handy erreicht die PIN-Abfrage nie."""
     d = load()
     tag = next((t for t in d["tags"] if t["id"] == tid), None)
     phone = identify(token)
@@ -255,7 +257,11 @@ def trigger(tid: str, token: str) -> dict:
     if not it:
         return {"ok": False, "why": "no_target", "tag": tag["name"], "phone": phone["name"], "text": "Das Ziel dieses Tags existiert nicht mehr."}
     if it.get("pin_hash"):
-        return {"ok": False, "why": "pin", "tag": tag["name"], "phone": phone["name"], "text": "Das Ziel ist PIN-geschützt und lässt sich nicht per NFC auslösen."}
+        if pin_ok is None:
+            return {"ok": False, "why": "need_pin", "tag": tag["name"], "phone": phone["name"], "text": "Bitte die PIN eingeben."}
+        good, msg = pin_ok(it["id"])
+        if not good:
+            return {"ok": False, "why": "bad_pin", "tag": tag["name"], "phone": phone["name"], "text": msg}
     now = time.time()
     with _lock:
         if now - _last.get((tag["id"], phone["id"]), 0) < DEBOUNCE_S:

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>PIN eingeben · {{ app_display_name }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta name="theme-color" content="#1b1f24">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <style>
+    :root { --bg: #121519; --card: #1b1f24; --fg: #f2f3f5; --muted: #a3a9b0; --border: #363c44; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
+      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), var(--bg); }
+    .card { max-width: 380px; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 34px 26px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+    .sym { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; font-size: 38px; background: rgba(60,162,203,.16); box-shadow: 0 0 24px rgba(60,162,203,.35); }
+    h1 { font-size: 22px; margin: 0 0 8px; } p { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0; }
+    input { width: 100%; box-sizing: border-box; margin-top: 20px; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+      font-size: 30px; letter-spacing: 12px; text-align: center; }
+    input:focus { outline: none; border-color: #005fbe; box-shadow: 0 0 0 3px rgba(0,95,190,.35); }
+    button { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(180deg, #0a6fd3, #005fbe); cursor: pointer; }
+    .err { color: #e5544a; margin-top: 14px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="sym">🔒</div>
+    <h1>{{ title }}</h1>
+    <p>Bitte die PIN eingeben, um auszulösen.</p>
+    <form method="post" autocomplete="off">
+      <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="one-time-code" autofocus required aria-label="PIN">
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
+      <button type="submit">Auslösen</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -193,6 +193,7 @@ Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause un
   den du in Regeln als „WENN Knopf gedrückt“ verwendest.
 - **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
   und schließt sich die App beim Scannen von selbst.
+- **PIN-geschützte Ziele:** Nach dem Scannen fragt das Handy die PIN ab (Handy **und** PIN nötig, nach 5 Fehlversuchen gesperrt).
 - **Rechte:** eigener Bereich „Smart Home: NFC-Tags“. Ein Lese-Konto (z. B. Demo) sieht Tags, Handys und Freigaben, aber
   **keine Adressen**; verwalten darf nur, wer Schreibrecht hat.
 - Registrierungen gehören zur **Sicherung** und werden mit wiederhergestellt. Abgelehnte Versuche stehen im Logbuch.

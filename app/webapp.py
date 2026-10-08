@@ -616,7 +616,7 @@ def nfc_index():
     return resp
 
 
-@app.route("/nfc/<tid>", methods=["GET"])
+@app.route("/nfc/<tid>", methods=["GET", "POST"])
 def nfc_tag(tid):
     if request.method == "HEAD":
         return "", 204                                                         # Vorabruf durch Browser/Apps loest nichts aus
@@ -627,7 +627,23 @@ def nfc_tag(tid):
     ip = client_ip()
     if too_many_attempts(ip):
         return _nfc_page(False, "Zu viele Versuche", "Bitte einige Minuten warten.", 429)
-    r = nfc.trigger(tid, request.cookies.get(nfc.COOKIE, ""))
+    pin_check = None
+    if request.method == "POST":                                                # PIN-Eingabe nach dem Scannen (Ziel des Tags ist PIN-geschuetzt)
+        form_pin = (request.form.get("pin") or "").strip()[:12]
+
+        def pin_check(vid, _pin=form_pin):
+            blocked = _pin_gate(vid, pin=_pin)                                    # gleiche Zaehler und Sperre (5 Fehlversuche, 5 Minuten) wie am Dashboard
+            if blocked is None:
+                return True, ""
+            return False, blocked[0].get_json().get("error", "PIN falsch")
+    r = nfc.trigger(tid, request.cookies.get(nfc.COOKIE, ""), pin_check)
+    if r["why"] in ("need_pin", "bad_pin"):                                      # Handy ist registriert und erlaubt - jetzt die PIN abfragen
+        if r["why"] == "bad_pin":
+            note_failed_attempt(ip)
+            opslog.log("rules", f"NFC-Tag „{r['tag']}“ von „{r['phone']}“: PIN falsch oder gesperrt", dry=False)
+        resp = make_response(render_template("nfc_pin.html", title=r["tag"], error=(r["text"] if r["why"] == "bad_pin" else "")), 429 if "Zu viele" in r["text"] else (403 if r["why"] == "bad_pin" else 200))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
     if r["ok"]:
         if r["why"] != "debounced":
             opslog.log("rules", f"NFC-Tag „{r['tag']}“ von „{r['phone']}“ ausgelöst: {r['text'].split(' – ', 1)[-1]}", dry=False)
@@ -636,7 +652,7 @@ def nfc_tag(tid):
     note_failed_attempt(ip)
     if r["why"] in ("unknown_phone", "not_allowed"):
         opslog.log("rules", f"NFC-Tag „{r.get('tag', '?')}“ abgelehnt: {r['text']}", dry=False)
-    return _nfc_page(False, "Nicht erlaubt" if r["why"] in ("unknown_phone", "not_allowed", "pin") else "Nicht möglich", r["text"], 403 if r["why"] != "unknown_tag" else 404)
+    return _nfc_page(False, "Nicht erlaubt" if r["why"] in ("unknown_phone", "not_allowed") else "Nicht möglich", r["text"], 403 if r["why"] != "unknown_tag" else 404)
 
 
 @app.route("/nfc/pair/<code>", methods=["GET", "POST"])
@@ -4216,7 +4232,7 @@ _pin_fails: dict[str, list] = {}                          # schalter-id -> [Fehl
 PIN_MAX_FAILS, PIN_LOCK_S = 5, 300
 
 
-def _pin_gate(vid: str, has_fn=None, check_fn=None):
+def _pin_gate(vid: str, has_fn=None, check_fn=None, pin=None):
     """None = darf durch (keine PIN noetig oder richtig). Sonst eine Fehlerantwort (403/429). 5 Fehlversuche sperren den Schalter 5 Minuten.
     Standard: eigene Schalter/Knoepfe; mit has_fn/check_fn auch fuer Geraete (Schluessel mit Praefix, damit sich die Sperren nicht mischen)."""
     has_fn, check_fn = has_fn or virtual.has_pin, check_fn or virtual.check_pin
@@ -4229,7 +4245,7 @@ def _pin_gate(vid: str, has_fn=None, check_fn=None):
     if rec and now - rec[1] >= PIN_LOCK_S:
         _pin_fails.pop(vid, None)
         rec = None
-    pin = (request.get_json(silent=True) or {}).get("pin")
+    pin = pin if pin is not None else (request.get_json(silent=True) or {}).get("pin")
     if not pin:
         return jsonify(error="PIN erforderlich", pin_required=True), 403
     if check_fn(vid, str(pin)):
