@@ -926,8 +926,11 @@ def _probe_lock_channel(item: dict) -> dict | None:
         desc = _param_desc(item["interface"], item["address"])
     except HomematicError:
         return None
-    if _writable(desc.get("LOCK_TARGET_LEVEL")):
-        return {**item, "id": lock_id(item["address"])}
+    ctype = item.pop("ctype", "")
+    if _writable(desc.get("LOCK_TARGET_LEVEL")):                           # HomematicIP (HmIP-DLD): Zielstufe 0/1/2
+        return {**item, "id": lock_id(item["address"]), "lock_kind": "hmip"}
+    if "KEYMATIC" in ctype.upper() and _writable(desc.get("STATE")) and "OPEN" in desc:     # klassisches Keymatic (HM-Sec-Key, Funk BidCos): STATE + OPEN
+        return {**item, "id": lock_id(item["address"]), "lock_kind": "keymatic"}
     return None
 
 
@@ -945,10 +948,11 @@ def discover_locks(known_ids: set[str]) -> list[dict]:
     for dev in devices:
         dtype, dev_name = str(dev.get("type") or ""), str(dev.get("name") or "")
         for ch in dev["channels"]:
-            if "LOCK" not in str(ch.get("channelType") or "").upper():
+            ctype = str(ch.get("channelType") or "").upper()
+            if "LOCK" not in ctype and "KEYMATIC" not in ctype:
                 continue
             addr, ch_name = str(ch["address"]), str(ch.get("name") or "")
-            items.append({"address": addr, "interface": dev["interface"], "model": dtype,
+            items.append({"address": addr, "interface": dev["interface"], "model": dtype, "ctype": ctype,
                           "name": (dev_name if _is_default_name(ch_name, addr, dtype) else ch_name) or addr,
                           "room": rooms.get(str(ch.get("id")), "") or rooms.get(str(dev.get("id")), "")})
     with ThreadPoolExecutor(max_workers=4) as ex:
@@ -979,6 +983,7 @@ def add_locks(ids: list[str]) -> list[dict]:
         if i in have:
             continue
         item = {k: f[k] for k in ("id", "address", "interface", "model", "room", "name")}
+        item["lock_kind"] = f.get("lock_kind", "hmip")
         item["allow_open"] = False                         # Entriegeln/Oeffnen durch Regeln ist erst nach ausdruecklicher Freigabe moeglich
         items.append(item)
         added.append(item)
@@ -1012,6 +1017,11 @@ def remove_lock(lid: str) -> bool:
 def lock_state(x: dict):
     """True = verriegelt, False = entriegelt, None = unbekannt/nicht lesbar."""
     try:
+        if x.get("lock_kind") == "keymatic":                                # klassisches Keymatic: STATE wahr = entriegelt
+            v = _get_value(x["interface"], x["address"], "STATE")
+            if _unreach(x) or v is None:
+                return None
+            return not _truthy(v)
         t = str(_get_value(x["interface"], x["address"], "LOCK_STATE")).strip().upper()
         if _unreach(x):
             return None
@@ -1036,6 +1046,11 @@ def lock_action(lid: str, action: str) -> str:
         raise HomematicError("Türschloss existiert nicht mehr")
     if action != "lock" and not x.get("allow_open"):
         raise HomematicError(f"{x['name']}: Entriegeln/Öffnen durch Regeln ist nicht freigegeben (Smart Home → Sicherheit)")
+    if x.get("lock_kind") == "keymatic":                                    # klassisches Keymatic: verriegeln = STATE aus, entriegeln = STATE an, oeffnen = OPEN
+        key, val = ("OPEN", True) if action == "open" else ("STATE", action == "unlock")
+        _pushed.pop((x["interface"], x["address"], "STATE"), None)
+        _call("Interface.setValue", {"interface": x["interface"], "address": x["address"], "valueKey": key, "type": "bool", "value": val})
+        return x["name"]
     params = {"interface": x["interface"], "address": x["address"], "valueKey": "LOCK_TARGET_LEVEL", "value": LOCK_LEVELS[action]}
     _pushed.pop((x["interface"], x["address"], "LOCK_STATE"), None)
     try:

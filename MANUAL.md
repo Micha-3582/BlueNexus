@@ -357,9 +357,11 @@ Sensoren sind in Regeln als Bedingung nutzbar („WENN Sensor wahr/falsch“ bzw
 
 Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B. „alle Thermostate auf 25 °C“. Der Wert wird auf den Bereich des Geräts begrenzt (0 °C = „aus“, meist 4,5 °C).
 
-### Türschlösser (Homematic IP)
+### Türschlösser (Homematic IP und klassisches Keymatic)
 
 Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entriegeln und Öffnen** per Ablauf wird das Schloss unter „Türschlösser“ angelegt.
+
+**Klassisches Keymatic (Funk, z. B. HM-Sec-Key-S):** Wird bei der Schlosssuche (*Smart Home → Sicherheit*) ebenfalls gefunden und genauso angelegt. Der Zustand erscheint in der Schlossliste; *Verriegeln* und *Entriegeln* schalten den Riegel, *Öffnen* löst den Türöffner aus (Falle zurückziehen). Die Freigaben und Schutzregeln sind dieselben wie bei Homematic IP.
 
 > **Sicherheit:** *Entriegeln* und *Öffnen* sind erst erlaubt, wenn du das beim jeweiligen Schloss **ausdrücklich freigibst**. Sie funktionieren **nur in Abläufen** (nie in „Zustand halten“) und werden im **Trockenlauf nie ausgeführt**. *Verriegeln* ist immer erlaubt.
 

@@ -129,7 +129,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 
 - **Dimmen:** WLED-Lampen per Helligkeits-Regler.
 - **Rollläden:** auf Position fahren, anhalten, nach Sonnenstand automatisch abends zu und morgens auf.
-- **Türschlösser (HomematicIP):** öffnen, entriegeln, verriegeln – mit PIN und eigener Freigabe, ob Regeln öffnen dürfen.
+- **Türschlösser (HomematicIP und das klassische Keymatic):** öffnen, entriegeln, verriegeln – mit PIN und eigener Freigabe, ob Regeln öffnen dürfen.
 - **Homematic-Funk-Diagnose:** Duty Cycle der Funkmodule, gesprächigste Geräte, Befehle der App – plus ein Test „Homematic pausieren“, um den Verursacher von Funklast zu finden.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
 - **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel.
