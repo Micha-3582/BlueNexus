@@ -261,6 +261,12 @@ def activate() -> None:
     """Ersetzt die Netzwerk-Zugriffe auf Geraete/Kameras/CCU durch die Simulation (nur wenn BLUENEXUS_DEMO=1)."""
     if not ACTIVE:
         return
+    try:                                                    # Historie mitrutschen lassen (siehe demo_roll.py)
+        import demo_roll
+        demo_roll.roll(os.path.dirname(os.path.abspath(__file__)))
+    except Exception:                                       # noqa: BLE001 - die Demo muss auch ohne Verschiebung starten
+        import logging
+        logging.getLogger("demo_roll").exception("Historie konnte nicht verschoben werden")
     import camera
     import homematic
     import midea
