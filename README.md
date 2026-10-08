@@ -20,6 +20,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 |---|---|
 | ⚡ **Energie** | Victron Cerbo GX, Tibber-Strompreise, PV-Prognose, intelligente Ladeplanung, Überschuss-Automatik, Kosten und Ersparnis |
 | 🏠 **Smart Home** | Shelly, Tasmota, WLED, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
+| 🏷️ **NFC-Tags** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Nur registrierte Handys, auch unterwegs |
 | 🧠 **Regeln** | Grafischer Regel-Editor: WENN … DANN … SONST, Zeitpläne, Sonnenstand, Abläufe mit Timern, Telegram- und Pushover-Meldungen |
 | 📷 **Kameras** | Reolink und beliebige RTSP-Kameras: Standbild, Live-Bild, Bewegungs- und Klingel-Auslöser |
 | 🗣️ **Alexa** | Sprachsteuerung ohne Amazon-Entwicklerkonto – die App gibt sich im Heimnetz als Hue-Bridge aus |
@@ -37,6 +38,7 @@ Smart-Home-Zentrale mit Kameras – wer nur Energie will, blendet den Rest aus.
 - [Module](#module)
 - [Smart Home: unterstützte Geräte und Systeme](#smart-home-unterstützte-geräte-und-systeme)
 - [Regeln und Abläufe](#regeln-und-abläufe)
+- [NFC-Tags](#nfc-tags)
 - [Kameras](#kameras)
 - [Sprachsteuerung mit Alexa](#sprachsteuerung-mit-alexa)
 - [Benachrichtigungen](#benachrichtigungen)
@@ -174,6 +176,28 @@ Kamera-Standbild** · **Telegram mit Video zum Ereignis** (aus der SD-Karten-Auf
 - **Der Editor bietet nur an, was es bei dir gibt:** Systeme, die nicht eingerichtet oder abgewählt sind (z. B.
   keine Klimaanlage, kein Energie-Modul, keine Kamera), erscheinen nicht als Bedingung oder Schritt.
 - **Reaktionszeit** unter einer Sekunde mit Homematic-Push.
+
+---
+
+## NFC-Tags
+
+Ein günstiger **NFC-Aufkleber oder Schlüsselanhänger** wird zum physischen Knopf für dein Smart Home: Handy kurz
+daranhalten, und BlueNexus löst aus, was du in den Regeln festgelegt hast – Licht an, Garagentor, Gong im Haus,
+Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause und **unterwegs** über den Fernzugriff.
+
+- **Nur registrierte Handys.** Ein Tag trägt nur eine Internet-Adresse; ausgelöst wird erst, wenn das Handy der
+  Zentrale bekannt ist. Ein kopierter oder fotografierter Tag nützt niemandem.
+- **Registrieren** in Sekunden: direkt am Handy oder per Einmal-Link (15 Minuten gültig) für ein anderes Handy.
+  Verlorenes Handy? Mit einem Klick in der Liste löschen – sofort gesperrt.
+- **Pro Tag steuerbar**, welche Handys ihn nutzen dürfen. Jeder neue Tag legt automatisch einen eigenen Knopf (🏷️) an,
+  den du in Regeln als „WENN Knopf gedrückt“ verwendest.
+- **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
+  und schließt sich die App beim Scannen von selbst.
+- **Rechte:** eigener Bereich „Smart Home: NFC-Tags“. Ein Lese-Konto (z. B. Demo) sieht Tags, Handys und Freigaben, aber
+  **keine Adressen**; verwalten darf nur, wer Schreibrecht hat.
+- Registrierungen gehören zur **Sicherung** und werden mit wiederhergestellt. Abgelehnte Versuche stehen im Logbuch.
+- Erprobt mit **Android**; geeignet sind NFC-Tags nach NTAG/MIFARE-Standard (13,56 MHz). Einrichtung unter *Smart Home → NFC-Tags*,
+  ausführlich im [Handbuch](MANUAL.md#13c-nfc-tags-handy-scannen-knopf-auslösen).
 
 ---
 
