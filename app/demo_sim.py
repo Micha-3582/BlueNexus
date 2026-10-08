@@ -389,8 +389,22 @@ def activate() -> None:
     zigbee.set_setpoint = lambda sp, value: min(float(sp.get("max", 30)), max(float(sp.get("min", 5)), float(value)))
 
     wol.is_up = lambda ip: True
+    import sandbox
     import weather
-    weather.forecast = _weather_forecast
+    _real_weather = weather.forecast
+
+    def _weather_live(force: bool = False) -> dict:
+        """Echtes Wetter von Open-Meteo (einzige Ausnahme vom Testmodus, nur dieser Thread); bei Fehler die Simulation."""
+        try:
+            with sandbox.allow_outbound():
+                d = _real_weather(force)
+            if d.get("configured") and not d.get("error") and d.get("daily"):
+                return d
+        except Exception:                                   # noqa: BLE001
+            pass
+        return _weather_forecast(force)
+
+    weather.forecast = _weather_live
 
     camera.ffmpeg_path = lambda: "demo"          # Live-Ansicht verfuegbar melden (der Demo-Strom braucht kein ffmpeg)
     camera.snapshot = _cam_snapshot

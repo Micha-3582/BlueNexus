@@ -7,9 +7,24 @@ oder gesendet, und die echte Anlage merkt nichts davon.
 import ipaddress
 import os
 import socket
+import threading
+from contextlib import contextmanager
 
 ACTIVE = os.environ.get("BLUENEXUS_SANDBOX") == "1"
 _done = False
+
+
+_tl = threading.local()
+
+
+@contextmanager
+def allow_outbound():
+    """Erlaubt NUR dem aufrufenden Thread, waehrend des Blocks Verbindungen nach aussen (nur fuer gezielte Ausnahmen, z. B. Wetter in der Demo)."""
+    _tl.allow = True
+    try:
+        yield
+    finally:
+        _tl.allow = False
 
 
 def _local(addr) -> bool:
@@ -30,7 +45,7 @@ def _local(addr) -> bool:
 def _guard(orig, idx_addr):
     def wrapper(self, *args, **kw):
         addr = args[idx_addr(args)] if args else None
-        if not _local(addr):
+        if not _local(addr) and not getattr(_tl, "allow", False):
             raise OSError(101, "Testmodus: Verbindungen nach außen sind gesperrt (%s)" % (addr[0] if isinstance(addr, tuple) else addr))
         return orig(self, *args, **kw)
     return wrapper
