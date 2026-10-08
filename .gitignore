@@ -62,3 +62,7 @@ app/cloudflare_tunnel.json
 app/cloudflared.pid
 app/bin/
 app/nfc.json
+
+# Demo-Daten (echte Verlaufsdaten, nie ins oeffentliche Repo)
+demo-quelle/
+app/demo_data.json

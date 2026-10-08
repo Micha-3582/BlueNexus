@@ -287,3 +287,10 @@ class Cerbo:
             return True
         finally:
             c.close()
+
+
+# Demo-Modus (BLUENEXUS_DEMO=1): erfundener Cerbo statt echtem Geraet (siehe demo.py)
+import os as _os
+if _os.environ.get("BLUENEXUS_DEMO") == "1":
+    from demo import _make_cerbo
+    Cerbo = _make_cerbo()

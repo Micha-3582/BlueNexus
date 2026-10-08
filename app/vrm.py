@@ -397,3 +397,11 @@ def control_forecast(vf: dict, now: datetime, measured_today_kwh: float) -> tupl
         return None, "PV-Prognose (VRM) veraltet" + why + " – Rückfall auf Open-Meteo"
     tom = vf["tomorrow_kwh"] if any(h["day"] == "tomorrow" for h in hours) else None
     return {"today_kwh": round(measured_today_kwh + vf["remaining_today_kwh"], 2), "tomorrow_kwh": tom}, None
+
+
+# Demo-Modus (BLUENEXUS_DEMO=1): erfundene PV-Prognose (siehe demo.py)
+if os.environ.get("BLUENEXUS_DEMO") == "1":
+    from demo import vrm_forecast as _demo_forecast
+
+    def forecast(force: bool = False) -> dict:
+        return _demo_forecast()

@@ -66,6 +66,9 @@ def fetch_tibber_prices(token, timeout=15):
     Versucht Viertelstunden (falls Tibber sie irgendwann im PriceResolution-Enum
     freischaltet) und fällt sonst sauber auf Stundenwerte zurück.
     Stand 2026-07: die öffentliche API kennt nur HOURLY/DAILY -> Stundenwerte."""
+    if os.environ.get("BLUENEXUS_DEMO") == "1":          # Demo-Modus: erfundene Preise (demo.py)
+        from demo import demo_prices
+        return demo_prices()
     try:
         pi = _post(token, TIBBER_QUERY_QUARTER, timeout)
         combined = list(pi.get("today") or []) + list(pi.get("tomorrow") or [])
