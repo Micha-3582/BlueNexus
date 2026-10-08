@@ -10,7 +10,7 @@
   .rg { margin: 0; }
   .rg-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card2); cursor: pointer; font-weight: 600; font-size: 15px; }
   .rg-head:hover { border-color: var(--accent); }
-  .rg-head .chev { display: inline-block; color: var(--accent); transition: transform .15s; }
+  .rg-head .chev { display: inline-block; color: var(--accent-t); transition: transform .15s; }
   .rg.open > .rg-head .chev { transform: rotate(90deg); }
   .rg-head .cnt { color: var(--muted); font-weight: 400; font-size: 13px; }
   .rg-act { margin-left: auto; display: flex; gap: 6px; }
@@ -120,7 +120,7 @@ function uiPick(title, options) {                                // aus einer Li
       <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="ghost dlg-no">Abbrechen</button></div></div>`;
     ov.querySelector('h3').textContent = title;
     const box = ov.querySelector('.dlg-opts');
-    options.forEach(o => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.style.cssText = 'text-align:left;' + (o.cur ? 'border-color:var(--accent);color:var(--accent)' : ''); b.textContent = (o.cur ? '✓ ' : '') + o.label; b.onclick = () => close(o.v); box.appendChild(b); });
+    options.forEach(o => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.style.cssText = 'text-align:left;' + (o.cur ? 'border-color:var(--accent);color:var(--accent-t)' : ''); b.textContent = (o.cur ? '✓ ' : '') + o.label; b.onclick = () => close(o.v); box.appendChild(b); });
     const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
     const onKey = e => { if (e.key === 'Escape') close(null); };
     ov.querySelector('.dlg-no').onclick = () => close(null);

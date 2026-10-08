@@ -9,7 +9,7 @@
  *     opts    { legend: true, theme: 'dark' | 'light', onCreate(chart) }
  */
 window.VLChart = (function () {
-  var COLORS = ['#3ca2cb', '#35c07a', '#f0b429', '#e5544a', '#b57bee', '#2ec4b6', '#ff8fab', '#a0a8b8'];
+  var COLORS = ['#4b9be6', '#35c07a', '#f0b429', '#e5544a', '#b57bee', '#2ec4b6', '#ff8fab', '#a0a8b8'];
   var STEPS = [60e3, 300e3, 600e3, 900e3, 1800e3, 3600e3, 7200e3, 10800e3, 21600e3, 43200e3, 86400e3, 172800e3, 604800e3, 2592000e3];
 
   function niceTicks(t0, t1, want) {

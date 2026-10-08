@@ -28,8 +28,8 @@
     <span data-k="cprognose" style="display:none"><i class="sw sw-hatch-red"></i>Verbrauchsprognose (VRM)</span>
     <span data-k="solar"><i class="sw" style="background:#f48c24"></i>Solar</span>
     <span data-k="prognose" style="display:none"><i class="sw sw-hatch"></i>Solarprognose (VRM)</span>
-    <span data-k="soc"><i class="sw" style="background:#3ca2cb"></i>Batterie-SOC</span>
-    <span data-k="band"><i class="sw" style="background:rgba(60,162,203,.25);border:1px solid #3ca2cb"></i>SOC Min/Max</span>
+    <span data-k="soc"><i class="sw" style="background:#4b9be6"></i>Batterie-SOC</span>
+    <span data-k="band"><i class="sw" style="background:rgba(60,162,203,.25);border:1px solid #4b9be6"></i>SOC Min/Max</span>
   </div>
   <div class="sysgrid" id="energy-tiles" style="margin-top:12px"></div>
 </div>
@@ -208,7 +208,7 @@
     <div class="ps-wins" id="ps-wins"></div>
     <div class="ps-box"><canvas id="ps-chart"></canvas></div>
     <div class="legend" style="margin-top:8px">
-      <span><i class="sw" style="background:#3ca2cb"></i>Simulation (Vorschlag)</span>
+      <span><i class="sw" style="background:#4b9be6"></i>Simulation (Vorschlag)</span>
       <span><i class="sw" style="background:#f48c24"></i>Bisherige Steuerung</span>
       <span><i class="sw" style="background:#8b93a3"></i>Ohne Netzladen</span>
       <span><i class="sw" style="background:rgba(53,192,122,.7)"></i>Simulation lädt (kWh)</span>
@@ -222,7 +222,7 @@
   #vl-dash-range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   #vl-dash-range button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 13px; background: var(--card2); color: var(--muted); cursor: pointer; margin: 0; }
   #vl-dash-range button + button { border-left: 1px solid var(--border); }
-  #vl-dash-range button.on { background: var(--accent); color: #101317; font-weight: 600; }
+  #vl-dash-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
 </style>
 <div class="card full" id="verlauf-card" hidden style="margin-bottom:14px">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -413,7 +413,7 @@ function renderChart() {
   chart.data.labels = prices.map(p => p.label);
   const ds = chart.data.datasets[0];
   ds.data = prices.map(p => p.ct);
-  ds.backgroundColor = prices.map(p => LEVEL_COLORS[p.level] || '#3ca2cb');
+  ds.backgroundColor = prices.map(p => LEVEL_COLORS[p.level] || '#4b9be6');
   // "cheap_lock" (Schwellen-Vorschau der "Immer laden unter"-Regel) bekommt eine
   // eigene Farbe (Cyan) statt des lila "geplant"-Rahmens - beides kann fachlich
   // unabhaengig voneinander zutreffen, cheap_lock hat optisch Vorrang.
@@ -434,7 +434,7 @@ function buildEnergyChart() {
           yAxisID: 'y1', order: 1, spanGaps: true },
         { type: 'line', label: 'SOC Min', data: [], borderColor: 'transparent', pointRadius: 0,
           backgroundColor: 'rgba(60,162,203,.18)', fill: '-1', yAxisID: 'y1', order: 1, spanGaps: true },
-        { type: 'line', label: 'Batterie-SOC', data: [], borderColor: '#3ca2cb', backgroundColor: '#3ca2cb',
+        { type: 'line', label: 'Batterie-SOC', data: [], borderColor: '#4b9be6', backgroundColor: '#4b9be6',
           pointRadius: 2, borderWidth: 2, tension: .3, yAxisID: 'y1', order: 0, spanGaps: true },
         // Prognose-Rest ueber dem realen Solarertrag (gestapelt): wird vom Ertrag "ausgemalt", uebertroffen = kein Rest
         { type: 'bar', label: 'Solarprognose', data: [], backgroundColor: hatchPattern('#f48c24'), borderColor: '#f48c24',
@@ -1836,17 +1836,17 @@ function renderPlansim() {
   const tile = (t, big, sub, color) => `<div class="systile"><div class="systile-t">${t}</div><div class="systile-v" style="color:${color}">${big}</div><div class="systile-s">${sub}</div></div>`;
   const diff = r.current.net_ct - r.sim.net_ct;
   $('ps-tiles').innerHTML =
-    tile('🧠 Simulation', fmtE(r.sim.cost_ct), `lädt ${r.sim.grid_charge_kwh} kWh · Endstand ${r.sim.end_soc} %`, '#3ca2cb') +
+    tile('🧠 Simulation', fmtE(r.sim.cost_ct), `lädt ${r.sim.grid_charge_kwh} kWh · Endstand ${r.sim.end_soc} %`, '#4b9be6') +
     tile('⚙️ Bisherige Steuerung', fmtE(r.current.cost_ct), `lädt ${r.current.grid_charge_kwh} kWh · Endstand ${r.current.end_soc} %`, '#f48c24') +
     tile('⛔ Ohne Netzladen', fmtE(r.none.cost_ct), `Netzbezug ${r.none.grid_deficit_kwh} kWh · Endstand ${r.none.end_soc} %`, 'var(--muted)') +
     tile('Unterschied', (diff >= 0 ? '−' : '+') + fmtE(Math.abs(diff)), (diff >= 0 ? 'Simulation wäre günstiger' : 'bisherige Steuerung wäre günstiger') + ' (inkl. Akku-Restwert)', diff >= 0 ? 'var(--cheap)' : 'var(--exp)');
-  $('ps-wins').innerHTML = `<b style="color:#3ca2cb">Simulation lädt:</b> ${psWin(r.sim.windows)}<br><b style="color:#f48c24">Bisherige Steuerung:</b> ${psWin(r.current.windows)}`
+  $('ps-wins').innerHTML = `<b style="color:#4b9be6">Simulation lädt:</b> ${psWin(r.sim.windows)}<br><b style="color:#f48c24">Bisherige Steuerung:</b> ${psWin(r.current.windows)}`
     + (d.current_strategy ? ` <span class="muted">(${escH(d.current_strategy)})</span>` : '');
   const labels = r.times.map(t => t.slice(11, 16));
   const setup = () => new Chart($('ps-chart').getContext('2d'), {
     data: { labels: [], datasets: [
       { type: 'bar', label: 'Simulation lädt', data: [], backgroundColor: 'rgba(53,192,122,.7)', yAxisID: 'y2', order: 2 },
-      { type: 'line', label: 'Simulation', data: [], borderColor: '#3ca2cb', backgroundColor: '#3ca2cb', pointRadius: 0, borderWidth: 2.5, tension: .25, yAxisID: 'y', order: 0 },
+      { type: 'line', label: 'Simulation', data: [], borderColor: '#4b9be6', backgroundColor: '#4b9be6', pointRadius: 0, borderWidth: 2.5, tension: .25, yAxisID: 'y', order: 0 },
       { type: 'line', label: 'Bisherige Steuerung', data: [], borderColor: '#f48c24', pointRadius: 0, borderWidth: 2, tension: .25, yAxisID: 'y', order: 1 },
       { type: 'line', label: 'Ohne Netzladen', data: [], borderColor: '#8b93a3', borderDash: [5, 4], pointRadius: 0, borderWidth: 1.5, tension: .25, yAxisID: 'y', order: 1 },
     ] },

@@ -15,7 +15,7 @@
   <style>
     :root {
       --bg: #121519; --card: #1b1f24; --card2: #252a30;
-      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #3ca2cb; --brand: #f48c24; --border: #363c44;
+      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #005fbe; --accent-t: #4b9be6; --brand: #f48c24; --border: #363c44;
       --red: #e5544a;
     }
     * { box-sizing: border-box; }
@@ -88,7 +88,7 @@
     <input type="password" name="password2" autocomplete="new-password" minlength="8" required>
 
     <button type="submit">Konto anlegen</button>
-    <p class="hint" style="text-align:center;margin-top:14px">Schon eine Sicherung? <a href="{{ url_for('restore') }}" style="color:var(--accent)">Alles wiederherstellen</a></p>
+    <p class="hint" style="text-align:center;margin-top:14px">Schon eine Sicherung? <a href="{{ url_for('restore') }}" style="color:var(--accent-t)">Alles wiederherstellen</a></p>
   </form>
   <script>
     document.getElementById('pw-toggle').addEventListener('click', function () {

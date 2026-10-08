@@ -19,10 +19,10 @@
   <style>
     :root {
       --bg: #121519; --card: #1b1f24; --card2: #252a30;
-      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #3ca2cb; --border: #363c44;
+      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #005fbe; --accent-t: #4b9be6; --border: #363c44;
       /* Signaturfarben: Orange (MA-Multiservice) + Victron-Blau. Orange = Hauptaktion/Warnung, Blau = aktiv/Auswahl/Links */
-      --brand: #f48c24; --brand2: #3ca2cb; --on: #3ca2cb; --glow: rgba(60,162,203,.35);
-      --green: #35c07a; --blue: #3ca2cb; --red: #e5544a;
+      --brand: #f48c24; --brand2: #005fbe; --on: #005fbe; --glow: rgba(0,95,190,.5);
+      --green: #35c07a; --blue: #4b9be6; --red: #e5544a;
       /* Preis-Ampel wie Tibber Timer */
       --cheap: #35c07a; --normal: #5fa8d3; --exp: #f48c24; --vexp: #e5544a;
       --plan: #b072f5; --timer: #ffd54a;
@@ -180,13 +180,13 @@
     .log-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; height: 19px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
       background: #e5544a; color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px var(--bg, #121519); }
     .log-badge[hidden] { display: none; }
-    input[type=range] { padding: 0; margin: 0; border: 0; background: transparent; height: 24px; accent-color: var(--accent, #3ca2cb); cursor: pointer; }      /* Schieberegler: volle Laenge, links = Minimum, rechts = Maximum (nicht wie ein Textfeld mit Innenabstand) */
+    input[type=range] { padding: 0; margin: 0; border: 0; background: transparent; height: 24px; accent-color: var(--accent, #005fbe); cursor: pointer; }      /* Schieberegler: volle Laenge, links = Minimum, rechts = Maximum (nicht wie ein Textfeld mit Innenabstand) */
     input, select, textarea { color-scheme: dark; }      /* native Bedienelemente (Zeit-/Zahlenfelder, Auswahllisten) im dunklen Stil */
     .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
     .chip input { display:none; }
     .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
-    .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#121519; font-weight:600; }
-    .daytab.active { background: var(--accent); color: #121519; border-color: var(--accent); }
+    .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+    .daytab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     /* Victron Live-Kacheln */
     /* Festes Raster: 6 pro Zeile (Desktop), damit nichts springt */
     .sysgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
@@ -218,12 +218,12 @@
     .plane-row label { margin: 0 0 3px; }
     small.hint { color: var(--muted); font-size: 12px; }
     /* Hilfe-Boxen in den Einstellungen */
-    .help-link { display: inline-block; margin-top: 6px; color: var(--accent);
+    .help-link { display: inline-block; margin-top: 6px; color: var(--accent-t);
       text-decoration: none; font-size: 13px; }
     .help-link:hover { text-decoration: underline; }
     details.help { margin-top: 10px; background: var(--bg); border: 1px solid var(--border);
       border-radius: 10px; padding: 0 12px; }
-    details.help > summary { cursor: pointer; padding: 10px 0; color: var(--accent);
+    details.help > summary { cursor: pointer; padding: 10px 0; color: var(--accent-t);
       font-size: 13px; font-weight: 600; list-style: none; }
     details.help > summary::before { content: "❔ "; }
     details.help[open] > summary { border-bottom: 1px solid var(--border); }
@@ -241,7 +241,7 @@
       width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border);
       background: var(--card2); color: var(--muted); font-size: 11px; font-weight: 700;
       line-height: 1; cursor: pointer; padding: 0; margin-left: 6px; vertical-align: middle; }
-    .qhelp:hover, .qhelp[aria-expanded="true"] { color: #121519; background: var(--accent);
+    .qhelp:hover, .qhelp[aria-expanded="true"] { color: #fff; background: var(--accent);
       border-color: var(--accent); }
   /* Eigenes, dunkel gestyltes Kalender-Popup fuer die Tag-Auswahl (e-pick/f-pick/p-pick) statt des nativen
      Browser-Datepickers - der bricht aus dem Design und erscheint nicht neben dem Icon (Michael, 28.09.). */
@@ -259,14 +259,14 @@
     border-radius: 6px; cursor: pointer; }
   .calpop .cal-day:hover:not(:disabled) { background: var(--bg); }
   .calpop .cal-day.today { box-shadow: inset 0 0 0 1px var(--accent); }
-  .calpop .cal-day.sel { background: var(--accent); color: #121519; font-weight: 600; }
+  .calpop .cal-day.sel { background: var(--accent); color: #fff; font-weight: 600; }
   .calpop .cal-day:disabled { color: #454c5c; cursor: default; }
     .qpop { position: fixed; max-width: 360px; max-height: 72vh; overflow-y: auto; background: var(--card2);
       border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
       font-size: 13px; line-height: 1.5; color: var(--fg); box-shadow: 0 8px 24px rgba(0,0,0,.4);
       z-index: 80; }
     .qpop b { color: var(--fg); }
-    .qpop a { color: var(--accent); font-weight: 600; }
+    .qpop a { color: var(--accent-t); font-weight: 600; }
     .qpop ol, .qpop ul { margin: 6px 0; padding-left: 20px; } .qpop li { margin: 3px 0; }
     /* Kurze Unterzeile unter einer Kartenueberschrift (Details stehen hinter dem ?) */
     .card .sub { margin: -4px 0 14px; font-size: 13px; line-height: 1.45; color: var(--muted); }

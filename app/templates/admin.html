@@ -9,7 +9,7 @@
   /* Farbe pro Karte (Reihenfolge = Kartenreihenfolge) */
   .card:nth-of-type(1)  h2 svg.h2i { color: var(--blue); }   /* Update   */
   .card:nth-of-type(2)  h2 svg.h2i { color: var(--green); }  /* Betrieb  */
-  .card:nth-of-type(3)  h2 svg.h2i { color: var(--accent); } /* Cerbo    */
+  .card:nth-of-type(3)  h2 svg.h2i { color: var(--accent-t); } /* Cerbo    */
   .card:nth-of-type(4)  h2 svg.h2i { color: var(--timer); }  /* Tibber   */
   .card:nth-of-type(5)  h2 svg.h2i { color: var(--red); }    /* Standort */
   .card:nth-of-type(6)  h2 svg.h2i { color: var(--exp); }    /* Solarflächen */
@@ -27,7 +27,7 @@
   .tabbar button { flex: 0 0 auto; background: var(--card); color: var(--muted); border: 1px solid var(--border);
     border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .tabbar button:hover { color: var(--fg); }
-  .tabbar button.active { background: var(--accent); border-color: var(--accent); color: #101317; font-weight: 600; }
+  .tabbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   /* Trefferlisten der Geraetesuche: Zeilen abwechselnd schattiert, gut getrennt */
   #shelly-found > div { padding: 10px 12px; border: 1px solid transparent; }
   /* Symbol-Knoepfe: alle gleich gross, egal wie breit das Emoji ist */
@@ -40,7 +40,7 @@
   .tgl { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
     background: var(--card2); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: .75; }
   .tgl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .tgl.on { background: var(--on); border-color: var(--on); color: #101317; opacity: 1; }          /* an = Victron-Blau */
+  .tgl.on { background: var(--on); border-color: var(--on); color: #fff; opacity: 1; }          /* an = Victron-Blau */
   .tgl.dirty { background: var(--green); border-color: var(--green); color: #101317; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
   .tgl.del { color: var(--red); }
   .icon-pick.fixed { cursor: default; } .icon-pick.fixed:hover { border-color: var(--border); filter: none; }      /* Symbol fest (NFC-Knopf): gleiche Groesse wie die anderen, aber ohne Hover-Wirkung */
@@ -70,10 +70,10 @@
   .seg button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 13px; background: var(--card2); color: var(--muted); cursor: pointer; margin: 0; font-weight: 500; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button.on.none { background: #565c66; color: #fff; }
-  .seg button.on.read { background: var(--accent); color: #101317; font-weight: 600; }
+  .seg button.on.read { background: var(--accent); color: #fff; font-weight: 600; }
   .seg button.on.write { background: var(--green); color: #101317; font-weight: 600; }
   .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; }
-  .tgl.vis.on { background: var(--card2); border-color: var(--accent); color: var(--accent); opacity: 1; }
+  .tgl.vis.on { background: var(--card2); border-color: var(--accent); color: var(--accent-t); opacity: 1; }
   .tgl.pin.on { background: var(--card2); border-color: #f0b429; color: #f0b429; }
   .edit-panel { display: none; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
   .edit-panel.open { display: block; }
@@ -81,7 +81,7 @@
   .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
   .chip input { display:none; }
   .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
-  .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#121519; font-weight:600; }
+  .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
   .ro-locked { opacity: .65; pointer-events: none; }
   .ro-locked .qhelp { pointer-events: auto; }   /* Tooltips bleiben auch in gesperrten Karten lesbar */
   .ro-locked summary { pointer-events: auto; }  /* Aufklapp-Dreiecke (Anleitungen etc.) bleiben bedienbar, der Inhalt bleibt gesperrt */
@@ -690,11 +690,11 @@
     <div id="hm-locks" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
-<div class="card fam-hint-card fam-off" id="hint-sensoren" data-tab="sensoren"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
+<div class="card fam-hint-card fam-off" id="hint-sensoren" data-tab="sensoren"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
 
-<div class="card fam-hint-card fam-off" id="hint-thermostate" data-tab="thermostate"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
+<div class="card fam-hint-card fam-off" id="hint-thermostate" data-tab="thermostate"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
 
-<div class="card fam-hint-card fam-off" id="hint-sicherheit" data-tab="sicherheit"><div class="muted">Türschlösser gibt es bei Homematic. Wähle unter <a href="/smarthome#suchen" style="color:var(--accent);font-weight:600">Geräte suchen</a> „Homematic“ an und suche die Türschlösser.</div></div>
+<div class="card fam-hint-card fam-off" id="hint-sicherheit" data-tab="sicherheit"><div class="muted">Türschlösser gibt es bei Homematic. Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> „Homematic“ an und suche die Türschlösser.</div></div>
 
 <div class="card fam-card fam-off" id="hm-push-card" data-tab="sonstiges">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Homematic: Push von der CCU <span class="qhelp" role="button" tabindex="0" data-help="<b>Funk-Diagnose:</b> Der Duty Cycle zeigt, wie viel der erlaubten Sendezeit (1 % pro Stunde im 868-MHz-Band) das Funkmodul der CCU bereits genutzt hat; bei 100 % sendet die CCU nicht mehr, Befehle gehen verloren oder verspäten sich. Dazu: die gesprächigsten Geräte der letzten Minuten und die Zahl der Befehle dieser App (Zähler seit dem Start).<br><br><b>Meldungen der CCU:</b> Zeigt zuletzt Gemeldetes, z. B. beim Drücken einer Taste „PRESS_LONG“ mit Kanaladresse. Taste drücken, dann Aktualisieren. Fehlt der Tastendruck in der Liste, erreicht die Meldung die App nicht.">?</span></h2>
@@ -820,9 +820,9 @@
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Weitere Einstellungen rund ums Smart Home</h2>
   <div class="sub">Verweise auf Einstellungen an anderer Stelle.</div>
   <ul class="muted" style="margin:0 0 0 18px;padding:0;line-height:1.8">
-    <li><b>Dashboard-Kacheln</b> (ein-/ausblenden, sortieren): <a href="/admin#anzeige" style="color:var(--accent);font-weight:600">Einstellungen → Dashboard</a></li>
-    <li><b>Telegram-Meldungen</b>: <a href="/admin#meldungen" style="color:var(--accent);font-weight:600">Einstellungen → Meldungen</a></li>
-    <li><b>Logbücher</b>: <a href="/automation-log" style="color:var(--accent);font-weight:600">Automatik</a> · <a href="/rules-log" style="color:var(--accent);font-weight:600">Regeln</a></li>
+    <li><b>Dashboard-Kacheln</b> (ein-/ausblenden, sortieren): <a href="/admin#anzeige" style="color:var(--accent-t);font-weight:600">Einstellungen → Dashboard</a></li>
+    <li><b>Telegram-Meldungen</b>: <a href="/admin#meldungen" style="color:var(--accent-t);font-weight:600">Einstellungen → Meldungen</a></li>
+    <li><b>Logbücher</b>: <a href="/automation-log" style="color:var(--accent-t);font-weight:600">Automatik</a> · <a href="/rules-log" style="color:var(--accent-t);font-weight:600">Regeln</a></li>
     <li><b>PIN-Schutz</b>: pro Gerät in der Aktoren-Liste (nur Admins).</li>
   </ul>
 </div>
@@ -1521,7 +1521,7 @@ function uiDialog({ title, message, html, info, label, value = '', type = 'text'
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyIcons = [];
 const PWR_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:middle"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg>';
-const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#101317';          // eingeschaltet = Victron-Blau
+const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#fff';          // eingeschaltet = Victron-Blau
 async function shellyApi(url, method, body) {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined });
@@ -2786,7 +2786,7 @@ document.getElementById('tn-warn').addEventListener('click', () => uiDialog({ ti
   <p style="margin:0 0 10px">Mit dem Tunnel steht die <b>Anmeldeseite der Steuerung im Internet</b>. Ein Angreifer könnte Passwörter durchprobieren oder eine Sicherheitslücke in der App ausnutzen. Die Steuerung kann Türschlösser öffnen, Rollläden fahren und Geräte schalten.</p>
   <p style="margin:0 0 6px"><b>Bitte unbedingt:</b></p>
   <ul style="margin:0 0 10px;padding-left:20px">
-    <li><b>Cloudflare Access davorschalten:</b> Zero Trust → Zugriffssteuerungen → Anwendungen → <i>Self-hosted</i>, Anmeldung per <b>E-Mail-Code</b> nur für deine Adressen (kostenlos bis 50 Personen). Erst dann erreicht ein Fremder die App gar nicht. <a href="https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">Anleitung von Cloudflare ↗</a></li>
+    <li><b>Cloudflare Access davorschalten:</b> Zero Trust → Zugriffssteuerungen → Anwendungen → <i>Self-hosted</i>, Anmeldung per <b>E-Mail-Code</b> nur für deine Adressen (kostenlos bis 50 Personen). Erst dann erreicht ein Fremder die App gar nicht. <a href="https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/" target="_blank" rel="noopener" style="color:var(--accent-t);font-weight:600">Anleitung von Cloudflare ↗</a></li>
     <li><b>Lange Passwörter</b> für alle Konten, besonders für Konten mit Schreibrechten.</li>
     <li>Konten nur mit den <b>Rechten</b> anlegen, die wirklich nötig sind.</li>
   </ul>

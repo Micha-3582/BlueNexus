@@ -17,7 +17,7 @@
   var LONG_MS = 500, TOLERANCE = 10, EDGE = 70, SCROLL_STEP = 14;
   var style = document.createElement('style');
   style.textContent = '.sort-active{-webkit-user-select:none;user-select:none;cursor:grabbing}' +
-    '.sort-dragging{transform:scale(1.01);box-shadow:0 10px 28px rgba(0,0,0,.5);opacity:.92;position:relative;z-index:5;outline:2px solid var(--accent,#3ca2cb);outline-offset:1px}';
+    '.sort-dragging{transform:scale(1.01);box-shadow:0 10px 28px rgba(0,0,0,.5);opacity:.92;position:relative;z-index:5;outline:2px solid var(--accent,#005fbe);outline-offset:1px}';
   document.head.appendChild(style);
 
   var INTERACTIVE = 'input,select,textarea,button,a,label,summary,[contenteditable],.no-sort,.edit-panel,.tgl,.switch';
