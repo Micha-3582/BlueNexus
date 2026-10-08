@@ -41,7 +41,7 @@
   </style>
 </head>
 <body>
-  {% if sandbox %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
+  {% if demo %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🎬 <b>DEMO</b> – alle Daten, Geräte und Kameras sind erfunden. Es wird nichts geschaltet und nichts gesendet.</div>{% elif sandbox %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
   <div class="card">
     <h1>Sicherung wiederherstellen</h1>
     <p class="intro">Alle Einstellungen, Konten, Geräte und Regeln kommen zurück – die App ist danach wie die alte.</p>

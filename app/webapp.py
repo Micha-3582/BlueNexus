@@ -58,6 +58,7 @@ import updater
 import vrm
 import vrm_import
 import weather
+import demo
 import sandbox
 sandbox.activate()                                           # Testmodus: keine Verbindungen nach aussen (muss vor allen anderen Modulen aktiv sein)
 import auth
@@ -146,7 +147,7 @@ users = UserStore(os.path.join(BASE_DIR, "users.json"))
 def inject_app_display_name():
     """Personalisierbarer Anzeigename (Kopfzeile/Titel) - fuer alle Templates
     verfuegbar, auch Login/Konto-Anlage (kein DB-Zugriff, nur die lokale Datei)."""
-    return {"app_display_name": store.default_app_name(), "sandbox": sandbox.ACTIVE}
+    return {"app_display_name": store.default_app_name(), "sandbox": sandbox.ACTIVE, "demo": demo.ACTIVE}
 
 
 @app.context_processor
