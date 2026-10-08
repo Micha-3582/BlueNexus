@@ -189,7 +189,7 @@ Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause un
   Zentrale bekannt ist. Ein kopierter oder fotografierter Tag nützt niemandem.
 - **Registrieren** in Sekunden: direkt am Handy oder per Einmal-Link (15 Minuten gültig) für ein anderes Handy.
   Verlorenes Handy? Mit einem Klick in der Liste löschen – sofort gesperrt.
-- **Pro Tag steuerbar**, welche Handys ihn nutzen dürfen. Jeder neue Tag legt automatisch einen eigenen Knopf (🏷️) an,
+- **Pro NFC-Tag einstellbar**, welche Handys ihn nutzen dürfen (nicht zeitlich begrenzt – ein registriertes Handy darf, bis du es löschst). Jeder neue NFC-Tag legt automatisch einen eigenen Knopf (🏷️) an,
   den du in Regeln als „WENN Knopf gedrückt“ verwendest.
 - **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
   und schließt sich die App beim Scannen von selbst.
