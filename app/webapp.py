@@ -625,7 +625,10 @@ def nfc_tag(tid):
     if not store.module_on("smarthome"):
         return _nfc_page(False, "Nicht verfügbar", "Smart Home ist auf dieser Installation ausgeschaltet.", 404)
     ip = client_ip()
+    as_json = request.method == "POST" and "application/json" in (request.headers.get("Accept") or "")      # PIN-Seite sendet per fetch: Antwort ohne Seitenwechsel (das Fenster laesst sich dann selbst schliessen)
     if too_many_attempts(ip):
+        if as_json:
+            return jsonify(ok=False, error="Zu viele Versuche – bitte einige Minuten warten."), 429
         return _nfc_page(False, "Zu viele Versuche", "Bitte einige Minuten warten.", 429)
     pin_check = None
     if request.method == "POST":                                                # PIN-Eingabe nach dem Scannen (Ziel des Tags ist PIN-geschuetzt)
@@ -641,17 +644,25 @@ def nfc_tag(tid):
         if r["why"] == "bad_pin":
             note_failed_attempt(ip)
             opslog.log("rules", f"NFC-Tag „{r['tag']}“ von „{r['phone']}“: PIN falsch oder gesperrt", dry=False)
-        resp = make_response(render_template("nfc_pin.html", title=r["tag"], error=(r["text"] if r["why"] == "bad_pin" else "")), 429 if "Zu viele" in r["text"] else (403 if r["why"] == "bad_pin" else 200))
+        code = 429 if "Zu viele" in r["text"] else (403 if r["why"] == "bad_pin" else 200)
+        if as_json:
+            return jsonify(ok=False, error=r["text"] if r["why"] == "bad_pin" else ""), code
+        resp = make_response(render_template("nfc_pin.html", title=r["tag"], error=(r["text"] if r["why"] == "bad_pin" else "")), code)
         resp.headers["Cache-Control"] = "no-store"
         return resp
     if r["ok"]:
         if r["why"] != "debounced":
             opslog.log("rules", f"NFC-Tag „{r['tag']}“ von „{r['phone']}“ ausgelöst: {r['text'].split(' – ', 1)[-1]}", dry=False)
             ctrl._rules_wake.set()
-        return _nfc_page(True, r["tag"], r["text"].split(" – ", 1)[-1] if " – " in r["text"] else r["text"])
+        what = r["text"].split(" – ", 1)[-1] if " – " in r["text"] else r["text"]
+        if as_json:
+            return jsonify(ok=True, title=r["tag"], text=what)
+        return _nfc_page(True, r["tag"], what)
     note_failed_attempt(ip)
     if r["why"] in ("unknown_phone", "not_allowed"):
         opslog.log("rules", f"NFC-Tag „{r.get('tag', '?')}“ abgelehnt: {r['text']}", dry=False)
+    if as_json:
+        return jsonify(ok=False, error=r["text"]), 403 if r["why"] != "unknown_tag" else 404
     return _nfc_page(False, "Nicht erlaubt" if r["why"] in ("unknown_phone", "not_allowed") else "Nicht möglich", r["text"], 403 if r["why"] != "unknown_tag" else 404)
 
 

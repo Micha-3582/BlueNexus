@@ -23,18 +23,20 @@
     .pad button { padding: 16px 0; font-size: 24px; font-weight: 600; border-radius: 12px; border: 1px solid var(--border); background: var(--card2, #252a30); color: var(--fg); cursor: pointer; width: auto; margin: 0; touch-action: manipulation; }
     .pad button:active { transform: scale(.96); background: var(--border); }
     .pad .sm { font-size: 18px; color: var(--muted); }
+    .done .sym { background: rgba(60,162,203,.16); color: #4b9be6; box-shadow: 0 0 24px rgba(60,162,203,.35); font-size: 42px; font-weight: 700; }
+    .gray { background: #252a30; color: #f2f3f5; border: 1px solid #363c44; }
     .err { color: #e5544a; margin-top: 14px; font-size: 15px; }
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="card" id="card">
     <div class="sym">🔒</div>
     <h1>{{ title }}</h1>
     <p>Bitte die PIN eingeben, um auszulösen.</p>
     <form method="post" id="f" autocomplete="off">
       <input type="hidden" name="pin" id="pin">
       <div class="dots" id="dots" aria-live="polite">○○○○</div>
-      {% if error %}<div class="err" role="alert">{{ error }}</div>{% endif %}
+      {% if error %}<div class="err" id="err" role="alert">{{ error }}</div>{% endif %}
       <div class="pad">
         {% for n in [1,2,3,4,5,6,7,8,9] %}<button type="button" data-k="{{ n }}">{{ n }}</button>{% endfor %}
         <button type="button" class="sm" data-k="c" aria-label="Löschen">⌫</button><button type="button" data-k="0">0</button><button type="button" class="sm" data-k="x" aria-label="Abbrechen">✕</button>
@@ -42,15 +44,36 @@
     </form>
   </div>
   <script>
-    // Zahlenfeld wie am Dashboard (keine Handy-Tastatur): 4 Ziffern, danach wird automatisch gesendet
+    // Zahlenfeld wie am Dashboard (keine Handy-Tastatur): 4 Ziffern, danach wird automatisch gesendet - per fetch, ohne Seitenwechsel,
+    // damit der Browser das Fenster nach dem Ausloesen selbst schliessen darf (nach einem Seitenwechsel verbietet er es).
     (function () {
-      var pin = '', dots = document.getElementById('dots'), inp = document.getElementById('pin'), form = document.getElementById('f'), sent = false;
+      var pin = '', dots = document.getElementById('dots'), inp = document.getElementById('pin'), form = document.getElementById('f'), card = document.getElementById('card'), busy = false;
+      function show() { dots.textContent = new Array(pin.length + 1).join('●') + new Array(5 - pin.length).join('○'); }
+      function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+      function setErr(t) { var e = document.getElementById('err'); if (!e) { e = document.createElement('div'); e.id = 'err'; e.className = 'err'; e.setAttribute('role', 'alert'); dots.parentNode.insertBefore(e, dots.nextSibling); } e.textContent = t; }
+      function closeWin() { try { window.close(); } catch (e) {} }
+      function success(title, text) {
+        card.className = 'card done';
+        card.innerHTML = '<div class="sym">✓</div><h1>' + esc(title) + '</h1><p>' + esc(text) + '</p><button id="zu" type="button" class="gray" style="display:none;margin-top:20px">Schließen</button>';
+        setTimeout(closeWin, 3000);
+        setTimeout(function () { var b = document.getElementById('zu'); if (b && !document.hidden) { b.style.display = 'block'; b.onclick = closeWin; card.querySelector('p').textContent += ' – du kannst dieses Fenster jetzt schließen.'; } }, 3800);
+      }
+      function send() {
+        busy = true; inp.value = pin;
+        fetch(location.href, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'pin=' + encodeURIComponent(pin), credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j.ok) { success(j.title, j.text); return; }
+            pin = ''; show(); busy = false; setErr(j.error || 'Nicht möglich');
+          })
+          .catch(function () { form.submit(); });                               // Notfall: klassisches Senden (zeigt das Ergebnis als Seite)
+      }
       function press(k) {
-        if (sent) return;
-        if (k === 'x') { try { window.close(); } catch (e) {} setTimeout(function () { try { history.back(); } catch (e) {} }, 200); return; }
+        if (busy) return;
+        if (k === 'x') { closeWin(); setTimeout(function () { try { history.back(); } catch (e) {} }, 200); return; }
         if (k === 'c') pin = pin.slice(0, -1); else if (/^\d$/.test(k) && pin.length < 4) pin += k;
-        dots.textContent = new Array(pin.length + 1).join('●') + new Array(5 - pin.length).join('○');
-        if (pin.length === 4) { sent = true; inp.value = pin; setTimeout(function () { form.submit(); }, 120); }
+        show();
+        if (pin.length === 4) setTimeout(send, 120);
       }
       document.querySelectorAll('.pad button').forEach(function (b) { b.addEventListener('click', function () { press(b.getAttribute('data-k')); }); });
       document.addEventListener('keydown', function (e) { if (e.key === 'Backspace') press('c'); else if (/^\d$/.test(e.key)) press(e.key); });
