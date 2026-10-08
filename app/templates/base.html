@@ -278,6 +278,7 @@
   {% if demo %}<style>
     /* Demo: Gesperrte (nur lesbare) Karten sehen aus wie bedienbare - es laesst sich trotzdem nichts aendern (Klicks gesperrt, Speichern serverseitig abgelehnt) */
     .ro-locked { opacity: 1 !important; }
+    {% if user_perms.dashboard == 'read' %}.ro-locked { pointer-events: auto !important; }{% endif %}
     .switch input:disabled + .slider { opacity: 1 !important; cursor: default; }
     /* gesperrte Knoepfe normal darstellen - ausgenommen solche, die aus Bedienlogik grau sind (naechster Tag, Termin anlegen, Kalender) */
     button:disabled:not(.daytab):not(.cal-nav):not(.cal-day):not([id$="-prev"]):not([id$="-next"]):not(#ev-confirm):not(#ev-discard) { opacity: 1 !important; cursor: default; }
@@ -429,5 +430,47 @@ function askPin(title) {
     })();
   </script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+{% if demo and user_perms.dashboard == 'read' %}<script>
+/* Demo mit Nur-Lese-Konto: Klicks in gesperrten Bereichen zeigen einen freundlichen Hinweis; Servermeldungen "Kein Zugriff" werden dadurch ersetzt. */
+(function () {
+  var MSG = '🔒 Nur Ansicht in der Demo – du kannst alles ansehen, aber nichts verändern.';
+  var timer = null;
+  function toast() {
+    var t = document.getElementById('app-toast');
+    if (!t) {
+      t = document.createElement('div'); t.id = 'app-toast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1200;max-width:min(92vw,520px);padding:12px 18px;border-radius:12px;'
+        + 'background:var(--card);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:14px;line-height:1.4;transition:opacity .25s;opacity:0';
+      document.body.appendChild(t);
+    }
+    t.textContent = MSG; t.style.borderColor = 'var(--border)'; t.style.opacity = '1';
+    clearTimeout(timer); timer = setTimeout(function () { t.style.opacity = '0'; }, 3600);
+  }
+  function blocked(e) {
+    var t = e.target; if (!t || !t.closest) return false;
+    if (t.closest('.qhelp, summary, .tilt, .lb')) return false;           // Hilfe-Knoepfe und Aufklapp-Pfeile bleiben bedienbar
+    var inLocked = t.closest('.ro-locked');
+    var sw = t.closest('label.switch');
+    if (sw && sw.querySelector('input:disabled')) return true;           // gesperrter Schalter
+    if (inLocked && t.closest('input,select,textarea,button,a[href],label,[onclick]')) return true;
+    return false;
+  }
+  ['mousedown', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      if (!blocked(e)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (ev === 'click') toast();
+    }, true);
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && blocked(e)) { e.preventDefault(); e.stopPropagation(); toast(); }
+  }, true);
+  /* Technische Absagemeldungen der Seiten durch den Demo-Hinweis ersetzen */
+  new MutationObserver(function () {
+    var t = document.getElementById('app-toast');
+    if (t && t.textContent !== MSG && /Kein Zugriff|darf .{0,60}nicht ändern|nicht ändern/i.test(t.textContent)) { t.textContent = MSG; t.style.borderColor = 'var(--border)'; }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+})();
+</script>{% endif %}
 </body>
 </html>

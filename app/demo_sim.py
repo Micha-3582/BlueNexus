@@ -168,8 +168,7 @@ def _hm_get(address: str, key: str):
     if key == "POWER":
         return round(_watts(name), 1) if _default_on(name) else 0.0
     if key in ("MOTION", "PRESENCE_DETECTION_STATE"):
-        raw = int(t / 20) % 53 == 0
-        return (not raw) if inv else raw
+        return int(t / 20) % 53 == 0
     if key.startswith("PRESS_"):
         return False
     if key == "LOCK_STATE":
@@ -181,7 +180,7 @@ def _hm_get(address: str, key: str):
     if key == "STATE":
         if kind in ("switch", ""):
             return _default_on(name)
-        return bool(inv)          # Kontakt/Eingang: "zu"/inaktiv; ist der Sensor invertiert, meldet das Geraet dafuer den umgekehrten Rohwert
+        return False              # Kontakt/Eingang: Rohwert "zu"/inaktiv (die App wendet "invertiert" danach selbst an: bei invertierten Sensoren ergibt das TRUE = zu)
     return 0
 
 
@@ -384,7 +383,7 @@ def activate() -> None:
     wled.set_preset = lambda d, preset: int(preset or 0)
     wled.save_preset = lambda d, name: {"id": 3, "name": str(name)}
 
-    zigbee.read_value = lambda sen: (bool(sen.get("invert")) if sen.get("binary") else round(21.0 + 0.5 * math.sin(time.time() / 1100.0), 1))
+    zigbee.read_value = lambda sen: (False if sen.get("binary") else round(21.0 + 0.5 * math.sin(time.time() / 1100.0), 1))
     zigbee.read_setpoint = lambda sp: 21.0
     zigbee.set_setpoint = lambda sp, value: min(float(sp.get("max", 30)), max(float(sp.get("min", 5)), float(value)))
 
