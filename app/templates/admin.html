@@ -2853,7 +2853,7 @@ async function nfcLoad() {
 async function nfcCopy(tid) {
   const full = nfcBase() + '/nfc/' + tid;
   const url = full.replace(/^https:\/\//i, '');                     // ohne https:// - die NFC-App setzt das Protokoll selbst davor (bei http:// bleibt es vollständig)
-  try { await navigator.clipboard.writeText(url); nfcMsg('Adresse kopiert (ohne https://) – jetzt in der NFC-App als Adresse eintragen und auf den Tag schreiben: ' + url); }
+  try { await navigator.clipboard.writeText(url); nfcMsg('Adresse kopiert – jetzt in der NFC-App als Adresse eintragen und auf den Tag schreiben: ' + url); }
   catch (e) { await uiDialog({ title: 'Adresse des Tags', html: '<code style="word-break:break-all">' + escH(url) + '</code>', info: true }); }
 }
 async function nfcRename(tid) {
