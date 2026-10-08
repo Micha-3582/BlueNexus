@@ -20,14 +20,14 @@
   .card:nth-of-type(11) h2 svg.h2i { color: var(--red); }    /* Netz-Zähler  */
   /* Reiter (Tabs) */
   .tabbar { position: sticky; top: var(--hdr-h, 56px); z-index: 9; display: flex; gap: 6px; overflow-x: auto;
-    padding: 8px 0; margin-bottom: 14px; background: rgba(18,24,31,.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
+    padding: 8px 0; margin-bottom: 14px; background: rgba(18,21,25,.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* base.html setzt am Handy overflow-x:hidden auf <main> - das wuerde 'sticky' ausschalten; clip verhindert Seitenueberlauf ohne */
   @media (max-width: 640px) { main { overflow-x: clip; } }
   .tabbar button { flex: 0 0 auto; background: var(--card); color: var(--muted); border: 1px solid var(--border);
     border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .tabbar button:hover { color: var(--fg); }
-  .tabbar button.active { background: var(--accent); border-color: var(--accent); color: #0d141b; font-weight: 600; }
+  .tabbar button.active { background: var(--accent); border-color: var(--accent); color: #101317; font-weight: 600; }
   /* Trefferlisten der Geraetesuche: Zeilen abwechselnd schattiert, gut getrennt */
   #shelly-found > div { padding: 10px 12px; border: 1px solid transparent; }
   /* Symbol-Knoepfe: alle gleich gross, egal wie breit das Emoji ist */
@@ -40,8 +40,8 @@
   .tgl { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
     background: var(--card2); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: .75; }
   .tgl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .tgl.on { background: var(--on); border-color: var(--on); color: #0d141b; opacity: 1; }          /* an = Victron-Blau */
-  .tgl.dirty { background: var(--green); border-color: var(--green); color: #0d141b; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
+  .tgl.on { background: var(--on); border-color: var(--on); color: #101317; opacity: 1; }          /* an = Victron-Blau */
+  .tgl.dirty { background: var(--green); border-color: var(--green); color: #101317; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
   .tgl.del { color: var(--red); }
   .icon-pick.fixed { cursor: default; } .icon-pick.fixed:hover { border-color: var(--border); filter: none; }      /* Symbol fest (NFC-Knopf): gleiche Groesse wie die anderen, aber ohne Hover-Wirkung */
   /* Alle kleinen Aktionsknoepfe einer Zeile (PIN, Sichtbarkeit, Bearbeiten, Ein/Aus, Test) gleich gross */
@@ -70,8 +70,8 @@
   .seg button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 13px; background: var(--card2); color: var(--muted); cursor: pointer; margin: 0; font-weight: 500; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button.on.none { background: #565c66; color: #fff; }
-  .seg button.on.read { background: var(--accent); color: #0d141b; font-weight: 600; }
-  .seg button.on.write { background: var(--green); color: #0d141b; font-weight: 600; }
+  .seg button.on.read { background: var(--accent); color: #101317; font-weight: 600; }
+  .seg button.on.write { background: var(--green); color: #101317; font-weight: 600; }
   .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; }
   .tgl.vis.on { background: var(--card2); border-color: var(--accent); color: var(--accent); opacity: 1; }
   .tgl.pin.on { background: var(--card2); border-color: #f0b429; color: #f0b429; }
@@ -81,7 +81,7 @@
   .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
   .chip input { display:none; }
   .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
-  .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#12181f; font-weight:600; }
+  .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#121519; font-weight:600; }
   .ro-locked { opacity: .65; pointer-events: none; }
   .ro-locked .qhelp { pointer-events: auto; }   /* Tooltips bleiben auch in gesperrten Karten lesbar */
   .ro-locked summary { pointer-events: auto; }  /* Aufklapp-Dreiecke (Anleitungen etc.) bleiben bedienbar, der Inhalt bleibt gesperrt */
@@ -1521,7 +1521,7 @@ function uiDialog({ title, message, html, info, label, value = '', type = 'text'
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyIcons = [];
 const PWR_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:middle"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg>';
-const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#0d141b';          // eingeschaltet = Victron-Blau
+const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#101317';          // eingeschaltet = Victron-Blau
 async function shellyApi(url, method, body) {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined });

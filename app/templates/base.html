@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icon-16.png') }}">
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
-  <meta name="theme-color" content="#1a2129">
+  <meta name="theme-color" content="#1b1f24">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,8 +18,8 @@
   <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
   <style>
     :root {
-      --bg: #12181f; --card: #1a2129; --card2: #232d38;
-      --fg: #eef2f5; --muted: #9aa9b6; --accent: #3ca2cb; --border: #34414e;
+      --bg: #121519; --card: #1b1f24; --card2: #252a30;
+      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #3ca2cb; --border: #363c44;
       /* Signaturfarben: Orange (MA-Multiservice) + Victron-Blau. Orange = Hauptaktion/Warnung, Blau = aktiv/Auswahl/Links */
       --brand: #f48c24; --brand2: #3ca2cb; --on: #3ca2cb; --glow: rgba(60,162,203,.35);
       --green: #35c07a; --blue: #3ca2cb; --red: #e5544a;
@@ -29,7 +29,7 @@
     }
     * { box-sizing: border-box; }
     body { margin: 0; color: var(--fg);
-      background: radial-gradient(1100px 520px at 8% -8%, rgba(60,162,203,.10), transparent 62%),
+      background: radial-gradient(1300px 640px at 8% -8%, rgba(60,162,203,.15), transparent 64%),
                   radial-gradient(900px 480px at 100% 108%, rgba(244,140,36,.08), transparent 60%), var(--bg);
       background-attachment: fixed;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -128,10 +128,10 @@
       font-size: 12px; letter-spacing: .04em; }
     /* Tabellen auf dem Handy horizontal scrollbar statt gequetscht */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin; scrollbar-color: #445666 transparent; }
+      scrollbar-width: thin; scrollbar-color: #4a5059 transparent; }
     .table-scroll::-webkit-scrollbar { height: 8px; }
     .table-scroll::-webkit-scrollbar-track { background: transparent; }
-    .table-scroll::-webkit-scrollbar-thumb { background: #445666; border-radius: 4px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: #4a5059; border-radius: 4px; }
     @media (max-width: 640px) {
       #charge-log, #ev-list { table-layout: auto; font-size: 12px; }
       #charge-log { min-width: 0; }          /* passt meist ohne Scrollen */
@@ -164,29 +164,29 @@
     .sw-plan { background: transparent; border: 2px solid var(--plan); }
     /* Kurve mit Scroll (schmale Ansicht) + Drag-Auswahl */
     .chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
-      margin-top: 12px; max-width: 100%; scrollbar-width: thin; scrollbar-color: #445666 transparent; }
+      margin-top: 12px; max-width: 100%; scrollbar-width: thin; scrollbar-color: #4a5059 transparent; }
     .chart-scroll::-webkit-scrollbar { height: 8px; }
     .chart-scroll::-webkit-scrollbar-track { background: transparent; }
-    .chart-scroll::-webkit-scrollbar-thumb { background: #445666; border-radius: 4px; }
+    .chart-scroll::-webkit-scrollbar-thumb { background: #4a5059; border-radius: 4px; }
     .chart-inner { height: 300px; width: 100%; }
     /* Handy: Kurve doppelt so breit -> ~12 h sichtbar, Rest seitlich scrollen.
        Feste CSS-Breite statt JS verhindert das Aufschaukeln von Chart.js. */
     @media (max-width: 720px) { .chart-inner { height: 250px; width: 200%; } }
     .chart-scroll canvas { cursor: crosshair; touch-action: pan-x pan-y; }   /* pan-y: senkrecht wischen scrollt die Seite auch ueber dem Diagramm */
     body.selecting .chart-scroll canvas { touch-action: none; }
-    .sel-btn[aria-pressed="true"] { background: var(--timer); color: #12181f; border-color: var(--timer); }
+    .sel-btn[aria-pressed="true"] { background: var(--timer); color: #121519; border-color: var(--timer); }
     .daytab { font-size: 13px; padding: 6px 14px; }
     /* roter Zaehler wie bei Handy-Apps: ungelesene Logbuch-Eintraege */
     .log-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; height: 19px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
-      background: #e5544a; color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px var(--bg, #12181f); }
+      background: #e5544a; color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px var(--bg, #121519); }
     .log-badge[hidden] { display: none; }
     input[type=range] { padding: 0; margin: 0; border: 0; background: transparent; height: 24px; accent-color: var(--accent, #3ca2cb); cursor: pointer; }      /* Schieberegler: volle Laenge, links = Minimum, rechts = Maximum (nicht wie ein Textfeld mit Innenabstand) */
     input, select, textarea { color-scheme: dark; }      /* native Bedienelemente (Zeit-/Zahlenfelder, Auswahllisten) im dunklen Stil */
     .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
     .chip input { display:none; }
     .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
-    .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#12181f; font-weight:600; }
-    .daytab.active { background: var(--accent); color: #12181f; border-color: var(--accent); }
+    .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#121519; font-weight:600; }
+    .daytab.active { background: var(--accent); color: #121519; border-color: var(--accent); }
     /* Victron Live-Kacheln */
     /* Festes Raster: 6 pro Zeile (Desktop), damit nichts springt */
     .sysgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
@@ -241,7 +241,7 @@
       width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border);
       background: var(--card2); color: var(--muted); font-size: 11px; font-weight: 700;
       line-height: 1; cursor: pointer; padding: 0; margin-left: 6px; vertical-align: middle; }
-    .qhelp:hover, .qhelp[aria-expanded="true"] { color: #12181f; background: var(--accent);
+    .qhelp:hover, .qhelp[aria-expanded="true"] { color: #121519; background: var(--accent);
       border-color: var(--accent); }
   /* Eigenes, dunkel gestyltes Kalender-Popup fuer die Tag-Auswahl (e-pick/f-pick/p-pick) statt des nativen
      Browser-Datepickers - der bricht aus dem Design und erscheint nicht neben dem Icon (Michael, 28.09.). */
@@ -259,7 +259,7 @@
     border-radius: 6px; cursor: pointer; }
   .calpop .cal-day:hover:not(:disabled) { background: var(--bg); }
   .calpop .cal-day.today { box-shadow: inset 0 0 0 1px var(--accent); }
-  .calpop .cal-day.sel { background: var(--accent); color: #12181f; font-weight: 600; }
+  .calpop .cal-day.sel { background: var(--accent); color: #121519; font-weight: 600; }
   .calpop .cal-day:disabled { color: #454c5c; cursor: default; }
     .qpop { position: fixed; max-width: 360px; max-height: 72vh; overflow-y: auto; background: var(--card2);
       border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;

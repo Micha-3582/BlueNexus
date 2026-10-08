@@ -9,22 +9,22 @@
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#1a2129">
+  <meta name="theme-color" content="#1b1f24">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
   <style>
-    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: #eef2f5;
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: #f2f3f5;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), #12181f; }
-    .card { max-width: 420px; width: 100%; background: #1a2129; border: 1px solid #34414e; border-radius: 18px; padding: 28px 24px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), #121519; }
+    .card { max-width: 420px; width: 100%; background: #1b1f24; border: 1px solid #363c44; border-radius: 18px; padding: 28px 24px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
     img.logo { width: 72px; height: 72px; border-radius: 18px; display: block; margin: 0 auto 14px; }
-    h1 { font-size: 21px; margin: 0 0 6px; text-align: center; } .sub { color: #9aa9b6; font-size: 14px; text-align: center; margin: 0 0 20px; line-height: 1.5; }
+    h1 { font-size: 21px; margin: 0 0 6px; text-align: center; } .sub { color: #a3a9b0; font-size: 14px; text-align: center; margin: 0 0 20px; line-height: 1.5; }
     .step { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0; } .n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: rgba(60,162,203,.16); color: #3ca2cb; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-    .step b { display: block; margin-bottom: 2px; } .step span { color: #9aa9b6; font-size: 14px; line-height: 1.45; }
+    .step b { display: block; margin-bottom: 2px; } .step span { color: #a3a9b0; font-size: 14px; line-height: 1.45; }
     .ok { color: #3ca2cb; } .warn { color: #f48c24; }
     button { width: 100%; margin-top: 10px; padding: 13px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #1c1105; background: linear-gradient(180deg,#f79b3d,#f48c24); cursor: pointer; }
-    #inst-hint { display: none; margin-top: 8px; color: #9aa9b6; font-size: 13px; line-height: 1.5; }
+    #inst-hint { display: none; margin-top: 8px; color: #a3a9b0; font-size: 13px; line-height: 1.5; }
   </style>
 </head>
 <body>
