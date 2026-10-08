@@ -670,7 +670,10 @@ def nfc_tag(tid):
 def nfc_pair(code):
     """GET zeigt nur eine Rueckfrage (Link-Vorschauen von Chat-Apps rufen Links ab und wuerden den Einmal-Code sonst verbrauchen); erst der Knopf (POST) registriert."""
     ip = client_ip()
+    as_json = request.method == "POST" and "application/json" in (request.headers.get("Accept") or "")      # Bestaetigen per fetch: Ergebnis ohne Seitenwechsel (das Fenster laesst sich dann selbst schliessen)
     if too_many_attempts(ip):
+        if as_json:
+            return jsonify(ok=False, title="Zu viele Versuche", text="Bitte einige Minuten warten."), 429
         return _nfc_page(False, "Zu viele Versuche", "Bitte einige Minuten warten.", 429)
     if request.method == "GET":
         info = nfc.pair_peek(code)
@@ -683,10 +686,15 @@ def nfc_pair(code):
     got = nfc.pair_use(code)
     if not got:
         note_failed_attempt(ip)
+        if as_json:
+            return jsonify(ok=False, title="Link ungültig", text="Der Registrierungs-Link ist abgelaufen oder wurde schon benutzt. Bitte in der App einen neuen erzeugen."), 410
         return _nfc_page(False, "Link ungültig", "Der Registrierungs-Link ist abgelaufen oder wurde schon benutzt. Bitte in der App einen neuen erzeugen.", 410)
     phone, token = got
     opslog.log("rules", f"NFC: Handy „{phone['name']}“ registriert", dry=False)
-    return _nfc_cookie(_nfc_page(True, "Handy registriert", f"„{phone['name']}“ darf jetzt NFC-Tags nutzen, für die es freigegeben ist."), token)
+    text = f"„{phone['name']}“ darf jetzt NFC-Tags nutzen, für die es freigegeben ist."
+    if as_json:
+        return _nfc_cookie(jsonify(ok=True, title="Handy registriert", text=text), token)
+    return _nfc_cookie(_nfc_page(True, "Handy registriert", text), token)
 
 
 @app.route("/api/nfc", methods=["GET"])

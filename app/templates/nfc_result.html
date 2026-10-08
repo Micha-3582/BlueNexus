@@ -33,14 +33,33 @@
     <div class="sym">{{ '✓' if ok else '✕' }}</div>
     <h1>{{ title }}</h1>
     <p>{{ text }}</p>
-    {% if ok and not confirm %}<button id="zu" type="button" onclick="schliessen()" style="display:none;margin-top:20px;background:#252a30;color:#f2f3f5;border:1px solid #363c44">Schließen</button>{% endif %}
-    {% if confirm %}<form method="post" style="margin-top:22px"><button type="submit">Jetzt registrieren</button></form>{% endif %}
+    
+    {% if confirm %}<form method="post" id="reg" style="margin-top:22px"><button type="submit">Jetzt registrieren</button></form>{% endif %}
   </div>
-  {% if ok and not confirm %}<script>
-    // Erfolg: Fenster selbst schliessen (klappt, wenn der Browser den Tag in einem neuen Tab ohne Verlauf oeffnet); sonst erscheint ein Schliessen-Knopf.
-    function schliessen() { try { window.close(); } catch (e) {} setTimeout(function () { if (!document.hidden) { try { history.back(); } catch (e) {} } }, 250); }
-    setTimeout(function () { try { window.close(); } catch (e) {} }, 1500);
-    setTimeout(function () { var b = document.getElementById('zu'); if (b) b.style.display = 'block'; }, 2300);
-  </script>{% endif %}
+  <script>
+    // Ergebnis ohne Seitenwechsel anzeigen: Nach einem Seitenwechsel darf der Browser das Fenster nicht mehr selbst schliessen, und "zurueck" fuehrte auf
+    // die Bestaetigungsseite mit dem schon benutzten (ungueltigen) Link. Deshalb: Bestaetigen per fetch, Ergebnis in derselben Karte, nach 3 s schliessen.
+    var card = document.querySelector('.card');
+    function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function closeWin() { try { window.close(); } catch (e) {} }
+    function showDone(ok, title, text, closeAfter) {
+      card.className = 'card ' + (ok ? 'ok' : 'no');
+      card.innerHTML = '<div class="sym">' + (ok ? '✓' : '✕') + '</div><h1>' + esc(title) + '</h1><p id="msg">' + esc(text) + '</p>' +
+        '<button id="zu" type="button" style="display:none;margin-top:20px;background:#252a30;color:#f2f3f5;border:1px solid #363c44">Schließen</button>';
+      if (ok) setTimeout(closeWin, closeAfter);
+      setTimeout(function () { var b = document.getElementById('zu'); if (b && !document.hidden) { b.style.display = 'block'; b.onclick = closeWin; document.getElementById('msg').textContent += ' – du kannst dieses Fenster jetzt schließen.'; } }, closeAfter + 800);
+    }
+    {% if ok and not confirm %}showDone(true, {{ title | tojson }}, {{ text | tojson }}, 1500);{% endif %}
+    {% if confirm %}
+    document.getElementById('reg').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = e.target.querySelector('button'); btn.disabled = true;
+      fetch(location.href, { method: 'POST', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { showDone(!!j.ok, j.title, j.text, 3000); })
+        .catch(function () { e.target.submit(); });                                // Notfall: klassisches Senden
+    });
+    {% endif %}
+  </script>
 </body>
 </html>
