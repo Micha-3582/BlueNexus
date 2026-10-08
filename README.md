@@ -169,6 +169,10 @@ Kamera-Standbild** · **Telegram mit Video zum Ereignis** (aus der SD-Karten-Auf
 - **Trockenlauf:** Regeln werden nur protokolliert, nichts wird geschaltet – ideal zum Ausprobieren.
 - **Logbuch** zeigt, was wann und warum geschaltet wurde.
 - **Gruppen:** Regeln lassen sich in frei benennbare Gruppen sortieren (auf- und zuklappbar, per Ziehen sortierbar).
+  Änderungen in der Regelliste (Gruppen, Reihenfolge, Ein/Aus, Löschen) gelten **sofort**; eine Regel im Regel-Editor
+  speicherst du bewusst mit „Speichern“.
+- **Adresse aufrufen:** Ein Regel-Schritt (GET/POST) für Webhooks und andere Systeme – dazu passend der **Knopf mit
+  Web-Aufruf** mit geheimer, nur für Administratoren sichtbarer Adresse.
 - **Laufende Abläufe überstehen einen Neustart** der App.
 - **Restzeit** laufender Timer auf der Dashboard-Kachel; Antippen bricht ab.
 - **Sperrzeit** gegen mehrfaches Auslösen (z. B. Lichtschranke).
@@ -265,7 +269,8 @@ Ersparnis · Wetter.
   seine eigene Auswahl und Reihenfolge zusammen.
 - **Jede Liste ist per langem Druck und Ziehen sortierbar** (Geräte, Sensoren, Schalter, Kameras, Regeln …).
 - Schalten per Antippen, bei Bedarf mit **PIN**.
-- Dunkles, mobil optimiertes Design.
+- **Hell oder dunkel:** Unter *Einstellungen → Dashboard → Darstellung* wählt jedes Gerät **Dunkel, Hell oder Automatisch**
+  (folgt dem Gerät). Gilt auch auf Anmelde- und NFC-Seiten. Mobil optimiertes Design in den Farben Blau (Victron-Herkunft) und Orange.
 
 ---
 
@@ -403,6 +408,9 @@ Die App ist dafür gebaut, auch erreichbar zu sein, wenn man will – deshalb is
 ---
 
 ## Fernzugriff von unterwegs
+
+*Eigene Domain:* Der Tunnel läuft auch mit einer eigenen Adresse (z. B. `meinname.example.de`); die Schritte dafür
+stehen im [Handbuch (Kapitel 13b)](MANUAL.md#13b-fernzugriff-von-unterwegs-cloudflare-tunnel).
 
 Unter *Einstellungen → System → Fernzugriff* richtest du einen **Cloudflare-Tunnel** direkt in der App ein:
 Token eintragen, fertig. Keine Portfreigabe im Router, keine feste IP, kein eigener Server im Internet nötig. Die
