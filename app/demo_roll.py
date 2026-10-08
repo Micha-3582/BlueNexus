@@ -3,7 +3,7 @@
 Beim Start der Demo (BLUENEXUS_DEMO=1) wird geprueft, wie viele volle Wochen der letzte "echte" Datentag hinter gestern liegt.
 Ist das mindestens eine, werden alle Datumsangaben der Historie um dieses Vielfache von 7 Tagen nach vorn geschoben
 (Wochentage bleiben erhalten). Der Stand steht in demo_roll.json ({"anchor": "YYYY-MM-DD"}).
-Betroffen: history.json, history_archive/, price_history.json, solar_log.json, savings_days.json, verlauf.db.
+Betroffen: history.json, history_archive/, price_history.json, solar_log.json, savings_days.json, forecast_hours.json, verlauf.db.
 """
 from __future__ import annotations
 
@@ -117,6 +117,7 @@ def roll(app_dir: str | None = None, today: date | None = None) -> int:
     _shift_days_file(os.path.join(app_dir, "price_history.json"), n)
     _shift_days_file(os.path.join(app_dir, "solar_log.json"), n, ("auto_pr_date", "auto_bucket_date"))
     _shift_days_file(os.path.join(app_dir, "savings_days.json"), n)
+    _shift_days_file(os.path.join(app_dir, "forecast_hours.json"), n)          # gemerkte VRM-Stundenprognose je Tag
     _shift_db(app_dir, n)
     _dump({"anchor": (anchor + timedelta(days=n)).isoformat(), "rolled": datetime.now().isoformat(timespec="seconds")}, marker)
     return n
