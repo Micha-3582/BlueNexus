@@ -10,6 +10,11 @@ Diese Software ist **mehr als eine Victron-Steuerung**. Sie ist eine eigenständ
 **Smart-Home-Zentrale** – ohne ioBroker, Home Assistant, Node-RED oder Cloud-Zwang – und bringt dabei ein
 vollwertiges **Energiemanagement für Victron-ESS-Anlagen mit dynamischem Strompreis** gleich mit.
 
+> ⚠️ **Das Energie-Modul unterstützt ausschließlich Victron** (Cerbo GX mit MultiPlus-II/Quattro, ESS, per Modbus TCP).
+> Speichersysteme und Wechselrichter anderer Hersteller werden **nicht** unterstützt. PV-Wechselrichter anderer Marken,
+> die am Cerbo angemeldet sind, sind dagegen kein Problem. Wer keine Victron-Anlage hat, wählt das Energie-Modul ab und
+> nutzt BlueNexus als reine Smart-Home-Zentrale.
+
 Jede Installation trägt den Namen ihres Besitzers: Beim ersten Start fragt die App nach dem Vornamen und heißt
 dann z. B. **„Michaels BlueNexus“** – in Kopfzeile, Browser-Tab, Handy-App und Nachrichten (später frei änderbar).
 
