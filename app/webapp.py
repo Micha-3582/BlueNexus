@@ -11,6 +11,7 @@ Start:
   pip install -r requirements.txt
   python webapp.py            # http://<host>:5005
 """
+import copy
 import logging
 import re
 import threading
@@ -263,7 +264,7 @@ ENDPOINT_AREA = {
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
     "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
-    "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete",
+    "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete", "api_virtual_url": "settings_geraete",
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete",
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
@@ -1885,6 +1886,14 @@ class Controller:
                 sent = notify.video(cam, set(st.get("filter") or []), (st.get("text") or "").strip(), cfg, st.get("to"))
                 who = (" an " + notify.names(st.get("to"))) if st.get("to") else ""
                 jobs.append(("notify", cam["name"], f"Video von {cam['name']} ({what}) {'wird, sobald die Aufnahme fertig ist, per Telegram' + who + ' gesendet' if sent else 'NICHT gesendet (Telegram nicht eingerichtet)'}", None if sent else "Telegram nicht eingerichtet"))
+        elif t == "http":
+            label = st.get("label") or "Web-Aufruf"
+            meth = st.get("method", "GET")
+            if dry:
+                jobs.append(("notify", label, f"Web-Aufruf „{label}“ ({meth}) würde ausgeführt", None))
+            else:
+                webhook.fire(f"rule-{act['rule_id']}", f"{rule} – {label}", st["url"], meth)         # im Hintergrund; Ergebnis steht im Logbuch (ohne Adresse)
+                jobs.append(("notify", label, f"Web-Aufruf „{label}“ ({meth}) wird ausgeführt", None))
         elif t == "virtual":
             vname = next((v["name"] for v in virtual.load() if v["id"] == st["id"]), None)
             if vname is None:
@@ -2955,10 +2964,18 @@ def _sun_info(cfg: dict) -> dict:
 def api_rules_get():
     """Regeln (eigener Baustein): Regeln, Status, Einstellungen, letzte Aktionen."""
     cfg = store.load_config()
+    rl = [n for r in rules.list_rules() for n in rules.to_new(r)]
+    if not auth.has_level(g.perms, "rules", "write"):                        # Lese-Konten sehen die Adressen von Web-Aufrufen nicht (koennen Zugangsschluessel enthalten)
+        rl = copy.deepcopy(rl)
+        for r in rl:
+            for br in ("then", "else"):
+                for stp in r.get(br) or []:
+                    if isinstance(stp, dict) and stp.get("type") == "http":
+                        stp["url"], stp["url_hidden"] = "", True
     return jsonify({"enabled": rules.enabled(cfg), "dry_run": rules.dry_run(cfg),
                     "settings": rules.settings(cfg), "defaults": rules.DEFAULTS, "bounds": rules.BOUNDS,
                     "tariff_mode": cfg.get("tariff_mode", "tibber"),
-                    "groups": rules.load().get("groups", []), "rules": [n for r in rules.list_rules() for n in rules.to_new(r)], "status": {**rules.rollup_status(dict(rule_engine.status)), **dict(flow_engine.status)}, "owner": dict(rule_engine.owner),
+                    "groups": rules.load().get("groups", []), "rules": rl, "status": {**rules.rollup_status(dict(rule_engine.status)), **dict(flow_engine.status)}, "owner": dict(rule_engine.owner),
                     "sun": _sun_info(cfg), "events": autolog.recent("rules", 8)})
 
 
@@ -4223,6 +4240,19 @@ def _pin_gate(vid: str, has_fn=None, check_fn=None):
     left = PIN_MAX_FAILS - rec[0]
     log.warning("Falsche PIN an Schalter bzw. Gerät %s (%d von %d)", vid, rec[0], PIN_MAX_FAILS)
     return jsonify(error="PIN falsch" + (f" – noch {left} Versuche" if left > 0 else " – gesperrt für 5 Minuten"), pin_required=True), 403
+
+
+@app.route("/api/virtual/<vid>/url", methods=["GET"])
+def api_virtual_url(vid):
+    """Hinterlegte Web-Adresse eines Knopfs - nur fuer Administratoren (zum Ansehen/Aendern; sonst bleibt sie geheim)."""
+    if not auth.is_full_admin(g.perms):
+        return jsonify(error="Nur Administratoren dürfen die Adresse sehen."), 403
+    it = next((v for v in virtual.load() if v["id"] == vid), None)
+    if not it:
+        return jsonify(error="nicht gefunden"), 404
+    resp = jsonify(url=it.get("url", ""), method=it.get("method", "GET"))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.route("/api/virtual/<vid>/press", methods=["POST"])

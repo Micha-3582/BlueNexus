@@ -540,7 +540,7 @@
   <div class="admin-only" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input id="virt-name" placeholder="Name, z.B. Warmwasser-Timer" style="flex:1;min-width:200px" autocomplete="off">
     <span class="qhelp" role="button" tabindex="0" data-help="Schalter bleibt an oder aus. Knopf wird gedrückt. Nachlauf-Timer läuft X Minuten und lässt sich neu starten.">?</span> <select id="virt-kind" style="width:auto"><option value="switch">Schalter (bleibt an/aus)</option><option value="button">Knopf (wird gedrückt)</option><option value="webhook">Knopf mit Web-Aufruf (ruft eine Adresse auf)</option><option value="timer">Nachlauf-Timer (läuft X Minuten, neu startbar)</option></select>
-    <span id="virt-url-wrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:260px"><input id="virt-url" type="password" placeholder="Adresse, die aufgerufen wird (bleibt geheim)" autocomplete="new-password" style="flex:1;min-width:200px"> <select id="virt-method" style="width:auto" title="Art des Aufrufs"><option value="GET">GET</option><option value="POST">POST</option></select></span>
+    <span id="virt-url-wrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:260px"><input id="virt-url" type="text" placeholder="Adresse, die aufgerufen wird, z. B. http://192.168.2.50/relay/0?turn=on" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"> <select id="virt-method" style="width:auto" title="Art des Aufrufs"><option value="GET">GET</option><option value="POST">POST</option></select></span>
     <span id="virt-min-wrap" style="display:none;align-items:center;gap:6px"><input id="virt-min" type="number" min="1" max="1440" step="1" value="3" style="width:80px" title="Nachlaufzeit in Minuten"> <span class="muted">Minuten</span></span>
     <button id="virt-add" class="ghost">Anlegen</button>
   </div>
@@ -2212,8 +2212,8 @@ async function loadVirtualAdmin() {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="virtRenameSave('${vid}')">${I_CHECK}</button></div>`}
         ${v.kind === 'timer' ? `<div class="edit-row" style="margin-top:10px"><span class="muted">Nachlaufzeit</span><input id="vmin-${vid}" type="number" min="1" max="1440" step="1" value="${v.minutes}" style="width:80px"><span class="muted">Minuten</span>
           <button type="button" class="tgl" title="Nachlaufzeit speichern" aria-label="Nachlaufzeit speichern" onclick="virtPatch('${vid}', { minutes: document.getElementById('vmin-${vid}').value })">${I_CHECK}</button></div>` : ''}
-        ${v.kind === 'button' && !v.nfc ? `<div class="edit-row" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="muted">🔗 Web-Aufruf: ${v.has_url ? 'Adresse hinterlegt (aus Sicherheitsgründen nicht sichtbar)' : 'keine Adresse hinterlegt'}</span>
-          <button type="button" class="ghost" onclick="virtUrl('${vid}', ${v.has_url ? 'true' : 'false'})">${v.has_url ? 'Adresse ändern …' : 'Adresse hinterlegen …'}</button>
+        ${v.kind === 'button' && !v.nfc ? `<div class="edit-row" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="muted">🔗 Web-Aufruf: ${v.has_url ? 'Adresse hinterlegt (nur Administratoren sehen sie)' : 'keine Adresse hinterlegt'}</span>
+          <button type="button" class="ghost" onclick="virtUrl('${vid}', ${v.has_url ? 'true' : 'false'})">${v.has_url ? 'Adresse ansehen / ändern …' : 'Adresse hinterlegen …'}</button>
           ${v.has_url ? `<select style="width:auto" title="Art des Aufrufs" onchange="virtPatch('${vid}', { method: this.value })"><option value="GET"${v.method !== 'POST' ? ' selected' : ''}>GET</option><option value="POST"${v.method === 'POST' ? ' selected' : ''}>POST</option></select>` : ''}</div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(v.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'virtual','${vid}','show','Dashboard')`)}
@@ -2231,8 +2231,10 @@ async function virtPatch(id, body) {
   loadVirtualAdmin();
 }
 async function virtUrl(id, has) {
-  const url = await uiDialog({ title: 'Web-Aufruf', message: 'Beim Drücken ruft die Zentrale diese Adresse auf (GET oder POST), zum Beispiel einen Webhook oder ein anderes Smart-Home-System. Die Adresse wird nie angezeigt und steht auch nicht im Logbuch.' + (has ? ' Leer lassen und bestätigen entfernt den Aufruf.' : ''),
-    label: 'Adresse (http:// oder https://)', type: 'password', okText: has ? 'Speichern' : 'Hinterlegen' });
+  let cur = '';
+  if (has) { try { cur = (await shellyApi('/api/virtual/' + encodeURIComponent(id) + '/url')).url || ''; } catch (e) { shellyMsg(e.message, true); return; } }
+  const url = await uiDialog({ title: 'Web-Aufruf', message: 'Beim Drücken ruft die Zentrale diese Adresse auf (GET oder POST), zum Beispiel einen Webhook oder ein anderes Smart-Home-System. Nur Administratoren sehen die Adresse; im Logbuch und in Meldungen steht sie nicht.' + (has ? ' Leer lassen und bestätigen entfernt den Aufruf.' : ''),
+    label: 'Adresse (http:// oder https://)', value: cur, okText: has ? 'Speichern' : 'Hinterlegen' });
   if (url === null) return;
   if (!url.trim()) { if (has) await virtPatch(id, { clear_url: true }); return; }
   await virtPatch(id, { url: url.trim() });

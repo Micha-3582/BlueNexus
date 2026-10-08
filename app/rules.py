@@ -243,7 +243,7 @@ def normalize_condition(c: dict) -> dict:
 AC_MODES = ("auto", "cool", "dry", "heat", "fan_only", "smart_dry")
 AC_FANS = ("auto", "silent", "low", "medium", "high", "max")
 VIDEO_FILTERS = ("animal", "person", "vehicle", "motion")                      # Ereignisarten fuer "Video zum Ereignis" (leer = jede Aufnahme)
-STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac")
+STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http")
 MAX_WAIT_S = 7 * 86400
 
 
@@ -315,6 +315,16 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
         if str(a.get("action", "set")).strip().lower() == "stop":
             return {"type": t, "id": bid, "action": "stop"}
         return {"type": t, "id": bid, "action": "set", "level": int(round(_num(a.get("level", 0), 0, 100, "Rollladen-Position (%)")))}
+    if t == "http":                                  # Adresse aufrufen (GET/POST), z. B. Webhook oder anderes Smart-Home-System (webhook.py)
+        import webhook
+        method = str(a.get("method") or "GET").strip().upper()
+        if method not in webhook.METHODS:
+            raise RuleError("Adresse aufrufen: GET oder POST wählen")
+        try:
+            url = webhook.validate(str(a.get("url") or ""))
+        except webhook.WebhookError as e:
+            raise RuleError(f"Adresse aufrufen: {e}")
+        return {"type": t, "url": url, "method": method, "label": str(a.get("label") or "").strip()[:60]}
     if t == "photo":                                 # Kamera-Standbild per Telegram (camera.py + notify.py)
         cid = str(a.get("id") or "").strip()
         if not cid:

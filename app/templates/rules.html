@@ -316,7 +316,7 @@ function collectCond(row) {
   if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
   return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
 }
-const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)']];
+const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)']];
 const videoCams = () => (S.cameras || []).filter(x => (x.kind || 'reolink') === 'reolink');
 function toRow(a, rs) {                              // "Senden an": nur wenn es mehr als einen Empfaenger gibt (Telegram: S.recipients, Pushover: S.prec)
   rs = rs || S.recipients || [];
@@ -410,6 +410,10 @@ function actRow(a, branch, flow) {
       <input class="a-title" placeholder="Titel (optional)" value="${escH(a.title || '')}" style="width:170px" oninput="ruleEdited(this)">
       <span class="muted">Priorität</span> ${sel('a-prio', String(a.priority || 0), prio)} ${sel('a-snd', a.sound || '', snd)}
       ${MODULES.cameras ? `<span class="muted">Bild</span> ${sel('a-pcam', a.camera || '', camOpts)}` : ''}${toRow(a, S.prec)}`;
+  } else if (t === 'http') {
+    body = `<b>🔗 Adresse aufrufen</b> ${sel('a-hm', a.method === 'POST' ? 'POST' : 'GET', [['GET', 'GET'], ['POST', 'POST']])}
+      <input class="a-url" type="text" spellcheck="false" autocomplete="off" placeholder="${a.url_hidden ? 'Adresse ist für dich nicht sichtbar' : 'Adresse, z. B. http://192.168.2.50/relay/0?turn=on'}" value="${escH(a.url || '')}" style="flex:1;min-width:240px" oninput="ruleEdited(this)" ${a.url_hidden ? 'disabled' : ''}>
+      <input class="a-label" type="text" placeholder="Bezeichnung fürs Logbuch (optional)" value="${escH(a.label || '')}" maxlength="60" style="min-width:200px" oninput="ruleEdited(this)">`;
   } else if (t === 'wol') {
     const list = S.wol || [], opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rechner fehlt)']);
     body = `<b>⏰ Rechner aufwecken</b> ${sel('a-wid', a.id, opts)}${list.length ? '' : '<span class="muted">Noch kein Rechner angelegt – Smart Home → Wake-on-LAN.</span>'}`;
@@ -441,6 +445,7 @@ function collectAct(x) {
   if (t === 'virtual') return { type: t, id: q('a-vid').value, state: q('a-vst').value };
   if (t === 'lock') return { type: t, id: q('a-lid').value, state: q('a-lst').value };
   if (t === 'wol') return { type: t, id: q('a-wid').value };
+  if (t === 'http') return { type: t, method: q('a-hm').value, url: q('a-url').value.trim(), label: q('a-label').value.trim() };
   return { device_id: q('a-dev').value, state: q('a-state').value };
 }
 function collectRule(box) {
@@ -512,6 +517,7 @@ function actAddSel(sel, branch) {
     virtual: () => ({ type: 'virtual', id: ((S.virtual || [])[0] || {}).id || '', state: 'on' }),
     lock: () => ({ type: 'lock', id: ((S.locks || [])[0] || {}).id || '', state: 'lock' }),
     wol: () => ({ type: 'wol', id: ((S.wol || [])[0] || {}).id || '' }),
+    http: () => ({ type: 'http', method: 'GET', url: '', label: '' }),
     sound: () => ({ type: 'sound', id: ((S.sounds || [])[0] || {}).id || '', track: 1, volume: 100, repeats: 1 }),
     photo: () => ({ type: 'photo', id: ((S.cameras || [])[0] || {}).id || '', text: '' }),
     video: () => ({ type: 'video', id: (videoCams()[0] || {}).id || '', text: '', filter: ['animal'] }),
@@ -623,6 +629,7 @@ const actSummary = a => {
   const t = a.type || 'switch';
   if (t === 'toggle') return `umschalten: ${devName(a.device_id)}`;
   if (t === 'wol') { const w = (S.wol || []).find(x => x.id === a.id); return `aufwecken: ${w ? w.name : '?'}`; }
+  if (t === 'http') return `Adresse aufrufen (${a.method === 'POST' ? 'POST' : 'GET'})${a.label ? ': ' + a.label : ''}`;
   if (t === 'lock') { const k = (S.locks || []).find(x => x.id === a.id); return `Türschloss ${k ? k.name : '?'} ${LOCK_WORD[a.state]}`; }
   if (t === 'wait') { const s = a.seconds || 0; return 'warte ' + (s % 3600 === 0 ? s / 3600 + ' h' : s % 60 === 0 ? s / 60 + ' min' : s + ' s'); }
   if (t === 'setpoint') return `Thermostate ${(a.device_ids || []).includes('*') ? '(alle)' : '(' + (a.device_ids || []).length + ')'} → ${a.value} °C`;
