@@ -275,6 +275,13 @@
     .card h2 .qhelp { text-transform: none; vertical-align: 1px; }
     .qpop code { background: var(--bg); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
   </style>
+  {% if demo %}<style>
+    /* Demo: Gesperrte (nur lesbare) Karten sehen aus wie bedienbare - es laesst sich trotzdem nichts aendern (Klicks gesperrt, Speichern serverseitig abgelehnt) */
+    .ro-locked { opacity: 1 !important; }
+    .switch input:disabled + .slider { opacity: 1 !important; cursor: default; }
+    /* gesperrte Knoepfe normal darstellen - ausgenommen solche, die aus Bedienlogik grau sind (naechster Tag, Termin anlegen, Kalender) */
+    button:disabled:not(.daytab):not(.cal-nav):not(.cal-day):not([id$="-prev"]):not([id$="-next"]):not(#ev-confirm):not(#ev-discard) { opacity: 1 !important; cursor: default; }
+  </style>{% endif %}
 </head>
 <body>
   {% if demo %}<div style="position:sticky;top:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🎬 <b>DEMO</b> – alle Daten, Geräte und Kameras sind erfunden. Es wird nichts geschaltet und nichts gesendet.</div>{% elif sandbox %}<div style="position:sticky;top:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
