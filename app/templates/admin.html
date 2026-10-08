@@ -20,7 +20,7 @@
   .card:nth-of-type(11) h2 svg.h2i { color: var(--red); }    /* Netz-Zähler  */
   /* Reiter (Tabs) */
   .tabbar { position: sticky; top: var(--hdr-h, 56px); z-index: 9; display: flex; gap: 6px; overflow-x: auto;
-    padding: 8px 0; margin-bottom: 14px; background: var(--navbg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
+    padding: 8px 10px; margin-bottom: 14px; border-radius: 18px; background: var(--navbg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* base.html setzt am Handy overflow-x:hidden auf <main> - das wuerde 'sticky' ausschalten; clip verhindert Seitenueberlauf ohne */
   @media (max-width: 640px) { main { overflow-x: clip; } }
