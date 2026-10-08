@@ -191,7 +191,9 @@ function showStep(n) {
   document.querySelectorAll('.wiz-step').forEach(s => {
     s.classList.toggle('active', parseInt(s.dataset.step) === step);
   });
-  document.getElementById('wiz-back').style.visibility = step === 0 ? 'hidden' : 'visible';
+  const backBtn = document.getElementById('wiz-back');
+  backBtn.textContent = step === 0 ? '← Module ändern' : '← Zurück';     // im ersten Schritt führt der Knopf zur Modulwahl
+  backBtn.style.visibility = 'visible';
   document.getElementById('wiz-counter').textContent = `Schritt ${step + 1} von ${STEP_COUNT}`;
   const nextBtn = document.getElementById('wiz-next');
   nextBtn.textContent = step === STEP_COUNT - 1 ? 'Speichern & starten' : 'Weiter →';
@@ -199,7 +201,10 @@ function showStep(n) {
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 
-document.getElementById('wiz-back').addEventListener('click', () => showStep(step - 1));
+document.getElementById('wiz-back').addEventListener('click', () => {
+  if (step === 0) { window.location.href = '/setup/modules'; return; }
+  showStep(step - 1);
+});
 document.getElementById('wiz-next').addEventListener('click', async () => {
   if (step === STEP_COUNT - 1) {
     await doSave();
