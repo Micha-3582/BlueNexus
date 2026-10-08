@@ -2005,6 +2005,9 @@ class Controller:
         _alexa_sync()                                              # Alexa-Anbindung (Hue-Emulation), nur wenn das Modul an ist
 
 
+import demo_sim
+demo_sim.activate()                                            # Demo-Modus (BLUENEXUS_DEMO=1): simulierte Geraete/Kameras/CCU
+
 ctrl = Controller()
 
 
