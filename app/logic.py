@@ -1,0 +1,503 @@
+"""
+Victron Standalone Steuerung - Entscheidungslogik
+=================================================
+1:1-Portierung von victron_steuerung_v39.4.js (ioBroker) nach Python.
+
+REIN & TESTBAR: keine Hardware, kein Netz. Die Funktion decide() bekommt
+alle Eingaben als Argumente plus einen persistenten State-Dict und gibt
+die Entscheidung + aktualisierten State zurück. I/O (Modbus, Tibber, PV,
+Speicherung) liegt außerhalb.
+
+ESS-Mode:  9 = laden erlaubt · 10 = nicht laden (wie in V39.4).
+"""
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+
+# --- PARAMETER (aus V39.4) ---
+PV_KORREKTUR_FAKTOR = 0.68
+PV_TOM_MORNING_FACTOR = 0.15   # Saisonal: Winter 0.05 / Sommer 0.25
+DAILY_USAGE_KWH = 30.0
+BATTERY_USABLE_KWH = 24.0
+PV_RESERVE_KWH = 5.0
+CHARGE_POWER_W = 3500
+HYSTERESE_SOC = 1.5
+
+MORNING_PEAK_START = 7
+MORNING_PEAK_END = 9
+EVENING_PEAK_START = 19
+EVENING_PEAK_END = 21
+MIN_PEAK_SOC = 40
+EVENING_COMFORT_SOC = 0.0     # 0 = aus. Sonst: Komfort-Ziel-SOC vor dem Abend-Peak, siehe Params.evening_comfort_soc
+VALLEY_MIN_SAVING_CT = 15.0    # Mindestersparnis (ct/kWh) ggue. dem erwarteten Abend-Peak-Preis, damit der Vorkauf greift
+PEAK_AVOID_PRICE = 37.0
+NIGHT_SAFETY_SOC = 30.0
+TARGET_SAFE_SOC = 35.0
+MAX_CHARGE_SOC = 90.0   # harte Ladesperre: nie über diesen SOC aus dem Netz laden
+ABSOLUTE_CHEAP_PRICE = 0.0   # Gegenstück: unter diesem Preis (ct/kWh) IMMER laden, 0 = aus
+
+ESS_CHARGE = 9
+ESS_IDLE = 10
+
+
+@dataclass
+class Params:
+    """Alle anlagenspezifischen Steuerungs-Parameter. Defaults = V39.4 (Michael).
+    Über die Web-App pro Anlage anpassbar."""
+    battery_usable_kwh: float = BATTERY_USABLE_KWH
+    daily_usage_kwh: float = DAILY_USAGE_KWH
+    charge_power_w: int = CHARGE_POWER_W
+    pv_reserve_kwh: float = PV_RESERVE_KWH
+    pv_korrektur_faktor: float = PV_KORREKTUR_FAKTOR
+    pv_tom_morning_factor: float = PV_TOM_MORNING_FACTOR
+    hysterese_soc: float = HYSTERESE_SOC
+    morning_peak_start: int = MORNING_PEAK_START
+    morning_peak_end: int = MORNING_PEAK_END
+    evening_peak_start: int = EVENING_PEAK_START
+    evening_peak_end: int = EVENING_PEAK_END
+    min_peak_soc: float = MIN_PEAK_SOC
+    evening_comfort_soc: float = EVENING_COMFORT_SOC
+    valley_min_saving_ct: float = VALLEY_MIN_SAVING_CT
+    peak_avoid_price: float = PEAK_AVOID_PRICE
+    night_safety_soc: float = NIGHT_SAFETY_SOC
+    target_safe_soc: float = TARGET_SAFE_SOC
+    max_charge_soc: float = MAX_CHARGE_SOC
+    absolute_cheap_price: float = ABSOLUTE_CHEAP_PRICE
+    soc_floor_pct: float = 0.0     # 'Minimaler SOC' am Cerbo (wird je Durchlauf gelesen): darunter liefert der Akku nichts mehr
+    smart_planner_safety_buffer_pct: float = 5.0   # Intelligente Planung rechnet mit soc_floor_pct + diesem Puffer als
+    # Untergrenze (siehe webapp._smart_decision), OHNE den echten Cerbo-Minimalwert zu aendern - reine Sicherheitsmarge
+    # gegen eine zu optimistische Sonnenprognose (Michael, 29.09.: "min soc 15% eingestellt, Software soll trotzdem mit
+    # 20% rechnen" - Ladelimit/harte Cerbo-Sperre bleiben unveraendert bei den echten 15%, nur die Planung selbst wird
+    # vorsichtiger und laedt nachts etwas frueher/mehr, statt bis auf den letzten Prozentpunkt auf die Sonne zu wetten).
+    periodic_full_charge_days: float = 0.0     # periodische Vollladung fuer Batteriegesundheit/BMS-Balancing (0 = aus,
+    # siehe webapp._apply_periodic_full_charge): alle X Tage wird die Ladeobergrenze (max_charge_soc) auf
+    # periodic_full_charge_target_soc angehoben, damit die Batterie hin und wieder wirklich voll wird - WANN das
+    # geschieht, entscheidet weiterhin ganz normal die preis-/sonnenbewusste Planung (nie blindes Sofortladen,
+    # Michael 30.09.: "niemals blind laden und die preise ausser acht lassen"). Angeregt durch Victrons "GX
+    # Opportunity Loads"-Folien (Venus OS v3.80), die genau das empfehlen.
+    periodic_full_charge_target_soc: float = 100.0
+    dynamic_pricing: bool = True   # False = fester Tarif: keine preisbasierten Strategien
+
+    @classmethod
+    def from_config(cls, cfg: dict) -> "Params":
+        """Baut Params aus einem Config-Dict; unbekannte/fehlende Felder = Default."""
+        fields = cls().__dict__
+        kwargs = {k: cfg[k] for k in fields if k in cfg and cfg[k] is not None}
+        kwargs["dynamic_pricing"] = cfg.get("tariff_mode", "tibber") != "fixed"
+        return cls(**kwargs)
+
+
+@dataclass
+class Slot:
+    name: str          # "HH:MM-HH:MM"
+    price: float       # ct/kWh
+    start: datetime
+
+
+@dataclass
+class PersistentState:
+    """Ersetzt die internen ioBroker-States (0_userdata.0.Victron.Intern_*)."""
+    day_stamp: str = ""
+    slots_charged: int = 0
+    last_counted_slot: str = ""
+    commit_slot: str = ""
+    morning_bridge: bool = False
+    night_buffer: bool = False
+    charge_limit_hit: bool = False
+    smart_commit_slot: str = ""    # wie commit_slot, aber fuer die Intelligente Planung (siehe webapp._smart_decision):
+                                    # verhindert, dass eine einmal begonnene Ladung innerhalb derselben Viertelstunde
+                                    # durch eine neu berechnete Entscheidung wieder abgebrochen wird (Michael, 28.09.:
+                                    # "wenn es zu einer ladeentscheidung kommt das dann die 15 min auch durchgezogen
+                                    # werden" - vorher flatterte das bei knappen Faellen minuetlich an/aus)
+    last_full_charge_date: str = ""    # periodische Vollladung (siehe webapp._apply_periodic_full_charge): Tag,
+                                        # an dem der Akku zuletzt tatsaechlich das Vollladungs-Ziel erreicht hat
+                                        # (egal ob durch Sonne oder Netz) - Grundlage fuer "wieder faellig?"
+    full_charge_pending: bool = False  # True, waehrend eine faellige Vollladung auf einen guenstigen Moment wartet
+                                        # (nur fuer die Logbuch-Meldung, damit sie nicht jeden Tick neu erscheint)
+
+
+@dataclass
+class Decision:
+    allow_now: bool
+    ess_mode: int
+    now_slot: str
+    now_price: float
+    reason: str
+    strategy: str
+    balance: float
+    plan: list = field(default_factory=list)      # gewählte Slots
+    plan_windows: str = ""
+    target_slots: int = 0
+    solar_today_korr: float = 0.0
+    solar_tom_korr: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Hilfsfunktionen
+# ---------------------------------------------------------------------------
+def _pad2(n: int) -> str:
+    return f"{n:02d}"
+
+
+def fmt_hm(d: datetime) -> str:
+    return f"{_pad2(d.hour)}:{_pad2(d.minute)}"
+
+
+def slot_name_from_date(d: datetime) -> str:
+    e = d + timedelta(minutes=15)
+    return f"{_pad2(d.hour)}:{_pad2(d.minute)}-{_pad2(e.hour)}:{_pad2(e.minute)}"
+
+
+def build_slots(price_entries: list, now: datetime) -> list:
+    """price_entries: [{'startsAt': iso, 'total': EUR/kWh}, ...] (heute + morgen).
+    Filtert auf ab-jetzt und dedupliziert - wie readAllPrices() in V39.4."""
+    now_q = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
+    slots: list[Slot] = []
+    seen = set()
+    for item in price_entries:
+        start = _parse_iso(item["startsAt"])
+        if start >= now_q:
+            name = slot_name_from_date(start)
+            if name not in seen:
+                seen.add(name)
+                slots.append(Slot(name=name, price=item["total"] * 100, start=start))
+    slots.sort(key=lambda s: s.start)
+    return slots
+
+
+_ISO_FALLBACK = (
+    "%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M",
+)
+
+
+def _parse_iso(s: str) -> datetime:
+    """Tibber liefert z.B. 2026-07-22T10:00:00.000+02:00. Wir wollen die
+    lokale Wanduhrzeit (tz entfernen). Robust auch für Python 3.9, wo
+    fromisoformat weniger Formate versteht (Z-Suffix, krumme Bruchteile)."""
+    text = str(s).strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        dt = None
+        for fmt in _ISO_FALLBACK:
+            try:
+                dt = datetime.strptime(text, fmt)
+                break
+            except ValueError:
+                continue
+        if dt is None:
+            raise
+    if dt.tzinfo is not None:
+        dt = dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
+def _avg_price_on_day(slots: list, day, h_from: int, h_to: int) -> float | None:
+    """Durchschnittspreis der Slots eines bestimmten Kalendertags in [h_from, h_to) Uhr, oder None ohne Daten."""
+    vals = [s.price for s in slots if s.start.date() == day and h_from <= s.start.hour < h_to]
+    return sum(vals) / len(vals) if vals else None
+
+
+def merge_into_windows(picked: list) -> str:
+    if not picked:
+        return ""
+    s = sorted(picked, key=lambda x: x.start)
+    windows = []
+    win_start = s[0].start
+    win_end = win_start + timedelta(minutes=15)
+    for slot in s[1:]:
+        if slot.start == win_end:
+            win_end = win_end + timedelta(minutes=15)
+        else:
+            windows.append(f"{fmt_hm(win_start)}-{fmt_hm(win_end)}")
+            win_start = slot.start
+            win_end = win_start + timedelta(minutes=15)
+    windows.append(f"{fmt_hm(win_start)}-{fmt_hm(win_end)}")
+    return ", ".join(windows)
+
+
+def calc_peak_protection(soc, hour_now, solar_today, solar_tom, p: Params, target_soc: float | None = None):
+    """target_soc: Standard = p.min_peak_soc (Sicherheitsziel); ein hoeherer Wert (z.B. p.evening_comfort_soc)
+    prueft stattdessen, ob DER hoehere Komfort-Zielwert bis zum Peak erreicht wird."""
+    current_kwh = (soc / 100) * p.battery_usable_kwh
+    min_peak_kwh = (max(p.min_peak_soc if target_soc is None else target_soc, p.soc_floor_pct) / 100) * p.battery_usable_kwh      # nie unter der Cerbo-Untergrenze
+    hours_to_peak = None
+    peak_label = ""
+    pv_until_peak = 0.0
+
+    if hour_now < p.morning_peak_start:
+        hours_to_peak = p.morning_peak_start - hour_now
+        peak_label = "Morgen-Peak"
+        pv_until_peak = solar_today * (0.0 if hour_now < 6 else 0.05)
+    elif p.morning_peak_end <= hour_now < p.evening_peak_start:
+        hours_to_peak = p.evening_peak_start - hour_now
+        peak_label = "Abend-Peak"
+        pv_factor = 0.50 if hour_now < 13 else (0.25 if hour_now < 16 else 0.05)
+        pv_until_peak = solar_today * pv_factor
+    elif hour_now >= p.evening_peak_end:
+        hours_to_peak = (24 - hour_now) + p.morning_peak_start
+        peak_label = "Morgen-Peak (morgen)"
+        pv_until_peak = solar_tom * p.pv_tom_morning_factor
+
+    if hours_to_peak is None:
+        return False, 0.0, ""
+
+    usage_until_peak = (p.daily_usage_kwh / 24) * hours_to_peak
+    projected = current_kwh + pv_until_peak - usage_until_peak
+    if projected < min_peak_kwh:
+        return True, (min_peak_kwh - projected), f"Schutz vor {peak_label}"
+    return False, 0.0, ""
+
+
+# ---------------------------------------------------------------------------
+# Hauptentscheidung (Port von recalcPlanAndApply)
+# ---------------------------------------------------------------------------
+def decide(soc: float, price_entries: list, solar_today_raw: float,
+           solar_tom_raw: float, state: PersistentState,
+           now: datetime | None = None,
+           manual_override: bool = False,
+           force_reason: str = "MANUELL",
+           params: Params | None = None) -> Decision:
+    p = params or Params()
+    now = now or datetime.now()
+    stamp = f"{now.year}-{_pad2(now.month)}-{_pad2(now.day)}"
+
+    # --- Day-Reset ---
+    if state.day_stamp != stamp:
+        state.day_stamp = stamp
+        state.slots_charged = 0
+        state.last_counted_slot = ""
+        state.commit_slot = ""
+        state.morning_bridge = False
+        state.night_buffer = False
+
+    # --- Aktuellen Slot/Preis IMMER zuerst bestimmen (auch für Override-Anzeige) ---
+    now_q = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
+    now_slot_name = slot_name_from_date(now_q)
+    hour_now = now.hour
+    slots_all = build_slots(price_entries, now)
+    prices = [s.price for s in slots_all]
+    avg_price = sum(prices) / len(prices) if prices else 0.0
+    min_price = min(prices) if prices else 0.0
+    now_price = next((s.price for s in slots_all if s.name == now_slot_name), avg_price)
+
+    # PV-Korrektur schon hier berechnen (nicht erst weiter unten), damit auch die
+    # fruehen Return-Zweige (Ladesperre/manueller Override) die echten Sonnenwerte
+    # mitgeben koennen, statt stillschweigend auf den Decision-Dataclass-Default
+    # 0.0 zurueckzufallen - sonst zeigt das Dashboard "Sonne heute/morgen 0 kWh",
+    # sobald ein manueller Ladetermin oder Sofort-Override aktiv ist, obwohl die
+    # Prognose intern laengst da ist (gefunden 20.09., Michael meldete faelschlich
+    # vermutete PV-Prognose-Ausfaelle).
+    solar_today = round(solar_today_raw * p.pv_korrektur_faktor, 2)
+    solar_tom = round(solar_tom_raw * p.pv_korrektur_faktor, 2)
+
+    # --- Harte Ladesperre: nie über das SOC-Limit laden, auch nicht manuell ---
+    # Mit Hysterese (state.charge_limit_hit als Riegel, wie bei Nacht-Puffer/
+    # Morgen-Bruecke): ohne das flackert die Sperre bei jedem Tick einzeln an/aus,
+    # sobald der SOC-Messwert im Rauschen um die Schwelle pendelt (z.B. 89,8/90,1/
+    # 89,9 %) - das erzeugt viele winzige Ladevorgaenge statt einmal sauber zu stoppen.
+    # Erst wieder freigeben, wenn der SOC um hysterese_soc UNTER die Schwelle faellt.
+    if manual_override:
+        limit_hit = state.charge_limit_hit
+        if soc >= p.max_charge_soc:
+            limit_hit = True
+        elif soc <= (p.max_charge_soc - p.hysterese_soc):
+            limit_hit = False
+        state.charge_limit_hit = limit_hit
+        if limit_hit:
+            limit_txt = f"Ladelimit {int(p.max_charge_soc)}% erreicht"
+            return Decision(allow_now=False, ess_mode=ESS_IDLE,
+                            now_slot=now_slot_name, now_price=round(now_price, 3),
+                            reason=limit_txt, strategy=limit_txt, balance=0.0,
+                            solar_today_korr=solar_today, solar_tom_korr=solar_tom)
+        return Decision(allow_now=True, ess_mode=ESS_CHARGE,
+                        now_slot=now_slot_name, now_price=round(now_price, 3),
+                        reason=force_reason, strategy=force_reason, balance=0.0,
+                        solar_today_korr=solar_today, solar_tom_korr=solar_tom)
+
+    if not slots_all:
+        return Decision(allow_now=False, ess_mode=ESS_IDLE, now_slot=now_slot_name,
+                        now_price=0.0, reason="Keine Preisdaten",
+                        strategy="", balance=0.0,
+                        solar_today_korr=solar_today, solar_tom_korr=solar_tom)
+
+    # --- Gesamtbilanz bis zum NÄCHSTEN Mittag (wenn die PV wieder trägt) ---
+    # Vor 12 Uhr ist das der heutige Mittag (~Stunden), ab 12 Uhr der morgige.
+    # (Vorher fest now+1Tag -> nachts nach 00:00 wurde fälschlich der übernächste
+    #  Mittag angesetzt, ~34 h, was die Bilanz massiv zu negativ machte.)
+    pv_rem_factor = 0.75 if hour_now < 10 else (0.50 if hour_now < 13 else (0.25 if hour_now < 16 else 0.0))
+    expected_pv_rest = (solar_today * pv_rem_factor) + (solar_tom * p.pv_tom_morning_factor)
+    noon = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    next_noon = noon if now < noon else noon + timedelta(days=1)
+    hours_to_bridge = max(1, (next_noon - now).total_seconds() / 3600)
+    current_kwh = (soc / 100) * p.battery_usable_kwh
+    total_need_kwh = (p.daily_usage_kwh / 24) * hours_to_bridge
+    usable_now_kwh = max(0.0, soc - p.soc_floor_pct) / 100 * p.battery_usable_kwh            # nur was ueber der Cerbo-Untergrenze liegt, ist entnehmbar
+    balance = (usable_now_kwh + expected_pv_rest) - total_need_kwh
+
+    # === SCHRITT 1: BEDARF ===
+    # Bei festem Tarif (kein Preisunterschied über den Tag) ergeben zeitfenster-
+    # basierte Netzlade-Strategien (Peak-Schutz/Nacht-Puffer/Morgen-Brücke/
+    # Tiefpreis-Sicherung) keinen Sinn - sie existieren nur, um teure vor
+    # günstigen Slots zu vermeiden. Die App lädt dann nie aktiv aus dem Netz,
+    # sondern überlässt PV-Vorrang und Netzbezug bei Bedarf dem normalen
+    # ESS-Verhalten; das Ladelimit (max_charge_soc) und der Sofort-Override
+    # bleiben unverändert wirksam.
+    grid_need = 0.0
+    strategy = ""
+    slot_filter = None
+
+    if p.dynamic_pricing:
+        # Prio 1: Peak-Schutz (Ziel ist normalerweise min_peak_soc; ist es JETZT vor dem Abend-Peak
+        # deutlich guenstiger als der zu erwartende Preis waehrend des Abend-Peaks selbst, zielt die
+        # Steuerung stattdessen auf das hoehere Komfort-Ziel und laedt den Ueberschuss mit ein)
+        peak_target = p.min_peak_soc
+        valley_note = ""
+        if (p.evening_comfort_soc > p.min_peak_soc
+                and p.morning_peak_end <= hour_now < p.evening_peak_start):
+            evening_avg = _avg_price_on_day(slots_all, now.date(), p.evening_peak_start, p.evening_peak_end)
+            if evening_avg is not None and now_price <= evening_avg - p.valley_min_saving_ct:
+                peak_target = p.evening_comfort_soc
+                valley_note = f" – günstig ({now_price:.1f} ct, {evening_avg - now_price:.1f} ct billiger als der Abend-Peak)"
+        needs, kwh, reason = calc_peak_protection(soc, hour_now, solar_today, solar_tom, p, target_soc=peak_target)
+        if needs:
+            grid_need = kwh
+            strategy = reason + valley_note
+            if hour_now < p.morning_peak_start:
+                slot_filter = lambda s: s.start.hour < p.morning_peak_start
+            elif p.morning_peak_end <= hour_now < p.evening_peak_start:
+                slot_filter = lambda s: s.start.hour < p.evening_peak_start
+            else:
+                slot_filter = lambda s: s.start.hour < p.morning_peak_start or s.start.hour >= p.evening_peak_end
+
+        # Prio 2: Nacht-Puffer (22-06) mit Hysterese
+        if strategy == "" and (hour_now >= 22 or hour_now < 6):
+            night = state.night_buffer
+            if soc <= (p.night_safety_soc - p.hysterese_soc) and balance < 0:
+                night = True
+            elif soc >= (p.night_safety_soc + p.hysterese_soc):
+                night = False
+            state.night_buffer = night
+            if night:
+                night_target = p.night_safety_soc + p.hysterese_soc
+                grid_need = max(0.0, (night_target - soc) / 100 * p.battery_usable_kwh)
+                strategy = "Nacht-Puffer"
+                slot_filter = lambda s: s.start.hour >= 22 or s.start.hour < 6
+
+        # Prio 3: Morgen-Brücke (00-09)
+        if strategy == "" and hour_now < 9:
+            bridge = state.morning_bridge
+            if soc <= (p.target_safe_soc - p.hysterese_soc):
+                bridge = True
+            elif soc >= p.target_safe_soc:
+                bridge = False
+            state.morning_bridge = bridge
+            if bridge:
+                grid_need = max(0.0, (p.target_safe_soc - soc) / 100 * p.battery_usable_kwh)
+                strategy = "Morgen-Brücke"
+                slot_filter = lambda s: s.start.hour < 9
+
+        # Prio 4: Tiefpreis-Sicherung
+        if strategy == "" and balance < 0:
+            grid_need = abs(balance)
+            strategy = "Tiefpreis-Sicherung"
+            slot_filter = None
+    else:
+        strategy = "PV-Vorrang (fester Tarif)"
+
+    # === SCHRITT 2: PLANUNG ===
+    max_charge = max(0.0, (p.battery_usable_kwh - p.pv_reserve_kwh) - current_kwh)
+    final_grid_need = min(grid_need, max_charge)
+    needed_slots = math.ceil((final_grid_need / (p.charge_power_w / 1000.0)) * 4)
+
+    candidates = [s for s in slots_all if slot_filter(s)] if slot_filter else slots_all
+    picked = sorted(candidates, key=lambda s: s.price)[:needed_slots]
+
+    # === SCHRITT 3: AUSFÜHRUNG ===
+    plan_says_yes = any(pk.name == now_slot_name for pk in picked)
+    allow_now = plan_says_yes
+
+    # Notbremse mit Hysterese (nutzt night_buffer als gemeinsamen Zustand) -
+    # nur bei dynamischem Tarif: bei festem Preis bringt "vor dem Preis-Peak
+    # noch günstig nachladen" keinen Vorteil.
+    if p.dynamic_pricing:
+        emerg_on = p.min_peak_soc - 10
+        emerg_off = p.min_peak_soc
+        emergency = state.night_buffer
+        if soc <= emerg_on and now_price <= p.peak_avoid_price:
+            emergency = True
+        if soc >= emerg_off:
+            emergency = False
+        state.night_buffer = emergency
+
+        if not allow_now and emergency:
+            allow_now = True
+            strategy = f"Notbremse ({int(soc)}% < {int(emerg_off)}%)"
+
+    # Preislimit für Standard-Strategien
+    if p.dynamic_pricing and allow_now and "Peak" not in strategy and "Notbremse" not in strategy:
+        if strategy == "Nacht-Puffer":
+            exec_limit = avg_price * 1.1
+        else:
+            exec_limit = min_price + (avg_price - min_price) * 0.25
+        if now_price > exec_limit:
+            allow_now = False
+            strategy = f"Warte auf günstig ({strategy})"
+
+    # Commitment
+    committed = state.commit_slot
+    if committed != "" and committed != now_slot_name:
+        committed = ""
+        state.commit_slot = ""
+    if committed == now_slot_name:
+        allow_now = True
+
+    # --- Absolute Günstig-Schwelle: IMMER laden, unabhängig von jeder Strategie ---
+    # Faengt Preise ab, die an dem Tag mit hoher Sicherheit nicht mehr unterboten werden
+    # (z.B. ein kurzer Ausreisser weit unter dem sonstigen Niveau) - das soll bedingungslos
+    # genutzt werden, auch wenn gerade KEINE Strategie ueberhaupt Bedarf sieht (Bilanz
+    # positiv, kein Peak in Sicht etc.). Deshalb bewusst NACH dem Preislimit-Gate oben
+    # (das wuerde sonst genau die knapp-am-Schwellenwert-Faelle wieder als "Warte auf
+    # guenstig" wegfiltern) - aber weiterhin VOR der harten SOC-Ladesperre direkt danach,
+    # die hat immer das letzte Wort ("immer laden" heisst nicht "auch ueber dem Ladelimit").
+    # Bei festem Tarif (dynamic_pricing=False) ist der Preis ohnehin konstant - dann greift
+    # die Schwelle entweder gar nicht oder dauerhaft, je nach eingestelltem Wert.
+    if p.absolute_cheap_price and now_price <= p.absolute_cheap_price:
+        allow_now = True
+        strategy = f"Supergünstig (≤ {p.absolute_cheap_price:.0f} ct)"
+
+    # --- Harte Ladesperre (Automatik): über dem SOC-Limit nie laden ---
+    # Gleicher Hysterese-Riegel wie im manual_override-Zweig oben (state.charge_limit_hit
+    # ist bewusst dasselbe Feld - pro Tick laeuft ohnehin nur einer der beiden Zweige).
+    limit_hit = state.charge_limit_hit
+    if soc >= p.max_charge_soc:
+        limit_hit = True
+    elif soc <= (p.max_charge_soc - p.hysterese_soc):
+        limit_hit = False
+    state.charge_limit_hit = limit_hit
+    if limit_hit:
+        allow_now = False
+        strategy = f"Ladelimit {int(p.max_charge_soc)}%"
+
+    # Slot-Zähler
+    if plan_says_yes and state.last_counted_slot != now_slot_name:
+        state.slots_charged += 1
+        state.last_counted_slot = now_slot_name
+        state.commit_slot = now_slot_name
+
+    ess_mode = ESS_CHARGE if allow_now else ESS_IDLE
+    reason_text = f"{strategy or 'Idle'} | Bal: {balance:.1f}kWh | SoC: {soc}%"
+
+    return Decision(
+        allow_now=allow_now, ess_mode=ess_mode, now_slot=now_slot_name,
+        now_price=round(now_price, 3), reason=reason_text,
+        strategy=strategy or "Idle", balance=round(balance, 2),
+        plan=picked, plan_windows=merge_into_windows(picked),
+        target_slots=needed_slots, solar_today_korr=solar_today,
+        solar_tom_korr=solar_tom,
+    )

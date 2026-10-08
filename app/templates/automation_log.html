@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ log_title }} · {{ app_display_name }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2 style="margin:0">{{ log_title }}</h2>
+    <select id="days" class="ghost" style="width:auto"><option value="7">7 Tage</option><option value="30" selected>30 Tage</option><option value="">Alles</option></select>
+    <button type="button" class="ghost" id="btn-clear" style="margin-left:auto" title="Alle Einträge dieses Logbuchs löschen">🗑 Logbuch leeren</button>
+    <a href="{{ back_url }}"><button type="button" class="ghost">← {{ back_label }}</button></a>
+  </div>
+  <div class="muted" style="margin:6px 0 10px">{{ log_hint }} Auch die Aktionen des Trockenlaufs stehen hier (dort steht „würde …“), neueste zuerst.</div>
+  <div id="summary" class="muted" style="margin-bottom:8px"></div>
+  <div class="table-scroll"><table id="tbl"></table></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const MODULE = {{ module | tojson }};
+const $ = id => document.getElementById(id);
+const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = ts => `${ts.slice(8, 10)}.${ts.slice(5, 7)}. ${ts.slice(11, 16)}`;
+const BADGE = { on: ['an', 'var(--cheap)'], off: ['aus', '#e5544a'], fail: ['Fehler', '#e5544a'], adopt: ['bereits an', 'var(--cheap)'], manual: ['von Hand', 'var(--muted)'], paused: ['Pause', 'var(--muted)'],
+  start: ['Ablauf', 'var(--accent)'], cancel: ['abgebrochen', 'var(--muted)'], setpoint: ['Sollwert', 'var(--cheap)'], notify: ['Nachricht', 'var(--accent)'], virtual: ['Schalter', 'var(--accent)'] };
+async function load() {
+  const days = $('days').value;
+  let d;
+  try { d = await (await fetch(`/api/automation/log?module=${MODULE}&limit=500` + (days ? '&days=' + days : ''))).json(); }
+  catch (e) { $('tbl').innerHTML = '<tr><td class="muted">Fehler beim Laden.</td></tr>'; return; }
+  const rows = d.entries || [];
+  const real = rows.filter(r => !r.dry).length, fail = rows.filter(r => r.action === 'fail').length;
+  $('summary').textContent = rows.length ? `${rows.length} Einträge · davon ${real} echt geschaltet, ${rows.length - real} im Trockenlauf${fail ? ` · ${fail} Fehler` : ''}` : '';
+  $('tbl').innerHTML = `<tr class="thead"><td>Zeit</td><td>Gerät</td><td>Aktion</td><td>Meldung</td></tr>` + (rows.length ? rows.map(r => {
+    const [t, c] = BADGE[r.action] || [r.action || '–', 'var(--muted)'];
+    return `<tr><td style="white-space:nowrap">${fmt(r.ts)}</td><td>${escH(r.dev || '–')}</td><td><b style="color:${c}">${t}</b></td><td>${escH(r.text)}</td></tr>`;
+  }).join('') : '<tr><td colspan="4" class="muted">Keine Einträge.</td></tr>');
+}
+function uiConfirm(title, message, okText) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok danger"></button></div></div>`;
+    ov.querySelector('h3').textContent = title; ov.querySelector('.dlg-msg').textContent = message; ov.querySelector('.dlg-ok').textContent = okText || 'OK';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(false); };
+    ov.querySelector('.dlg-ok').onclick = () => close(true); ov.querySelector('.dlg-no').onclick = () => close(false);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-no').focus();
+  });
+}
+function showToast(text, isErr) {
+  let t = $('log-toast');
+  if (!t) {
+    t = document.createElement('div'); t.id = 'log-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1200;max-width:min(92vw,520px);padding:12px 18px;border-radius:12px;'
+      + 'background:var(--card);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:14px;line-height:1.4;transition:opacity .25s;opacity:0';
+    document.body.appendChild(t);
+  }
+  t.textContent = text; t.style.borderColor = isErr ? '#e5544a' : 'var(--border)'; t.style.opacity = '1';
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, isErr ? 7000 : 3000);
+}
+$('btn-clear').addEventListener('click', async () => {
+  if (!await uiConfirm('Logbuch leeren?', 'Alle Einträge dieses Logbuchs werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.', 'Alles löschen')) return;
+  try {
+    const r = await fetch('/api/automation/log/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: MODULE }) });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || `Leeren fehlgeschlagen (HTTP ${r.status}).`, true); }
+  } catch (e) { showToast('Leeren fehlgeschlagen – Server nicht erreichbar.', true); }
+  await load(); if (window.refreshLogBadges) window.refreshLogBadges();
+});
+window.LOG_OPEN = MODULE;                                   // dieses Logbuch ist offen: sein Zaehler bleibt aus
+async function markRead() { try { await fetch('/api/automation/log/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: MODULE }) }); if (window.refreshLogBadges) window.refreshLogBadges(); } catch (e) { /* egal */ } }
+async function loadAndRead() { await load(); markRead(); }
+$('days').addEventListener('change', load); loadAndRead(); setInterval(loadAndRead, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{{ title }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta name="theme-color" content="#1a2129">
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: #eef2f5;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
+      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), #12181f; }
+    .card { max-width: 380px; width: 100%; background: #1a2129; border: 1px solid #34414e; border-radius: 18px; padding: 34px 26px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+    .sym { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 700; }
+    .ok .sym { background: rgba(60,162,203,.16); color: #3ca2cb; box-shadow: 0 0 24px rgba(60,162,203,.35); }
+    .no .sym { background: rgba(229,84,74,.14); color: #e5544a; }
+    button { width: 100%; padding: 13px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #1c1105; background: linear-gradient(180deg,#f79b3d,#f48c24); cursor: pointer; }
+    h1 { font-size: 22px; margin: 0 0 8px; } p { color: #9aa9b6; font-size: 15px; line-height: 1.5; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="card {{ 'ok' if ok else 'no' }}">
+    <div class="sym">{{ '✓' if ok else '✕' }}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ text }}</p>
+    {% if ok and not confirm %}<button id="zu" type="button" onclick="schliessen()" style="display:none;margin-top:20px;background:#232d38;color:#eef2f5;border:1px solid #34414e">Schließen</button>{% endif %}
+    {% if confirm %}<form method="post" style="margin-top:22px"><button type="submit">Jetzt registrieren</button></form>{% endif %}
+  </div>
+  {% if ok and not confirm %}<script>
+    // Erfolg: Fenster selbst schliessen (klappt, wenn der Browser den Tag in einem neuen Tab ohne Verlauf oeffnet); sonst erscheint ein Schliessen-Knopf.
+    function schliessen() { try { window.close(); } catch (e) {} setTimeout(function () { if (!document.hidden) { try { history.back(); } catch (e) {} } }, 250); }
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 1500);
+    setTimeout(function () { var b = document.getElementById('zu'); if (b) b.style.display = 'block'; }, 2300);
+  </script>{% endif %}
+</body>
+</html>

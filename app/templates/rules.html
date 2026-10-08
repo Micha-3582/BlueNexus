@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+{% block title %}Regeln · {{ app_display_name }}{% endblock %}
+{% block content %}
+{% set sh_active = 'regeln' %}{% include '_sh_nav.html' %}
+<style>
+  .card h2 { display: flex; align-items: center; gap: 8px; }
+  .card h2 svg.h2i { width: 16px; height: 16px; flex: 0 0 auto; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.chk { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: normal; cursor: pointer; }
+  .chk input { width: auto; margin: 0; }
+  .rg { margin: 0; }
+  .rg-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card2); cursor: pointer; font-weight: 600; font-size: 15px; }
+  .rg-head:hover { border-color: var(--accent); }
+  .rg-head .chev { display: inline-block; color: var(--accent); transition: transform .15s; }
+  .rg.open > .rg-head .chev { transform: rotate(90deg); }
+  .rg-head .cnt { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .rg-act { margin-left: auto; display: flex; gap: 6px; }
+  .rg-act button { padding: 5px 10px; }
+  .rg-body { display: none; flex-direction: column; gap: 10px; padding: 10px 0 2px 12px; margin: 6px 0 4px 12px; border-left: 2px solid var(--border); }
+  .rg.open > .rg-body { display: flex; }
+</style>
+
+{% if user_perms.rules != 'write' %}
+<div class="card" style="border-color:var(--muted)"><div class="muted">🧪 Testbereich – mit diesem Konto lässt sich nichts speichern, und nichts wirkt auf die echte Steuerung.</div></div>
+{% endif %}
+<div class="card" id="rules-card">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Regeln <span class="qhelp" role="button" tabindex="0" data-help="Jede Regel hat einen Namen und besteht aus <b>WENN</b> (Bedingungen: Uhrzeit, Strompreis, Akku, Sonne, Sensor, anderes Gerät, eigener Schalter), <b>DANN</b> und optional <b>SONST</b>.<br><br><b>Zwei Arten:</b><ul><li><b>Zustand halten:</b> Geräte folgen der Bedingung, z. B. „Licht an, solange die Tür offen ist“.</li><li><b>Ablauf:</b> startet einmal, wenn die Bedingung eintritt – mit Warten, Thermostat-Sollwerten, Nachrichten und eigenen Schaltern, z. B. „Warmwasser-Timer“.</li></ul>Fehlt ein Messwert (Sensor oder Gerät nicht erreichbar), passiert nichts. Zustands-Regeln übernehmen laufende Geräte; von Hand ausgeschaltete bleiben aus, bis die Bedingung einmal nicht mehr stimmt. Eine „ausschalten“-Regel gewinnt gegen jede „einschalten“-Regel desselben Geräts. Werden die Regeln insgesamt ausgeschaltet, werden laufende Abläufe abgebrochen.<br><br>Geräte richtest du unter <i>Smart Home → Geräte suchen</i> ein. <b>Änderungen gelten erst mit „Speichern“ (Leiste unten).</b>">?</span></h2>
+  <div class="sub">Verknüpft Auslöser mit Aktionen – für das ganze Smart Home.</div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <label class="switch" style="margin:0"><input type="checkbox" id="rules_enabled"><span class="slider"></span></label>
+    <div><b>Regeln aktiv</b> <span class="qhelp" role="button" tabindex="0" data-help="Hauptschalter für alle Regeln auf dieser Seite. Aus = es wird nichts geschaltet; laufende Abläufe werden abgebrochen.">?</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:10px">
+    <label class="switch" style="margin:0"><input type="checkbox" id="rules_dry"><span class="slider"></span></label>
+    <div><b>Trockenlauf</b> <span class="qhelp" role="button" tabindex="0" data-help="Es wird nur protokolliert (und gemeldet), was geschaltet würde – nichts wird wirklich geschaltet. Ideal zum Ausprobieren neuer Regeln.">?</span><div class="muted">Nur protokollieren, nichts schalten.</div></div>
+  </div>
+  <div style="margin-top:14px"><span data-log-badge="rules" style="display:inline-block"><a href="/rules-log"><button type="button" class="ghost">📒 Logbuch</button></a></span></div>
+</div>
+
+<div class="card">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Deine Regeln <span class="qhelp" role="button" tabindex="0" data-help="Regeln lassen sich in frei benennbare Gruppen sortieren (z. B. Timer, Licht, Garten). Jede Gruppe ist ein Knopf, der ihre Regeln auf- und zuklappt. Eine Regel legst du mit dem 📁 in der Regelzeile (oder beim Bearbeiten über „Gruppe“) in eine Gruppe; dort lässt sich auch gleich eine neue Gruppe anlegen. Gruppen und Regeln innerhalb einer Gruppe lassen sich mit langem Drücken und Ziehen sortieren. Regeln ohne Gruppe stehen unten bei „Ohne Gruppe“. Änderungen gelten nach „Speichern“.">?</span></h2>
+  <div id="rules-list" style="display:flex;flex-direction:column;gap:12px"></div>
+  <div id="rule-wizard" style="margin-top:12px"></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" id="fab-add" title="Neue Regel" onclick="wizStart()" style="width:48px;height:48px;border-radius:50%;padding:0;font-size:28px;line-height:1;display:flex;align-items:center;justify-content:center">+</button></div>
+  <div class="muted" id="rules-msg" style="margin-top:8px"></div>
+  <details style="margin-top:14px">
+    <summary>Feineinstellungen (Pause nach Handschaltung, Sicherheits-Timer)</summary>
+    <div id="rules-settings" class="grid2" style="margin-top:10px"></div>
+    <div style="margin-top:10px"><button id="rules-settings-reset" class="ghost" type="button">Alle auf Standard</button></div>
+  </details>
+</div>
+
+<div id="savebar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:900;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;box-shadow:0 -6px 20px rgba(0,0,0,.35)">
+  <span id="savebar-msg">● Ungespeicherte Änderungen – die Steuerung nutzt noch die bisherigen Regeln</span>
+  <button class="ghost" id="btn-discard" type="button">Verwerfen</button><button id="btn-save" type="button">Speichern</button>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const RULES_LEVEL = {{ (user_perms.rules or 'none') | tojson }};   // 'none' | 'read' | 'write' - siehe Einstellungen -> System -> Weitere Benutzer
+const $ = id => document.getElementById(id);
+const helpQ = t => `<span class="qhelp" role="button" tabindex="0" data-help="${String(t).replace(/"/g, '&quot;')}">?</span>`;
+const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(url, method, body) {
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || (r.status >= 500 ? `Der Server antwortet nicht richtig (HTTP ${r.status}) – wurde die App gerade neu gestartet?` : 'Fehler ' + r.status));
+  return j;
+}
+let toastTimer = null;
+function savedToast(text = 'Gespeichert ✓') {
+  let el = $('save-toast');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'save-toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:1100;background:var(--green);color:#0b1f14;font-weight:600;padding:9px 18px;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.45);transition:opacity .3s;pointer-events:none';
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.style.opacity = '1';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+function uiConfirm(title, message, okText) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok"></button></div></div>`;
+    ov.querySelector('h3').textContent = title; ov.querySelector('.dlg-msg').textContent = message; ov.querySelector('.dlg-ok').textContent = okText || 'OK';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+    ov.querySelector('.dlg-ok').onclick = () => close(true); ov.querySelector('.dlg-no').onclick = () => close(false);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-ok').focus();
+  });
+}
+
+function uiAsk(title, label, value, okText) {                    // Text eingeben: gibt den Text oder null zurueck
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><label class="dlg-l"></label><input class="dlg-in" maxlength="40" autocomplete="off">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok"></button></div></div>`;
+    ov.querySelector('h3').textContent = title; ov.querySelector('.dlg-l').textContent = label; ov.querySelector('.dlg-ok').textContent = okText || 'OK';
+    const inp = ov.querySelector('.dlg-in'); inp.value = value || '';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const ok = () => { const v = inp.value.trim(); if (v) close(v); else inp.style.borderColor = '#e5544a'; };
+    const onKey = e => { if (e.key === 'Escape') close(null); else if (e.key === 'Enter') ok(); };
+    ov.querySelector('.dlg-ok').onclick = ok; ov.querySelector('.dlg-no').onclick = () => close(null);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(null); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); inp.focus(); inp.select();
+  });
+}
+function uiPick(title, options) {                                // aus einer Liste waehlen: options = [{v, label, cur}] -> gewaehlter Wert oder null
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:380px;max-height:85vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 12px;font-size:17px"></h3><div class="dlg-opts" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="ghost dlg-no">Abbrechen</button></div></div>`;
+    ov.querySelector('h3').textContent = title;
+    const box = ov.querySelector('.dlg-opts');
+    options.forEach(o => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.style.cssText = 'text-align:left;' + (o.cur ? 'border-color:var(--accent);color:var(--accent)' : ''); b.textContent = (o.cur ? '✓ ' : '') + o.label; b.onclick = () => close(o.v); box.appendChild(b); });
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(null); };
+    ov.querySelector('.dlg-no').onclick = () => close(null);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(null); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov);
+  });
+}
+
+/* Entwurf: Alle Aenderungen bleiben lokal, bis "Speichern" gedrueckt wird. S = Serverstand, R/CFG = Entwurf. */
+let S = { devs: [], A: { rules: [], status: {}, tariff_mode: 'tibber', events: [], settings: {}, defaults: {}, bounds: {} } };
+let R = [], GR = [], CFG = { enabled: false, dry: true, settings: {} };          // GR = Gruppen (Entwurf): [{id, name}] in Reihenfolge
+let dirty = false, newId = 0;
+const clone = o => JSON.parse(JSON.stringify(o));
+const dev = id => S.devs.find(d => d.id === id);
+function wledChanged(el) { const box = ruleBox(el); syncRule(box); touch(); renderRules(); }          // Lampe/Art gewechselt: Felder neu aufbauen
+const WLED_INFO = {};                            // WLED-Geraete-ID -> {presets: [...]} | null (nicht erreichbar); undefined = noch nicht geladen
+async function wledLoadInfo(id) {
+  WLED_INFO[id] = null;                          // verhindert doppeltes Laden
+  try { const r = await fetch('/api/shelly/' + encodeURIComponent(id) + '/wled', { cache: 'no-store' }); WLED_INFO[id] = r.ok ? await r.json() : null; } catch (e) { WLED_INFO[id] = null; }
+  if (typeof renderRules === 'function') renderRules();
+}
+function resetDraft() { GR = clone(S.A.groups || []); R = clone(S.A.rules || []); R.forEach(r => { if (!(r.name || '').trim()) r.name = 'Regel: ' + ((S.devs.find(d => d.id === r.device_id) || {}).name || 'Gerät'); }); CFG = { enabled: !!S.A.enabled, dry: !!S.A.dry_run, settings: { ...S.A.settings } }; setDirty(false); }
+/* Automatisch speichern: nur Aenderungen in der Regelliste (Gruppen, Sortierung, Ein/Aus, Loeschen). Wer eine Regel im Regel-Editor
+   bearbeitet oder neu anlegt, schliesst das bewusst mit "Speichern" ab; bis dahin bleibt die Leiste stehen. */
+const MSG_PENDING = '● Ungespeicherte Änderungen – die Steuerung nutzt noch die bisherigen Regeln';
+const isPending = () => editDirty || R.some(x => String(x.id).startsWith('new-'));
+let autoTimer = null, saving = false, ver = 0, editDirty = false;          // editDirty: im Regel-Editor veraendert, noch nicht gespeichert
+function setDirty(v) {
+  dirty = v; $('savebar').style.display = v ? 'flex' : 'none'; document.body.style.paddingBottom = v ? '110px' : '';
+  if (!v) { editDirty = false; $('savebar-msg').textContent = MSG_PENDING; $('savebar-msg').style.color = ''; clearTimeout(autoTimer); }
+}
+function touch() {
+  ver++; setDirty(true);
+  if (EDIT || WIZ) editDirty = true;
+  if (RULES_LEVEL !== 'write') return;
+  if (isPending()) { $('savebar-msg').textContent = '● Regel bearbeitet – zum Übernehmen unten auf „Speichern“ drücken'; return; }
+  $('savebar-msg').textContent = '… wird gespeichert';
+  autoTimer = setTimeout(() => saveAll(true), 1100);
+}
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+async function saveAll(auto) {
+  if (auto === true) { if (saving) { autoTimer = setTimeout(() => saveAll(true), 800); return; } if (R.find(x => !(x.name || '').trim())) { $('savebar-msg').textContent = '⚠ Jede Regel braucht einen Namen.'; return; } }
+  if (RULES_LEVEL !== 'write') {                    // Testbereich: nichts speichern, Entwurf bleibt zum Weiterspielen erhalten
+    $('savebar-msg').textContent = '🧪 Nur zum Ausprobieren – dieses Konto darf nicht speichern.';
+    $('savebar-msg').style.color = '#e5544a';
+    setTimeout(() => { $('savebar-msg').style.color = ''; $('savebar-msg').textContent = '● Ungespeicherte Änderungen – die Steuerung nutzt noch die bisherigen Regeln'; }, 4000);
+    return;
+  }
+  const unnamed = R.find(r => !(r.name || '').trim());
+  if (unnamed) { EDIT = unnamed.id; renderRules(); const n = document.querySelector('.r-name'); if (n) n.focus(); $('savebar-msg').textContent = '⚠ Jede Regel braucht einen Namen.'; $('savebar-msg').style.color = '#e5544a'; setTimeout(() => { $('savebar-msg').style.color = ''; }, 6000); return; }
+  const btn = $('btn-save'); btn.disabled = true; saving = true; const v0 = ver, manual = auto !== true;
+  const cfg = { rules_enabled: CFG.enabled, rules_dry_run: CFG.dry };
+  for (const [k, v] of Object.entries(CFG.settings)) cfg['rules_' + k] = v;
+  const body = { config: cfg, rules: R.map(r => ({ id: String(r.id).startsWith('new-') ? undefined : r.id, name: r.name || '', enabled: r.enabled !== false, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, keep_trigger: !!r.keep_trigger, cooldown_s: r.cooldown_s || 0, when: r.when, then: r.then, else: r.else, group: r.group || '' })), groups: GR };
+  try {
+    await api('/api/automation', 'POST', body);
+    if (manual) { savedToast('Gespeichert ✓'); await loadServer(); resetDraft(); EDIT = null; renderAll(); }
+    else {                                       // automatisch: Editor bleibt offen, nur den Serverstand nachziehen
+      await loadServer();
+      if (ver === v0) { if (GR.some(g => String(g.id).startsWith('ng-'))) { resetDraft(); renderRules(); } setDirty(false); }          // neue Gruppen haben jetzt echte IDs
+      savedToast('Automatisch gespeichert ✓');
+    }
+  }
+  catch (e) { $('savebar-msg').textContent = '⚠ ' + e.message; $('savebar-msg').style.color = '#e5544a'; setTimeout(() => { $('savebar-msg').style.color = ''; }, 8000); }
+  btn.disabled = false; saving = false;
+}
+$('btn-save').addEventListener('click', saveAll);
+$('btn-discard').addEventListener('click', async () => {
+  if (!await uiConfirm('Änderungen verwerfen?', 'Alle noch nicht gespeicherten Änderungen dieser Seite gehen verloren.', 'Verwerfen')) return;
+  resetDraft(); renderAll();
+});
+$('rules_enabled').addEventListener('change', () => { CFG.enabled = $('rules_enabled').checked; touch(); });
+$('rules_dry').addEventListener('change', () => { CFG.dry = $('rules_dry').checked; touch(); });
+
+const SET_FIELDS = [
+  { k: 'manual_hold_min', label: 'Pause nach Handschaltung', unit: 'min', hint: 'So lange lässt eine Regel ein Gerät in Ruhe, das du in der App von Hand geschaltet hast.' },
+  { k: 'failsafe_min', label: 'Sicherheits-Timer', unit: 'min', hint: 'Fällt die Steuerung aus, schaltet sich das Gerät nach dieser Zeit selbst aus. 0 = kein Timer. Nur bei Shelly und Tasmota.' },
+];
+function renderSettings() {
+  const A = S.A, box = $('rules-settings');
+  box.innerHTML = SET_FIELDS.map(f => { const [lo, hi] = A.bounds[f.k];
+    return `<div><label>${f.label} (${f.unit}) <span class="qhelp" role="button" tabindex="0" data-help="${escH(f.hint)} Standard: ${A.defaults[f.k]}.">?</span></label><input type="number" min="${lo}" max="${hi}" step="any" data-k="${f.k}" value="${escH(CFG.settings[f.k])}" placeholder="${A.defaults[f.k]}"></div>`; }).join('');
+  box.oninput = e => { const inp = e.target.closest('input[data-k]'); if (inp) { CFG.settings[inp.dataset.k] = inp.value === '' ? A.defaults[inp.dataset.k] : Number(inp.value); touch(); } };
+  $('rules-settings-reset').onclick = () => { CFG.settings = { ...A.defaults }; touch(); renderSettings(); };
+}
+
+const MODULES = {{ modules | tojson }};                         // Module der Installation: ausgeschaltete blenden ihre Bedingungen/Aktionen im Editor aus
+const FAMS = {{ families | tojson }};                                // gewaehlte Smart-Home-Systeme (Einstellungen -> Geraete): nicht vorhandene blenden ihre Schritte aus
+const ENERGY_CONDS = ['price', 'budget', 'soc', 'sun_tomorrow'];           // brauchen das Modul Energie (Strompreis, Akku, Prognose)
+const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Anderes Gerät (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf']];
+let CUR_FLOW = false;                           // gerade gezeichnete Regel ist ein Ablauf (kein 'Laufzeit pro Tag')
+const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
+const switchable = () => S.devs.filter(d => d.switchable !== false && !d.auto);
+const COND_DEFAULT = {
+  weekday: { type: 'weekday', days: [0, 1, 2, 3, 4] }, at: { type: 'at', time: '23:30', days: [] }, sun: { type: 'sun', event: 'sunset', offset: 0, days: [] }, sunwin: { type: 'sunwin', phase: 'night', start: 0, end: 0 }, time: { type: 'time', from: '09:00', to: '16:00', days: [] }, price: { type: 'price', op: 'below', ct: 25 },
+  budget: { type: 'budget', minutes: 120, from: '06:00', to: '22:00' }, soc: { type: 'soc', op: 'above', pct: 50 }, sun_tomorrow: { type: 'sun_tomorrow', op: 'above', kwh: 15 },
+};
+const BIN_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+const SENSOR_DEFAULT_VALUE = { temperature: 20, humidity: 60, brightness: 100, power: 100 };
+function sensorDefault(sid) {                      // neue Sensor-Bedingung: Ja/Nein-Sensor -> TRUE, Messwert -> "ueber" Standardwert
+  const s = (S.sensors || []).find(x => x.id === sid) || (S.sensors || [])[0];
+  if (!s) return { type: 'sensor', sensor_id: '', is: true };
+  return s.binary ? { type: 'sensor', sensor_id: s.id, is: true }
+                  : { type: 'sensor', sensor_id: s.id, op: 'above', value: SENSOR_DEFAULT_VALUE[s.kind] ?? 0 };
+}
+const deviceDefault = () => ({ type: 'device', device_id: (S.devs[0] || {}).id || '', is: 'on' });
+const virtualDefault = vid => { const v = (S.virtual || []).find(x => x.id === vid) || (S.virtual || [])[0]; return v ? { type: 'virtual', id: v.id, is: v.kind === 'button' ? 'pressed' : 'on' } : { type: 'virtual', id: '', is: 'on' }; };
+const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : clone(COND_DEFAULT[t]);
+const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+let FIXED = false;
+const optHtml = (list, val) => list.map(([v, t]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${t}</option>`).join('');
+function sunInfo(c) {                            // Uhrzeiten von heute inkl. Versatz - aktualisiert sich beim Tippen
+  const sn = S.A.sun || {}; if (!sn.configured) return '';
+  const m = t => { const [h, mi] = t.split(':').map(Number); return h * 60 + mi; };
+  const f = x => { x = ((Math.round(x) % 1440) + 1440) % 1440; return String(Math.floor(x / 60)).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0'); };
+  if (c.type === 'sun') return `→ heute um ${f(m(c.event === 'sunrise' ? sn.sunrise : sn.sunset) + (+c.offset || 0))} Uhr`;
+  const night = c.phase === 'night', a = m(night ? sn.sunset : sn.sunrise) + (+c.start || 0), b = m(night ? sn.sunrise : sn.sunset) + (+c.end || 0);
+  return night ? `→ an ab ${f(a)} Uhr, aus um ${f(b)} Uhr (am nächsten Morgen)` : `→ an ab ${f(a)} Uhr, aus um ${f(b)} Uhr`;
+}
+function condRow(c, mode) {                       // mode: 'on' | 'off' = was DANN macht (nur fuer den Text von "Laufzeit pro Tag")
+  const sel = (cls, val, list) => `<select class="${cls}" style="width:auto" onchange="ruleEdited(this)">${optHtml(list, val)}</select>`;
+  const num = (cls, val, w) => `<input class="${cls}" type="number" step="any" value="${escH(val)}" style="width:${w}px" oninput="ruleEdited(this)">`;
+  const tm = (cls, val, end, quarter) => {        // quarter: nur Viertelstunden (Tagesziel-Fenster arbeitet im 15-Min-Raster der Preise), sonst jede Minute
+    const [h, m] = String(val).split(':').map(Number), pad2 = n => String(n).padStart(2, '0');
+    const hours = Array.from({ length: end ? 25 : 24 }, (_, i) => i), mins = quarter ? [...new Set([0, 15, 30, 45, m])].sort((a, b) => a - b) : Array.from({ length: 60 }, (_, i) => i);
+    return `<span class="tsel" data-t="${cls}" style="display:inline-flex;align-items:center;gap:3px"><select class="t-h" style="width:auto" onchange="ruleEdited(this)">${hours.map(i => `<option value="${pad2(i)}" ${i === h ? 'selected' : ''}>${pad2(i)}</option>`).join('')}</select>:`
+      + `<select class="t-m" style="width:auto" onchange="ruleEdited(this)">${mins.map(i => `<option value="${pad2(i)}" ${i === m ? 'selected' : ''}>${pad2(i)}</option>`).join('')}</select></span>`;
+  };
+  const cmp = (cls, v) => sel(cls, v, [['below', 'unter'], ['above', 'über']]);
+  const chips = days => `<span style="display:inline-flex;gap:4px;flex-wrap:wrap" title="Keine Auswahl = jeden Tag">${WD.map((n, i) => `<label class="chip"><input type="checkbox" class="c-day" value="${i}" ${(days || []).includes(i) ? 'checked' : ''} onchange="ruleEdited(this)"><span>${n}</span></label>`).join('')}</span>`;
+  let body = '';
+  if (c.type === 'time') body = `von ${tm('c-from', c.from)} bis ${tm('c-to', c.to, true)} Uhr ${chips(c.days)}`;
+  else if (c.type === 'at') body = `um ${tm('c-at', c.time)} Uhr ${chips(c.days)}`;
+  else if (c.type === 'weekday') body = `nur an ${chips(c.days)} <span class="muted">(ganzer Kalendertag, 0–24 Uhr)</span>`;
+  else if (c.type === 'sunwin') {
+    const sn = S.A.sun || {}, night = c.phase === 'night', a = sn.configured ? (night ? sn.sunset : sn.sunrise) : null, b = sn.configured ? (night ? sn.sunrise : sn.sunset) : null;
+    body = `${sel('c-sph', c.phase, [['night', '🌙 Nacht – ab Sonnenuntergang bis Sonnenaufgang'], ['day', '☀️ Tag – ab Sonnenaufgang bis Sonnenuntergang']])}
+      <span class="muted">Beginn verschoben um</span> ${num('c-sws', c.start || 0, 92)} <span class="muted">Ende um</span> ${num('c-swe', c.end || 0, 92)} <span class="muted">Min (negativ = früher)</span>`
+      + (sn.configured ? ` <span class="muted c-sinfo" style="width:100%">${sunInfo(c)}</span>` : ` <span style="color:#e5544a">⚠ Kein Standort eingetragen – Einstellungen › Wetter</span>`);
+  } else if (c.type === 'sun') {
+    const off = c.offset || 0, sn = S.A.sun || {}, today = sn.configured ? (c.event === 'sunrise' ? sn.sunrise : sn.sunset) : null;
+    body = `bei ${sel('c-sev', c.event, [['sunrise', '🌅 Sonnenaufgang'], ['sunset', '🌇 Sonnenuntergang']])} ${sel('c-soff-dir', off < 0 ? 'before' : off > 0 ? 'after' : 'exact', [['exact', 'genau'], ['before', 'vor'], ['after', 'nach']]).replace('onchange="ruleEdited(this)"', 'onchange="sunDir(this)"')}`
+      + `<span class="c-soff-box" ${off ? '' : 'style="display:none"'}> ${num('c-soff', Math.abs(off), 92)} Min</span> ${chips(c.days)}`
+      + (sn.configured ? `<span class="muted c-sinfo">${sunInfo(c)}</span>` : `<span style="color:#e5544a">⚠ Kein Standort eingetragen – Einstellungen › Wetter (die Regel wartet, bis er da ist)</span>`);
+  }
+  else if (c.type === 'price') body = `${cmp('c-op', c.op)} ${num('c-ct', c.ct, 70)} ct/kWh`;
+  else if (c.type === 'budget' && mode === 'off') body = `heute ${num('c-min', c.minutes, 70)} Min gelaufen`;
+  else if (c.type === 'budget') body = `läuft ${num('c-min', c.minutes, 70)} Min pro Tag, ${FIXED ? 'so früh wie möglich' : 'in den günstigsten Zeiten'}, zwischen ${tm('c-from', c.from, false, true)} und ${tm('c-to', c.to, true, true)} Uhr`;
+  else if (c.type === 'soc') body = `${cmp('c-op', c.op)} ${num('c-pct', c.pct, 70)} %`;
+  else if (c.type === 'sun_tomorrow') body = `${cmp('c-op', c.op)} ${num('c-kwh', c.kwh, 70)} kWh`;
+  else if (c.type === 'sensor') {
+    const list = S.sensors || [], sen = list.find(x => x.id === c.sensor_id);
+    const opts = list.map(x => [x.id, escH(x.name)]); if (!sen) opts.unshift([c.sensor_id, '(Sensor nicht mehr vorhanden)']);
+    const pick = sel('c-sensor', c.sensor_id, opts).replace('onchange="ruleEdited(this)"', 'onchange="sensorChanged(this)"');
+    if ('is' in c) {                               // Ja/Nein-Sensor: TRUE / FALSE
+      let w = BIN_WORDS[sen && sen.kind] || ['wahr', 'falsch']; if (sen && sen.invert && BIN_WORDS[sen.kind]) w = [w[1], w[0]];
+      body = `${pick} ist ${sel('c-is', c.is ? '1' : '0', [['1', 'TRUE – ' + w[0]], ['0', 'FALSE – ' + w[1]]])}`;
+    } else body = `${pick} ${cmp('c-op', c.op)} ${num('c-val', c.value, 80)} ${escH(sen ? sen.unit : '')}`;
+  } else if (c.type === 'virtual') {
+    const list = S.virtual || [], v = list.find(x => x.id === c.id);
+    const opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!v) opts.unshift([escH(c.id), '(Schalter fehlt)']);
+    const pick = sel('c-virt', c.id, opts).replace('onchange="ruleEdited(this)"', 'onchange="virtChanged(this)"');
+    body = (c.is === 'pressed' || (v && v.kind === 'button')) ? `${pick} wird gedrückt` : `${pick} ${v && v.kind === 'timer' ? sel('c-vis', c.is, [['on', 'läuft'], ['off', 'läuft nicht']]) : 'ist ' + sel('c-vis', c.is, [['on', 'an'], ['off', 'aus']])}`;
+  } else if (c.type === 'device') {
+    const opts = S.devs.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!dev(c.device_id)) opts.unshift([escH(c.device_id), '(Gerät fehlt)']);
+    const kind = 'is' in c ? c.is : 'power';
+    const pick = sel('c-dev', c.device_id, opts);
+    const k = `<select class="c-dk" style="width:auto" onchange="deviceCondKind(this)">${optHtml([['on', 'ist an'], ['off', 'ist aus'], ['power', 'Leistung …']], kind)}</select>`;
+    body = `${pick} ${k}` + (kind === 'power' ? ` ${cmp('c-op', c.op || 'above')} ${num('c-val', c.value ?? 50, 70)} W` : '');
+  }
+  return `<div class="cond" data-type="${c.type}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg,rgba(255,255,255,.04));border-radius:8px;padding:6px 8px;margin-top:6px">
+    <select class="c-type" style="width:auto" onchange="condTypeChanged(this)">${optHtml(allowed(FIXED, c.type), c.type)}</select>
+    <span style="flex:1;min-width:160px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${body}</span>
+    <button class="ghost" style="padding:2px 9px" title="Bedingung entfernen" onclick="condDel(this)">✕</button></div>`;
+}
+function collectCond(row) {
+  const t = row.dataset.type, v = c => {
+    const e = row.querySelector('.' + c); if (e) return e.value;
+    const ts = row.querySelector('.tsel[data-t="' + c + '"]'); return ts ? ts.querySelector('.t-h').value + ':' + (ts.querySelector('.t-h').value === '24' ? '00' : ts.querySelector('.t-m').value) : '';
+  };
+  const days = () => [...row.querySelectorAll('.c-day:checked')].map(x => +x.value);
+  if (t === 'time') return { type: t, from: v('c-from'), to: v('c-to'), days: days() };
+  if (t === 'at') return { type: t, time: v('c-at'), days: days() };
+  if (t === 'weekday') return { type: t, days: days() };
+  if (t === 'sunwin') return { type: t, phase: v('c-sph'), start: v('c-sws') || 0, end: v('c-swe') || 0 };
+  if (t === 'sun') { const dir = v('c-soff-dir'), m = Math.abs(+v('c-soff') || 0); return { type: t, event: v('c-sev'), offset: dir === 'before' ? -m : dir === 'after' ? m : 0, days: days() }; }
+  if (t === 'price') return { type: t, op: v('c-op'), ct: v('c-ct') };
+  if (t === 'budget') return { type: t, minutes: v('c-min'), from: v('c-from') || '00:00', to: v('c-to') || '24:00' };
+  if (t === 'soc') return { type: t, op: v('c-op'), pct: v('c-pct') };
+  if (t === 'sensor') return row.querySelector('.c-is') ? { type: t, sensor_id: v('c-sensor'), is: v('c-is') === '1' }
+                                                          : { type: t, sensor_id: v('c-sensor'), op: v('c-op'), value: v('c-val') };
+  if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed' };
+  if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
+  return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
+}
+const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)']];
+const videoCams = () => (S.cameras || []).filter(x => (x.kind || 'reolink') === 'reolink');
+function toRow(a, rs) {                              // "Senden an": nur wenn es mehr als einen Empfaenger gibt (Telegram: S.recipients, Pushover: S.prec)
+  rs = rs || S.recipients || [];
+  if (rs.length < 2) return '';
+  const chosen = Array.isArray(a.to) && a.to.length ? a.to : rs.filter(r => r.system).map(r => r.id);
+  return `<span class="a-to" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;width:100%"><span class="muted">Senden an:</span>${rs.map(r => `<label class="chk" style="margin:0"><input type="checkbox" value="${escH(r.id)}" ${chosen.includes(r.id) ? 'checked' : ''} onchange="ruleEdited(this)"> ${escH(r.name)}</label>`).join('')}</span>`;
+}
+const toVal = q => { const el = q('a-to'); return el ? { to: [...el.querySelectorAll('input:checked')].map(i => i.value) } : {}; };
+const toNames = (a, list) => { const rs = list || S.recipients || []; return Array.isArray(a.to) && a.to.length && rs.length > 1 ? ' an ' + a.to.map(i => (rs.find(r => r.id === i) || { name: '?' }).name).join(', ') : ''; };
+function stepAvailable(t) {
+  const has = k => (S.devs || []).some(d => d.kind === k);
+  if (t === 'photo') return !!MODULES.cameras;
+  if (t === 'video') return !!MODULES.cameras && videoCams().length > 0;                 // nur Reolink-Kameras (SD-Karte, Aufnahmen per Kamera-Schnittstelle)
+  if (t === 'pushover') return (S.prec || []).length > 0;                 // nur mit eingerichtetem Pushover
+  if (t === 'ac') return !!FAMS.midea || has('midea');
+  if (t === 'wled') return !!FAMS.tasmota || has('wled');
+  if (t === 'blind' || t === 'sound') return !!FAMS.homematic || (t === 'blind' ? (S.blinds || []).length : (S.sounds || []).length) > 0;
+  if (t === 'setpoint') return !!FAMS.homematic || !!FAMS.zigbee || (S.setpoints || []).length > 0;
+  if (t === 'wol') return !!FAMS.wol || (S.wol || []).length > 0;
+  if (t === 'lock') return (S.locks || []).length > 0;
+  return true;
+}
+function actRow(a, branch, flow) {
+  const t = a.type || 'switch', sel = (cls, val, list, w) => `<select class="${cls}" style="width:${w || 'auto'}" onchange="ruleEdited(this)">${optHtml(list, val)}</select>`;
+  let body = '';
+  if (t === 'switch') {
+    const devs = switchable(), known = devs.some(x => x.id === a.device_id), d = dev(a.device_id);
+    const opts = devs.map(x => `<option value="${escH(x.id)}" ${x.id === a.device_id ? 'selected' : ''}>${escH(x.icon)} ${escH(x.name)}</option>`).join('')
+      + (known ? '' : `<option value="${escH(a.device_id)}" selected>${d ? escH(d.icon + ' ' + d.name) : '(Gerät fehlt)'}</option>`);
+    body = `<select class="a-state" style="width:auto;font-weight:600" onchange="ruleEdited(this)">${optHtml([['on', '🟢 einschalten'], ['off', '🔴 ausschalten']], a.state)}</select>
+      <select class="a-dev" style="width:auto;min-width:180px" onchange="ruleEdited(this)">${opts}</select>`;
+  } else if (t === 'toggle') {
+    const devs = switchable(), known = devs.some(x => x.id === a.device_id), d = dev(a.device_id);
+    const opts = devs.map(x => `<option value="${escH(x.id)}" ${x.id === a.device_id ? 'selected' : ''}>${escH(x.icon)} ${escH(x.name)}</option>`).join('')
+      + (known ? '' : `<option value="${escH(a.device_id)}" selected>${d ? escH(d.icon + ' ' + d.name) : '(Gerät fehlt)'}</option>`);
+    body = `<b>🔁 Umschalten</b> <select class="a-dev" style="width:auto;min-width:180px" onchange="ruleEdited(this)">${opts}</select> <span class="muted">(läuft es, geht es aus – sonst an)</span>`;
+  } else if (t === 'wait') {
+    const sec = a.seconds || 60, unit = sec % 3600 === 0 ? 'h' : sec % 60 === 0 ? 'min' : 's', val = unit === 'h' ? sec / 3600 : unit === 'min' ? sec / 60 : sec;
+    body = `<b>⏱ Warten</b> <input class="a-wval" type="number" min="1" step="any" value="${val}" style="width:90px" oninput="ruleEdited(this)">
+      <select class="a-wunit" style="width:auto" onchange="ruleEdited(this)">${optHtml([['s', 'Sekunden'], ['min', 'Minuten'], ['h', 'Stunden']], unit)}</select>`;
+  } else if (t === 'setpoint') {
+    const all = (a.device_ids || []).includes('*'), list = S.setpoints || [];
+    body = `<b>🌡 Thermostate auf</b> <input class="a-spv" type="number" step="0.5" value="${escH(a.value ?? 21)}" style="width:80px" oninput="ruleEdited(this)"> °C
+      <div style="display:flex;gap:10px;flex-wrap:wrap;width:100%;align-items:center">
+        <label class="chk"><input type="checkbox" class="a-spall" ${all ? 'checked' : ''} onchange="spAll(this)"> alle</label>
+        ${list.map(x => `<label class="chk"><input type="checkbox" class="a-sp" value="${escH(x.id)}" ${all || (a.device_ids || []).includes(x.id) ? 'checked' : ''} ${all ? 'disabled' : ''} onchange="ruleEdited(this)"> ${escH(x.name)}</label>`).join('')}
+        ${list.length ? '' : '<span class="muted">Noch keine Thermostate – unter Smart Home → Geräte suchen → Homematic „Thermostate suchen“.</span>'}</div>`;
+  } else if (t === 'notify') {
+    body = `<b>✉ Telegram</b> <input class="a-text" placeholder="Nachricht, z.B. Warmwasser ist fertig" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)">${toRow(a)}`;
+  } else if (t === 'sound') {
+    const list = S.sounds || [], opts = list.map(x => [escH(x.id), escH(x.icon || '🔔') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Soundmodul fehlt)']);
+    const nin = (cls, v, min, max, w) => `<input class="${cls}" type="number" min="${min}" max="${max}" step="1" value="${escH(v)}" style="width:${w}px" oninput="ruleEdited(this)">`;
+    body = `<b>🔔 Sound</b> ${sel('a-sid', a.id, opts)} <span class="muted">Titel</span> ${nin('a-str', a.track ?? 1, 1, 255, 78)} <span class="muted">Lautstärke</span> ${nin('a-svol', a.volume ?? 100, 0, 100, 78)} <span class="muted">%  ·  Wiederholungen</span> ${nin('a-srep', a.repeats ?? 1, 1, 20, 70)}${list.length ? '' : '<span class="muted">Noch kein Soundmodul angelegt – Smart Home → Geräte suchen → Homematic-Soundmodule suchen.</span>'}`;
+  } else if (t === 'ac') {
+    const list = S.devs.filter(d => d.kind === 'midea'), opts = list.map(x => [escH(x.id), escH(x.icon || '❄️') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Klimaanlage fehlt)']);
+    body = `<b>❄ Klimaanlage</b> ${sel('a-acid', a.id, opts)} ${sel('a-acp', a.power || '', [['', 'Ein/Aus unverändert'], ['on', 'einschalten'], ['off', 'ausschalten']])}
+      ${sel('a-acm', a.mode || '', [['', 'Modus unverändert'], ['auto', 'Automatik'], ['cool', 'Kühlen'], ['dry', 'Entfeuchten'], ['heat', 'Heizen'], ['fan_only', 'Lüften'], ['smart_dry', 'Intelligent entfeuchten']])}
+      <span class="muted">Soll</span> <input class="a-act" type="number" min="10" max="35" step="0.5" value="${escH(a.target ?? '')}" placeholder="–" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">°C</span>
+      ${sel('a-acf', a.fan || '', [['', 'Lüfter unverändert'], ['auto', 'Automatik'], ['silent', 'Flüster'], ['low', 'niedrig'], ['medium', 'mittel'], ['high', 'hoch'], ['max', 'maximal']])}
+      ${list.length ? '' : '<span class="muted">Noch keine Klimaanlage angelegt – Smart Home → Geräte suchen → Klimaanlage.</span>'}`;
+  } else if (t === 'wled') {
+    const list = S.devs.filter(d => d.kind === 'wled'), opts = list.map(x => [escH(x.id), escH(x.icon || '💡') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(WLED-Gerät fehlt)']);
+    const mode = a.mode === 'color' ? 'color' : 'preset', info = WLED_INFO[a.id];
+    if (a.id && info === undefined) wledLoadInfo(a.id);                         // Voreinstellungen der Lampe nachladen und danach neu zeichnen
+    const presets = (info && info.presets) || [];
+    const psel = presets.length ? sel('a-wps', a.preset ?? '', [...(presets.some(p => p.id === a.preset) ? [] : [[escH(a.preset ?? ''), 'Voreinstellung ' + escH(a.preset ?? '?')]]), ...presets.map(p => [p.id, escH(p.name)])])
+      : `<input class="a-wps" type="number" min="1" max="250" step="1" value="${escH(a.preset ?? 1)}" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">${info === undefined ? 'lade Voreinstellungen …' : 'Nummer der Voreinstellung (Lampe nicht erreichbar oder keine angelegt)'}</span>`;
+    body = `<b>💡 WLED</b> <select class="a-wid2" style="width:auto" onchange="wledChanged(this)">${optHtml(opts, a.id)}</select> <select class="a-wmode" style="width:auto" onchange="wledChanged(this)">${optHtml([['preset', 'Voreinstellung aufrufen'], ['color', 'Farbe setzen']], mode)}</select>
+      ${mode === 'preset' ? psel : `<input class="a-wcol" type="color" value="${escH(a.color || '#ffa000')}" style="width:54px;height:34px;padding:0;border:0;background:transparent" oninput="ruleEdited(this)"> <span class="muted">Helligkeit</span> <input class="a-wbri" type="number" min="1" max="100" step="1" value="${escH(a.brightness ?? '')}" placeholder="–" style="width:70px" oninput="ruleEdited(this)"> <span class="muted">% (leer = unverändert)</span>`}
+      ${list.length ? '' : '<span class="muted">Noch keine WLED-Lampe angelegt – Smart Home → Geräte suchen → Tasmota / WLED.</span>'}`;
+  } else if (t === 'blind') {
+    const list = S.blinds || [], opts = list.map(x => [escH(x.id), escH(x.icon || '🪟') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rollladen fehlt)']);
+    const stop = a.action === 'stop';
+    body = `<b>🪟 Rollladen</b> ${sel('a-bid', a.id, opts)} ${sel('a-bact', stop ? 'stop' : 'set', [['set', 'fahren auf'], ['stop', 'anhalten']])}
+      <span class="a-blv"><input class="a-blvl" type="number" min="0" max="100" step="1" value="${escH(a.level ?? 0)}" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">% (0 = zu, 100 = auf; bei „anhalten“ egal)</span></span>${list.length ? '' : '<span class="muted">Noch kein Rollladen angelegt – Smart Home → Geräte suchen → Homematic-Rollläden suchen.</span>'}`;
+  } else if (t === 'photo') {
+    const list = S.cameras || [], opts = list.map(x => [escH(x.id), '📷 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Kamera fehlt)']);
+    body = `<b>📷 Standbild per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Bild (optional), z.B. Bewegung im Hof" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">${list.length ? '' : '<span class="muted">Noch keine Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
+  } else if (t === 'video') {
+    const list = videoCams(), opts = list.map(x => [escH(x.id), '🎥 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Kamera fehlt)']);
+    const flt = Array.isArray(a.filter) ? a.filter : [];
+    const kinds = [['animal', 'Tier'], ['person', 'Person'], ['vehicle', 'Fahrzeug'], ['motion', 'Bewegung']];
+    body = `<b>🎥 Video per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Video (optional)" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">
+      <span class="a-vf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;width:100%"><span class="muted">Nur senden bei ${helpQ('Das Video wird nur gesendet, wenn die Aufnahme der Kamera eine dieser Ereignisarten enthält. Nichts angehakt = bei jeder Aufnahme. Gesendet werden 10 Sekunden in 720p, ab 3 Sekunden vor dem Auslösen; das Video kommt erst, wenn die Aufnahme fertig ist (meist 1 bis 2 Minuten). Nur für Reolink-Kameras mit SD-Karte.')}:</span>${kinds.map(([k, l]) => `<label class="chk" style="margin:0"><input type="checkbox" value="${k}" ${flt.includes(k) ? 'checked' : ''} onchange="ruleEdited(this)"> ${l}</label>`).join('')}</span>${list.length ? '' : '<span class="muted">Keine Reolink-Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
+  } else if (t === 'pushover') {
+    const cams = S.cameras || [], camOpts = [['', '— kein Bild —'], ...cams.map(x => [escH(x.id), '📷 ' + escH(x.name)])];
+    if (a.camera && !cams.some(x => x.id === a.camera)) camOpts.push([escH(a.camera), '(Kamera fehlt)']);
+    const prio = [['0', 'normal'], ['-1', 'leise'], ['1', 'hoch (durchbricht Ruhezeiten)'], ['2', 'Notfall (wiederholt, bis bestätigt)']];
+    const snd = [['', 'Standardton'], ['siren', 'Sirene'], ['spacealarm', 'Weltraumalarm'], ['alien', 'Alien'], ['persistent', 'Dauerton'], ['bugle', 'Signalhorn'], ['cashregister', 'Kasse'], ['magic', 'Magic'], ['vibrate', 'nur Vibration'], ['none', 'lautlos']];
+    body = `<b>🔔 Pushover</b> <input class="a-text" placeholder="Nachricht, z.B. Bewegung auf dem Hof" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)">
+      <input class="a-title" placeholder="Titel (optional)" value="${escH(a.title || '')}" style="width:170px" oninput="ruleEdited(this)">
+      <span class="muted">Priorität</span> ${sel('a-prio', String(a.priority || 0), prio)} ${sel('a-snd', a.sound || '', snd)}
+      ${MODULES.cameras ? `<span class="muted">Bild</span> ${sel('a-pcam', a.camera || '', camOpts)}` : ''}${toRow(a, S.prec)}`;
+  } else if (t === 'wol') {
+    const list = S.wol || [], opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rechner fehlt)']);
+    body = `<b>⏰ Rechner aufwecken</b> ${sel('a-wid', a.id, opts)}${list.length ? '' : '<span class="muted">Noch kein Rechner angelegt – Smart Home → Wake-on-LAN.</span>'}`;
+  } else if (t === 'lock') {
+    const list = S.locks || [], lk = list.find(x => x.id === a.id), opts = list.map(x => [escH(x.id), '🔒 ' + escH(x.name)]); if (!lk) opts.unshift([escH(a.id), '(Schloss fehlt)']);
+    const warn = lk && a.state !== 'lock' && !lk.allow_open ? '<div style="color:#e5544a;width:100%">⚠ Dieses Schloss ist nicht zum Entriegeln/Öffnen durch Regeln freigegeben (Smart Home → Sicherheit) – so lässt sich die Regel nicht speichern.</div>' : '';
+    body = `<b>🔒 Türschloss</b> ${sel('a-lid', a.id, opts)} ${sel('a-lst', a.state, [['open', 'Tür öffnen (Falle ziehen)'], ['unlock', 'entriegeln'], ['lock', 'verriegeln']])}${list.length ? '' : '<span class="muted">Noch kein Türschloss angelegt – Smart Home → Geräte suchen → Homematic-Türschlösser suchen.</span>'}${warn}`;
+  } else if (t === 'virtual') {
+    const list = S.virtual || [], opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Schalter fehlt)']);
+    body = `<b>🎚 Eigener Schalter</b> ${sel('a-vid', a.id, opts)} ${sel('a-vst', a.state, [['on', 'einschalten (Timer: starten / verlängern)'], ['off', 'ausschalten (Timer: stoppen)'], ['toggle', 'umschalten'], ['press', 'drücken (Knopf)']])}`;
+  }
+  const mv = flow ? `<button class="ghost" style="padding:2px 8px" title="nach oben" onclick="actMove(this,-1)">↑</button><button class="ghost" style="padding:2px 8px" title="nach unten" onclick="actMove(this,1)">↓</button>` : '';
+  return `<div class="act" data-branch="${branch}" data-type="${t}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.04);border-radius:8px;padding:6px 8px;margin-top:6px">
+    ${body}<span style="margin-left:auto;display:flex;gap:4px">${mv}<button class="ghost" style="padding:2px 9px" title="Aktion entfernen" onclick="actDel(this)">✕</button></span></div>`;
+}
+function collectAct(x) {
+  const t = x.dataset.type, q = c => x.querySelector('.' + c);
+  if (t === 'toggle') return { type: t, device_id: q('a-dev').value };
+  if (t === 'wait') return { type: t, seconds: Math.round((+q('a-wval').value || 0) * ({ s: 1, min: 60, h: 3600 }[q('a-wunit').value])) };
+  if (t === 'setpoint') return { type: t, device_ids: q('a-spall').checked ? ['*'] : [...x.querySelectorAll('.a-sp:checked')].map(c => c.value), value: q('a-spv').value };
+  if (t === 'notify') return { type: t, text: q('a-text').value, ...toVal(q) };
+  if (t === 'photo') return { type: t, id: q('a-cid').value, text: q('a-text').value, ...toVal(q) };
+  if (t === 'video') return { type: t, id: q('a-cid').value, text: q('a-text').value, filter: [...x.querySelectorAll('.a-vf input:checked')].map(i => i.value), ...toVal(q) };
+  if (t === 'pushover') { const o = { type: t, text: q('a-text').value, title: q('a-title').value, priority: +q('a-prio').value, sound: q('a-snd').value, ...toVal(q) }; const c = q('a-pcam'); if (c && c.value) o.camera = c.value; return o; }
+  if (t === 'ac') return { type: t, id: q('a-acid').value, power: q('a-acp').value, mode: q('a-acm').value, target: q('a-act').value, fan: q('a-acf').value };
+  if (t === 'wled') { const m = q('a-wmode').value, o = { type: t, id: q('a-wid2').value, mode: m }; if (m === 'color') { o.color = q('a-wcol') ? q('a-wcol').value : '#ffa000'; o.brightness = q('a-wbri') ? q('a-wbri').value : ''; } else o.preset = q('a-wps') ? q('a-wps').value : 1; return o; }
+  if (t === 'blind') return { type: t, id: q('a-bid').value, action: q('a-bact').value, level: q('a-blvl').value };
+  if (t === 'sound') return { type: t, id: q('a-sid').value, track: q('a-str').value, volume: q('a-svol').value, repeats: q('a-srep').value };
+  if (t === 'virtual') return { type: t, id: q('a-vid').value, state: q('a-vst').value };
+  if (t === 'lock') return { type: t, id: q('a-lid').value, state: q('a-lst').value };
+  if (t === 'wol') return { type: t, id: q('a-wid').value };
+  return { device_id: q('a-dev').value, state: q('a-state').value };
+}
+function collectRule(box) {
+  const mode = box.querySelector('.r-mode'), acts = b => [...box.querySelectorAll(`.act[data-branch="${b}"]`)].map(collectAct);
+  const conds = [...box.querySelectorAll('.cond')].map(collectCond), then = acts('then'), other = acts('else');
+  let kind = box.querySelector('.r-kind').value;
+  if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => c.type === 'virtual' && c.is === 'pressed'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
+  return { name: box.querySelector('.r-name').value, enabled: box.querySelector('.r-en').checked, mode: kind, abort_on_fall: !!(box.querySelector('.r-abort') || {}).checked, keep_trigger: !!box.querySelector('.r-reset') && !box.querySelector('.r-reset').checked, cooldown_s: +((box.querySelector('.r-cool') || {}).value) || 0, when: { mode: mode ? mode.value : 'all', conds }, then, else: other };
+}
+const ruleBox = el => el.closest('[data-rule]');
+function syncRule(box) {                          // Entwurf der Regel aus den sichtbaren Feldern neu aufbauen
+  const r = R.find(x => x.id === box.dataset.rule); Object.assign(r, collectRule(box));
+  r.device_id = ((r.then.concat(r.else).find(a => !a.type || a.type === 'toggle') || {}).device_id) || r.device_id; return r;
+}
+function ruleEdited(el) {
+  const box = ruleBox(el), r = syncRule(box); touch(); box.querySelector('.r-status').innerHTML = statusBlock(r);
+  const row = el.closest('.cond'), info = row && row.querySelector('.c-sinfo'); if (info) info.textContent = sunInfo(collectCond(row));      // Sonne: Uhrzeit sofort nachziehen
+}
+function sunDir(sel) {                           // Sonne: "genau" blendet den Versatz aus, vor/nach zeigt ihn (Standard 30 Min)
+  const row = sel.closest('.cond'), box = row.querySelector('.c-soff-box'), inp = row.querySelector('.c-soff');
+  box.style.display = sel.value === 'exact' ? 'none' : ''; if (sel.value !== 'exact' && !+inp.value) inp.value = 30;
+  ruleEdited(sel);
+}
+function virtChanged(sel) { condTypeChanged(sel, virtualDefault(sel.value)); }
+function sensorChanged(sel) { condTypeChanged(sel, sensorDefault(sel.value)); }          // anderer Sensor: Art kann wechseln (Messwert <-> Ja/Nein)
+function deviceCondKind(sel) {                    // ist an / ist aus / Leistung: Eingabefeld ein- oder ausblenden
+  const row = sel.closest('.cond'), c = collectCond(row);
+  if (sel.value === 'power') { c.op = 'above'; c.value = 50; delete c.is; }
+  condTypeChanged(sel, c);
+}
+function condTypeChanged(sel, replacement) {      // Typ gewechselt: Bedingung bekommt die Standardwerte des neuen Typs
+  const row = sel.closest('.cond'), box = ruleBox(row), r = R.find(x => x.id === box.dataset.rule);
+  const rows = [...box.querySelectorAll('.cond')], rest = collectRule(box); Object.assign(r, rest);
+  r.when.conds = rows.map(rw => rw === row ? (replacement || condDefault(sel.value)) : collectCond(rw));
+  touch(); renderRules();
+}
+function condDel(btn) {
+  const box = ruleBox(btn); btn.closest('.cond').remove(); const r = syncRule(box);
+  touch(); renderRules();
+}
+function spAll(cb) { const box = ruleBox(cb); syncRule(box); touch(); renderRules(); }
+function actMove(btn, dir) {
+  const row = btn.closest('.act'), box = ruleBox(row), r = syncRule(box), b = row.dataset.branch;
+  const i = [...box.querySelectorAll(`.act[data-branch="${b}"]`)].indexOf(row), j = i + dir;
+  if (j < 0 || j >= r[b].length) return;
+  [r[b][i], r[b][j]] = [r[b][j], r[b][i]]; touch(); renderRules();
+}
+// Standard fuer neue Ablaeufe: bei Wegfall der Bedingung sofort beenden - ausser bei Impuls-Ausloesern (Knopf, 'Um HH:MM'), die gleich wieder wegfallen
+const isKeySensor = c => c.type === 'sensor' && /^key_/.test(((S.sensors || []).find(x => x.id === c.sensor_id) || {}).kind || '');
+const flowAbortDefault = r => !r.when.conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'at' || c.type === 'sun' || isKeySensor(c));
+function kindChanged(sel) {
+  const box = ruleBox(sel), r = R.find(x => x.id === box.dataset.rule), c = collectRule(box);
+  if (sel.value === 'state' && (c.then.concat(c.else).some(a => a.type && a.type !== 'switch') || c.when.conds.some(x => x.type === 'virtual' && x.is === 'pressed'))) {
+    sel.value = 'flow'; savedToast('Erst Warten, Nachricht, Sollwert, eigenen Schalter und „wird gedrückt“ entfernen'); return;
+  }
+  const wasFlow = r.mode === 'flow'; Object.assign(r, c, { mode: sel.value }); if (sel.value === 'flow' && !wasFlow) r.abort_on_fall = flowAbortDefault(r); touch(); renderRules();
+}
+function actDel(btn) { const box = ruleBox(btn); btn.closest('.act').remove(); syncRule(box); touch(); renderRules(); }
+function condAdd(sel) {
+  const box = ruleBox(sel), r = syncRule(box); if (!sel.value) return;
+  r.when.conds.push(condDefault(sel.value)); touch(); renderRules();
+}
+function actAddSel(sel, branch) {
+  const box = ruleBox(sel), r = syncRule(box), t = sel.value; if (!t) return;
+  const used = new Set(r[branch].filter(a => !a.type || a.type === 'toggle').map(a => a.device_id)), d = switchable().find(x => !used.has(x.id)) || switchable()[0];
+  const mk = {
+    switch: () => ({ device_id: d ? d.id : '', state: branch === 'else' ? 'off' : 'on' }), toggle: () => ({ type: 'toggle', device_id: d ? d.id : '' }), wait: () => ({ type: 'wait', seconds: 60 }),
+    setpoint: () => ({ type: 'setpoint', device_ids: ['*'], value: 21 }), notify: () => ({ type: 'notify', text: '' }),
+    virtual: () => ({ type: 'virtual', id: ((S.virtual || [])[0] || {}).id || '', state: 'on' }),
+    lock: () => ({ type: 'lock', id: ((S.locks || [])[0] || {}).id || '', state: 'lock' }),
+    wol: () => ({ type: 'wol', id: ((S.wol || [])[0] || {}).id || '' }),
+    sound: () => ({ type: 'sound', id: ((S.sounds || [])[0] || {}).id || '', track: 1, volume: 100, repeats: 1 }),
+    photo: () => ({ type: 'photo', id: ((S.cameras || [])[0] || {}).id || '', text: '' }),
+    video: () => ({ type: 'video', id: (videoCams()[0] || {}).id || '', text: '', filter: ['animal'] }),
+    pushover: () => ({ type: 'pushover', text: '', priority: 0 }),
+    ac: () => ({ type: 'ac', id: (S.devs.find(d => d.kind === 'midea') || {}).id || '', power: 'on', mode: 'cool', target: 24 }),
+    wled: () => ({ type: 'wled', id: (S.devs.find(d => d.kind === 'wled') || {}).id || '', mode: 'preset', preset: 1 }),
+    blind: () => ({ type: 'blind', id: ((S.blinds || [])[0] || {}).id || '', action: 'set', level: 0 }),
+  };
+  r[branch].push(mk[t]());
+  if (t !== 'switch' && r.mode !== 'flow') { r.mode = 'flow'; r.abort_on_fall = flowAbortDefault(r); savedToast('Regel-Art auf „Ablauf“ gestellt'); }
+  touch(); renderRules();
+}
+async function ruleDelete(id) {
+  if (!await uiConfirm('Regel löschen?', 'Die Regel wird sofort entfernt. Das Gerät bleibt in der Liste.', 'Löschen')) return;
+  R = R.filter(r => r.id !== id); if (EDIT === id) EDIT = null; touch(); renderRules();
+}
+let WIZ = null;                                   // neue Regel: nur der Name, danach gleich in den Regel-Editor
+function wizStart() { WIZ = { name: '', group: '' }; renderWizard(); $('rule-wizard').scrollIntoView({ block: 'center', behavior: 'smooth' }); const n = $('wiz-name'); if (n) n.focus(); }
+function wizCancel() { WIZ = null; renderWizard(); }
+async function wizGroup(sel) { let v = sel.value; if (v === '__new') { v = await groupNew(); if (!v) { sel.value = WIZ.group || ''; return; } WIZ.group = v; renderRules(); return; } WIZ.group = v; }
+function wizCreate() {
+  const name = ($('wiz-name').value || '').trim();
+  if (!name) { $('wiz-name').style.borderColor = '#e5544a'; $('wiz-name').focus(); savedToast('Bitte einen Namen eingeben'); return; }
+  const r = { id: 'new-' + (++newId), name, device_id: '', enabled: true, mode: 'state', when: { mode: 'all', conds: [] }, then: [], else: [] };
+  if (WIZ.group) r.group = WIZ.group;
+  R.push(r); openGroupOf(r); WIZ = null; EDIT = r.id; touch(); renderRules(); renderWizard();
+  window.scrollTo({ top: $('rules-list').getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+}
+function renderWizard() {
+  const w = $('rule-wizard'), fab = $('fab-add');
+  fab.style.display = (WIZ || EDIT) ? 'none' : 'flex';
+  if (!WIZ) { w.innerHTML = ''; return; }
+  w.innerHTML = `<div style="border:1px dashed var(--border);border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <input id="wiz-name" placeholder="Name der neuen Regel (Pflicht), z.B. Warmwasser-Timer" value="${escH(WIZ.name)}" oninput="WIZ.name = this.value; this.style.borderColor = ''" onkeydown="if (event.key === 'Enter') wizCreate()" style="flex:1;min-width:220px;font-weight:600">
+    <select id="wiz-group" style="width:auto" onchange="wizGroup(this)">${optHtml([['', 'Ohne Gruppe'], ...GR.map(g => [escH(g.id), escH(g.name)]), ['__new', '＋ Neue Gruppe …']], WIZ.group || '')}</select>
+    <button type="button" onclick="wizCreate()">Weiter zum Regel-Editor</button>
+    <button class="ghost" style="padding:2px 9px" title="Abbrechen" onclick="wizCancel()">✕</button></div>`;
+}
+const norm = v => Array.isArray(v) ? v.map(norm) : (v && typeof v === 'object') ? Object.fromEntries(Object.keys(v).sort().map(k => [k, norm(v[k])])) : (typeof v === 'string' && v.trim() !== '' && !isNaN(v) ? Number(v) : v);
+const sig = r => JSON.stringify(norm({ enabled: r.enabled !== false, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, when: r.when, then: r.then, else: r.else }));
+function statusHtml(r) {                          // Status gibt es nur fuer die gespeicherte, unveraenderte Regel - waehrend des Bearbeitens steht dort nichts
+  if (String(r.id).startsWith('new-')) return '';
+  const saved = (S.A.rules || []).find(x => x.id === r.id);
+  if (!saved || sig(saved) !== sig(r)) return '';
+  const st = (S.A.status || {})[r.id];
+  if (!st) return '';
+  const warn = !S.A.enabled ? '<div style="color:#e5544a">⚠ Die Regeln sind insgesamt ausgeschaltet („Regeln aktiv“ ganz oben) – es wird nichts geschaltet.</div>'
+    : S.A.dry_run ? '<div style="color:#f0a030">🧪 Trockenlauf ist an – es wird nur protokolliert (Logbuch), nichts wirklich geschaltet.</div>' : '';
+  const why = st.text ? ` <span class="muted">– ${escH(st.text)}</span>` : '';
+  const conds = (st.conds || []).length ? `<div class="muted" style="margin-top:4px">${st.conds.map(c => (c.ok === true ? '✅ ' : c.ok === false ? '❌ ' : '❔ ') + escH(c.text)).join('<br>')}</div>` : '';
+  return warn + (st.state === 'on' ? '<span>🟢 läuft</span>' : '<span class="muted">⚪ läuft nicht</span>') + why + conds;
+}
+const statusBlock = r => { const h = statusHtml(r); return h ? `<div style="margin-top:10px">${h}</div>` : ''; };
+/* Blockly-artige Bloecke: blau = WENN, gruen = DANN, orange = SONST */
+const blk = (color, head, inner) => `<div style="margin-top:10px;border-left:6px solid ${color};border-radius:6px 10px 10px 6px;background:${color}1a;padding:8px 10px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="color:${color};letter-spacing:.06em;min-width:52px">${head[0]}</b>${head[1] || ''}</div>${inner}</div>`;
+function ruleHtml(r) {
+  const id = escH(r.id), conds = r.when.conds, then = r.then || [], other = r.else || [], flow = r.mode === 'flow';
+  CUR_FLOW = flow;
+  const onMode = then.some(a => a.state === 'on') || !then.length ? 'on' : 'off';
+  const modeSel = conds.length > 1 ? `<select class="r-mode" style="width:auto" onchange="ruleEdited(this)">${optHtml([['all', 'alle müssen zutreffen (UND)'], ['any', 'mindestens eine (ODER)']], r.when.mode)}</select>` : '';
+  const addCond = `<select style="width:auto;margin-top:8px" onchange="condAdd(this)"><option value="" disabled hidden selected>+ Bedingung hinzufügen …</option>${optHtml(allowed(FIXED, ''), '')}</select>`;
+  const addAct = (b, label) => `<select style="width:auto;margin-top:8px" onchange="actAddSel(this, '${b}')"><option value="" disabled hidden selected>${label}</option>${optHtml(STEP_TYPES.filter(([t]) => stepAvailable(t)), '')}</select>`;
+  return `<div data-rule="${id}" style="border:1px solid var(--border);border-radius:12px;padding:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <input class="r-name" placeholder="Name der Regel (Pflicht)" value="${escH(r.name)}" oninput="ruleEdited(this)" style="flex:1;min-width:160px;font-weight:600${r.name && r.name.trim() ? '' : ';border-color:#e5544a'}">
+      <label class="switch" style="margin:0" title="Regel an/aus"><input type="checkbox" class="r-en" ${r.enabled !== false ? 'checked' : ''} onchange="ruleEdited(this)"><span class="slider"></span></label>
+      <button class="ghost" onclick="ruleCopy('${id}')" title="Regel kopieren">⧉</button>
+      <button class="ghost" onclick="ruleDelete('${id}')" title="Regel löschen">✕</button>
+    </div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted">Art der Regel <span class="qhelp" role="button" tabindex="0" data-help="<b>Zustand halten:</b> Das Gerät folgt der Bedingung, z. B. „Licht an, solange die Tür offen ist“.<br><b>Ablauf:</b> startet einmal, wenn die Bedingung eintritt, und arbeitet die Schritte nacheinander ab – mit Warten, Nachricht, Sollwert.">?</span></span>
+      <select class="r-kind" style="width:auto" onchange="kindChanged(this)">${optHtml([['state', 'Zustand halten – das Gerät folgt der Bedingung'], ['flow', 'Ablauf – einmal beim Auslöser, Schritt für Schritt']], flow ? 'flow' : 'state')}</select></div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted">Gruppe ${helpQ('Sortiert die Regel in der Liste. Gruppen legst du frei an; sie lassen sich jederzeit umbenennen, verschieben oder löschen (die Regeln bleiben erhalten).')}</span>
+      <select class="r-group" style="width:auto" onchange="ruleGroupChanged(this)">${optHtml([['', 'Ohne Gruppe'], ...GR.map(g => [escH(g.id), escH(g.name)]), ['__new', '＋ Neue Gruppe …']], gOf(r))}</select></div>
+    ${flow && conds.some(c => c.type === 'virtual' && c.is === 'on') ? `<div style="margin-top:8px"><label class="chk"><input type="checkbox" class="r-reset" ${r.keep_trigger ? '' : 'checked'} onchange="ruleEdited(this)"> Am Ende des Ablaufs den auslösenden Schalter ausschalten <span class="qhelp" role="button" tabindex="0" data-help="Ist der Ablauf durchgelaufen, wird der Schalter aus der WENN-Bedingung wieder ausgeschaltet – danach läuft das SONST. Bei vorzeitigem Abbruch ist er ohnehin schon aus.">?</span></label></div>` : ''}
+    ${flow ? `<div style="margin-top:8px"><label class="chk"><input type="checkbox" class="r-abort" ${r.abort_on_fall ? 'checked' : ''} onchange="ruleEdited(this)"> Ablauf sofort beenden, wenn die Bedingung wegfällt <span class="qhelp" role="button" tabindex="0" data-help="Läuft der Ablauf noch (z. B. ein Timer) und die Bedingung fällt weg – etwa weil der Schalter wieder ausgeschaltet wird –, wird er sofort beendet. Bei Regeln mit SONST-Schritten passiert das immer.">?</span></label></div>` : ''}
+    ${flow ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted">Sperrzeit nach dem Auslösen <span class="qhelp" role="button" tabindex="0" data-help="Löst die Bedingung nach dem Start gleich noch einmal aus (z. B. eine mehrfach durchfahrene Lichtschranke), wird das innerhalb dieser Zeit ignoriert. 0 = keine Sperre.">?</span></span><input class="r-cool" type="number" min="0" max="86400" step="1" value="${r.cooldown_s || 0}" style="width:92px" oninput="ruleEdited(this)"><span class="muted">Sekunden</span></div>` : ''}
+    ${blk('#4c97ff', ['WENN', modeSel], conds.map(c => condRow(c, onMode)).join('') + addCond)}
+    ${blk('#35c07a', ['DANN', flow ? '<span class="muted">Schritte nacheinander</span>' : ''], then.map(a => actRow(a, 'then', flow)).join('') + addAct('then', '+ Aktion hinzufügen …'))}
+    ${other.length ? blk('#f0a030', ['SONST', '<span class="muted">' + (flow ? 'Wenn die Bedingung wegfällt – auch bei Abbruch. Zum Aufräumen: Geräte aus, Thermostate zurück.' : 'wenn die Bedingung nicht zutrifft') + '</span>'], other.map(a => actRow(a, 'else', flow)).join('') + addAct('else', '+ Aktion hinzufügen …'))
+      : addAct('else', '+ SONST hinzufügen …').replace('margin-top:8px', 'margin-top:10px')}
+    <div class="r-status">${statusBlock(r)}</div>
+  </div>`;
+}
+let EDIT = null;                                  // ID der Regel, die gerade im Regel-Editor offen ist (null = Liste)
+const devName = id => { const d = dev(id); return d ? d.name : '(Gerät fehlt)'; };
+function condSummary(c) {
+  const cmp = c.op === 'below' ? 'unter' : 'über';
+  if (c.type === 'time') return `${c.from}–${c.to} Uhr`;
+  if (c.type === 'at') return `um ${c.time} Uhr`;
+  if (c.type === 'weekday') return 'nur ' + (c.days || []).map(i => WD[i]).join(', ');
+  if (c.type === 'sunwin') return (c.phase === 'night' ? 'Nacht' : 'Tag') + ' (Sonnenstand)';
+  if (c.type === 'sun') return (c.event === 'sunrise' ? 'Sonnenaufgang' : 'Sonnenuntergang') + (c.offset ? ` ${Math.abs(c.offset)} Min ${c.offset < 0 ? 'vor' : 'nach'}` : '');
+  if (c.type === 'price') return `Preis ${cmp} ${c.ct} ct`;
+  if (c.type === 'budget') return `${c.minutes} Min Laufzeit/Tag`;
+  if (c.type === 'soc') return `Akku ${cmp} ${c.pct} %`;
+  if (c.type === 'sun_tomorrow') return `Sonne morgen ${cmp} ${c.kwh} kWh`;
+  if (c.type === 'sensor') {
+    const sen = (S.sensors || []).find(x => x.id === c.sensor_id), n = sen ? sen.name : '(Sensor fehlt)';
+    return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
+  }
+  if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
+  if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
+  return c.type;
+}
+const LOCK_WORD = { open: 'öffnen', unlock: 'entriegeln', lock: 'verriegeln' };
+const VSTATE_WORD = { on: 'an', off: 'aus', toggle: 'umschalten', press: 'drücken' };
+const actSummary = a => {
+  const t = a.type || 'switch';
+  if (t === 'toggle') return `umschalten: ${devName(a.device_id)}`;
+  if (t === 'wol') { const w = (S.wol || []).find(x => x.id === a.id); return `aufwecken: ${w ? w.name : '?'}`; }
+  if (t === 'lock') { const k = (S.locks || []).find(x => x.id === a.id); return `Türschloss ${k ? k.name : '?'} ${LOCK_WORD[a.state]}`; }
+  if (t === 'wait') { const s = a.seconds || 0; return 'warte ' + (s % 3600 === 0 ? s / 3600 + ' h' : s % 60 === 0 ? s / 60 + ' min' : s + ' s'); }
+  if (t === 'setpoint') return `Thermostate ${(a.device_ids || []).includes('*') ? '(alle)' : '(' + (a.device_ids || []).length + ')'} → ${a.value} °C`;
+  if (t === 'ac') { const k = dev(a.id), m = { auto: 'Automatik', cool: 'Kühlen', dry: 'Entfeuchten', heat: 'Heizen', fan_only: 'Lüften', smart_dry: 'Intelligent entfeuchten' }; return `Klimaanlage ${k ? k.name : '?'}: ${[a.power === 'on' ? 'ein' : a.power === 'off' ? 'aus' : '', a.mode ? m[a.mode] : '', a.target != null ? a.target + ' °C' : '', a.fan ? 'Lüfter ' + a.fan : ''].filter(Boolean).join(', ')}`; }
+  if (t === 'wled') { const k = dev(a.id); return `WLED ${k ? k.name : '?'} ${a.mode === 'color' ? 'Farbe ' + a.color + (a.brightness ? ', ' + a.brightness + ' %' : '') : 'Voreinstellung ' + a.preset}`; }
+  if (t === 'blind') { const k = (S.blinds || []).find(x => x.id === a.id); return `Rollladen ${k ? k.name : '?'} ${a.action === 'stop' ? 'anhalten' : 'auf ' + a.level + ' %'}`; }
+  if (t === 'sound') { const k = (S.sounds || []).find(x => x.id === a.id); return `Sound ${k ? k.name : '?'} (Titel ${a.track})`; }
+  if (t === 'photo') { const k = (S.cameras || []).find(x => x.id === a.id); return `Standbild ${k ? k.name : '?'} per Telegram${toNames(a)}`; }
+  if (t === 'video') { const k = (S.cameras || []).find(x => x.id === a.id); const L = { animal: 'Tier', person: 'Person', vehicle: 'Fahrzeug', motion: 'Bewegung' }; return `Video ${k ? k.name : '?'} per Telegram${(a.filter || []).length ? ' bei ' + a.filter.map(f => L[f]).join('/') : ''}${toNames(a)}`; }
+  if (t === 'pushover') return `Pushover${toNames(a, S.prec)} „${(a.text || '').slice(0, 25)}${(a.text || '').length > 25 ? '…' : ''}“${a.priority > 0 ? ' (' + (a.priority === 2 ? 'Notfall' : 'hoch') + ')' : ''}${a.camera ? ' mit Bild' : ''}`;
+  if (t === 'notify') return `Telegram${toNames(a)} „${(a.text || '').slice(0, 25)}${(a.text || '').length > 25 ? '…' : ''}“`;
+  if (t === 'virtual') { const v = (S.virtual || []).find(x => x.id === a.id); return `Schalter ${v ? v.name : '?'} ${VSTATE_WORD[a.state]}`; }
+  return `${a.state === 'on' ? 'ein' : 'aus'}: ${devName(a.device_id)}`;
+};
+function ruleRow(r) {
+  const id = escH(r.id), conds = r.when.conds.map(condSummary).join(r.when.mode === 'any' ? ' ODER ' : ' UND ');
+  const sum = (r.mode === 'flow' ? '⚙ Ablauf · ' : '') + `WENN ${conds} → DANN ${(r.then || []).map(actSummary).join(', ')}` + ((r.else || []).length ? ` · SONST ${r.else.map(actSummary).join(', ')}` : '');
+  const st = statusHtml(r);
+  return `<div data-sort-id="${id}" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <label class="switch" style="margin:0" title="Regel an/aus"><input type="checkbox" ${r.enabled !== false ? 'checked' : ''} onchange="listToggle('${id}', this.checked)"><span class="slider"></span></label>
+    <div style="flex:1;min-width:200px;cursor:grab" title="Lange drücken und ziehen = Reihenfolge ändern · Bearbeiten mit ✎"><b>${escH(r.name || '(ohne Namen)')}</b>${st ? ' <span style="margin-left:6px">' + st + '</span>' : ''}
+      <div class="muted" style="margin-top:2px">${escH(sum)}</div></div>
+    <button class="ghost" onclick="ruleMove('${id}')" title="In eine Gruppe verschieben">📁</button>
+    <button class="ghost" onclick="editOpen('${id}')" title="Regel bearbeiten">✎</button>
+    <button class="ghost" onclick="ruleCopy('${id}')" title="Regel kopieren">⧉</button>
+    <button class="ghost" onclick="ruleDelete('${id}')" title="Regel löschen">✕</button></div>`;
+}
+function ruleCopy(id) {                           // Kopie mit dem Namen "Kopie <alter Name>", zunaechst ausgeschaltet; gleich im Regel-Editor zum Anpassen
+  const src = R.find(x => x.id === id); if (!src) return;
+  const box = document.querySelector(`[data-rule="${id}"]`); if (box) syncRule(box);       // offene, noch nicht uebernommene Eingaben mitnehmen
+  const c = clone(src); c.id = 'new-' + (++newId); c.name = 'Kopie ' + (src.name || ''); c.enabled = false;
+  R.push(c); openGroupOf(c); EDIT = c.id; touch(); renderRules();
+  const n = document.querySelector('.r-name'); if (n) { n.focus(); n.select(); }
+  window.scrollTo({ top: $('rules-card').offsetTop, behavior: 'smooth' });
+  savedToast('Kopie angelegt – Name anpassen, dann Speichern');
+}
+function listToggle(id, on) { const r = R.find(x => x.id === id); if (r) { r.enabled = on; touch(); } }
+function editOpen(id) { EDIT = id; renderRules(); renderWizard(); window.scrollTo({ top: $('rules-card').offsetTop, behavior: 'smooth' }); }
+function editClose() {
+  const r = R.find(x => x.id === EDIT);
+  if (r && !(r.name || '').trim()) { const n = document.querySelector('.r-name'); if (n) { n.style.borderColor = '#e5544a'; n.focus(); } savedToast('Jede Regel braucht einen Namen'); return; }
+  if (r) openGroupOf(r);
+  EDIT = null; renderRules(); renderWizard();
+}
+/* ---- Gruppen: frei benennbar, auf-/zuklappbar, sortierbar ---- */
+let GOPEN = {};                                   // Gruppen-ID (oder '_' = Ohne Gruppe) -> aufgeklappt; wird im Browser gemerkt
+try { GOPEN = JSON.parse(localStorage.getItem('ruleGroupsOpen') || '{}') || {}; } catch (e) { GOPEN = {}; }
+const gOpen = k => (k in GOPEN) ? !!GOPEN[k] : k === '_';
+function gSave() { try { localStorage.setItem('ruleGroupsOpen', JSON.stringify(GOPEN)); } catch (e) { /* Komfort */ } }
+const gOf = r => (r.group && GR.some(g => g.id === r.group)) ? r.group : '';
+function openGroupOf(r) { GOPEN[gOf(r) || '_'] = true; gSave(); }
+function groupToggle(k) { GOPEN[k] = !gOpen(k); gSave(); renderRules(); }
+const gNameTaken = (name, except) => GR.some(g => g.id !== except && g.name.toLowerCase() === name.toLowerCase());
+async function groupNew(preset) {                 // legt eine Gruppe an; gibt ihre ID zurueck (oder null bei Abbruch)
+  let name = preset;
+  for (;;) {
+    name = await uiAsk('Neue Gruppe', 'Name der Gruppe (frei wählbar, z. B. Timer, Licht, Garten)', name || '', 'Anlegen');
+    if (!name) return null;
+    if (!gNameTaken(name)) break;
+    savedToast('Diese Gruppe gibt es schon');
+  }
+  const g = { id: 'ng-' + (++newId), name }; GR.push(g); GOPEN[g.id] = true; gSave(); touch();
+  return g.id;
+}
+async function groupRename(id) {
+  const g = GR.find(x => x.id === id); if (!g) return;
+  for (;;) {
+    const n = await uiAsk('Gruppe umbenennen', 'Neuer Name', g.name, 'Speichern');
+    if (!n) return;
+    if (!gNameTaken(n, id)) { g.name = n; touch(); renderRules(); return; }
+    savedToast('Diese Gruppe gibt es schon');
+  }
+}
+async function groupDelete(id) {
+  const g = GR.find(x => x.id === id); if (!g) return;
+  const n = R.filter(r => r.group === id).length;
+  if (!await uiConfirm('Gruppe löschen?', `Die Gruppe „${g.name}“ wird entfernt.${n ? ` Die ${n} Regel${n > 1 ? 'n' : ''} darin bleiben erhalten und landen bei „Ohne Gruppe“.` : ''} Gilt sofort.`, 'Löschen')) return;
+  R.forEach(r => { if (r.group === id) delete r.group; }); GR = GR.filter(x => x.id !== id); delete GOPEN[id]; gSave(); touch(); renderRules();
+}
+async function ruleMove(id) {                     // Regel in eine andere Gruppe legen
+  const r = R.find(x => x.id === id); if (!r) return;
+  const cur = gOf(r);
+  const v = await uiPick(`„${r.name || 'Regel'}“ verschieben nach …`, [{ v: '', label: 'Ohne Gruppe', cur: !cur }, ...GR.map(g => ({ v: g.id, label: g.name, cur: g.id === cur })), { v: '__new', label: '＋ Neue Gruppe …' }]);
+  if (v === null) return;
+  let target = v;
+  if (v === '__new') { target = await groupNew(); if (!target) return; }
+  const rr = R.find(x => x.id === id); if (!rr) return;                 // waehrend der Dialoge kann der Entwurf neu geladen worden sein: Regel frisch suchen
+  if (target) rr.group = target; else delete rr.group;
+  openGroupOf(rr); touch(); renderRules();
+}
+async function ruleGroupChanged(sel) {            // Auswahl im Regel-Editor
+  const box = ruleBox(sel), r = syncRule(box);
+  let v = sel.value;
+  const rid = r.id;
+  if (v === '__new') { v = await groupNew(); if (!v) { sel.value = gOf(r); return; } }
+  const rr = R.find(x => x.id === rid) || r;                            // Entwurf evtl. neu geladen: Regel frisch suchen
+  if (v) rr.group = v; else delete rr.group;
+  touch(); renderRules();
+}
+function reorderWithin(ids) {                     // Reihenfolge innerhalb einer Gruppe: die Plaetze der Gruppen-Regeln in R neu belegen
+  const pos = []; R.forEach((r, i) => { if (ids.includes(r.id)) pos.push(i); });
+  const ordered = ids.map(i => R.find(r => r.id === i)).filter(Boolean);
+  pos.forEach((p, k) => { R[p] = ordered[k]; });
+  touch(); savedToast('Reihenfolge geändert');
+}
+function groupSection(g, rs) {                    // g = null: "Ohne Gruppe"
+  const k = g ? g.id : '_', open = gOpen(k), sid = g ? ` data-sort-id="${escH(g.id)}"` : '';
+  const act = g ? `<span class="rg-act no-sort"><button type="button" class="ghost" onclick="event.stopPropagation();groupRename('${escH(g.id)}')" title="Gruppe umbenennen">✎</button><button type="button" class="ghost" onclick="event.stopPropagation();groupDelete('${escH(g.id)}')" title="Gruppe löschen (die Regeln bleiben)">✕</button></span>` : '';
+  const on = rs.filter(r => r.enabled !== false).length;
+  return `<div class="rg${open ? ' open' : ''}"${sid}><div class="rg-head" onclick="groupToggle('${escH(k)}')" title="${g ? 'Auf-/Zuklappen · lange drücken und ziehen = Gruppe verschieben' : 'Auf-/Zuklappen'}"><span class="chev">▸</span><span>${escH(g ? g.name : 'Ohne Gruppe')}</span><span class="cnt">${rs.length} Regel${rs.length === 1 ? '' : 'n'}${rs.length ? ' · ' + on + ' an' : ''}</span>${act}</div>
+    <div class="rg-body" data-rg="${escH(k)}">${rs.length ? rs.map(ruleRow).join('') : '<div class="muted">Keine Regeln in dieser Gruppe – mit 📁 an einer Regel zuordnen.</div>'}</div></div>`;
+}
+function renderRules() {
+  const box = $('rules-list');
+  FIXED = S.A.tariff_mode === 'fixed';
+  if (EDIT && !R.find(x => x.id === EDIT)) EDIT = null;
+  if (EDIT) {
+    box.innerHTML = `<div><button type="button" class="ghost" onclick="editClose()">← Alle Regeln</button></div>` + ruleHtml(R.find(x => x.id === EDIT));
+  } else {
+    if (!R.length && !GR.length) box.innerHTML = '<div class="muted">Noch keine Regel. Tippe unten rechts auf +, um eine anzulegen.</div>';
+    else if (!GR.length) box.innerHTML = R.map(ruleRow).join('');                             // ohne Gruppen: wie bisher eine Liste
+    else {
+      const loose = R.filter(r => !gOf(r));
+      box.innerHTML = GR.map(g => groupSection(g, R.filter(r => r.group === g.id))).join('') + (loose.length ? groupSection(null, loose) : '');
+    }
+    document.querySelectorAll('.rg-body').forEach(b => { if (window.sortableList) sortableList(b, { canStart: () => !EDIT, onDone: reorderWithin }); });
+  }
+  renderWizard();
+}
+
+function renderMain() { $('rules_enabled').checked = CFG.enabled; $('rules_dry').checked = CFG.dry; }
+function renderAll() { renderMain(); renderSettings(); renderRules(); }
+async function loadServer() {                    // alles gleichzeitig und ohne Live-Abfragen der Geraete (?light=1) - die Seite steht sofort
+  const get = async (url, fallback) => { try { const r = await fetch(url); if (!r.ok) return fallback; const j = await r.json(); return j == null ? fallback : j; } catch (e) { return fallback; } };
+  const [devs, A, sensors, virt, sps, lks, wols, camj, snds, blds, recs, prec] = await Promise.all([
+    fetch('/api/shelly?light=1').then(r => r.json()), fetch('/api/rules').then(r => r.json()),
+    get('/api/sensors?light=1', []), get('/api/virtual', []), get('/api/homematic/setpoints?light=1', []), get('/api/homematic/locks?light=1', []),
+    get('/api/wol?light=1', []), get('/api/cameras', {}), get('/api/homematic/sounds', []), get('/api/homematic/blinds?light=1', []), get('/api/notify/recipients', []), get('/api/pushover/recipients', [])]);
+  const arr = v => Array.isArray(v) ? v : [];
+  S = { devs: arr(devs), A, sensors: arr(sensors), virtual: arr(virt), setpoints: arr(sps), locks: arr(lks), wol: arr(wols), cameras: arr(camj.cameras), sounds: arr(snds), blinds: arr(blds), recipients: arr(recs), prec: arr(prec) };
+}
+async function refresh() {                        // alle 10 s: Status auffrischen, den Entwurf nie anfassen
+  try { await loadServer(); } catch (e) { return; }
+  document.querySelectorAll('[data-rule]').forEach(el => { const r = R.find(x => x.id === el.dataset.rule), s = el.querySelector('.r-status'); if (r && s) s.innerHTML = statusBlock(r); });
+  if (!dirty && !EDIT && !WIZ && !document.querySelector('.dlg-no')) { const a = document.activeElement; if (!(a && ['INPUT', 'SELECT'].includes(a.tagName))) { resetDraft(); renderAll(); } }
+}
+/* Regeln umsortieren: lang druecken und ziehen (aendert den Entwurf; mit "Speichern" uebernehmen) */
+if (window.sortableList) sortableList('rules-list', { canStart: () => !EDIT,
+  onDone: ids => { if (EDIT) return; if (GR.length) GR.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); else R.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); touch(); savedToast('Reihenfolge geändert'); } });
+(async () => { await loadServer(); resetDraft(); renderAll(); setInterval(refresh, 10000); })();
+</script>
+{% endblock %}

@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}Verläufe · {{ app_display_name }}{% endblock %}
+{% block content %}
+<style>
+  .vl-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .vl-top h2 { margin: 0; }
+  .vl-top .grow { flex: 1; }
+  .vl-range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .vl-range button { border: 0; border-radius: 0; padding: 6px 11px; font-size: 13px; background: var(--card2); color: var(--muted); cursor: pointer; margin: 0; }
+  .vl-range button + button { border-left: 1px solid var(--border); }
+  .vl-range button.on { background: var(--accent); color: #0d141b; font-weight: 600; }
+  .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  #vl-zoom.on, #vl-day.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent); }
+  .vl-chart { margin-top: 14px; }
+  .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
+  .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .vl-canvas { position: relative; height: 280px; }
+  .vl-empty { color: var(--muted); padding: 40px 0; text-align: center; position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+  .vl-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .vl-table td { padding: 6px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
+  .vl-modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+  .vl-modal > div { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; }
+  .vl-checks label { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-weight: normal; }
+  .vl-checks input { width: auto; }
+</style>
+
+<div class="card">
+  <div class="vl-top">
+    <h2>Verläufe</h2><span class="grow"></span>
+    <div class="vl-range" id="vl-range">
+      <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button><button data-h="168">7 T</button><button data-h="720">30 T</button><button data-h="8760">1 J</button>
+    </div>
+    <span class="vl-nav">
+      <button type="button" class="ghost" id="vl-zoom" aria-pressed="false" title="Lupe: Bereich im Diagramm aufziehen und vergrößern. Danach ist wieder Wischen aktiv.">🔍 Zoom</button>
+      <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
+    </span>
+    <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
+    <button type="button" class="ghost" id="vl-zoomback" style="display:none" title="Zum vorherigen Zeitraum zurück (oder Doppelklick ins Diagramm)">↩ Zoom zurück</button>
+    <button type="button" class="ghost" id="vl-add-chart" style="display:none">＋ Diagramm</button>
+    <button type="button" class="ghost" id="vl-manage" style="display:none">⚙ Datenreihen</button>
+  </div>
+  <div class="muted" id="vl-note" style="margin-top:8px"></div>
+
+  <div id="vl-manage-box" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+    <div class="muted" style="margin-bottom:8px">Was aufgezeichnet wird <span class="qhelp" role="button" tabindex="0" data-help="Aufgezeichnet wird nur, was hier steht. Rohwerte in der gewählten Abtastzeit bleiben 7 Tage erhalten, dazu gibt es eine Minuten-Zusammenfassung (Mittel, Min, Max) für ein Jahr. Wird eine Reihe entfernt, bleiben ihre Werte erhalten und schließen wieder an, wenn du sie neu anlegst.">?</span></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <select id="vl-src" style="flex:1;min-width:240px"></select>
+      <select id="vl-iv" style="width:auto"></select>
+      <input id="vl-label" placeholder="Name (optional)" maxlength="60" style="flex:1;min-width:160px">
+      <button class="ghost" id="vl-series-add">Aufzeichnen</button>
+    </div>
+    <table class="vl-table" id="vl-series-table"></table>
+    <div class="muted" id="vl-stats" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="vl-charts"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='calpicker.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='verlauf-chart.js') }}"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const IS_ADMIN = ({{ user_perms | tojson }} || {}).user_management === 'write';
+const APP_NAME = {{ app_display_name | tojson }};
+const COLORS = VLChart.COLORS;
+let SERIES = {}, CHARTS = [], RANGE = { hours: 12 }, INST = {}, CATALOG = null, TIMER = null, ZOOM_STACK = [], LAST = {};     // LAST: zuletzt gezeigte Daten je Diagramm (fuer den PNG-Export)
+
+async function api(url, method, body) {
+  const r = await fetch(url, { method: method || 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Fehler ' + r.status);
+  return j;
+}
+let toastT = null;
+function toast(text, err) {
+  let el = $('vl-toast'); if (!el) { el = document.createElement('div'); el.id = 'vl-toast'; el.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translateX(-50%);z-index:1100;padding:9px 18px;border-radius:999px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.45);transition:opacity .3s;pointer-events:none'; document.body.appendChild(el); }
+  el.textContent = text; el.style.background = err ? '#e5544a' : 'var(--green)'; el.style.color = err ? '#fff' : '#0d141b'; el.style.opacity = 1;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.style.opacity = 0; }, 2600);
+}
+function modal(title, bodyHtml, okText) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div'); ov.className = 'vl-modal';
+    ov.innerHTML = `<div><h3 style="margin:0 0 12px">${esc(title)}</h3>${bodyHtml}<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost" data-x="0">Abbrechen</button><button data-x="1">${esc(okText || 'OK')}</button></div></div>`;
+    document.body.appendChild(ov);
+    const done = ok => { const box = ov.firstElementChild; const res = ok ? box : null; if (!ok) ov.remove(); resolve({ box: res, close: () => ov.remove() }); };
+    ov.addEventListener('click', e => { const b = e.target.closest('[data-x]'); if (b) done(b.dataset.x === '1'); else if (e.target === ov) done(false); });
+  });
+}
+
+/* ---------------- Zeitraum ---------------- */
+function rangeMs() {
+  if (RANGE.from) return [RANGE.from, RANGE.to];
+  if (RANGE.day) return [RANGE.day, RANGE.day + 86400000];
+  const now = Date.now(); return [now - RANGE.hours * 3600000, now];
+}
+const MIN_MS = 60000;
+function markRange() {
+  document.querySelectorAll('#vl-range button').forEach(b => b.classList.toggle('on', !RANGE.day && !RANGE.from && +b.dataset.h === RANGE.hours));
+  $('vl-zoomback').style.display = ZOOM_STACK.length ? '' : 'none';
+  document.querySelectorAll('.vl-zout').forEach(b => { b.style.display = ZOOM_STACK.length ? '' : 'none'; });          // auch an jedem Diagramm
+  $('vl-live').style.display = RANGE.liveHours ? '' : 'none';
+  if (!RANGE.day) dayBtnReset();
+}
+function dayBtnReset() { $('vl-day').textContent = '📅 Tag wählen'; $('vl-day').classList.remove('on'); }
+function dayBtnSet(ms) { $('vl-day').textContent = '📅 ' + new Date(ms).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }); $('vl-day').classList.add('on'); }
+function setRange(r) {
+
+  RANGE = r; ZOOM_STACK = [];
+  if (r.day) dayBtnSet(r.day);
+  markRange(); loadAll();
+}
+function zoomTo(t0, t1) {                           // per Ziehen im Diagramm gewaehlter Ausschnitt (gilt fuer alle Diagramme)
+  if (t1 - t0 < 10000) return;
+  ZOOM_STACK.push(RANGE); RANGE = { from: Math.round(t0), to: Math.round(t1), zoom: true };
+  markRange(); loadAll();
+}
+function zoomOut() {
+  if (!ZOOM_STACK.length) return;
+  RANGE = ZOOM_STACK.pop(); if (RANGE.day) dayBtnSet(RANGE.day); markRange(); loadAll();
+}
+$('vl-zoomback').addEventListener('click', zoomOut);
+document.querySelectorAll('#vl-range button').forEach(b => b.addEventListener('click', () => setRange({ hours: +b.dataset.h })));
+const isoOf = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+$('vl-day').addEventListener('click', e => openCalendarPicker(e.currentTarget, { value: RANGE.day ? isoOf(RANGE.day) : isoOf(Date.now()), max: isoOf(Date.now()) },
+  iso => { const [y, m, d] = iso.split('-').map(Number); setRange({ day: new Date(y, m - 1, d).getTime() }); }));
+
+/* Zeitraum verschieben (Knoepfe und Wischen im Diagramm): Das Fenster behaelt seine Breite und bleibt nie in der Zukunft. */
+function panTo(from, to) {
+  const now = Date.now(), span = to - from;
+  if (to > now) { from -= to - now; to = now; }
+  const live = RANGE.liveHours || (!RANGE.from && !RANGE.day ? RANGE.hours : 0);
+  if (to >= now - 2000 && live) { RANGE = { hours: live }; ZOOM_STACK = []; markRange(); loadAll(); return; }
+  RANGE = { from: Math.round(from), to: Math.round(from + span), pan: true, liveHours: live || undefined };
+  markRange(); loadAll();
+}
+$('vl-live').addEventListener('click', () => { if (RANGE.liveHours) setRange({ hours: RANGE.liveHours }); });
+/* Lupe: nur fuer EINEN Zoom aktiv - danach springt sie zurueck und Wischen gilt wieder. */
+let ZOOM_MODE = false;
+function setZoomMode(on) {
+  ZOOM_MODE = on;
+  $('vl-zoom').classList.toggle('on', on); $('vl-zoom').setAttribute('aria-pressed', on);
+  document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = on ? 'crosshair' : 'grab'; });
+}
+$('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && ZOOM_MODE) setZoomMode(false); });
+
+/* ---------------- Diagramme ---------------- */
+const { fmtTick, niceTicks, fmtNum } = VLChart;
+
+function chartCard(c) {
+  return `<div class="card vl-chart" data-sort-id="${esc(c.id)}"><div class="vl-chart-head"><h3>${esc(c.title)}${c.dashboard ? ' <span class="muted" style="font-size:12px;font-weight:normal" title="Wird auch auf dem Dashboard gezeigt">· 🏠 Dashboard</span>' : ''}</h3>
+    <button class="ghost vl-zout" onclick="zoomOut()" style="${ZOOM_STACK.length ? '' : 'display:none'}" title="Zoom zurück: einen Schritt zum vorherigen Ausschnitt (gilt für alle Diagramme)" aria-label="Zoom zurück">−</button>
+    <button class="ghost" onclick="exportDialog('${esc(c.id)}')" title="Als PNG-Bild speichern">⬇ PNG</button>
+    ${IS_ADMIN ? `<button class="ghost" onclick="editChart('${esc(c.id)}')" title="Diagramm bearbeiten">✎</button><button class="ghost" onclick="deleteChart('${esc(c.id)}')" title="Diagramm löschen">✕</button>` : ''}</div>
+    <div class="vl-canvas"><canvas id="cv-${esc(c.id)}"></canvas><div class="vl-empty" id="em-${esc(c.id)}"></div></div></div>`;
+}
+function renderCharts() {
+  Object.values(INST).forEach(ch => ch.destroy()); INST = {};
+  const box = $('vl-charts');
+  box.innerHTML = CHARTS.length ? CHARTS.map(chartCard).join('')
+    : `<div class="card vl-chart muted">${Object.keys(SERIES).length ? 'Noch kein Diagramm angelegt.' : 'Noch nichts aufgezeichnet.'} ${IS_ADMIN ? 'Mit „⚙ Datenreihen“ wählst du aus, was aufgezeichnet wird, mit „＋ Diagramm“ legst du ein Diagramm an.' : 'Ein Administrator legt fest, was aufgezeichnet und angezeigt wird.'}</div>`;
+  loadAll(true);
+}
+async function loadChartData(c) {
+  const [t0, t1] = rangeMs(), cv = $('cv-' + c.id); if (!cv) return;
+  const ids = c.series.filter(i => SERIES[i]);
+  const em = $('em-' + c.id);
+  if (!ids.length) { em.style.display = 'flex'; em.textContent = 'Keine Reihen gewählt' + (IS_ADMIN ? ' – ✎ drücken.' : '.'); if (INST[c.id]) { INST[c.id].destroy(); delete INST[c.id]; } return; }
+  let d; try { d = await api(`/api/verlauf/data?series=${encodeURIComponent(ids.join(','))}&from=${Math.round(t0)}&to=${Math.round(t1)}&points=${VLChart.pointsFor(c.kind, cv.clientWidth, 1.4)}`); }
+  catch (e) { em.style.display = 'flex'; em.textContent = e.message; return; }
+  LAST[c.id] = { d, t0, t1 };
+  const r = VLChart.draw(INST, c, SERIES, d, t0, t1, cv, { onCreate: () => attachZoom(c.id, cv) });
+  em.style.display = r.any ? 'none' : 'flex'; em.textContent = r.any ? '' : 'Noch keine Werte in diesem Zeitraum';
+}
+function attachZoom(cid, cv) {
+  let pending = null, pan = null;
+  cv.style.touchAction = ZOOM_MODE ? 'none' : 'pan-y'; cv.style.cursor = ZOOM_MODE ? 'crosshair' : 'grab';   // senkrecht scrollt die Seite, seitlich wischt das Diagramm
+  const ch = () => INST[cid];
+  const px = e => Math.max(ch().chartArea.left, Math.min(ch().chartArea.right, e.clientX - cv.getBoundingClientRect().left));
+  const capture = e => { try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } };
+  const begin = e => { ch()._sel = { x0: px(e), x1: px(e) }; capture(e); };
+  const startPan = (e, x0) => {
+    const c = ch(); if (!c) return;
+    const a = c.chartArea, sx = c.scales.x;
+    pan = { x0, t0: sx.min, t1: sx.max, w: a.right - a.left, dt: 0 };
+    cv.style.cursor = 'grabbing'; capture(e);
+  };
+  const movePan = e => {
+    const c = ch(); if (!c || !pan) return;
+    let dt = -(e.clientX - pan.x0) / pan.w * (pan.t1 - pan.t0);
+    dt = Math.min(dt, Math.max(0, Date.now() - pan.t1));              // nicht in die Zukunft
+    pan.dt = dt;
+    c.options.scales.x.min = pan.t0 + dt; c.options.scales.x.max = pan.t1 + dt; c.update('none');
+  };
+  const endPan = () => {
+    const p = pan; pan = null; cv.style.cursor = ZOOM_MODE ? 'crosshair' : 'grab';
+    if (!p) return;
+    if (Math.abs(p.dt) > (p.t1 - p.t0) * 0.01) panTo(p.t0 + p.dt, p.t1 + p.dt);
+    else { const c = ch(); if (c) { c.options.scales.x.min = p.t0; c.options.scales.x.max = p.t1; c.update('none'); } }
+  };
+  const finish = () => {
+    pending = null;
+    if (pan) { endPan(); return; }
+    const c = ch(); if (!c || !c._sel) return;
+    const s = c._sel; c._sel = null; c.draw();
+    if (Math.abs(s.x1 - s.x0) > 8) {
+      const a = c.scales.x.getValueForPixel(Math.min(s.x0, s.x1)), b = c.scales.x.getValueForPixel(Math.max(s.x0, s.x1));
+      setZoomMode(false);                                              // Lupe springt nach dem Zoom wieder heraus
+      zoomTo(a, b);
+    }
+  };
+  cv.addEventListener('pointerdown', e => {
+    if (e.button > 0 || !ch()) return;
+    const x = e.clientX - cv.getBoundingClientRect().left, a = ch().chartArea; if (x < a.left || x > a.right) return;
+    if (ZOOM_MODE) begin(e);
+    else if (e.pointerType === 'touch') pending = { x: e.clientX, y: e.clientY, e };          // erst erkennen, ob seitlich gewischt oder senkrecht gescrollt wird
+    else startPan(e, e.clientX);
+  });
+  cv.addEventListener('pointermove', e => {
+    if (pan) { movePan(e); return; }
+    if (pending) {
+      const dx = Math.abs(e.clientX - pending.x), dy = Math.abs(e.clientY - pending.y);
+      if (dx > 8 && dx > dy) { const p0 = pending; pending = null; startPan(p0.e, p0.x); movePan(e); return; }
+      if (dy > 8) pending = null;                                                                // senkrecht: Seite scrollt
+    }
+    const c = ch(); if (c && c._sel) { c._sel.x1 = px(e); c.draw(); }
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => cv.addEventListener(ev, finish));
+  cv.addEventListener('touchmove', e => { if (ch() && (ch()._sel || pan) && e.cancelable) e.preventDefault(); }, { passive: false });
+  cv.addEventListener('dblclick', zoomOut);
+  cv.addEventListener('contextmenu', e => { if (pan || (ch() && ch()._sel)) e.preventDefault(); });
+}
+async function loadAll(first) {
+  markRange();
+  const [t0, t1] = rangeMs();
+  const tf = t => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: t1 - t0 < 7200000 ? '2-digit' : undefined });
+  $('vl-note').textContent = RANGE.pan ? `Zeitraum: ${tf(t0)} – ${tf(t1)}  („Jetzt“ = aktuelle Zeit)`
+    : RANGE.from ? `Ausschnitt: ${tf(t0)} – ${tf(t1)}  (Doppelklick ins Diagramm oder „Zoom zurück“)`
+    : RANGE.day ? new Date(t0).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+    : 'Tipp: Im Diagramm seitlich wischen verschiebt die Zeit. Mit „🔍 Zoom“ einen Bereich aufziehen und vergrößern.';
+  await Promise.all(CHARTS.map(loadChartData));
+}
+setInterval(() => { if (!RANGE.day && !RANGE.from && !document.hidden && !document.querySelector('.vl-modal')) loadAll(); }, 15000);
+
+/* ---------------- PNG-Export ---------------- */
+/* Bild = Titel + Zeitraum + Diagramm (inkl. Legende) + Fusszeile; wahlweise dunkel (wie am Bildschirm) oder weiss (zum Drucken). */
+async function makePng(id, light) {
+  const c = CHARTS.find(x => x.id === id), last = LAST[id];
+  if (!c || !last) throw new Error('Diagramm ist noch nicht geladen');
+  const cs = getComputedStyle(document.documentElement), live = INST[id];
+  const W = live ? live.width : 900, H = live ? live.height : 280;
+  const th = light ? { bg: '#ffffff', fg: '#1b1f27', mut: '#5b6472' } : { bg: (cs.getPropertyValue('--card') || '#1b1f27').trim() || '#1b1f27', fg: '#e8edf5', mut: '#9aa4b5' };
+  // Das Diagramm wird unsichtbar noch einmal in gewuenschter Farbgebung gezeichnet - das angezeigte bleibt unveraendert.
+  const host = document.createElement('div'); host.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:${H}px`;
+  const cv2 = document.createElement('canvas'); host.appendChild(cv2); document.body.appendChild(host);
+  const tmp = {}; let dataUrl;
+  try { VLChart.draw(tmp, c, SERIES, last.d, last.t0, last.t1, cv2, { theme: light ? 'light' : 'dark' }); dataUrl = tmp[c.id].toBase64Image('image/png', 1); }
+  finally { if (tmp[c.id]) tmp[c.id].destroy(); host.remove(); }
+  const img = new Image(); img.src = dataUrl; await img.decode();
+  const k = img.width / W || 1, pad = Math.round(18 * k), head = Math.round(62 * k), foot = Math.round(30 * k);
+  const out = document.createElement('canvas'); out.width = img.width + pad * 2; out.height = img.height + head + foot + pad;
+  const g = out.getContext('2d'), font = getComputedStyle(document.body).fontFamily || 'sans-serif';
+  g.fillStyle = th.bg; g.fillRect(0, 0, out.width, out.height);
+  g.textBaseline = 'alphabetic'; g.fillStyle = th.fg; g.font = `bold ${Math.round(22 * k)}px ${font}`; g.fillText(c.title, pad, pad + Math.round(24 * k), out.width - pad * 2);
+  const tf = t => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  g.fillStyle = th.mut; g.font = `${Math.round(14 * k)}px ${font}`; g.fillText(`${tf(last.t0)} – ${tf(last.t1)}`, pad, pad + Math.round(48 * k), out.width - pad * 2);
+  g.drawImage(img, pad, head);
+  g.font = `${Math.round(12 * k)}px ${font}`; g.fillText(`${APP_NAME} · Verläufe · exportiert am ${tf(Date.now())}`, pad, out.height - Math.round(10 * k), out.width - pad * 2);
+  return new Promise((res, rej) => out.toBlob(b => b ? res(b) : rej(new Error('Bild konnte nicht erzeugt werden')), 'image/png'));
+}
+function downloadBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+window.exportDialog = async id => {
+  const c = CHARTS.find(x => x.id === id); if (!c) return;
+  let last = 'dark'; try { last = localStorage.getItem('vlPngBg') || 'dark'; } catch (e) { /* egal */ }
+  const { box, close } = await modal('Als PNG-Bild speichern', `<div class="muted" style="margin-bottom:10px">Gespeichert wird das Diagramm „${esc(c.title)}“ genau mit dem Zeitraum, der gerade angezeigt wird (inkl. Legende, Titel und Zeitraum).</div>
+    <label>Hintergrund <span class="qhelp" role="button" tabindex="0" data-help="Dunkel entspricht der Bildschirmansicht, Weiß eignet sich zum Drucken und für Dokumente.">?</span></label><select id="vx-bg"><option value="dark" ${last === 'dark' ? 'selected' : ''}>dunkel (wie hier)</option><option value="light" ${last === 'light' ? 'selected' : ''}>weiß (zum Drucken)</option></select>`, 'Speichern');
+  if (!box) return;
+  const light = box.querySelector('#vx-bg').value === 'light'; close();
+  try { localStorage.setItem('vlPngBg', light ? 'light' : 'dark'); } catch (e) { /* egal */ }
+  try {
+    const blob = await makePng(id, light), d = new Date(), p = n => String(n).padStart(2, '0');
+    const name = `Verlauf-${c.title.replace(/[^\wäöüÄÖÜß-]+/g, '_').replace(/^_+|_+$/g, '') || 'Diagramm'}-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.png`;
+    downloadBlob(blob, name); toast('Bild gespeichert ✓');
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------------- Diagramme anlegen/bearbeiten (Admin) ---------------- */
+async function saveCharts() {
+  try { CHARTS = (await api('/api/verlauf/charts', 'POST', { charts: CHARTS })).charts; } catch (e) { toast(e.message, true); }
+}
+async function chartDialog(c) {
+  const list = Object.values(SERIES);
+  if (!list.length) { toast('Zuerst unter „⚙ Datenreihen“ etwas zum Aufzeichnen wählen', true); return; }
+  const { box, close } = await modal(c ? 'Diagramm bearbeiten' : 'Neues Diagramm',
+    `<label>Titel <span class="qhelp" role="button" tabindex="0" data-help="Überschrift des Diagramms, z. B. „aktueller Stromverbrauch in Watt“.">?</span></label><input id="vd-title" maxlength="60" value="${esc(c ? c.title : '')}" placeholder="z. B. aktueller Stromverbrauch in Watt">
+     <label style="margin-top:12px">Darstellung <span class="qhelp" role="button" tabindex="0" data-help="Linie, Fläche, Balken, Stufen und weitere Arten. Balken zeigen den Mittelwert je Zeitabschnitt, Stufen halten den Wert bis zur nächsten Änderung.">?</span></label>
+     <select id="vd-kind">${[['line', 'Linie'], ['area', 'Fläche'], ['bar', 'Balken (Mittel je Zeitabschnitt)'], ['step', 'Stufen'], ['points', 'Punkte'], ['stackarea', 'Fläche gestapelt (Summe aus den Reihen)'], ['stackbar', 'Balken gestapelt (Summe aus den Reihen)']].map(([k, n]) => `<option value="${k}" ${(c && c.kind || 'line') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+     <label style="margin-top:10px;display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" id="vd-dash" style="width:auto" ${c && c.dashboard ? 'checked' : ''}> Auf dem Dashboard zeigen <span class="qhelp" role="button" tabindex="0" data-help="Alle so markierten Diagramme erscheinen auf dem Dashboard in der Kachel „Verlauf“.">?</span></label>
+     <label style="margin-top:12px">Reihen <span class="qhelp" role="button" tabindex="0" data-help="Bis zu 12 Reihen je Diagramm. Reihen mit unterschiedlichen Einheiten bekommen eine zweite Achse. Das Farbfeld links neben dem Namen legt die Farbe der Reihe in diesem Diagramm fest.">?</span></label>
+     <div class="vl-checks">${(() => { let extra = c ? c.series.length : 0; return list.map(s => { const own = c && c.colors && c.colors[s.id], def = c && c.series.includes(s.id) ? COLORS[c.series.indexOf(s.id) % COLORS.length] : COLORS[extra++ % COLORS.length]; return `<label><input type="checkbox" value="${esc(s.id)}" ${c && c.series.includes(s.id) ? 'checked' : ''}> <input type="color" class="vd-col" data-id="${esc(s.id)}" data-own="${own ? '1' : ''}" data-def="${def}" value="${own || def}" title="Farbe in diesem Diagramm (nur bei gewählter Reihe wirksam)" style="width:38px;height:26px;padding:0;border:0;background:transparent"> <span style="flex:1">${esc(s.label)}${s.unit ? ' <span class="muted">(' + esc(s.unit) + ')</span>' : ''}</span></label>`; }).join(''); })()}</div>
+`, 'Speichern');
+  if (!box) return;
+  const title = box.querySelector('#vd-title').value.trim() || 'Diagramm', ids = [...box.querySelectorAll('.vl-checks input[type=checkbox]:checked')].map(x => x.value);
+  const dashboard = box.querySelector('#vd-dash').checked, kind = box.querySelector('#vd-kind').value;
+  const colors = {}; box.querySelectorAll('.vd-col').forEach(x => { if (ids.includes(x.dataset.id)) colors[x.dataset.id] = x.value; });
+  close();
+  if (c) { c.title = title; c.series = ids; c.colors = colors; c.dashboard = dashboard; c.kind = kind; } else CHARTS.push({ id: 'c' + Date.now(), title, series: ids, colors, dashboard, kind });
+  await saveCharts(); renderCharts();
+}
+window.editChart = id => chartDialog(CHARTS.find(c => c.id === id));
+window.deleteChart = async id => {
+  const c = CHARTS.find(x => x.id === id); if (!c) return;
+  const { box, close } = await modal('Diagramm löschen?', `<div class="muted">„${esc(c.title)}“ wird gelöscht. Die aufgezeichneten Werte bleiben erhalten.</div>`, 'Löschen');
+  if (!box) return; close();
+  CHARTS = CHARTS.filter(x => x.id !== id); await saveCharts(); renderCharts();
+};
+$('vl-add-chart').addEventListener('click', () => chartDialog(null));
+
+/* ---------------- Datenreihen verwalten (Admin) ---------------- */
+async function loadSeries() {
+  const [s, c] = await Promise.all([api('/api/verlauf/series'), api('/api/verlauf/charts')]);
+  SERIES = {}; s.series.forEach(x => { SERIES[x.id] = x; }); CHARTS = c.charts;
+  const st = s.stats, mb = (st.bytes / 1048576).toFixed(1);
+  $('vl-stats').textContent = `Datenbank: ${st.raw.toLocaleString('de-DE')} Rohwerte (${st.raw_days} Tage) · ${st.rollup.toLocaleString('de-DE')} Minutenwerte (${st.rollup_days} Tage) · ${mb} MB` + (st.since ? ' · seit ' + new Date(st.since * 1000).toLocaleDateString('de-DE') : '');
+  renderSeriesTable();
+}
+function ivLabel(s) { return s < 60 ? s + ' s' : s / 60 + ' min'; }
+function renderSeriesTable() {
+  const t = $('vl-series-table'), list = Object.values(SERIES);
+  const ivs = (CATALOG && CATALOG.intervals) || [5, 10, 30, 60, 300];
+  t.innerHTML = list.length ? list.map(s => `<tr data-id="${esc(s.id)}"><td><input value="${esc(s.label)}" maxlength="60" onchange="seriesPatch('${esc(s.id)}', { label: this.value })"></td>
+      <td style="white-space:nowrap"><select style="width:auto" onchange="seriesPatch('${esc(s.id)}', { interval_s: +this.value })">${ivs.map(i => `<option value="${i}" ${i === s.interval_s ? 'selected' : ''}>alle ${ivLabel(i)}</option>`).join('')}</select></td>
+      <td class="muted">${esc(s.unit || (s.binary ? 'an/aus' : ''))}</td><td style="text-align:right"><button class="ghost" onclick="seriesRemove('${esc(s.id)}')" title="Aufzeichnung beenden">✕</button></td></tr>`).join('')
+    : '<tr><td class="muted">Noch nichts ausgewählt.</td></tr>';
+}
+async function loadCatalog() {
+  CATALOG = await api('/api/verlauf/catalog');
+  const groups = {}; CATALOG.sources.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
+  $('vl-src').innerHTML = Object.entries(groups).map(([g, l]) => `<optgroup label="${esc(g)}">${l.map(c => `<option value="${esc(c.id)}" data-type="${esc(c.type)}" data-interval="${c.interval || ''}" data-label="${esc(c.label)}" ${c.known ? 'disabled' : ''}>${esc(c.label)}${c.unit ? ' (' + esc(c.unit) + ')' : ''}${c.known ? ' – wird aufgezeichnet' : ''}</option>`).join('')}</optgroup>`).join('') || '<option value="">Nichts verfügbar</option>';
+  const first = [...$('vl-src').options].find(o => !o.disabled); if (first) $('vl-src').value = first.value;
+  $('vl-iv').innerHTML = CATALOG.intervals.map(i => `<option value="${i}">alle ${ivLabel(i)}</option>`).join('');
+  srcChanged(); renderSeriesTable();
+}
+function srcChanged() { const o = $('vl-src').selectedOptions[0]; if (!o) return; const d = o.dataset.interval || (CATALOG.defaults || {})[o.dataset.type]; if (d) $('vl-iv').value = d; $('vl-label').placeholder = o.dataset.label || 'Name (optional)'; }
+$('vl-src').addEventListener('change', srcChanged);
+$('vl-manage').addEventListener('click', async () => {
+  const b = $('vl-manage-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';
+  if (b.style.display === 'block') { try { await loadCatalog(); } catch (e) { toast(e.message, true); } }
+});
+$('vl-series-add').addEventListener('click', async () => {
+  const src = $('vl-src').value; if (!src) return;
+  try { await api('/api/verlauf/series', 'POST', { source: src, interval_s: +$('vl-iv').value, label: $('vl-label').value }); $('vl-label').value = ''; toast('Wird aufgezeichnet ✓'); await loadSeries(); await loadCatalog(); renderCharts(); }
+  catch (e) { toast(e.message, true); }
+});
+window.seriesPatch = async (id, body) => { try { await api('/api/verlauf/series/' + encodeURIComponent(id), 'PATCH', body); toast('Gespeichert ✓'); await loadSeries(); renderCharts(); } catch (e) { toast(e.message, true); } };
+window.seriesRemove = async id => {
+  const s = SERIES[id]; if (!s) return;
+  const { box, close } = await modal('Aufzeichnung beenden?', `<div class="muted">„${esc(s.label)}“ wird nicht mehr aufgezeichnet und aus allen Diagrammen entfernt. Die bisher gespeicherten Werte bleiben erhalten (und schließen wieder an, wenn du die Reihe neu anlegst).</div>
+    <label style="margin-top:12px;display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" id="vd-del" style="width:auto"> Gespeicherte Werte auch endgültig löschen <span class="qhelp" role="button" tabindex="0" data-help="Ohne Haken bleiben die bisherigen Werte erhalten und schließen wieder an, wenn du die Reihe neu anlegst.">?</span></label>`, 'Beenden');
+  if (!box) return; const del = box.querySelector('#vd-del').checked; close();
+  try { await api('/api/verlauf/series/' + encodeURIComponent(id), 'DELETE', { delete_data: del }); toast(del ? 'Beendet, Werte gelöscht' : 'Aufzeichnung beendet'); await loadSeries(); await loadCatalog(); renderCharts(); } catch (e) { toast(e.message, true); }
+};
+
+/* ---------------- Start ---------------- */
+if (IS_ADMIN) { $('vl-add-chart').style.display = ''; $('vl-manage').style.display = ''; }
+if (IS_ADMIN && window.sortableList) sortableList('vl-charts', { onDone: ids => { CHARTS.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); saveCharts().then(() => toast('Reihenfolge gespeichert ✓')); } });
+(async () => {
+  try { await loadSeries(); } catch (e) { $('vl-note').textContent = e.message; return; }
+  document.querySelectorAll('#vl-range button').forEach(b => b.classList.toggle('on', +b.dataset.h === RANGE.hours));
+  renderCharts();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wiederherstellen · {{ app_display_name }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta name="theme-color" content="#1a2129">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
+  <style>
+    :root { --bg: #12181f; --card: #1a2129; --fg: #eef2f5; --muted: #9aa9b6; --accent: #3ca2cb; --brand: #f48c24; --border: #34414e; --red: #e5544a; --green: #3fb86f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--fg);
+      background: radial-gradient(1000px 500px at 10% -10%, rgba(60,162,203,.14), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), var(--bg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 26px; width: 100%; max-width: 420px; }
+    h1 { font-size: 18px; margin: 0 0 8px; font-weight: 600; }
+    .intro { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 16px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 4px; }
+    input[type="password"], input[type="file"] { width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 15px; }
+    button { width: 100%; margin-top: 18px; cursor: pointer; border: none; border-radius: 10px;
+      padding: 12px 16px; font-size: 15px; font-weight: 600; background: linear-gradient(180deg, #f79b3d, #f48c24); color: #1c1105; box-shadow: 0 2px 10px rgba(244,140,36,.25); }
+    button[disabled] { opacity: .5; cursor: default; }
+    button.ghost { background: none; border: 1px solid var(--border); color: var(--fg); }
+    .msg { font-size: 14px; margin-top: 14px; line-height: 1.5; }
+    .err { color: var(--red); } .ok { color: var(--green); }
+    .sum { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 14px; line-height: 1.6; margin-top: 14px; display: none; }
+    a { color: var(--accent); }
+    input[type=checkbox] { accent-color: var(--accent); }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(60,162,203,.35); }
+    .card { box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+  </style>
+</head>
+<body>
+  {% if sandbox %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
+  <div class="card">
+    <h1>Sicherung wiederherstellen</h1>
+    <p class="intro">Alle Einstellungen, Konten, Geräte und Regeln kommen zurück – die App ist danach wie die alte.</p>
+
+    <label for="f">Sicherungsdatei</label>
+    <input type="file" id="f" accept=".hnx,application/octet-stream">
+    <label for="pw">Sicherungs-Passwort</label>
+    <input type="password" id="pw" autocomplete="off">
+
+    <div class="sum" id="sum"></div>
+    <div class="msg" id="msg"></div>
+    <button type="button" id="check">Sicherung prüfen</button>
+    <button type="button" id="go" class="ghost" style="display:none">Jetzt wiederherstellen</button>
+    <p class="intro" style="text-align:center;margin:16px 0 0"><a href="{{ url_for('create_account') }}">← Stattdessen ein neues Konto anlegen</a></p>
+  </div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function msg(t, cls) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+async function send(mode) {
+  const f = $('f').files[0];
+  if (!f) { msg('Bitte eine Sicherungsdatei wählen.', 'err'); return null; }
+  if (!$('pw').value) { msg('Bitte das Sicherungs-Passwort eingeben.', 'err'); return null; }
+  const fd = new FormData(); fd.append('file', f); fd.append('password', $('pw').value); fd.append('mode', mode);
+  const r = await fetch('/restore', { method: 'POST', body: fd });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { msg(d.error || ('Fehler ' + r.status), 'err'); return null; }
+  return d;
+}
+$('check').onclick = async () => {
+  $('check').disabled = true; msg('Prüfe …');
+  try {
+    const d = await send('inspect'); if (!d) return;
+    const when = d.created ? new Date(d.created).toLocaleString('de-DE') : '?';
+    $('sum').style.display = 'block';
+    $('sum').innerHTML = `<b>${esc(d.app)}</b><br>Erstellt: ${esc(when)}${d.version ? ' · Version ' + esc(d.version) : ''}<br>`
+      + `${d.count} Dateien · Konten: ${esc((d.users || []).join(', ') || '–')}<br>`
+      + (d.include_data ? 'mit Verläufen und Historie' : 'nur Einstellungen (ohne Verläufe)');
+    msg('Passwort stimmt. Mit „Jetzt wiederherstellen“ wird alles eingespielt.', 'ok');
+    $('go').style.display = 'block'; $('check').style.display = 'none';
+  } catch (e) { msg('Fehler: ' + e.message, 'err'); } finally { $('check').disabled = false; }
+};
+$('go').onclick = async () => {
+  $('go').disabled = true; msg('Spiele ein …');
+  try {
+    const d = await send('restore'); if (!d) { $('go').disabled = false; return; }
+    if (d.failed && d.failed.length) { msg('Einige Dateien konnten nicht geschrieben werden: ' + d.failed.join('; '), 'err'); return; }
+    if (!d.restarting) { msg('Fertig ✓ – bitte die App jetzt einmal neu starten und dann anmelden.', 'ok'); return; }
+    msg('Fertig ✓ – die App startet neu …', 'ok');
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try { const r = await fetch('/login', { cache: 'no-store' }); if (r.ok) { location.href = '/login'; return; } } catch (e) {}
+    }
+    msg('Die App antwortet noch nicht – bitte Seite in einer Minute neu laden.', 'err');
+  } catch (e) { msg('Fehler: ' + e.message, 'err'); $('go').disabled = false; }
+};
+</script>
+  <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+{# Unter-Menue "Smart Home": gemeinsam fuer /smarthome (Reiter schalten ohne Neuladen), /automation und /rules.
+   Erwartet: sh_active = Reiter-ID ('aktoren', ... 'automatik', 'regeln'). #}
+<style>
+  .shnav { position: sticky; top: var(--hdr-h, 56px); z-index: 9; display: flex; gap: 6px; overflow-x: auto; align-items: center;
+    padding: 8px 0; margin-bottom: 14px; background: rgba(18,24,31,.35); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
+  .shnav::-webkit-scrollbar { display: none; }
+  .shnav a { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 14px; font-weight: 500; white-space: nowrap;
+    background: var(--card); color: var(--muted); border: 1px solid var(--border); text-decoration: none; border-radius: 999px; }
+  .shnav a.active { font-weight: 600; }
+  .shnav a svg { display: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  /* Schmale Bildschirme (Handy, kleines Fenster): nur Symbole, der Name steht im Hover-/Tooltip-Text */
+  @media (max-width: 900px) {
+    .shnav a { width: 44px; height: 40px; padding: 0; }
+    .shnav a svg { display: block; }
+    .shnav a .lbl { display: none; }
+  }
+  .shnav a:hover { color: var(--fg); }
+  .shnav a.active { background: var(--accent); border-color: var(--accent); color: #0d141b; }
+  .shnav .sep { flex: 0 0 1px; align-self: stretch; background: var(--border); margin: 4px 2px; }
+  @media (max-width: 480px) { .shnav { gap: 4px; } .shnav a { width: 38px; height: 38px; } .shnav a svg { width: 19px; height: 19px; } }
+  @media (max-width: 640px) { main { overflow-x: clip; } }   {# 'hidden' wuerde sticky ausschalten #}
+</style>
+{% set _ic = {
+  'aktoren': '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
+  'sensoren': '<polyline points="3 12 7 12 10 5 14 19 17 12 21 12"/>',
+  'thermostate': '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
+  'sicherheit': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  'regeln': '<line x1="9" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="9" y1="18" x2="21" y2="18"/><polyline points="3 6 4.5 7.5 7 4.5"/><polyline points="3 12 4.5 13.5 7 10.5"/><polyline points="3 18 4.5 19.5 7 16.5"/>',
+  'suchen': '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/>',
+  'nfc': '<path d="M6 8.5a6 6 0 0 1 0 7"/><path d="M10 6a10 10 0 0 1 0 12"/><path d="M14 3.5a14 14 0 0 1 0 17"/>',
+  'wol': '<rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="16" x2="12" y2="21"/>',
+  'alexa': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  'sonstiges': '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'
+} %}
+{% macro tab(tid, label, href) -%}
+  <a href="{{ href }}"{% if href.startswith('/smarthome#') %} data-tab="{{ tid }}"{% endif %}{% if sh_active == tid %} class="active"{% endif %} title="{{ label }}" aria-label="{{ label }}"><svg viewBox="0 0 24 24" aria-hidden="true">{{ _ic[tid]|safe }}</svg><span class="lbl">{{ label }}</span></a>
+{%- endmacro %}
+<nav class="shnav" id="tabbar" aria-label="Smart Home">
+  {% for t in sh_tabs %}
+    {% if not loop.first and t.group != loop.previtem.group %}<span class="sep"></span>{% endif %}
+    {{ tab(t.id, t.label, t.href) }}
+  {% endfor %}
+</nav>
+<script>
+  (function () {   // Hoehe der klebenden Kopfzeile -> Unterleiste klebt direkt darunter
+    const set = () => document.documentElement.style.setProperty('--hdr-h', (document.querySelector('header')?.offsetHeight || 56) + 'px');
+    set(); window.addEventListener('resize', set); window.addEventListener('load', set);
+    document.addEventListener('DOMContentLoaded', () => document.querySelector('#tabbar a.active')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  })();
+</script>

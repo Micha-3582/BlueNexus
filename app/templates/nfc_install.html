@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>NFC einrichten · {{ app_display_name }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1a2129">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; color: #eef2f5;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(900px 500px at 10% -10%, rgba(60,162,203,.16), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), #12181f; }
+    .card { max-width: 420px; width: 100%; background: #1a2129; border: 1px solid #34414e; border-radius: 18px; padding: 28px 24px; box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+    img.logo { width: 72px; height: 72px; border-radius: 18px; display: block; margin: 0 auto 14px; }
+    h1 { font-size: 21px; margin: 0 0 6px; text-align: center; } .sub { color: #9aa9b6; font-size: 14px; text-align: center; margin: 0 0 20px; line-height: 1.5; }
+    .step { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0; } .n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: rgba(60,162,203,.16); color: #3ca2cb; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .step b { display: block; margin-bottom: 2px; } .step span { color: #9aa9b6; font-size: 14px; line-height: 1.45; }
+    .ok { color: #3ca2cb; } .warn { color: #f48c24; }
+    button { width: 100%; margin-top: 10px; padding: 13px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #1c1105; background: linear-gradient(180deg,#f79b3d,#f48c24); cursor: pointer; }
+    #inst-hint { display: none; margin-top: 8px; color: #9aa9b6; font-size: 13px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="{{ url_for('static', filename='icon-512.png') }}" alt="" width="72" height="72">
+    <h1>{{ app_display_name }}</h1>
+    <p class="sub">NFC-Tags mit diesem Handy nutzen</p>
+    {% if not smarthome %}<p class="sub warn">Smart Home ist auf dieser Installation ausgeschaltet – NFC-Tags sind nicht verfügbar.</p>{% endif %}
+    <div class="step"><div class="n">1</div><div><b>App installieren</b><span id="inst-state">Damit öffnet und schließt sich die App beim Scannen von selbst. Eine Anmeldung ist dafür nicht nötig.</span>
+      <button id="inst" type="button" style="display:none">App installieren</button>
+      <div id="inst-hint">Im Browser-Menü (⋮ oder Teilen-Symbol) <strong>„App installieren“</strong> bzw. <strong>„Zum Startbildschirm hinzufügen“</strong> wählen.</div></div></div>
+    <div class="step"><div class="n">2</div><div><b>Handy registrieren</b>
+      {% if phone %}<span class="ok">✓ Dieses Handy ist als „{{ phone }}“ registriert.</span>
+      {% else %}<span class="warn">Noch nicht registriert.</span><span> Lass dir vom Administrator einen Registrierungs-Link schicken und öffne ihn auf diesem Handy.</span>{% endif %}</div></div>
+    <div class="step"><div class="n">3</div><div><b>Tag scannen</b><span>Handy an den NFC-Tag halten – fertig.</span></div></div>
+  </div>
+  <script>
+    var ev = null, st = document.getElementById('inst-state'), btn = document.getElementById('inst'), hint = document.getElementById('inst-hint');
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (standalone) { st.textContent = '✓ Die App ist installiert.'; st.className = 'ok'; }
+    else {
+      hint.style.display = 'block';
+      window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); ev = e; btn.style.display = 'block'; hint.style.display = 'none'; });
+      btn.addEventListener('click', function () { if (ev) { ev.prompt(); ev.userChoice.finally(function () { ev = null; btn.style.display = 'none'; }); } });
+      window.addEventListener('appinstalled', function () { st.textContent = '✓ Die App wurde installiert.'; st.className = 'ok'; btn.style.display = 'none'; hint.style.display = 'none'; });
+    }
+  </script>
+  <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+</body>
+</html>

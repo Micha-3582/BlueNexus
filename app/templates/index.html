@@ -1,0 +1,1915 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div id="banner"></div>
+
+<div class="dash" id="dashboard">
+<div class="card full" id="live-card" style="margin-bottom:14px">
+  <h2>Live-Werte (Victron)</h2>
+  <div class="sysgrid" id="sysgrid">
+    <div class="muted">lädt …</div>
+  </div>
+</div>
+
+<div class="card full" id="energy-card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <h2 style="margin:0">Energie (Verlauf)</h2>
+    <button id="e-prev" class="ghost daytab" title="Vorheriger Tag">◀</button>
+    <span id="e-day" style="min-width:78px;text-align:center;font-size:14px">Heute</span>
+    <button id="e-next" class="ghost daytab" title="Nächster Tag">▶</button>
+    <button id="e-pick" type="button" class="ghost daytab" title="Tag auswählen">📅</button>
+    <span class="muted" style="margin-left:auto" id="energy-hint">Verbrauch &amp; Solar, Batterie-SOC. Baut sich im Lauf des Tages auf.</span>
+  </div>
+  <div class="chart-scroll">
+    <div class="chart-inner"><canvas id="energy-chart"></canvas></div>
+  </div>
+  <div class="legend" id="energy-legend" title="Klick auf einen Eintrag blendet ihn im Diagramm ein/aus">
+    <span data-k="verbrauch"><i class="sw" style="background:#e5544a"></i>Verbrauch</span>
+    <span data-k="cprognose" style="display:none"><i class="sw sw-hatch-red"></i>Verbrauchsprognose (VRM)</span>
+    <span data-k="solar"><i class="sw" style="background:#f48c24"></i>Solar</span>
+    <span data-k="prognose" style="display:none"><i class="sw sw-hatch"></i>Solarprognose (VRM)</span>
+    <span data-k="soc"><i class="sw" style="background:#3ca2cb"></i>Batterie-SOC</span>
+    <span data-k="band"><i class="sw" style="background:rgba(60,162,203,.25);border:1px solid #3ca2cb"></i>SOC Min/Max</span>
+  </div>
+  <div class="sysgrid" id="energy-tiles" style="margin-top:12px"></div>
+</div>
+
+<div class="card full" id="flow-card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <h2 style="margin:0">Energieflüsse</h2>
+    <button id="f-prev" class="ghost daytab" title="Vorheriger Tag">◀</button>
+    <span id="f-day" style="min-width:78px;text-align:center;font-size:14px">Heute</span>
+    <button id="f-next" class="ghost daytab" title="Nächster Tag">▶</button>
+    <button id="f-pick" type="button" class="ghost daytab" title="Tag auswählen">📅</button>
+    <span class="muted" style="margin-left:auto" id="flow-hint">Woher der Strom kam und wohin er ging – oben genutzt/erzeugt, unten Batterie/Netz-Ladung.</span>
+  </div>
+  <div class="chart-scroll">
+    <div class="chart-inner"><canvas id="flow-chart"></canvas></div>
+  </div>
+  <div class="legend">
+    <span><i class="sw" style="background:#26c6c6"></i>Batterie ins Netz</span>
+    <span><i class="sw" style="background:#f0a63c"></i>Solar ins Netz</span>
+    <span><i class="sw" style="background:#35c07a"></i>Solar zur Batterie</span>
+    <span><i class="sw" style="background:#cddc39"></i>Solar zum Verbrauch</span>
+    <span><i class="sw" style="background:#4da3ff"></i>Batterie zum Verbrauch</span>
+    <span><i class="sw" style="background:#e5544a"></i>Netz zum Verbrauch</span>
+    <span><i class="sw" style="background:#c07af5"></i>Netz zur Batterie</span>
+  </div>
+</div>
+
+<div class="card full" id="week-card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <h2 style="margin:0">Wochenrückblick</h2>
+    <button id="w-prev" class="ghost daytab" title="Vorherige Woche">◀</button>
+    <span id="w-range" style="min-width:150px;text-align:center;font-size:14px">Diese Woche</span>
+    <button id="w-next" class="ghost daytab" title="Nächste Woche">▶</button>
+  </div>
+  <div class="table-scroll"><table id="week-table"></table></div>
+</div>
+
+<div class="card full" id="month-card" style="margin-bottom:14px">
+  <h2 style="margin:0 0 8px">Monatsüberblick</h2>
+  <div class="table-scroll" style="max-height:400px;overflow-y:auto"><table id="month-table"></table></div>
+</div>
+
+  <div class="card" id="tibber-card">
+    <h2 id="strategy-card-title">Strompreis</h2>
+    <div class="row">
+      <div class="metric" id="price-tile"><div class="val" id="price">–</div><div class="lbl">Preis jetzt (ct/kWh)</div></div>
+      <div class="metric"><div class="val" id="mode">–</div><div class="lbl">ESS-Modus</div></div>
+    </div>
+    <div style="margin-top:14px" id="strategy"></div>
+    <div class="muted" id="meta" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card" id="override-card">
+    <h2>Sofort laden (Override)</h2>
+    <div style="display:flex;align-items:center;gap:14px">
+      <label class="switch" style="margin:0">
+        <input type="checkbox" id="override"><span class="slider"></span>
+      </label>
+      <div class="muted" id="override-hint">Netzladen erzwingen, unabhängig vom Preis.</div>
+    </div>
+    <div class="muted" id="override-note" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card full" id="price-plan-card">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <h2 style="margin:0">Strompreis & Ladeplan</h2>
+      <button id="p-prev" class="ghost daytab" title="Vorheriger Tag">◀</button>
+      <span id="p-day" style="min-width:78px;text-align:center;font-size:14px">Heute</span>
+      <button id="p-next" class="ghost daytab" title="Nächster Tag">▶</button>
+      <button id="p-pick" type="button" class="ghost daytab" title="Tag auswählen">📅</button>
+      <button id="btn-select" class="ghost sel-btn" aria-pressed="false">✏️ Markieren</button>
+      <span class="muted" style="margin-left:auto" id="drag-hint">In die Kurve klicken oder ziehen, um einen Ladetermin anzulegen.</span>
+    </div>
+    <div class="chart-scroll" id="chart-scroll">
+      <div class="chart-inner" id="chart-inner"><canvas id="chart"></canvas></div>
+    </div>
+    <div class="legend">
+      <span><i class="sw sw-cheap"></i>günstig</span>
+      <span><i class="sw sw-normal"></i>normal</span>
+      <span><i class="sw sw-exp"></i>teuer</span>
+      <span><i class="sw sw-vexp"></i>sehr teuer</span>
+      <span><i class="sw sw-plan"></i>geplantes Ladefenster</span>
+      <span><i class="sw" style="background:transparent;border:2px solid #22d3ee"></i>Preisschwelle greift</span>
+      <span><i class="sw" style="background:rgba(255,213,74,.4);border:1px solid #ffd54a"></i>dein Termin</span>
+      <span class="muted" style="margin-left:auto" id="price-stats"></span>
+    </div>
+    <div class="muted" id="planline" style="margin-top:8px"></div>
+  </div>
+
+<div class="card full" id="charge-log-card">
+  <h2>Ladevorgänge (heute)</h2>
+  <div class="sub">Geplante und durchgeführte Ladefenster mit Preis, Menge und Kosten.</div>
+  <div class="table-scroll"><table id="charge-log"></table></div>
+</div>
+
+<div class="card full" id="ev-card">
+  <h2>Manuelle Ladetermine</h2>
+  <div id="ev-form" class="ev-form">
+    <div class="grid2">
+      <div><label>Start <span class="qhelp" role="button" tabindex="0" data-help="Beginn des Ladefensters – wird durch Ziehen in der Preiskurve gewählt.">?</span></label><input id="ev-start" readonly placeholder="in der Kurve wählen"></div>
+      <div><label>Ende <span class="qhelp" role="button" tabindex="0" data-help="Ende des Ladefensters – wird durch Ziehen in der Preiskurve gewählt.">?</span></label><input id="ev-end" readonly placeholder="in der Kurve wählen"></div>
+    </div>
+    <label>Notiz (optional) <span class="qhelp" role="button" tabindex="0" data-help="Freier Text zur Erinnerung, z. B. wofür das Ladefenster gedacht ist.">?</span></label>
+    <input type="text" id="ev-note" placeholder="z.B. Akku voll bis 7 Uhr">
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button id="ev-confirm" disabled>Termin anlegen</button>
+      <button id="ev-discard" class="ghost" disabled>Auswahl verwerfen</button>
+    </div>
+    <div class="muted" id="ev-empty" style="margin-top:8px">Ziehe in der Kurve über die gewünschten Viertelstunden. Die Auswahl wird erst nach Bestätigung angelegt.</div>
+  </div>
+  <div class="table-scroll"><table id="ev-list" style="margin-top:16px"></table></div>
+</div>
+
+<div class="card full" id="shelly-card" hidden style="margin-bottom:14px">
+  <h2>Geräte</h2>
+  <div class="sysgrid" id="shelly-grid"></div>
+</div>
+<div class="card full" id="virtual-card" hidden style="margin-bottom:14px">
+  <h2>Schalter &amp; Aktionen</h2>
+  <div class="sysgrid" id="virtual-grid"></div>
+</div>
+<div class="card full" id="sensors-card" hidden style="margin-bottom:14px">
+  <h2>Sensoren</h2>
+  <div class="sysgrid" id="sensors-grid"></div>
+</div>
+
+<style>
+  #weather-card .wx-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #weather-card .wx-place { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  #weather-card .wx-temp { font-size: 34px; font-weight: 600; line-height: 1.15; margin-top: 4px; }
+  #weather-card .wx-right { text-align: right; }
+  #weather-card .wx-icon { font-size: 40px; line-height: 1.1; }
+  #wx-hours { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 6px; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; scrollbar-color: #445666 transparent; }
+  #wx-hours::-webkit-scrollbar { height: 8px; }
+  #wx-hours::-webkit-scrollbar-track { background: transparent; }
+  #wx-hours::-webkit-scrollbar-thumb { background: #445666; border-radius: 4px; }
+  #wx-hours .h { flex: 0 0 auto; min-width: 58px; text-align: center; padding: 8px 6px; border-radius: 10px;
+    background: var(--card2, rgba(255,255,255,.04)); font-size: 13px; }
+  #wx-hours .h .t { font-weight: 600; font-size: 15px; }
+  #wx-hours .h .i { font-size: 22px; margin: 2px 0; }
+  #wx-days { margin-top: 8px; }
+  #wx-days .d { display: grid; grid-template-columns: 78px 30px 84px 1fr; align-items: center; gap: 8px; padding: 7px 6px;
+    font-size: 14px; }
+  #wx-days .d:nth-child(even) { background: rgba(255,255,255,.04); }
+  #wx-days .d .m { color: var(--muted); font-size: 12px; }
+  @media (max-width: 560px) { #wx-days .d { grid-template-columns: 64px 28px 76px 1fr; font-size: 13px; } }
+
+</style>
+<div class="card full" id="savings-card" hidden style="margin-bottom:14px">
+  <style>
+    #savings-card table { margin-top: 10px; }
+    #savings-card details { margin-top: 10px; }
+  </style>
+  <h2 style="margin:0 0 4px">Ersparnis</h2>
+  <div class="muted" id="sv-sub">Was PV, Akku und Steuerung gegenüber „alles aus dem Netz“ sparen.</div>
+  <div class="sysgrid" id="sv-tiles" style="margin-top:10px"></div>
+  <div class="table-scroll"><table id="sv-table"></table></div>
+  <details><summary class="muted">So wird gerechnet</summary><div class="muted" id="sv-explain" style="margin-top:6px"></div></details>
+</div>
+
+<div class="card full" id="plansim-card" hidden style="margin-bottom:14px">
+  <style>
+    #plansim-card .ps-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    #plansim-card .ps-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    #plansim-card .ps-box { position: relative; height: 260px; margin-top: 10px; }
+    #plansim-card .ps-wins { margin: 10px 0 4px; font-size: 14px; line-height: 1.6; }
+    #plansim-card table { margin-top: 8px; }
+    #plansim-card details { margin-top: 10px; }
+  </style>
+  <div class="ps-head"><h2 style="margin:0">Ladeplan-Simulation</h2><span class="ps-badge">Test – steuert nichts</span>
+    <span class="muted" style="margin-left:auto" id="ps-hint"></span></div>
+  <div class="muted" id="ps-msg" style="margin-top:6px"></div>
+  <div id="ps-body" hidden>
+    <div class="sysgrid" id="ps-tiles" style="margin-top:10px"></div>
+    <div class="ps-wins" id="ps-wins"></div>
+    <div class="ps-box"><canvas id="ps-chart"></canvas></div>
+    <div class="legend" style="margin-top:8px">
+      <span><i class="sw" style="background:#3ca2cb"></i>Simulation (Vorschlag)</span>
+      <span><i class="sw" style="background:#f48c24"></i>Bisherige Steuerung</span>
+      <span><i class="sw" style="background:#8b93a3"></i>Ohne Netzladen</span>
+      <span><i class="sw" style="background:rgba(53,192,122,.7)"></i>Simulation lädt (kWh)</span>
+    </div>
+    <div class="table-scroll"><table id="ps-hist"></table></div>
+    <details><summary class="muted">Annahmen &amp; Erklärung</summary><div class="muted" id="ps-assume" style="margin-top:6px"></div></details>
+  </div>
+</div>
+
+<style>
+  #vl-dash-range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  #vl-dash-range button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 13px; background: var(--card2); color: var(--muted); cursor: pointer; margin: 0; }
+  #vl-dash-range button + button { border-left: 1px solid var(--border); }
+  #vl-dash-range button.on { background: var(--accent); color: #0d141b; font-weight: 600; }
+</style>
+<div class="card full" id="verlauf-card" hidden style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2 style="margin:0;flex:1">Verlauf</h2>
+    <div id="vl-dash-range"><button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="24">24 h</button><button data-h="168">7 T</button></div>
+    <a href="/verlauf" class="muted" style="text-decoration:none;white-space:nowrap" title="Alle Verläufe, Zoomen und Tage ansehen">Alle Verläufe →</a>
+  </div>
+  <div id="vl-dash-charts"></div>
+</div>
+
+<div class="card full" id="weather-card" hidden style="margin-bottom:14px">
+  <div class="wx-top">
+    <div><div class="wx-place">📍 <span id="wx-place">Wetter</span></div><div class="wx-temp" id="wx-temp">–</div>
+      <div class="muted" id="wx-sub" style="margin-top:2px"></div></div>
+    <div class="wx-right"><div id="wx-text"></div><div class="wx-icon" id="wx-icon"></div></div>
+  </div>
+  <div id="wx-detail">
+    <div class="muted" style="margin-top:10px">Nächste 24 Stunden</div>
+    <div id="wx-hours"></div>
+    <div class="muted" style="margin-top:8px">7 Tage</div>
+    <div id="wx-days"></div>
+    <div class="muted" id="wx-foot" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='calpicker.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='verlauf-chart.js') }}"></script>
+<script>
+const MODULES = {{ modules | tojson }};              // Module der Installation (Energie / Smart Home / Kameras)
+const DASHBOARD_LEVEL = {{ (user_perms.dashboard or 'none') | tojson }};   // 'none' | 'read' | 'write' - siehe Einstellungen -> System -> Weitere Benutzer
+const LEVEL_COLORS = {
+  VERY_CHEAP: '#35c07a', CHEAP: '#35c07a', NORMAL: '#5fa8d3',
+  EXPENSIVE: '#f48c24', VERY_EXPENSIVE: '#e5544a'
+};
+// Jede Dashboard-Kachel einzeln ein-/ausblendbar (Einstellungen -> Kacheln),
+// Schluessel muessen exakt zu den ui.show_*-Feldern aus /api/status passen.
+// (show_tibber_card wird bei festem Tarif zusaetzlich in den Admin-Einstellungen
+// gesperrt/ausgegraut - siehe admin.html updateTariffFields.)
+const TILE_IDS = {
+  show_live_values: 'live-card', show_energy_chart: 'energy-card',
+  show_flow_chart: 'flow-card', show_week_overview: 'week-card',
+  show_month_overview: 'month-card', show_tibber_card: 'tibber-card',
+  show_override_card: 'override-card', show_price_plan: 'price-plan-card',
+  show_charge_log: 'charge-log-card', show_ev_card: 'ev-card',
+};
+// Reihenfolge der Kacheln (Einstellungen -> Kacheln); Standard = Reihenfolge dieser Liste.
+const ORDER_IDS = { ...TILE_IDS, show_shelly_card: 'shelly-card', show_sensors_card: 'sensors-card', show_virtual_card: 'virtual-card', show_weather_card: 'weather-card', show_plansim_card: 'plansim-card', show_savings_card: 'savings-card', show_verlauf_card: 'verlauf-card' };
+function applyTileOrder(order) {
+  const keys = Object.keys(ORDER_IDS), given = (order || []).filter(k => keys.includes(k));
+  [...given, ...keys.filter(k => !given.includes(k))].forEach((k, i) => { const el = $(ORDER_IDS[k]); if (el) el.style.order = i; });
+}
+// Eingeschraenkte Konten (siehe Einstellungen -> System -> Weitere Benutzer): "Schreiben" auf
+// Dashboard darf Geraete schalten, Override setzen und Ladetermine anlegen, "Lesen" nur ansehen.
+// Hier nur die passenden Bedienelemente ausblenden - die eigentliche Sperre sitzt serverseitig.
+if (DASHBOARD_LEVEL !== 'write') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const evCard = $('ev-card'); if (evCard) evCard.style.display = 'none';
+    const selBtn = $('btn-select'); if (selBtn) selBtn.style.display = 'none';
+  });
+}
+if (DASHBOARD_LEVEL === 'read') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const ov = $('override'); if (ov) ov.disabled = true;
+    const hint = $('override-hint'); if (hint) hint.textContent = 'Demo-Zugang: nur Ansicht, kein Schalten möglich.';
+  });
+}
+
+let sensorsDragActive = false, virtualDragActive = false, virtualCache = [], wolCache = [];
+let virtualEnabled = true, sensorsEnabled = true, shellyEnabled = true, weatherEnabled = true, plansimEnabled = true, savingsEnabled = true, verlaufEnabled = true;
+function applyTileVisibility(ui) {
+  applyTileOrder(ui.tile_order);
+  shellyEnabled = ui.show_shelly_card !== false;
+  sensorsEnabled = ui.show_sensors_card !== false;
+  virtualEnabled = ui.show_virtual_card !== false;
+  if (typeof loadVirtual === 'function') loadVirtual();
+  if (typeof loadSensors === 'function') loadSensors();
+  if (weatherEnabled !== (ui.show_weather_card !== false)) { weatherEnabled = ui.show_weather_card !== false; if (typeof loadWeather === 'function') loadWeather(); }
+  if (plansimEnabled !== (ui.show_plansim_card !== false)) { plansimEnabled = ui.show_plansim_card !== false; if (typeof loadPlansim === 'function') loadPlansim(); }
+  if (verlaufEnabled !== (ui.show_verlauf_card !== false)) { verlaufEnabled = ui.show_verlauf_card !== false; if (typeof loadVerlauf === 'function') loadVerlauf(); }
+  if (savingsEnabled !== (ui.show_savings_card !== false)) { savingsEnabled = ui.show_savings_card !== false; if (typeof loadSavings === 'function') loadSavings(); }
+  for (const [key, id] of Object.entries(TILE_IDS)) {
+    const el = $(id);
+    if (el) el.hidden = ui[key] === false;
+  }
+}
+let chart, energyChart, flowChart, prices = [], allPrices = [], schedules = [], nowSlot = '', nowIso = '';
+let energyDay = '', energyMinDay = '';
+let pastFc = null;   // gemerkte VRM-Prognose eines vergangenen Tages: {day, solar, cons}
+let fcData = null, lastEnergyHist = [], energyFcFull = [], energyCFull = [];   // VRM-Prognose, zuletzt gezeigte Messwerte, Prognose je Balken
+const legendHidden = new Set((() => { try { return JSON.parse(localStorage.getItem('energyLegendHidden') || '[]'); } catch (e) { return []; } })());
+let activeDay = 'today', chargePowerW = 3500, overrideBusy = false;
+let drag = null;           // {from, to}
+let selectMode = false;    // Touch: ziehen markiert statt scrollen
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+// Gemeinsame Spaltenbreiten für beide Ladetabellen (letzte Spalte = Löschen)
+const COLGROUP = '<colgroup>'
+  + '<col style="width:32%"><col style="width:13%"><col style="width:13%">'
+  + '<col style="width:13%"><col style="width:13%"><col style="width:16%"></colgroup>';
+// Summenzeile (Strich): Ø-Effektivpreis = Gesamtkosten / Gesamtmenge
+function totalRow(list) {
+  const kwh = list.reduce((a, x) => a + (x.kwh || 0), 0);
+  const cost = list.reduce((a, x) => a + (x.cost || 0), 0);
+  const avg = kwh > 0 ? (cost / kwh * 100) : null;
+  return `<tr class="total"><td>Summe</td><td></td>`
+    + `<td>${avg != null ? avg.toFixed(1) + ' ct' : '–'}</td>`
+    + `<td>${kwh.toFixed(2)} kWh</td><td>${cost.toFixed(2)} €</td><td></td></tr>`;
+}
+
+function isNarrow() { return window.matchMedia('(max-width: 720px)').matches; }
+
+/* --- Auswahl-/Termin-Bänder über der Kurve --- */
+const bandPlugin = {
+  id: 'bands',
+  beforeDatasetsDraw(c) {
+    if (!prices.length) return;
+    const { ctx, chartArea: area, scales: { x } } = c;
+    const half = (x.width / prices.length) / 2;
+    const band = (from, to, fill, stroke) => {
+      const left = x.getPixelForValue(from) - half;
+      const right = x.getPixelForValue(to) + half;
+      ctx.fillStyle = fill;
+      ctx.fillRect(left, area.top, right - left, area.bottom - area.top);
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.strokeRect(left, area.top, right - left, area.bottom - area.top); }
+    };
+    ctx.save();
+    // bestehende Termine (gelb)
+    for (const s of schedules) {
+      if (!s.enabled) continue;
+      const idx = prices.map((p, i) => (p.start >= s.start && p.start < s.end) ? i : -1).filter(i => i >= 0);
+      if (idx.length) band(idx[0], idx[idx.length - 1], 'rgba(255,213,74,.16)', 'rgba(255,213,74,.5)');
+    }
+    // laufende Auswahl (blau) bzw. bestätigungswartende Auswahl (bleibt blau
+    // markiert, bis sie angelegt oder verworfen wird)
+    if (drag) {
+      const a = Math.min(drag.from, drag.to), b = Math.max(drag.from, drag.to);
+      band(a, b, 'rgba(60,162,203,.22)', 'rgba(60,162,203,.7)');
+    } else if (pendingSel) {
+      const idx = prices.map((p, i) => (p.start >= pendingSel.start && p.start < pendingSel.end) ? i : -1).filter(i => i >= 0);
+      if (idx.length) band(idx[0], idx[idx.length - 1], 'rgba(60,162,203,.22)', 'rgba(60,162,203,.7)');
+    }
+    // Jetzt-Linie – nur in der HEUTE-Ansicht (im Morgen-Tab gibt es kein "jetzt")
+    const ni = activeDay === 'today'
+      ? prices.findIndex(p => p.label.slice(0, 2) === nowSlot.slice(0, 2) && p.label.slice(3, 5) === nowSlot.slice(3, 5))
+      : -1;
+    if (ni >= 0) {
+      const px = x.getPixelForValue(ni);
+      ctx.strokeStyle = '#eef2f5'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(px, area.top); ctx.lineTo(px, area.bottom); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+};
+
+function buildChart() {
+  chart = new Chart($('chart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ data: [], borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title: items => { const p = prices[items[0].dataIndex]; return p ? p.label : ''; },
+          label: item => { const p = prices[item.dataIndex];
+            return p ? `${p.ct} ct/kWh${p.planned ? ' · eingeplant' : ''}${p.cheap_lock ? ' · Preisschwelle greift' : ''}` : ''; }
+        } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#9aa9b6', autoSkip: false, maxRotation: 0,
+          callback(v, i) { const p = prices[i]; if (!p || !p.label.endsWith(':00')) return '';
+            const step = (chart && chart.width > 900) ? 4 : 8; return i % step === 0 ? p.label : ''; } } },
+        y: { grid: { color: '#34414e' }, ticks: { color: '#9aa9b6', callback: v => v + ' ct' } }
+      }
+    },
+    plugins: [bandPlugin]
+  });
+  attachDrag();
+}
+
+function renderChart() {
+  chart.data.labels = prices.map(p => p.label);
+  const ds = chart.data.datasets[0];
+  ds.data = prices.map(p => p.ct);
+  ds.backgroundColor = prices.map(p => LEVEL_COLORS[p.level] || '#3ca2cb');
+  // "cheap_lock" (Schwellen-Vorschau der "Immer laden unter"-Regel) bekommt eine
+  // eigene Farbe (Cyan) statt des lila "geplant"-Rahmens - beides kann fachlich
+  // unabhaengig voneinander zutreffen, cheap_lock hat optisch Vorrang.
+  ds.borderColor = prices.map(p => p.cheap_lock ? '#22d3ee' : (p.planned ? '#b072f5' : 'transparent'));
+  ds.borderWidth = prices.map(p => p.cheap_lock || p.planned ? 2 : 0);
+  chart.update('none');
+}
+
+/* --- Energie-Verlauf (echte Stundenwerte) --- */
+function buildEnergyChart() {
+  energyChart = new Chart($('energy-chart').getContext('2d'), {
+    data: {
+      labels: [],
+      datasets: [
+        { type: 'bar', label: 'Verbrauch', data: [], backgroundColor: '#e5544a', yAxisID: 'y', order: 3, stack: 'v' },
+        { type: 'bar', label: 'Solar', data: [], backgroundColor: '#f48c24', yAxisID: 'y', order: 3, stack: 's' },
+        { type: 'line', label: 'SOC Max', data: [], borderColor: 'transparent', pointRadius: 0,
+          yAxisID: 'y1', order: 1, spanGaps: true },
+        { type: 'line', label: 'SOC Min', data: [], borderColor: 'transparent', pointRadius: 0,
+          backgroundColor: 'rgba(60,162,203,.18)', fill: '-1', yAxisID: 'y1', order: 1, spanGaps: true },
+        { type: 'line', label: 'Batterie-SOC', data: [], borderColor: '#3ca2cb', backgroundColor: '#3ca2cb',
+          pointRadius: 2, borderWidth: 2, tension: .3, yAxisID: 'y1', order: 0, spanGaps: true },
+        // Prognose-Rest ueber dem realen Solarertrag (gestapelt): wird vom Ertrag "ausgemalt", uebertroffen = kein Rest
+        { type: 'bar', label: 'Solarprognose', data: [], backgroundColor: hatchPattern('#f48c24'), borderColor: '#f48c24',
+          borderWidth: 1, borderSkipped: false, yAxisID: 'y', order: 3, stack: 's' },
+        // Verbrauchsprognose des VRM: Rest ueber dem realen Verbrauch (gestapelt auf dem Verbrauchsbalken)
+        { type: 'bar', label: 'Verbrauchsprognose', data: [], backgroundColor: hatchPattern('#e5544a'), borderColor: '#e5544a',
+          borderWidth: 1, borderSkipped: false, yAxisID: 'y', order: 3, stack: 'v' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { itemSort: (x, y) => TIP_RANK[x.dataset.label] - TIP_RANK[y.dataset.label], callbacks: {
+          labelColor(item) {
+            const c = item.dataset.borderColor;
+            if (item.dataset.label === 'Solarprognose' || item.dataset.label === 'Verbrauchsprognose') return { borderColor: c, backgroundColor: hatchPattern(c, '#252a33') };
+            return Chart.defaults.plugins.tooltip.callbacks.labelColor.call(this, item);
+          },
+          label: item => {
+            const l = item.dataset.label;
+            if (l === 'SOC Max' || l === 'SOC Min') return null;
+            if (l === 'Solarprognose') { const f = energyFcFull[item.dataIndex]; return f ? `Solarprognose: ${f.toFixed(2)} kWh` : null; }
+            if (l === 'Verbrauchsprognose') { const f = energyCFull[item.dataIndex]; return f ? `Verbrauchsprognose: ${f.toFixed(2)} kWh` : null; }
+            const v = item.parsed.y;
+            if (v == null) return null;
+            return l === 'Batterie-SOC' ? `${l}: ${v} %` : `${l}: ${v.toFixed(2)} kWh`;
+          }
+        } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#9aa9b6', autoSkip: false, maxRotation: 0,
+          callback(v) { const lab = this.getLabelForValue(v); if (!lab.endsWith(':00')) return ''; const hr = parseInt(lab, 10); const step = (energyChart && energyChart.width > 900) ? 2 : 3; return hr % step === 0 ? lab : ''; } } },
+        y: { stacked: true, position: 'left', beginAtZero: true, title: { display: true, text: 'kWh', color: '#9aa9b6' },
+          grid: { color: '#34414e' }, ticks: { color: '#9aa9b6' } },
+        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: '%', color: '#9aa9b6' },
+          grid: { drawOnChartArea: false }, ticks: { color: '#9aa9b6', callback: v => v + ' %' } }
+      }
+    }
+  });
+}
+
+// Auflösung der Energie-Diagramme (15-Min vs. stündlich, wie VRM). Wird per
+// Einstellung gesetzt und im Status-Poll aktualisiert. Getrennt je Chart.
+let energyHourly = false;   // "Energie (Verlauf)"
+let flowHourly = false;     // "Energieflüsse"
+const FLOW_KEYS = ['b_grid', 's_grid', 's_batt', 's_load', 'b_load', 'g_load', 'g_batt'];
+function aggregateHourly(hist) {
+  const map = new Map();
+  for (const h of hist) {
+    const hr = h.hour.slice(0, 2) + ':00';
+    let a = map.get(hr);
+    if (!a) {
+      a = { hour: hr, verbrauch: 0, solar: 0, socs: [], soc_min: null, soc_max: null };
+      FLOW_KEYS.forEach(k => a[k] = 0);
+      map.set(hr, a);
+    }
+    a.verbrauch += h.verbrauch || 0;
+    a.solar += h.solar || 0;
+    FLOW_KEYS.forEach(k => a[k] += h[k] || 0);
+    if (h.soc_avg != null) a.socs.push(h.soc_avg);
+    if (h.soc_min != null) a.soc_min = a.soc_min == null ? h.soc_min : Math.min(a.soc_min, h.soc_min);
+    if (h.soc_max != null) a.soc_max = a.soc_max == null ? h.soc_max : Math.max(a.soc_max, h.soc_max);
+  }
+  return [...map.values()].map(a => {
+    const o = {
+      hour: a.hour,
+      verbrauch: Math.round(a.verbrauch * 1000) / 1000,
+      solar: Math.round(a.solar * 1000) / 1000,
+      soc_avg: a.socs.length ? Math.round(a.socs.reduce((x, y) => x + y, 0) / a.socs.length * 10) / 10 : null,
+      soc_min: a.soc_min, soc_max: a.soc_max,
+    };
+    FLOW_KEYS.forEach(k => o[k] = Math.round(a[k] * 1000) / 1000);
+    return o;
+  });
+}
+/* Gestrichelte Schraffur fuer die Solarprognose-Balken (wie im VRM) */
+function hatchPattern(color, bg) {
+  const c = document.createElement('canvas'); c.width = c.height = 8;
+  const x = c.getContext('2d'); if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 8, 8); }
+  x.strokeStyle = color; x.lineWidth = 1.6;
+  x.beginPath(); x.moveTo(0, 8); x.lineTo(8, 0); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(6, 10); x.lineTo(10, 6); x.stroke();
+  return x.createPattern(c, 'repeat');
+}
+function tomorrowStr() { const d = new Date(todayStr() + 'T00:00'); d.setDate(d.getDate() + 1); return isoDay(d); }
+/* Prognose (Wh je Stunde) fuer heute/morgen aus dem VRM oder null (kein Zugang / keine Daten / anderer Tag) */
+function fcForDay(day, src) {
+  src = src === undefined ? fcData : src;
+  if (!src || !src.hours || !src.hours.length) return null;
+  const key = day === todayStr() ? 'today' : day === tomorrowStr() ? 'tomorrow' : null;
+  if (!key) {                                            // vergangener Tag: gemerkte Prognose
+    const p = pastFc && pastFc.day === day ? (src === fcData ? pastFc.solar : pastFc.cons) : null;
+    return p && Object.keys(p).length ? p : null;
+  }
+  const m = {}; src.hours.filter(h => h.day === key).forEach(h => { m[h.hour] = h.wh; });
+  return Object.keys(m).length ? m : null;
+}
+const TIP_RANK = { 'Batterie-SOC': 0, 'Verbrauch': 1, 'Verbrauchsprognose': 2, 'Solar': 3, 'Solarprognose': 4, 'SOC Max': 5, 'SOC Min': 6 };   // Reihenfolge im Tooltip
+// Legenden-Eintrag -> Datensaetze des Energie-Diagramms
+const LEGEND_DS = { verbrauch: [0], solar: [1], soc: [4], band: [2, 3], prognose: [5], cprognose: [6] };
+function renderEnergyChart(hist) {
+  if (!energyChart) return;
+  hist = hist || [];
+  lastEnergyHist = hist;
+  if (energyHourly) hist = aggregateHourly(hist);
+  const day = energyDay || todayStr();
+  const fc = fcForDay(day), cfc = fcForDay(day, fcData && fcData.cons);
+  let rows = hist;
+  if (fc || cfc) {               // mit Prognose: ganzer Tag als Raster (wie im VRM), Zukunft bleibt leer
+    const step = energyHourly ? 60 : 15, byLabel = new Map(hist.map(h => [h.hour, h]));
+    rows = [];
+    for (let m = 0; m < 1440; m += step) { const lab = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; rows.push(byLabel.get(lab) || { hour: lab }); }
+  }
+  energyChart.data.labels = rows.map(h => h.hour);
+  const d = energyChart.data.datasets;
+  d[0].data = rows.map(h => h.verbrauch ?? null);
+  d[1].data = rows.map(h => h.solar ?? null);
+  d[2].data = rows.map(h => h.soc_max ?? null);
+  d[3].data = rows.map(h => h.soc_min ?? null);
+  d[4].data = rows.map(h => h.soc_avg ?? null);
+  const per = energyHourly ? 1 : 0.25;             // Prognose ist stuendlich -> bei 15-Min-Raster gleichmaessig verteilt
+  energyFcFull = rows.map(h => fc ? (fc[parseInt(h.hour, 10)] || 0) / 1000 * per : null);
+  d[5].data = rows.map((h, i) => energyFcFull[i] == null ? null
+    : Math.round((legendHidden.has('solar') ? energyFcFull[i] : Math.max(0, energyFcFull[i] - (h.solar || 0))) * 1000) / 1000);
+  energyCFull = rows.map(h => cfc ? (cfc[parseInt(h.hour, 10)] || 0) / 1000 * per : null);
+  d[6].data = rows.map((h, i) => energyCFull[i] == null ? null
+    : Math.round((legendHidden.has('verbrauch') ? energyCFull[i] : Math.max(0, energyCFull[i] - (h.verbrauch || 0))) * 1000) / 1000);
+  Object.entries(LEGEND_DS).forEach(([k, idx]) => idx.forEach(i => { d[i].hidden = legendHidden.has(k); }));
+  document.querySelectorAll('#energy-legend [data-k]').forEach(el => {
+    el.classList.toggle('off', legendHidden.has(el.dataset.k));
+    if (el.dataset.k === 'prognose') el.style.display = fc ? '' : 'none';
+    if (el.dataset.k === 'cprognose') el.style.display = cfc ? '' : 'none';
+  });
+  const hasData = hist.some(h => h.verbrauch || h.solar || h.soc_avg != null);
+  const takt = energyHourly ? 'stündlich' : 'im 15-Min-Takt';
+  $('energy-hint').textContent = hasData
+    ? `Verbrauch & Solar, Batterie-SOC ${takt} (echte Messwerte)${fc ? ' – gestrichelt: Prognose vom Victron-VRM.' : '.'}`
+    : (fc || cfc) ? 'Prognose vom Victron-VRM (gestrichelt).' : 'Noch keine Verlaufsdaten – füllt sich mit jedem Regelzyklus.';
+  energyChart.update('none');
+}
+$('energy-legend').addEventListener('click', e => {
+  const el = e.target.closest('[data-k]'); if (!el) return;
+  const k = el.dataset.k;
+  if (legendHidden.has(k)) legendHidden.delete(k); else legendHidden.add(k);
+  try { localStorage.setItem('energyLegendHidden', JSON.stringify([...legendHidden])); } catch (err) { /* nur Komfort */ }
+  renderEnergyChart(lastEnergyHist);
+});
+
+/* --- Energieflüsse (7 Pfade, gestapelt +/-) --- */
+const FLOWS = [
+  { key: 'b_grid', label: 'Batterie ins Netz',     color: '#26c6c6', sign: -1 },
+  { key: 's_grid', label: 'Solar ins Netz',        color: '#f0a63c', sign: 1 },
+  { key: 's_batt', label: 'Solar zur Batterie',    color: '#35c07a', sign: 1 },
+  { key: 's_load', label: 'Solar zum Verbrauch',   color: '#cddc39', sign: 1 },
+  { key: 'b_load', label: 'Batterie zum Verbrauch', color: '#4da3ff', sign: -1 },
+  { key: 'g_load', label: 'Netz zum Verbrauch',    color: '#e5544a', sign: -1 },
+  { key: 'g_batt', label: 'Netz zur Batterie',     color: '#c07af5', sign: -1 },
+];
+function buildFlowChart() {
+  flowChart = new Chart($('flow-chart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: FLOWS.map(f => ({
+      label: f.label, data: [], backgroundColor: f.color, stack: 'e',
+      borderWidth: 0, categoryPercentage: 0.9, barPercentage: 0.98 })) },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: item => {
+            const v = item.parsed.y;
+            if (!v) return null;
+            return `${item.dataset.label}: ${Math.abs(v).toFixed(2)} kWh`;
+          }
+        } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#9aa9b6', autoSkip: false, maxRotation: 0,
+          callback(v) { const lab = this.getLabelForValue(v); if (!lab.endsWith(':00')) return ''; const hr = parseInt(lab, 10); const step = (flowChart && flowChart.width > 900) ? 2 : 3; return hr % step === 0 ? lab : ''; } } },
+        y: { stacked: true, title: { display: true, text: 'kWh', color: '#9aa9b6' },
+          grid: { color: '#34414e' }, ticks: { color: '#9aa9b6' } }
+      }
+    }
+  });
+}
+function renderFlowChart(hist) {
+  if (!flowChart) return;
+  hist = hist || [];
+  if (flowHourly) hist = aggregateHourly(hist);
+  flowChart.data.labels = hist.map(h => h.hour);
+  FLOWS.forEach((f, i) => {
+    flowChart.data.datasets[i].data = hist.map(h => (h[f.key] || 0) * f.sign);
+  });
+  // Y-Achse symmetrisch um 0: 0 immer in der Mitte, Balken nach oben ODER unten
+  let mx = 0;
+  hist.forEach(h => {
+    let pos = 0, neg = 0;
+    FLOWS.forEach(f => { const val = h[f.key] || 0; if (f.sign > 0) pos += val; else neg += val; });
+    mx = Math.max(mx, pos, neg);
+  });
+  const M = Math.max(0.2, Math.ceil(mx * 10) / 10);
+  flowChart.options.scales.y.min = -M;
+  flowChart.options.scales.y.max = M;
+  const hasData = hist.some(h => FLOWS.some(f => h[f.key]));
+  $('flow-hint').textContent = hasData
+    ? 'Woher der Strom kam und wohin er ging (echte Messwerte).'
+    : 'Noch keine Verlaufsdaten – füllt sich mit jedem Regelzyklus.';
+  flowChart.update('none');
+}
+
+/* --- Tages-Navigation für beide Energie-Charts --- */
+function isoDay(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function todayStr() { return (nowIso || new Date().toISOString()).slice(0, 10); }
+function fmtDayLabel(day) {
+  const t = todayStr();
+  const y = new Date(t + 'T00:00'); y.setDate(y.getDate() - 1);
+  const [Y, M, D] = day.split('-');
+  if (day === t) return 'Heute';
+  if (day === tomorrowStr()) return 'Morgen';
+  if (day === isoDay(y)) return `Gestern · ${D}.${M}.`;
+  return `${D}.${M}.${Y}`;
+}
+function applyEnergyDayUI() {
+  if (typeof markWeekRow === 'function') markWeekRow();
+  const minD = energyMinDay || todayStr();
+  ['e', 'f'].forEach(p => {
+    $(p + '-day').textContent = fmtDayLabel(energyDay);
+    $(p + '-prev').style.display = energyDay <= minD ? 'none' : '';
+    $(p + '-next').style.display = energyDay >= (fcForDay(tomorrowStr()) ? tomorrowStr() : todayStr()) ? 'none' : '';
+  });
+}
+async function loadEnergyDay(day) {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  energyDay = day;
+  try {
+    pastFc = null;
+    if (day < todayStr() && fcData && fcData.configured) {       // vergangener Tag: gemerkte VRM-Prognose dazuholen
+      try { const p = await (await fetch('/api/vrm/forecast/history?day=' + day)).json(); pastFc = { day, solar: p.solar || {}, cons: p.cons || {} }; } catch (e) { pastFc = null; }
+    }
+    const d = day > todayStr() ? { history: [] }        // Zukunft: keine Messwerte, nur die Prognose
+      : await (await fetch('/api/history?day=' + day)).json();
+    energyMinDay = d.min_day || energyMinDay;
+    renderEnergyChart(d.history);
+    renderFlowChart(d.history);
+    renderEnergyTiles(d.history, day);
+  } catch (e) { /* still */ }
+  applyEnergyDayUI();
+}
+function shiftEnergyDay(delta) {
+  const base = new Date((energyDay || todayStr()) + 'T00:00');
+  base.setDate(base.getDate() + delta);
+  let nd = isoDay(base);
+  const t = todayStr(), minD = energyMinDay || t;
+  const maxD = fcForDay(tomorrowStr()) ? tomorrowStr() : t;
+  if (nd > maxD) nd = maxD;
+  if (nd < minD) nd = minD;
+  loadEnergyDay(nd);
+}
+$('e-prev').addEventListener('click', () => shiftEnergyDay(-1));
+$('e-next').addEventListener('click', () => shiftEnergyDay(1));
+$('f-prev').addEventListener('click', () => shiftEnergyDay(-1));
+$('f-next').addEventListener('click', () => shiftEnergyDay(1));
+/* --- Eigenes Kalender-Popup (statt nativem <input type=date>) fuer e-pick/f-pick/p-pick: passend zum
+   dunklen Design und direkt neben dem Icon positioniert, statt am Browser-Standardort (Michael, 28.09.). */
+function openEnergyDatePick(anchor) {
+  openCalendarPicker(anchor, { value: energyDay || todayStr(), min: energyMinDay || todayStr(),
+    max: fcForDay(tomorrowStr()) ? tomorrowStr() : todayStr() }, day => loadEnergyDay(day));
+}
+$('e-pick').addEventListener('click', e => openEnergyDatePick(e.currentTarget));
+$('f-pick').addEventListener('click', e => openEnergyDatePick(e.currentTarget));   // teilt sich den Picker mit "Energie (Verlauf)" - beide zeigen denselben Tag
+
+/* --- Drag-Auswahl --- */
+function slotAtX(clientX) {
+  if (!prices.length || activeDay === 'past') return null;  // Verlauf ist nur Anzeige, keine Ladetermine im Nachhinein
+  const rect = chart.canvas.getBoundingClientRect();
+  const area = chart.chartArea;
+  const x = clientX - rect.left;
+  if (x < area.left || x > area.right) return null;
+  const idx = Math.floor(((x - area.left) / (area.right - area.left)) * prices.length);
+  return Math.max(0, Math.min(prices.length - 1, idx));
+}
+function startDrag(clientX) { const i = slotAtX(clientX); if (i === null) return false; drag = { from: i, to: i }; chart.update('none'); showSel(); return true; }
+function moveDrag(clientX) { if (!drag) return; const i = slotAtX(clientX); if (i === null || i === drag.to) return; drag.to = i; chart.update('none'); showSel(); }
+function showSel() {
+  if (!drag) return;
+  const a = Math.min(drag.from, drag.to), b = Math.max(drag.from, drag.to);
+  if (!prices[a] || !prices[b]) return;
+  const dur = (b - a + 1) * 15;
+  // Live-Schaetzung waehrend des Ziehens (bevor "Termin anlegen" gedrueckt wird):
+  // gleiche Rechnung wie windowStats() - Anzahl Viertelstunden * Ladeleistung.
+  const kwh = (dur / 60) * (chargePowerW / 1000);
+  $('drag-hint').textContent = `Auswahl: ${prices[a].label}–${endLabel(b)} · ${Math.floor(dur/60)}:${pad(dur%60)} h · ~${kwh.toFixed(1)} kWh`;
+}
+function endLabel(b) { const d = new Date(prices[b].start); d.setMinutes(d.getMinutes() + 15); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+
+let pendingSel = null;   // {start, end} – wartet auf Bestätigung
+
+function endDrag() {
+  if (!drag) return;
+  const a = Math.min(drag.from, drag.to), b = Math.max(drag.from, drag.to);
+  drag = null; chart.update('none');
+  if (!prices[a] || !prices[b]) return;
+  const start = prices[a].start.slice(0, 16);
+  const endD = new Date(prices[b].start); endD.setMinutes(endD.getMinutes() + 15);
+  const end = `${endD.getFullYear()}-${pad(endD.getMonth()+1)}-${pad(endD.getDate())}T${pad(endD.getHours())}:${pad(endD.getMinutes())}`;
+  // NICHT anlegen – nur die Eingabemaske füllen, Bestätigung abwarten.
+  pendingSel = { start, end };
+  $('ev-start').value = fmt(start);
+  $('ev-end').value = fmt(end);
+  $('ev-confirm').disabled = false;
+  $('ev-discard').disabled = false;
+  $('ev-empty').textContent = 'Auswahl bereit – mit „Termin anlegen" bestätigen oder verwerfen.';
+  $('drag-hint').textContent = 'In die Kurve klicken oder ziehen, um einen Ladetermin anzulegen.';
+  chart.update('none');   // pendingSel jetzt gesetzt -> blaue Markierung stehen lassen
+}
+
+function clearSelection() {
+  pendingSel = null;
+  $('ev-start').value = ''; $('ev-end').value = ''; $('ev-note').value = '';
+  $('ev-confirm').disabled = true; $('ev-discard').disabled = true;
+  $('ev-empty').textContent = 'Ziehe in der Kurve über die gewünschten Viertelstunden. Die Auswahl wird erst nach Bestätigung angelegt.';
+  if (chart) chart.update('none');   // blaue Markierung entfernen
+}
+
+document.getElementById('ev-confirm').addEventListener('click', async () => {
+  if (!pendingSel) return;
+  const r = await fetch('/api/ev', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start: pendingSel.start, end: pendingSel.end, note: $('ev-note').value }) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.error || 'Termin konnte nicht angelegt werden'); return; }
+  clearSelection();
+  load();
+});
+document.getElementById('ev-discard').addEventListener('click', clearSelection);
+
+function attachDrag() {
+  const cv = chart.canvas;
+  cv.addEventListener('mousedown', e => startDrag(e.clientX));
+  cv.addEventListener('mousemove', e => moveDrag(e.clientX));
+  window.addEventListener('mouseup', endDrag);
+  cv.addEventListener('touchstart', e => { if (!selectMode || e.touches.length !== 1) return; if (startDrag(e.touches[0].clientX)) e.preventDefault(); }, { passive: false });
+  cv.addEventListener('touchmove', e => { if (!selectMode || !drag) return; e.preventDefault(); moveDrag(e.touches[0].clientX); }, { passive: false });
+  cv.addEventListener('touchend', e => { if (!selectMode || !drag) return; e.preventDefault(); endDrag(); }, { passive: false });
+  cv.addEventListener('touchcancel', () => { drag = null; chart.update('none'); });
+}
+
+function setSelectMode(on) {
+  selectMode = on;
+  const btn = $('btn-select');
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.textContent = on ? '✏️ Markieren aktiv' : '✏️ Markieren';
+  document.body.classList.toggle('selecting', on);
+  updateWidth();
+}
+$('btn-select').addEventListener('click', () => setSelectMode(!selectMode));
+
+/* Breite kommt jetzt rein aus CSS (stabil). Hier nur ein sanftes resize,
+   ohne die Breite aus der eigenen Messung abzuleiten (kein Aufschaukeln). */
+function updateWidth() {
+  if (chart) chart.resize();
+}
+window.addEventListener('resize', () => { updateWidth(); });
+window.addEventListener('orientationchange', () => setTimeout(updateWidth, 200));
+
+/* --- Daten --- */
+async function load() {
+  let d = await (await fetch('/api/status')).json();
+  let s = d.status || {};
+  allPrices = d.prices || [];
+  schedules = d.ev_schedules || [];
+  nowSlot = s.now_slot || '';
+  nowIso = d.now || '';
+  applyDay();
+  renderOverview(d.charge_overview);
+  // Chart-Auflösung aus den Einstellungen übernehmen (15-Min vs. stündlich)
+  if (d.ui) {
+    energyHourly = !!d.ui.chart_energy_hourly; flowHourly = !!d.ui.chart_flow_hourly;
+    applyTileVisibility(d.ui);
+  }
+  // Energie-Charts: Live-Refresh nur wenn der heutige Tag angezeigt wird
+  energyMinDay = d.energy_min_day || energyMinDay;
+  if (!energyDay) energyDay = todayStr();
+  if (energyDay === todayStr()) {
+    renderEnergyChart(d.energy_history);
+    renderFlowChart(d.energy_history);
+    renderEnergyTiles(d.energy_history, energyDay);
+  }
+  applyEnergyDayUI();
+  loadShelly();
+  loadSensors();
+  loadVirtual();
+
+  const banner = $('banner');
+  if (d.last_error) banner.innerHTML = `<div class="banner err">Fehler: ${d.last_error}</div>`;
+  else if (s.dry_run) banner.innerHTML = `<div class="banner warn">DRY-RUN aktiv – der Cerbo wird NICHT geschaltet. Umstellen unter Einstellungen.</div>`;
+  else banner.innerHTML = '';
+
+  if (s.ok) {
+    chargePowerW = s.charge_power_w || 3500;
+    // Fester Tarif: kein Preis-Timing, kein Ladeplan - der ganze
+    // preisbezogene UI-Teil (Kurve, Markieren, manuelle Ladetermine per
+    // Drag) waere ohne echte dynamische Preise nur eine leere Huelle.
+    // Dashboard bleibt dann reines Live-Monitoring.
+    const isFixedTariff = s.tariff_mode === 'fixed';
+    // Fester Tarif erzwingt das Ausblenden zusaetzlich zur Kachel-Einstellung
+    // (die eigene .hidden-Vorbelegung aus applyTileVisibility() oben wird nur
+    // per ODER verschaerft, nicht ueberschrieben - eine bewusst ausgeblendete
+    // Kachel bleibt also auch bei dynamischem Tarif ausgeblendet).
+    $('price-plan-card').hidden = isFixedTariff || $('price-plan-card').hidden;
+    $('ev-card').hidden = isFixedTariff || $('ev-card').hidden;
+    $('price-tile').hidden = isFixedTariff;
+    $('strategy-card-title').textContent = isFixedTariff ? 'Status' : 'Strompreis';
+    $('override-hint').textContent = isFixedTariff
+      ? 'Erzwingt Netzladen. Zum Beenden wieder ausschalten.'
+      : 'Erzwingt Netzladen, unabhängig vom Preis. Zum Beenden wieder ausschalten.';
+    const priceEl = $('price'); priceEl.textContent = s.now_price;
+    // exakt die aktuelle Viertelstunde matchen (HH:MM), nicht nur die Stunde,
+    // damit die Zahl dieselbe Ampelfarbe wie der aktuelle Balken hat
+    const nowLabel = (s.now_slot || '').slice(0, 5);
+    const cur = allPrices.find(p => p.label === nowLabel);
+    priceEl.style.color = cur ? (LEVEL_COLORS[cur.level] || '') : '';
+    $('mode').innerHTML = `<span class="pill ${s.ess_mode === 9 ? 'green' : 'grey'}">${s.ess_text}</span>`;
+    $('strategy').innerHTML = `<span class="pill amber">${s.strategy}</span>` +
+      (s.ev_active ? ` <span class="pill green">Ladetermin läuft</span>` : '');
+    // "Bilanz" als Klartext: reicht der Strom bis zum nächsten Mittag oder fehlt was?
+    // Bei festem Tarif ist eine NEGATIVE Bilanz kein Hinweis auf irgendeine Aktion (es
+    // gibt kein "guenstig nachladen") und suggeriert mit dem Warn-Symbol faelschlich ein
+    // Problem, wo keins ist - Netzbezug kostet ja so oder so immer gleich viel. Deshalb
+    // wird die Zeile in dem Fall komplett weggelassen, nicht nur umformuliert.
+    const bal = Number(s.balance);
+    const ok = bal >= 0;
+    const showBalance = ok || !isFixedTariff;
+    // Konkret benennen, welcher Mittag gemeint ist: vor 12 Uhr = heute, ab 12 = morgen
+    // (identisch zur Horizont-Logik im Backend: nächster 12-Uhr-Punkt).
+    const nowH = parseInt((nowIso || '').slice(11, 13), 10);
+    const mittag = (isNaN(nowH) || nowH < 12) ? 'heute Mittag' : 'morgen Mittag';
+    const balTxt = ok
+      ? `Strom reicht bis ${mittag} – rechnerisch ${bal.toFixed(1)} kWh übrig (Akku ${s.soc}% + erwartete Sonne)`
+      : `${Math.abs(bal).toFixed(1)} kWh fehlen bis ${mittag} – wird günstig nachgeladen`;
+    const tip = 'Vorschau bis zum nächsten Mittag (wenn die Sonne wieder trägt): aktueller Akku-Inhalt + erwartete Sonne − geschätzter Verbrauch. '
+      + 'Positiv = Überschuss, es muss nichts extra aus dem Netz geladen werden. '
+      + 'Negativ = so viel fehlt und wird in den günstigsten Viertelstunden nachgeladen.';
+    $('meta').innerHTML =
+      (showBalance
+        ? `<div style="font-size:15px;font-weight:600;color:${ok ? 'var(--cheap)' : 'var(--exp)'}" title="${tip}">`
+          + `${ok ? '✓' : '⚠'} ${balTxt} <span style="opacity:.55;font-weight:400;cursor:help">ⓘ</span></div>`
+        : '')
+      + `<div class="muted" style="margin-top:4px">Sonne (${s.pv_source || '–'}) heute ${pvRangeTxt(s.pv_today, s.pv_today_range)} / `
+      + `morgen ${pvRangeTxt(s.pv_tom, s.pv_tom_range)} kWh · Stand ${d.last_tick || '–'}`
+      + (s.pv_note ? ` · ⚠ ${s.pv_note}` : '') + `</div>`;
+    // planline wird tag-genau in applyDay() gesetzt
+    if (!overrideBusy) $('override').checked = !!s.override;
+    const note = $('override-note');
+    if (s.override && s.dry_run) note.innerHTML = '<span style="color:var(--exp)">Override aktiv – aber Dry-Run schreibt NICHT an den Cerbo. Zum echten Schalten Dry-Run in den Einstellungen ausschalten.</span>';
+    else if (s.override) note.innerHTML = '<span style="color:var(--cheap)">Override aktiv – Cerbo lädt aus dem Netz.</span>';
+    else note.textContent = '';
+  } else {
+    $('strategy').innerHTML = `<span class="pill grey">${s.reason || '–'}</span>`;
+  }
+  renderChart();
+  renderEv();
+  // Die Victron-Live-Kacheln zeichnet ausschließlich loadLive() (alle 2 s),
+  // damit sie nicht im 15-s-Takt gelöscht und neu aufgebaut werden (Flackern).
+}
+
+// Prognose als Spanne zeigen (wie Victron), sobald genug Logbuch-Tage fuer
+// eine ehrliche Unsicherheits-Bandbreite vorliegen - sonst die reine Zahl.
+function pvRangeTxt(point, range) {
+  if (range && range.low != null && range.high != null) return `${range.low}–${range.high}`;
+  return typeof point === 'number' ? point.toFixed(1) : point;
+}
+function w(v) { return (v > 0 ? '+' : '') + Math.round(v) + ' W'; }
+function kv(rows) { return rows.map(r => `<div class="kv"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join(''); }
+function phases(o) { return kv([['L1', Math.round(o.l1) + ' W'], ['L2', Math.round(o.l2) + ' W'], ['L3', Math.round(o.l3) + ' W']]); }
+let tileDragActive = false;   // waehrend des Verschiebens keine Neuaufbauten durch loadLive()
+
+function getTileOrder() {
+  try { return JSON.parse(localStorage.getItem('sysTileOrder') || '[]'); } catch (e) { return []; }
+}
+function saveTileOrder(order) {
+  try { localStorage.setItem('sysTileOrder', JSON.stringify(order)); } catch (e) { /* egal, nur Komfort */ }
+}
+
+function renderSystem(sys, hasInv, hasMppt, pvSources, batteryUsableKwh) {
+  if (tileDragActive) return;   // Nutzer verschiebt gerade eine Kachel - nicht dazwischenfunken
+  const g = $('sysgrid');
+  if (!sys) { g.innerHTML = '<div class="muted">Keine Verbindung zum Cerbo.</div>'; return; }
+  const b = sys.battery;
+  const stateTxt = { 0: 'Ruhe', 1: 'Laden', 2: 'Entladen' }[b.state] || '–';
+  const gridColor = sys.grid.total > 5 ? 'var(--vexp)' : (sys.grid.total < -5 ? 'var(--cheap)' : 'var(--fg)');
+  // Jede Kachel bekommt eine stabile ID (data-tile-id), damit die vom Nutzer per
+  // Drag festgelegte Reihenfolge ueber Neuaufbauten hinweg erhalten bleibt.
+  const tiles = [];
+  const tile = (id, title, big, sub, color) => tiles.push({ id, html: `
+    <div class="systile" data-tile-id="${id}">
+      <div class="systile-t">${title}</div>
+      <div class="systile-v" ${color ? `style="color:${color}"` : ''}>${big}</div>
+      <div class="systile-s">${sub || ''}</div>
+    </div>` });
+  const sun = '<span class="sun-ico">☀︎</span>';
+  hasInv = hasInv !== false;
+  hasMppt = hasMppt !== false;
+  pvSources = pvSources || [];
+  const solarLabel = hasInv && hasMppt ? 'PV-WR + MPPT' : (hasInv ? 'PV-WR' : (hasMppt ? 'MPPT' : '–'));
+
+  tile('grid', '⚡ Netz', w(sys.grid.total), phases(sys.grid), gridColor);
+  tile('loads', '🏠 Gesamtverbrauch', Math.round(sys.loads.total) + ' W', phases(sys.loads), '#e0761f');
+  if (pvSources.length) {
+    // Jeder benannte Wechselrichter einzeln - die Summe steht schon in der
+    // "Gesamt Solar"-Kachel weiter unten, eine eigene Summenkachel wäre hier
+    // nur eine Wiederholung derselben Zahl (bzw. + MPPT-Anteil).
+    pvSources.forEach((s, i) => {
+      tile('pvsrc_' + (s.unit ?? i), sun + ' ' + s.name,
+        s.power === null ? '–' : Math.round(s.power) + ' W',
+        s.power === null ? 'nicht erreichbar' : '', 'var(--timer)');
+    });
+  } else if (hasInv) {
+    tile('pv_inverter', sun + ' PV-Wechselrichter', Math.round(sys.pv_inverter.total) + ' W', phases(sys.pv_inverter), 'var(--timer)');
+  }
+  if (hasMppt) {
+    tile('mppt', sun + ' PV-Ladegerät (MPPT)', Math.round(sys.pv_charger) + ' W', kv([['DC-Strom', sys.pv_charger_current.toFixed(1) + ' A']]), 'var(--timer)');
+  }
+  tile('solar_total', sun + ' Gesamt Solar', Math.round(sys.solar_total) + ' W', kv([['Quelle', solarLabel]]), 'var(--timer)');
+  const kwhInfo = batteryUsableKwh > 0
+    ? [['Geladen', (batteryUsableKwh * b.soc / 100).toFixed(1) + ' kWh']] : [];
+  tile('battery', '🔋 Batterie', b.soc + ' %',
+       kv([...kwhInfo, ['Status', stateTxt], ['Leistung', w(b.power)], ['Spannung', b.voltage.toFixed(2) + ' V'], ['Strom', b.current.toFixed(1) + ' A']]),
+       b.state === 1 ? 'var(--cheap)' : (b.state === 2 ? 'var(--exp)' : 'var(--fg)'));
+
+  // Gespeicherte Reihenfolge anwenden: bekannte IDs zuerst in gemerkter
+  // Reihenfolge, neue/unbekannte IDs (z.B. ein frisch hinzugefuegter
+  // Wechselrichter) haengen sich hinten in ihrer Standardreihenfolge an.
+  const order = getTileOrder();
+  tiles.sort((a, b2) => {
+    const ia = order.indexOf(a.id), ib = order.indexOf(b2.id);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  g.innerHTML = tiles.map(t => t.html).join('');
+}
+
+/* Kacheln per langem Klick/Tippen verschiebbar machen (Pointer Events decken
+   Maus, Touch und Stift einheitlich ab). Ablauf: pointerdown startet einen
+   500-ms-Timer; bewegt sich der Zeiger vorher zu weit, wird abgebrochen
+   (normales Scrollen/Tippen). Feuert der Timer, startet der Verschiebe-Modus:
+   Kachel folgt dem Zeiger optisch nicht direkt, stattdessen wird sie beim
+   Ueberfahren einer anderen Kachel sofort an deren Stelle einsortiert - der
+   Rest rutscht auf (Standard-Drag-Reorder-Verhalten, keine Bibliothek noetig). */
+function initTileDragging() {
+  const g = $('sysgrid');
+  if (!g) return;
+  const LONG_PRESS_MS = 500, MOVE_TOLERANCE = 10;
+  let pending = null;   // {el, x, y, timer}
+  let dragEl = null;
+
+  function cancelPending() {
+    if (pending) {
+      clearTimeout(pending.timer);
+      pending = null;
+      if (!dragEl) tileDragActive = false;   // Geste beendet, ohne dass ein Drag scharf wurde
+    }
+  }
+
+  function armDrag(el) {
+    dragEl = el;
+    g.classList.add('reordering');
+    el.classList.add('dragging');
+    if (navigator.vibrate) navigator.vibrate(15);   // kurzes haptisches Feedback, falls verfuegbar
+  }
+
+  function moveOver(clientX, clientY) {
+    if (!dragEl) return;
+    const els = [...g.querySelectorAll('.systile')];
+    const target = els.find(el => {
+      if (el === dragEl) return false;
+      const r = el.getBoundingClientRect();
+      return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+    });
+    if (!target) return;
+    const dragIdx = els.indexOf(dragEl), targetIdx = els.indexOf(target);
+    if (dragIdx < targetIdx) g.insertBefore(dragEl, target.nextSibling);
+    else g.insertBefore(dragEl, target);
+  }
+
+  function endDrag() {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging');
+    g.classList.remove('reordering');
+    const order = [...g.querySelectorAll('.systile')].map(el => el.dataset.tileId);
+    saveTileOrder(order);
+    dragEl = null;
+    tileDragActive = false;
+  }
+
+  g.addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.systile');
+    if (!el) return;
+    cancelPending();
+    // Ab hier schon blockieren, nicht erst wenn der Long-Press-Timer feuert:
+    // sonst koennte ein Live-Update genau waehrend der Wartezeit das Grid neu
+    // aufbauen und die spaeter gegriffene Kachel-Referenz wird zum Geist-Duplikat.
+    tileDragActive = true;
+    pending = {
+      el, x: e.clientX, y: e.clientY,
+      timer: setTimeout(() => { pending = null; armDrag(el); }, LONG_PRESS_MS),
+    };
+  });
+  g.addEventListener('pointermove', (e) => {
+    if (pending) {
+      if (Math.abs(e.clientX - pending.x) > MOVE_TOLERANCE || Math.abs(e.clientY - pending.y) > MOVE_TOLERANCE) {
+        cancelPending();
+      }
+      return;
+    }
+    if (dragEl) { e.preventDefault(); moveOver(e.clientX, e.clientY); }
+  }, { passive: false });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+    g.addEventListener(ev, () => { cancelPending(); endDrag(); }));
+  // Waehrend des laengeren Drucks nicht gleichzeitig die Seite scrollen lassen.
+  g.addEventListener('contextmenu', (e) => { if (pending || dragEl) e.preventDefault(); });
+  g.addEventListener('touchmove', e => { if (dragEl && e.cancelable) e.preventDefault(); }, { passive: false });   // Verschieben aktiv: Seite nicht mitscrollen
+}
+
+/* Tages-Bilanz-Kacheln (Netz/Solar) – an den im Energieverlauf gewählten Tag
+   gekoppelt. Rechnet aus den 15-Min-Verlaufsdaten des Tages (gleiche Quelle
+   wie die Charts), nicht aus den Live-Werten. */
+let energyTileDrag = false;   // waehrend Verschieben: Neuaufbau pausieren
+const ENERGY_TILE_DEFAULT = ['export', 'import', 'load', 'cforecast', 'solar', 'forecast', 'autarky'];   // Autarkie ganz rechts, Prognose daneben
+function energyTileOrder() {
+  let o = []; try { o = JSON.parse(localStorage.getItem('energyTileOrder')) || []; } catch (e) { /* egal */ }
+  return mergeEnergyTileOrder(o);
+}
+/* Fehlende Kacheln (z. B. die Prognose, die erst mit VRM-Zugang erscheint) kommen an ihren Standardplatz, nicht ans Ende. */
+function mergeEnergyTileOrder(saved) {
+  const res = saved.filter((k, i) => ENERGY_TILE_DEFAULT.includes(k) && saved.indexOf(k) === i);
+  ENERGY_TILE_DEFAULT.forEach((k, i) => {
+    if (res.includes(k)) return;
+    const prev = ENERGY_TILE_DEFAULT.slice(0, i).reverse().find(p => res.includes(p));
+    res.splice(prev ? res.indexOf(prev) + 1 : 0, 0, k);
+  });
+  return res;
+}
+function renderEnergyTiles(history, day) {
+  const el = $('energy-tiles');
+  if (!el || energyTileDrag) return;
+  let solar = 0, imp = 0, exp = 0, verbrauch = 0;
+  (history || []).forEach(r => {
+    solar += r.solar || 0;
+    verbrauch += r.verbrauch || 0;                 // Summe der roten Balken
+    imp += (r.g_load || 0) + (r.g_batt || 0);      // Netz → Verbrauch/Batterie
+    exp += (r.s_grid || 0) + (r.b_grid || 0);      // Solar/Batterie → Netz
+  });
+  const tag = (day && day === todayStr()) ? 'heute' : 'an diesem Tag';
+  const sun = '<span class="sun-ico">☀︎</span>';
+  const tiles = {};
+  const tile = (id, title, big, sub, color) => { tiles[id] = `
+    <div class="systile" data-tile-id="${id}">
+      <div class="systile-t">${title}</div>
+      <div class="systile-v" ${color ? `style="color:${color}"` : ''}>${big}</div>
+      <div class="systile-s">${sub || ''}</div>
+    </div>`; };
+  const fcm = fcForDay(day);
+  const fcSum = fcm ? Object.values(fcm).reduce((a, b) => a + b, 0) / 1000 : null;
+  if (fcSum != null) tile('forecast', sun + ' Solar-Prognose', fcSum.toFixed(1) + ' kWh',
+    day === todayStr() ? `noch ${fcData.remaining_today_kwh.toFixed(1)} kWh bis Tagesende (VRM)` : day < todayStr() ? 'Prognose (VRM, gemerkt)' : 'erwartet (VRM)', 'var(--timer)');
+  const ccm = fcForDay(day, fcData && fcData.cons);
+  if (ccm) tile('cforecast', '🏠 Verbrauchs-Prognose', (Object.values(ccm).reduce((a, b) => a + b, 0) / 1000).toFixed(1) + ' kWh',
+    day === todayStr() ? `noch ${fcData.cons.remaining_today_kwh.toFixed(1)} kWh bis Tagesende (VRM)` : day < todayStr() ? 'Prognose (VRM, gemerkt)' : 'erwartet (VRM)', '#e0761f');
+  if (day <= todayStr()) {                         // Zukunft: nur die Prognosen
+    // Autarkiegrad: Anteil des Verbrauchs, der aus eigener PV/Batterie gedeckt
+    // wurde statt aus dem Netz bezogen zu werden. 100 % = komplett autark.
+    const autarky = verbrauch > 0 ? Math.max(0, Math.min(100, (1 - imp / verbrauch) * 100)) : null;
+    const autarkyColor = autarky === null ? 'var(--muted)'
+      : autarky >= 70 ? 'var(--cheap)' : autarky >= 40 ? 'var(--accent)' : 'var(--exp)';
+    tile('export', '← Zum Netz', exp.toFixed(1) + ' kWh', kv([[tag + ' eingespeist', '']]), 'var(--cheap)');
+    tile('import', '→ Aus dem Netz', imp.toFixed(1) + ' kWh', kv([[tag + ' bezogen', '']]), 'var(--vexp)');
+    tile('load', '🏠 Gesamtverbrauch', verbrauch.toFixed(1) + ' kWh', kv([[tag + ' verbraucht', '']]), '#e0761f');
+    tile('solar', sun + ' Solar', solar.toFixed(1) + ' kWh', kv([[tag + ' erzeugt', '']]), 'var(--timer)');
+    tile('autarky', '🧭 Autarkiegrad', autarky === null ? '–' : Math.round(autarky) + ' %',
+      kv([[tag + (autarky === null ? ' noch keine Daten' : ' aus eigener Erzeugung'), '']]), autarkyColor);
+  }
+  el.innerHTML = energyTileOrder().filter(k => tiles[k]).map(k => tiles[k]).join('');
+}
+/* Tages-Kacheln wie die Live-Werte per langem Druck verschiebbar (Reihenfolge merkt sich der Browser). */
+function initEnergyTileDragging() {
+  const g = $('energy-tiles');
+  const LONG_PRESS_MS = 500, MOVE_TOLERANCE = 10;
+  let pending = null, dragEl = null;
+  const cancelPending = () => { if (pending) { clearTimeout(pending.timer); pending = null; if (!dragEl) energyTileDrag = false; } };
+  const endDrag = () => {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging'); g.classList.remove('reordering');
+    const shown = [...g.querySelectorAll('.systile')].map(el => el.dataset.tileId);
+    try { localStorage.setItem('energyTileOrder', JSON.stringify(mergeEnergyTileOrder(shown))); } catch (e) { /* nur Komfort */ }
+    dragEl = null; energyTileDrag = false;
+  };
+  g.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.systile'); if (!el) return;
+    cancelPending(); energyTileDrag = true;
+    pending = { el, x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+      pending = null; dragEl = el; g.classList.add('reordering'); el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, LONG_PRESS_MS) };
+  });
+  g.addEventListener('pointermove', e => {
+    if (pending) {
+      if (Math.abs(e.clientX - pending.x) > MOVE_TOLERANCE || Math.abs(e.clientY - pending.y) > MOVE_TOLERANCE) cancelPending();
+      return;
+    }
+    if (!dragEl) return;
+    e.preventDefault();
+    const els = [...g.querySelectorAll('.systile')];
+    const target = els.find(el => {
+      if (el === dragEl) return false;
+      const r = el.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if (!target) return;
+    if (els.indexOf(dragEl) < els.indexOf(target)) g.insertBefore(dragEl, target.nextSibling);
+    else g.insertBefore(dragEl, target);
+  }, { passive: false });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => g.addEventListener(ev, () => { cancelPending(); endDrag(); }));
+  g.addEventListener('contextmenu', e => { if (pending || dragEl) e.preventDefault(); });
+  g.addEventListener('touchmove', e => { if (dragEl && e.cancelable) e.preventDefault(); }, { passive: false });   // Verschieben aktiv: Seite nicht mitscrollen
+}
+initEnergyTileDragging();
+
+/* Schnelle Live-Aktualisierung (unabhängig vom 5-Min-Regelzyklus) */
+async function loadLive() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  try {
+    const l = await (await fetch('/api/live')).json();
+    if (!l.ok) return;
+    renderSystem(l.system, l.has_pv_inverter, l.has_mppt, l.pv_sources, l.battery_usable_kwh);
+  } catch (e) { /* still */ }
+}
+
+function fmt(x) { return x.replace('T', ' ').slice(0, 16); }
+function evStatus(i) {
+  const now = nowIso || new Date().toISOString().slice(0, 19);
+  if (now >= i.end) return '<span class="pill grey">abgelaufen</span>';
+  if (now >= i.start) return '<span class="pill green">läuft</span>';
+  return '<span class="pill amber">geplant</span>';
+}
+// Exakte Fenster-Berechnung: jeden 15-Min-Slot einzeln summieren
+function windowStats(startIso, endIso) {
+  const m = {};
+  allPrices.forEach(p => { m[p.start.slice(0, 16)] = p.ct; });
+  const kw = chargePowerW / 1000;
+  let n = 0, cost = 0, sum = 0, cnt = 0;
+  const e = new Date(endIso);
+  for (let t = new Date(startIso); t < e; t.setMinutes(t.getMinutes() + 15)) {
+    const key = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    n++;
+    const pr = m[key];
+    if (pr != null) { cost += pr / 100 * kw * 0.25; sum += pr; cnt++; }
+  }
+  return { kwh: n * kw * 0.25, cost, avg: cnt ? sum / cnt : null };
+}
+function renderEv() {
+  const t = $('ev-list');
+  const now = nowIso || new Date().toISOString().slice(0, 19);
+  // Abgelaufene Termine verschwinden hier – das tatsächlich Geladene steht dann
+  // oben in "Ladevorgänge" (mit Menge, Ø-Preis und Kosten aus dem Protokoll).
+  const active = schedules.filter(i => now < i.end);
+  if (!active.length) { t.innerHTML = '<tr><td class="muted">Keine anstehenden Termine.</td></tr>'; return; }
+  const head = `<tr class="thead"><td>Zeitraum</td><td>Status</td><td>Ø Preis</td><td>Menge</td><td>Kosten</td><td></td></tr>`;
+  const stats = [];
+  const rows = active.map(i => {
+    const st = windowStats(i.start, i.end);
+    stats.push(st);
+    const running = now >= i.start;
+    // Läuft schon: nicht mehr löschbar, nur stoppbar. Noch geplant: löschbar.
+    const action = running
+      ? `<button class="danger" onclick="stopEv('${i.id}')">Stop</button>`
+      : `<button class="danger" onclick="delEv('${i.id}')">Löschen</button>`;
+    return `<tr>
+      <td><b>${fmt(i.start)}</b> → ${fmt(i.end)}${i.note ? '<br><span class="muted">' + i.note + '</span>' : ''}</td>
+      <td>${evStatus(i)}</td>
+      <td>${st.avg != null ? st.avg.toFixed(1) + ' ct' : '–'}</td>
+      <td>${st.kwh.toFixed(2)} kWh</td>
+      <td>${st.cost.toFixed(2)} €</td>
+      <td style="text-align:right">${action}</td></tr>`;
+  }).join('');
+  t.innerHTML = COLGROUP + head + rows + totalRow(stats);
+}
+async function delEv(id) { await fetch('/api/ev/' + id, { method: 'DELETE' }); load(); }
+async function stopEv(id) {
+  if (!confirm('Ladetermin jetzt beenden? Das bereits Geladene bleibt in der Liste der Ladevorgänge.')) return;
+  await fetch('/api/ev/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'stop' }) });
+  load();
+}
+
+$('override').addEventListener('change', async e => {
+  overrideBusy = true;
+  await fetch('/api/override', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: e.target.checked }) });
+  // dem Regel-Durchlauf Zeit geben (Modbus + Tibber), dann Status neu holen
+  setTimeout(async () => { await load(); overrideBusy = false; }, 3000);
+});
+
+function dayStr(offset) {
+  const base = nowIso ? nowIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const dt = new Date(base + 'T00:00:00'); dt.setDate(dt.getDate() + offset);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+const addQuarter = hm => {
+  let [h, m] = hm.split(':').map(Number);
+  m += 15; if (m >= 60) { m -= 60; h = (h + 1) % 24; }
+  return `${pad(h)}:${pad(m)}`;
+};
+// Geplante Ladefenster NUR für den angegebenen Tag, zusammenhängende
+// 15-Min-Slots zu Fenstern gemergt (z.B. "13:45-14:15").
+function plannedWindowsFor(dateStr) {
+  const ps = allPrices
+    .filter(p => p.planned && p.start.slice(0, 10) === dateStr)
+    .sort((a, b) => a.start.localeCompare(b.start));
+  if (!ps.length) return '';
+  const wins = [];
+  let start = ps[0].label, end = addQuarter(ps[0].label);
+  for (let k = 1; k < ps.length; k++) {
+    if (ps[k].label === end) { end = addQuarter(ps[k].label); }
+    else { wins.push(`${start}-${end}`); start = ps[k].label; end = addQuarter(ps[k].label); }
+  }
+  wins.push(`${start}-${end}`);
+  return wins.join(', ');
+}
+// Tage-zurueck-Blick beim Strompreis-Diagramm, analog zu Energie (Verlauf) / Energieflüsse (◀ Tag ▶ 📅).
+// "Heute"/"Morgen" bleiben live und bearbeitbar (Ladetermine, Markieren) - alles davor kommt
+// schreibgeschuetzt aus der Preis-Historie (store.price_history, siehe /api/prices/history?day=).
+let priceDay = '', priceMinDay = '';
+const histPriceCache = {};   // Tag -> {p,src} | null, damit der Tick-Poll nicht staendig neu abfragt
+
+function priceMaxDay() { return fcForDay(tomorrowStr()) ? tomorrowStr() : todayStr(); }
+
+function applyDay() {
+  const target = priceDay || todayStr();
+  activeDay = target === todayStr() ? 'today' : (target === tomorrowStr() ? 'tomorrow' : 'past');
+  $('p-day').textContent = fmtDayLabel(target);
+  $('p-prev').style.display = priceMinDay && target <= priceMinDay ? 'none' : '';
+  $('p-next').style.display = target >= priceMaxDay() ? 'none' : '';
+  const selBtn = $('btn-select');
+  if (activeDay !== 'past') {
+    if (selBtn) selBtn.style.display = '';
+    prices = allPrices.filter(p => p.start.slice(0, 10) === target);
+    const emptyTom = activeDay === 'tomorrow' && !prices.length;
+    $('drag-hint').textContent = emptyTom
+      ? 'Für morgen liegen noch keine Preise vor (Tibber veröffentlicht sie ~13 Uhr).'
+      : 'In die Kurve klicken oder ziehen, um einen Ladetermin anzulegen.';
+    // Preis-Kennzahlen des angezeigten Tages (min / Ø / max)
+    const cts = prices.map(p => p.ct).filter(v => v != null);
+    $('price-stats').textContent = cts.length
+      ? `Min ${Math.min(...cts).toFixed(1)} · Ø ${(cts.reduce((a, b) => a + b, 0) / cts.length).toFixed(1)} · Max ${Math.max(...cts).toFixed(1)} ct/kWh`
+      : '';
+    const win = plannedWindowsFor(target);
+    $('planline').textContent = win
+      ? `Geplante Ladefenster (${activeDay === 'today' ? 'heute' : 'morgen'}): ${win}`
+      : (activeDay === 'today' ? 'Heute keine Netzladung geplant.' : 'Morgen keine Netzladung geplant.');
+    renderChart();
+    updateWidth();
+  } else {
+    if (selBtn) selBtn.style.display = 'none';
+    setSelectMode(false);
+    loadHistPrices(target);
+  }
+}
+
+async function loadHistPrices(day) {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  let rec = histPriceCache[day];
+  if (rec === undefined) {
+    try { rec = (await (await fetch('/api/prices/history?day=' + day)).json()).record; }
+    catch (e) { rec = null; }
+    histPriceCache[day] = rec;
+  }
+  if ((priceDay || todayStr()) !== day) return;      // zwischenzeitlich weitergeklickt - verwerfen
+  const vals = (rec ? rec.p : Array(96).fill(null)).filter(v => v != null);
+  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  prices = (rec ? rec.p : Array(96).fill(null)).map((ct, i) => {
+    const h = Math.floor(i / 4), m = (i % 4) * 15;
+    // Seit 28.09.2026 speichert store.record_prices() Tibbers eigene Einstufung (lvl) mit - damit sieht der
+    // Rueckblick exakt dieselben Farben wie am Tag selbst (Michael, Screenshot). Nur bei aelteren Tagen, die das
+    // Feld noch nicht haben, faellt es auf eine grobe Schaetzung relativ zum Tagesdurchschnitt zurueck.
+    const realLvl = rec && rec.lvl && rec.lvl[i];
+    const level = realLvl || (ct == null ? 'NORMAL' : ct < avg * 0.6 ? 'VERY_CHEAP' : ct < avg * 0.9 ? 'CHEAP'
+      : ct <= avg * 1.4 ? 'NORMAL' : ct <= avg * 1.8 ? 'EXPENSIVE' : 'VERY_EXPENSIVE');
+    return { start: `${day}T${pad(h)}:${pad(m)}`, label: `${pad(h)}:${pad(m)}`, ct, level, planned: false, cheap_lock: false };
+  });
+  const cts = prices.map(p => p.ct).filter(v => v != null);
+  $('price-stats').textContent = cts.length
+    ? `Min ${Math.min(...cts).toFixed(1)} · Ø ${(cts.reduce((a, b) => a + b, 0) / cts.length).toFixed(1)} · Max ${Math.max(...cts).toFixed(1)} ct/kWh`
+    : '';
+  $('drag-hint').textContent = !rec ? 'Für diesen Tag sind keine Preise gespeichert.'
+    : (rec.src === 'tibber' ? 'Gespeicherte Tibber-Preise – nur Anzeige, keine Bearbeitung.'
+                             : 'Aus den Bezugskosten zurückgerechnet (lückenhaft) – nur Anzeige.');
+  $('planline').textContent = '';
+  renderChart();
+  updateWidth();
+}
+
+function shiftPriceDay(delta) {
+  const base = new Date((priceDay || todayStr()) + 'T00:00');
+  base.setDate(base.getDate() + delta);
+  let nd = isoDay(base);
+  if (nd > priceMaxDay()) nd = priceMaxDay();
+  if (priceMinDay && nd < priceMinDay) nd = priceMinDay;
+  priceDay = nd;
+  applyDay();
+}
+$('p-prev').addEventListener('click', () => shiftPriceDay(-1));
+$('p-next').addEventListener('click', () => shiftPriceDay(1));
+$('p-pick').addEventListener('click', e => {
+  openCalendarPicker(e.currentTarget, { value: priceDay || todayStr(), min: priceMinDay || todayStr(), max: priceMaxDay() },
+    day => { priceDay = day; applyDay(); });
+});
+
+function renderOverview(items) {
+  const t = $('charge-log');
+  if (!items || !items.length) {
+    t.innerHTML = '<tr><td class="muted">Heute noch keine Ladefenster geplant oder durchgeführt.</td></tr>';
+    return;
+  }
+  const badge = s => s === 'geplant' ? '<span class="pill amber">geplant</span>'
+    : s === 'läuft' ? '<span class="pill green">läuft</span>'
+    : '<span class="pill green">geladen ✓</span>';
+  const head = `<tr class="thead"><td>Zeitfenster</td><td>Status</td><td>Ø Preis</td><td>Menge</td><td>Kosten</td><td></td></tr>`;
+  const rows = items.map(i => {
+    const end = i.end ? i.end.slice(11, 16) : 'jetzt';
+    return `<tr>
+      <td><b>${i.start.slice(11, 16)}–${end}</b>${i.strategy ? '<br><span class="muted">' + i.strategy + '</span>' : ''}</td>
+      <td>${badge(i.status)}</td>
+      <td>${i.avg_price != null ? i.avg_price + ' ct' : '–'}</td>
+      <td>${i.kwh} kWh</td>
+      <td>${i.cost.toFixed(2)} €</td>
+      <td></td>
+    </tr>`;
+  }).join('');
+  t.innerHTML = COLGROUP + head + rows + totalRow(items.map(i => ({ kwh: i.kwh, cost: i.cost })));
+}
+
+/* Wochenrückblick: 7-Tage-Bloecke, Solar/Verbrauch/Netz/Autarkie/Kosten,
+   blaetterbar (Rohdaten bleiben laenger vorrätig, als eine einzelne Woche
+   anzeigt - sonst waere die Statistik nach 7 Tagen einfach weg). */
+const WEEKDAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+let weekOffset = 0;
+function renderWeek(data) {
+  const t = $('week-table');
+  $('w-prev').disabled = !data.can_go_older;
+  $('w-next').disabled = weekOffset === 0;
+  const first = data.days[0].day, last = data.days[data.days.length - 1].day;
+  $('w-range').textContent = weekOffset === 0 ? 'Diese Woche'
+    : first.slice(8, 10) + '.' + first.slice(5, 7) + '. – ' + last.slice(8, 10) + '.' + last.slice(5, 7) + '.';
+  if (!data || !data.days || !data.days.length) { t.innerHTML = ''; return; }
+  const showCost = data.tariff_mode !== 'fixed' || data.totals.cost_eur > 0;
+  const showFees = showCost && data.has_contract_fees;
+  const head = `<tr class="thead"><td>Tag</td><td>Solar</td><td>Verbrauch</td>` +
+    `<td>Netzbezug</td><td>Autarkie</td>${showCost ? '<td>Kosten</td>' : ''}${showFees ? '<td>Gesamt inkl. Gebühren</td>' : ''}</tr>`;
+  // "Heute" ist per Konstruktion immer der letzte Tag der aktuellen Woche
+  // (offset 0) - nicht ueber Datumsvergleich mit der (evtl. im Hintergrund
+  // veralteten) Browser-Uhr ermitteln, das lief nach Mitternacht sonst
+  // ein paar Minuten auf den Vortag fehlbeschriftet.
+  const rows = data.days.map((d, i) => {
+    const dt = new Date(d.day + 'T00:00:00');
+    const isToday = weekOffset === 0 && i === data.days.length - 1;
+    const label = isToday ? 'Heute' : WEEKDAY_NAMES[dt.getDay()] + ' ' + d.day.slice(8, 10) + '.' + d.day.slice(5, 7) + '.';
+    return `<tr class="clickable" data-day="${d.day}" title="Anklicken: diesen Tag in den Diagrammen anzeigen">
+      <td>${label}</td>
+      <td>${d.solar.toFixed(1)} kWh</td>
+      <td>${d.verbrauch.toFixed(1)} kWh</td>
+      <td>${d.import.toFixed(1)} kWh</td>
+      <td>${d.autarky != null ? Math.round(d.autarky) + ' %' : '–'}</td>
+      ${showCost ? `<td>${d.cost_eur.toFixed(2)} €</td>` : ''}
+      ${showFees ? `<td>${(d.cost_incl_fees_eur || 0).toFixed(2)} €</td>` : ''}
+    </tr>`;
+  }).join('');
+  const tot = data.totals;
+  const totalRow = `<tr class="total">
+    <td>Summe</td>
+    <td>${tot.solar.toFixed(1)} kWh</td>
+    <td>${tot.verbrauch.toFixed(1)} kWh</td>
+    <td>${tot.import.toFixed(1)} kWh</td>
+    <td>${tot.autarky != null ? Math.round(tot.autarky) + ' %' : '–'}</td>
+    ${showCost ? `<td>${tot.cost_eur.toFixed(2)} €</td>` : ''}
+    ${showFees ? `<td>${(tot.cost_incl_fees_eur || 0).toFixed(2)} €</td>` : ''}
+  </tr>`;
+  t.innerHTML = head + rows + totalRow;
+  markWeekRow();
+}
+/* Zeile im Wochenrueckblick markieren, deren Tag gerade in den Energie-Diagrammen steht */
+function markWeekRow() {
+  document.querySelectorAll('#week-table tr[data-day]').forEach(tr => tr.classList.toggle('sel', tr.dataset.day === energyDay));
+}
+/* Klick auf einen Tag: Energie-Verlauf + Energiefluesse zeigen diesen Tag, Ansicht springt zu den Energiefluessen */
+$('week-table').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-day]'); if (!tr) return;
+  loadEnergyDay(tr.dataset.day);
+  $('flow-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+async function loadWeek() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  try { renderWeek(await (await fetch('/api/week?offset=' + weekOffset)).json()); } catch (e) {}
+}
+$('w-prev').addEventListener('click', () => { weekOffset++; loadWeek(); });
+$('w-next').addEventListener('click', () => { if (weekOffset > 0) { weekOffset--; loadWeek(); } });
+
+/* Monatsüberblick: EINE Zeile pro Kalendermonat (wie die Summenzeile des
+   Wochenrückblicks, nur je Monat statt je Woche), aus dem dauerhaften Monats-
+   Archiv (store.monthly_overview - nicht auf die 35-Tage-Historie beschränkt,
+   waechst ueber Jahre). Keine Pfeil-Navigation noetig, alle Monate stehen
+   direkt untereinander in der scrollbaren Tabelle, neuester zuerst. */
+const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
+  'August', 'September', 'Oktober', 'November', 'Dezember'];
+function renderMonth(data) {
+  const t = $('month-table');
+  const rows = (data && data.months) || [];
+  if (!rows.length) { t.innerHTML = ''; return; }
+  const anyCost = data.tariff_mode !== 'fixed' || rows.some(m => m.cost_eur > 0);
+  const showFees = anyCost && data.has_contract_fees;
+  const head = `<tr class="thead"><td>Monat</td><td>Solar</td><td>Verbrauch</td>` +
+    `<td>Netzbezug</td><td>Autarkie</td>${anyCost ? '<td>Kosten</td>' : ''}${showFees ? '<td>Gesamt inkl. Gebühren</td>' : ''}</tr>`;
+  // Zeilen sind neuester Monat zuerst - je Jahr eine "Summe <Jahr>"-Zwischensumme
+  // einfuegen, sobald das Jahr wechselt (bzw. am Ende fuer das letzte/aelteste Jahr).
+  const yearRow = (year, acc) => {
+    const autarky = acc.verbrauch > 0
+      ? Math.round(Math.max(0, Math.min(100, (1 - acc.import / acc.verbrauch) * 100))) : null;
+    return `<tr class="total">
+      <td>Summe ${year}</td>
+      <td>${acc.solar.toFixed(1)} kWh</td>
+      <td>${acc.verbrauch.toFixed(1)} kWh</td>
+      <td>${acc.import.toFixed(1)} kWh</td>
+      <td>${autarky != null ? autarky + ' %' : '–'}</td>
+      ${anyCost ? `<td>${acc.cost_eur.toFixed(2)} €</td>` : ''}
+      ${showFees ? `<td>${acc.cost_incl_fees_eur.toFixed(2)} €</td>` : ''}
+    </tr>`;
+  };
+  let body = '', curYear = null, acc = null;
+  rows.forEach((m, i) => {
+    if (curYear !== null && m.year !== curYear) { body += yearRow(curYear, acc); acc = null; }
+    if (!acc) { acc = { solar: 0, verbrauch: 0, import: 0, cost_eur: 0, cost_incl_fees_eur: 0 }; curYear = m.year; }
+    if (m.cost_known) { acc.cost_eur += m.cost_eur; acc.cost_incl_fees_eur += m.cost_incl_fees_eur || 0; }
+    acc.solar += m.solar; acc.verbrauch += m.verbrauch; acc.import += m.import;
+    const vrmTitle = m.cost_known ? 'Aus dem VRM-Verlauf aufgefüllt' : 'Aus dem VRM-Verlauf aufgefüllt – ohne Preis-Historie aus der Zeit, daher keine Kosten';
+    const label = (i === 0 ? `${MONTH_NAMES[m.month_num - 1]} ${m.year} (läuft)`
+      : `${MONTH_NAMES[m.month_num - 1]} ${m.year}`) + (m.vrm_only ? ` <span class="muted" title="${vrmTitle}">(VRM)</span>` : '');
+    body += `<tr>
+      <td>${label}</td>
+      <td>${m.solar.toFixed(1)} kWh</td>
+      <td>${m.verbrauch.toFixed(1)} kWh</td>
+      <td>${m.import.toFixed(1)} kWh</td>
+      <td>${m.autarky != null ? Math.round(m.autarky) + ' %' : '–'}</td>
+      ${anyCost ? `<td>${m.cost_known ? m.cost_eur.toFixed(2) + ' €' : '–'}</td>` : ''}
+      ${showFees ? `<td>${m.cost_known ? (m.cost_incl_fees_eur || 0).toFixed(2) + ' €' : '–'}</td>` : ''}
+    </tr>`;
+  });
+  if (acc) body += yearRow(curYear, acc);
+  t.innerHTML = head + body;
+}
+async function loadMonth() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  try { renderMonth(await (await fetch('/api/month')).json()); } catch (e) {}
+}
+async function loadPriceMinDay() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  // Einmalig: aeltester Tag der Preis-Historie (Grenze fuer "weiter zurueck" im Strompreis-Diagramm).
+  try { priceMinDay = (await (await fetch('/api/prices/history?days=1')).json()).info.first || ''; applyDay(); }
+  catch (e) {}
+}
+
+buildChart();
+buildEnergyChart();
+buildFlowChart();
+updateWidth();
+initTileDragging();
+load();
+loadLive();
+loadWeek();
+loadMonth();
+loadPriceMinDay();
+setInterval(load, 15000);      // Plan/Preise/Termine (langsamer)
+setInterval(loadLive, 2000);   // Live-Werte vom Cerbo (wie Victron: alle 2 s)
+setInterval(() => { loadSensors(); loadVirtual(); }, 3000);   // Sensoren (Ja/Nein) und eigene Schalter
+setInterval(loadWeek, 300000);  // Wochenrückblick (ändert sich langsam)
+setInterval(loadMonth, 300000); // Monatsüberblick (ändert sich langsam)
+
+/* --- Shelly-Geraete (Auswahl/Symbole in den Einstellungen; hier nur Schalten + Sortieren) --- */
+const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let shellyCache = [];
+let shellyDragActive = false;   // waehrend Verschieben: Neuaufbau pausieren
+async function loadShelly() {
+  if (shellyDragActive) return;
+  const card = $('shelly-card');
+  if (!shellyEnabled) { card.hidden = true; return; }
+  let list;
+  try { list = await (await fetch('/api/shelly?dashboard=1')).json(); } catch (e) { return; }
+  if (!shellyEnabled) { card.hidden = true; return; }   // waehrend des Wartens ausgeschaltet worden - sonst zeigt dieser noch "veraltete" Aufruf die Kachel doch wieder
+  if (shellyDragActive) return;
+  if (!Array.isArray(list) || !list.length) { card.hidden = true; return; }
+  shellyCache = list;
+  card.hidden = false;
+  $('shelly-grid').innerHTML = list.map(d => {
+    const stat = !d.online ? 'nicht erreichbar'
+      : (d.on ? 'an' : 'aus') + (d.power != null && d.switchable !== false ? ` · ${Math.round(d.power)} W` : '') + (d.automated ? ' · Auto' : '') + (d.switchable === false ? ' · Überwachung' : '');
+    return `<div class="systile" data-tile-id="${escH(d.id)}" ${d.online ? '' : 'style="opacity:.55"'}>
+      <div class="systile-t">${escH(d.name)}${d.pin_set && d.switchable !== false ? ' 🔒' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-size:30px;line-height:1.1">${escH(d.icon)}</span>
+        ${d.switchable === false
+          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${d.on ? 'var(--green)' : 'var(--muted)'}">${d.online ? (d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
+          : `<label class="switch${d.pin_set ? ' pinned' : ''}" ${d.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${d.on ? 'checked' : ''} ${d.online ? '' : 'disabled'}
+          onchange="shellySwitch('${escH(d.id)}', this.checked, this)"><span class="slider"></span></label>`}
+      </div>
+      <div class="systile-s">${stat}</div></div>`;
+  }).join('');
+}
+/* Sensoren (nur lesen): Ja/Nein als Punkt - gruen = Ja, rot = Nein; Messwerte als Zahl */
+const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
+const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung', 'keine Bewegung'], presence: ['anwesend', 'niemand da'], input: ['aktiv', 'nicht aktiv'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+async function loadSensors() {
+  const card = $('sensors-card');
+  if (!sensorsEnabled) { card.hidden = true; return; }
+  let list;
+  try { list = await (await fetch('/api/sensors', { cache: 'no-store' })).json(); } catch (e) { return; }
+  list = Array.isArray(list) ? list.filter(s => s.show !== false) : [];
+  if (!sensorsEnabled || !list.length) { card.hidden = true; return; }
+  card.hidden = false;
+  if (sensorsDragActive) return;
+  $('sensors-grid').innerHTML = list.map(s => {
+    const v = s.value, ok = v !== null && v !== undefined, w = SENSOR_WORDS[s.kind] ? (s.invert ? [SENSOR_WORDS[s.kind][1], SENSOR_WORDS[s.kind][0]] : SENSOR_WORDS[s.kind]) : ['Ja', 'Nein'];
+    const big = !ok ? '<span style="font-size:22px;font-weight:700;color:var(--muted)">–</span>'
+      : s.binary ? `<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${v ? 'var(--green)' : '#e5544a'};box-shadow:0 0 10px ${v ? 'var(--green)' : '#e5544a'}66"></span>`
+                 : `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums">${escH(String(v).replace('.', ','))}${s.unit ? ' ' + escH(s.unit) : ''}</span>`;
+    const sub = !ok ? 'kein Wert' : s.binary ? (v ? w[0] : w[1]) : escH(s.room || '');
+    const ic = escH(s.icon || SENSOR_ICON[s.kind] || '📡');
+    return `<div class="systile" data-tile-id="${escH(s.id)}" ${ok ? '' : 'style="opacity:.55"'}><div class="systile-t">${escH(s.name)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${ic}</span>${big}</div><div class="systile-s">${sub}</div></div>`;
+  }).join('');
+}
+/* Eigene Schalter & Knoepfe (Software): Knopf = Drucktaste, Schalter = Kippschalter */
+const TILE_SVG = p => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const TILE_ICON_PRESS = TILE_SVG('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>');        // Drucktaste
+const TILE_ICON_WAKE = TILE_SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');   // Glocke
+async function loadVirtual() {
+  const card = $('virtual-card');
+  if (!virtualEnabled) { card.hidden = true; return; }
+  let list;
+  try { list = await (await fetch('/api/virtual', { cache: 'no-store' })).json(); } catch (e) { return; }
+  list = Array.isArray(list) ? list.filter(v => v.show !== false) : [];
+  virtualCache = list;
+  let wols = []; try { const wj = await (await fetch('/api/wol', { cache: 'no-store' })).json(); wols = Array.isArray(wj) ? wj.filter(w => w.show !== false) : []; } catch (e) { /* ohne */ }
+  wolCache = wols;
+  if (!virtualEnabled || !(list.length || wols.length)) { card.hidden = true; return; }
+  if (Date.now() - virtualTouched < 1200) return;                                    // gerade bedient: kurz nicht dazwischenzeichnen (der Aufruf nach dem Klick zeichnet ohnehin neu)
+  card.hidden = false;
+  if (virtualDragActive) return;
+  $('virtual-grid').innerHTML = list.map(v => `<div class="systile" data-tile-id="${escH(v.id)}"><div class="systile-t">${escH(v.name)}${v.pin_set ? ' 🔒' : ''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(v.icon)}</span>
+      ${v.kind === 'button' ? `<button type="button" class="tilebtn${v.pin_set ? ' pinned' : ''}" title="${v.pin_set ? 'Drücken (PIN-geschützt)' : 'Drücken'}" aria-label="Drücken" onclick="virtualPress('${escH(v.id)}', this)">${TILE_ICON_PRESS}</button>`
+        : `<label class="switch${v.pin_set ? ' pinned' : ''}" ${v.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${v.on ? 'checked' : ''} onchange="virtualSet('${escH(v.id)}', this.checked, this)"><span class="slider"></span></label>`}</div>
+    <div class="systile-s">${v.kind === 'button' ? 'Knopf' : (v.kind === 'timer' ? (v.on ? 'läuft, noch <span class="vrem" data-rem="' + (v.remaining_s || 0) + '">' + fmtRemain(v.remaining_s || 0) + '</span>' : 'Timer aus') : (v.on ? 'an' : 'aus'))}${v.running ? ` · Ablauf läuft, noch <span class="vrem" data-rem="${v.running.remaining_s}">${fmtRemain(v.running.remaining_s)}</span>` : ''}</div></div>`).join('')
+    + wols.map(w => `<div class="systile" data-tile-id="${escH(w.id)}"><div class="systile-t">${escH(w.name)}${w.pin_set ? ' 🔒' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(w.icon)}</span>
+        <button type="button" class="tilebtn${w.pin_set ? ' pinned' : ''}" title="${w.pin_set ? 'Aufwecken (PIN-geschützt)' : 'Aufwecken'}" aria-label="Aufwecken" onclick="wolWake('${escH(w.id)}', this)">${TILE_ICON_WAKE}</button></div>
+      <div class="systile-s">${w.up === true ? '🟢 erreichbar' : w.up === false ? '⚪ nicht erreichbar' : 'Wake-on-LAN'}</div></div>`).join('');
+  virtualFetchedAt = Date.now();
+}
+let virtualFetchedAt = 0, virtualLast = 0, virtualTouched = 0;
+function tickVirtual() {                          // Restzeit sekundengenau herunterzaehlen (der Server wird nur alle paar Sekunden gefragt)
+  const els = document.querySelectorAll('#virtual-grid .vrem'); if (!els.length) return;
+  const passed = Math.floor((Date.now() - virtualFetchedAt) / 1000);
+  let zero = false;
+  els.forEach(e => { const left = Math.max(0, +e.dataset.rem - passed); e.textContent = fmtRemain(left); if (left <= 0) zero = true; });
+  if (zero && Date.now() - virtualLast > 1500) { virtualLast = Date.now(); loadVirtual(); }       // Ablauf zu Ende: Zustand gleich neu holen
+}
+setInterval(tickVirtual, 1000);
+const fmtRemain = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : s >= 120 ? `${Math.floor(s / 60)} min` : `${s} s`;
+/* askPin(): PIN-Zahlenfeld, steht gemeinsam in base.html (auch fuer die Smart-Home-Verwaltung) */
+async function virtualCall(url, body, el, name, needsPin) {
+  if (DASHBOARD_LEVEL !== 'write') { showToast('Dieses Konto darf nur ansehen, nicht schalten.'); loadVirtual(); return false; }
+  body = body || {};
+  let hint = name;
+  for (;;) {
+    if (needsPin) {
+      const pin = await askPin(hint);
+      if (pin === null) { virtualTouched = 0; loadVirtual(); return false; }         // abgebrochen: Schalter springt zurueck
+      body.pin = pin;
+    }
+    el.disabled = true; virtualTouched = Date.now();
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) { virtualTouched = 0; loadVirtual(); return true; }
+      const j = await r.json().catch(() => ({}));
+      if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; hint = 'Falsche PIN – bitte erneut'; needsPin = true; continue; }
+      showToast(j.error || `Fehlgeschlagen (Server-Antwort ${r.status})`, true);
+    } catch (e) { showToast('Server nicht erreichbar', true); }
+    break;
+  }
+  virtualTouched = 0; loadVirtual();
+  return false;
+}
+const virtualItem = id => (virtualCache || []).find(v => v.id === id) || (wolCache || []).find(v => v.id === id) || {};
+const wolWake = (id, el) => virtualCall('/api/wol/' + encodeURIComponent(id) + '/wake', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => { if (ok) showToast('Aufwecken gesendet ✓'); });
+const virtualPress = (id, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/press', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => { if (ok) showToast('Gedrückt ✓'); });
+const virtualSet = (id, on, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/set', { on }, el, virtualItem(id).name, !!virtualItem(id).pin_set);
+/* Meldungen im eigenen Stil statt Browser-Dialog (Fehler bleiben laenger stehen) */
+function showToast(text, isErr) {
+  let t = document.getElementById('app-toast');
+  if (!t) {
+    t = document.createElement('div'); t.id = 'app-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1200;max-width:min(92vw,520px);padding:12px 18px;border-radius:12px;'
+      + 'background:var(--card);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:14px;line-height:1.4;transition:opacity .25s;opacity:0';
+    document.body.appendChild(t);
+  }
+  t.textContent = text; t.style.borderColor = isErr ? '#e5544a' : 'var(--border)'; t.style.opacity = '1';
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, isErr ? 7000 : 3000);
+}
+async function shellySwitch(id, on, el) {
+  if (DASHBOARD_LEVEL !== 'write') { showToast('Dieses Konto darf nur ansehen, nicht schalten.'); return; }
+  const dv = (shellyCache || []).find(x => x.id === id) || {};
+  let needsPin = !!dv.pin_set, hint = dv.name, body = { on };
+  for (;;) {
+    if (needsPin) {
+      const pin = await askPin(hint);
+      if (pin === null) { loadShelly(); return; }                           // abgebrochen: Schalter springt zurueck
+      body.pin = pin;
+    }
+    el.disabled = true;
+    try {
+      const r = await fetch('/api/shelly/' + encodeURIComponent(id) + '/switch', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) break;
+      const j = await r.json().catch(() => ({}));
+      if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; hint = 'Falsche PIN – bitte erneut'; continue; }
+      showToast(j.error || `Schalten fehlgeschlagen (Server-Antwort ${r.status})`, true);
+    } catch (e) { showToast('Schalten fehlgeschlagen – Server nicht erreichbar', true); }
+    break;
+  }
+  loadShelly();
+  setTimeout(loadShelly, 2000);   // Leistungsmessung des Shelly braucht einen Moment
+}
+/* Umsortieren wie bei den Live-Werten: lang druecken, dann ueber andere Kachel ziehen. */
+function initShellyDragging() { makeSortable('shelly-grid', '/api/shelly/order', v => { shellyDragActive = v; }); }
+/* Umsortieren per langem Druecken und Ziehen - fuer Geraete-, Sensoren- und Schalter-Kacheln */
+function makeSortable(gridId, saveUrl, setActive) {
+  const g = $(gridId);
+  const LONG_PRESS_MS = 500, MOVE_TOLERANCE = 10;
+  let pending = null, dragEl = null;
+  const cancelPending = () => {
+    if (pending) { clearTimeout(pending.timer); pending = null; if (!dragEl) setActive(false); }
+  };
+  const endDrag = () => {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging'); g.classList.remove('reordering');
+    const ids = [...g.querySelectorAll('.systile')].map(el => el.dataset.tileId);
+    dragEl = null; setActive(false);
+    fetch(saveUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }) });
+  };
+  g.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.systile');
+    if (!el || e.target.closest('.switch, button')) return;      // Schalter und Knoepfe bleiben normal bedienbar
+    cancelPending();
+    setActive(true);
+    pending = { el, x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+      pending = null; dragEl = el; g.classList.add('reordering'); el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, LONG_PRESS_MS) };
+  });
+  g.addEventListener('pointermove', e => {
+    if (pending) {
+      if (Math.abs(e.clientX - pending.x) > MOVE_TOLERANCE || Math.abs(e.clientY - pending.y) > MOVE_TOLERANCE) cancelPending();
+      return;
+    }
+    if (!dragEl) return;
+    e.preventDefault();
+    const els = [...g.querySelectorAll('.systile')];
+    const target = els.find(el => {
+      if (el === dragEl) return false;
+      const r = el.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if (!target) return;
+    if (els.indexOf(dragEl) < els.indexOf(target)) g.insertBefore(dragEl, target.nextSibling);
+    else g.insertBefore(dragEl, target);
+  }, { passive: false });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => g.addEventListener(ev, () => { cancelPending(); endDrag(); }));
+  g.addEventListener('contextmenu', e => { if (pending || dragEl) e.preventDefault(); });
+  g.addEventListener('touchmove', e => { if (dragEl && e.cancelable) e.preventDefault(); }, { passive: false });   // Verschieben aktiv: Seite nicht mitscrollen
+}
+initShellyDragging();
+makeSortable('sensors-grid', '/api/sensors/order', v => { sensorsDragActive = v; });
+makeSortable('virtual-grid', '/api/virtual/order', v => { virtualDragActive = v; });
+setInterval(loadShelly, 15000);
+
+/* --- Solar-Prognose aus dem VRM-Portal: fliesst in den Energieverlauf ein (Zugang in den Einstellungen; Server puffert 30 min) --- */
+async function loadForecast() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  try { fcData = await (await fetch('/api/vrm/forecast')).json(); } catch (e) { return; }
+  if (!energyChart) return;
+  renderEnergyChart(lastEnergyHist);
+  renderEnergyTiles(lastEnergyHist, energyDay || todayStr());
+  applyEnergyDayUI();
+}
+loadForecast();
+setInterval(loadForecast, 300000);
+
+/* --- Wetter (nur Anzeige; Standort im Reiter "Wetter" der Einstellungen) --- */
+let wxData = null;
+/* --- Verlauf-Kachel: die im Menuepunkt "Verlaeufe" fuers Dashboard markierten Diagramme (gleiche Zeichnung wie dort) --- */
+let vlDashInst = {}, vlDashBusy = false, vlDashHours = (() => { try { return +localStorage.getItem('vlDashHours') || 24; } catch (e) { return 24; } })();
+async function loadVerlauf() {
+  const card = $('verlauf-card');
+  if (!verlaufEnabled) { card.hidden = true; return; }
+  if (vlDashBusy) return;
+  vlDashBusy = true;
+  try {
+    const [sr, cr] = await Promise.all([fetch('/api/verlauf/series'), fetch('/api/verlauf/charts')]);
+    if (!sr.ok || !cr.ok) { card.hidden = true; return; }
+    const series = {}; (await sr.json()).series.forEach(s => { series[s.id] = s; });
+    const charts = (await cr.json()).charts.filter(c => c.dashboard && c.series.some(i => series[i]));
+    if (!verlaufEnabled || !charts.length) { card.hidden = true; return; }
+    card.hidden = false;
+    document.querySelectorAll('#vl-dash-range button').forEach(b => b.classList.toggle('on', +b.dataset.h === vlDashHours));
+    const box = $('vl-dash-charts'), sig = charts.map(c => c.id + '|' + c.title + '|' + (c.kind || 'line')).join('||');
+    if (box.dataset.sig !== sig) {
+      Object.values(vlDashInst).forEach(x => x.destroy()); vlDashInst = {}; box.dataset.sig = sig;
+      box.innerHTML = charts.map(c => `<div style="margin-top:12px"><div style="font-weight:600;margin-bottom:4px">${escH(c.title)}</div><div style="position:relative;height:200px"><canvas id="vld-${escH(c.id)}"></canvas></div></div>`).join('');
+    }
+    const t1 = Date.now(), t0 = t1 - vlDashHours * 3600000;
+    await Promise.all(charts.map(async c => {
+      const cv = $('vld-' + c.id), ids = c.series.filter(i => series[i]); if (!cv) return;
+      const r = await fetch(`/api/verlauf/data?series=${encodeURIComponent(ids.join(','))}&from=${t0}&to=${t1}&points=${VLChart.pointsFor(c.kind, cv.clientWidth, 1.2)}`);
+      if (!r.ok) return;
+      VLChart.draw(vlDashInst, c, series, await r.json(), t0, t1, cv, { legend: ids.length > 1 });
+    }));
+  } catch (e) { /* egal - naechster Versuch */ } finally { vlDashBusy = false; }
+}
+document.querySelectorAll('#vl-dash-range button').forEach(b => b.addEventListener('click', () => { vlDashHours = +b.dataset.h; try { localStorage.setItem('vlDashHours', vlDashHours); } catch (e) { /* egal */ } loadVerlauf(); }));
+loadVerlauf(); setInterval(loadVerlauf, 30000);
+async function loadWeather() {
+  const card = $('weather-card');
+  if (!weatherEnabled) { card.hidden = true; return; }
+  try { wxData = await (await fetch('/api/weather')).json(); } catch (e) { return; }
+  if (!weatherEnabled) { card.hidden = true; return; }   // waehrend des Wartens ausgeschaltet worden - sonst zeigt dieser noch "veraltete" Aufruf die Kachel doch wieder
+  if (!wxData.configured || !wxData.current) { card.hidden = true; return; }     // ohne Standort keine Kachel
+  card.hidden = false;
+  renderWeather();
+}
+function renderWeather() {
+  const w = wxData, c = w.current;
+  $('wx-place').textContent = w.name || 'Wetter';
+  $('wx-temp').textContent = c.temp.toFixed(0) + ' °C';
+  $('wx-text').textContent = c.text;
+  $('wx-icon').textContent = c.icon;
+  $('wx-sub').textContent = `gefühlt ${c.feels.toFixed(0)} °C · Wind ${c.wind} km/h ${c.wind_dir}` + (c.humidity != null ? ` · ${c.humidity} % Luftfeuchte` : '');
+  $('wx-hours').innerHTML = (w.hourly || []).map((h, i) => `<div class="h"><div class="muted">${i === 0 ? 'Jetzt' : pad(h.hour) + ' Uhr'}</div>
+    <div class="i">${h.icon}</div><div class="t">${h.temp}°</div>
+    <div class="muted">${h.pop != null ? '💧' + h.pop + ' %' : ''}</div></div>`).join('');
+  const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  $('wx-days').innerHTML = (w.daily || []).map((d, i) => {
+    const dt = new Date(d.date + 'T00:00');
+    return `<div class="d"><div><b>${i === 0 ? 'Heute' : WD[dt.getDay()] + ' ' + pad(dt.getDate()) + '.'}</b></div><div>${d.icon}</div>
+      <div><b>${d.tmax}°</b> <span class="muted">/ ${d.tmin}°</span></div>
+      <div class="m">${d.pop != null ? '💧 ' + d.pop + ' % · ' : ''}${d.precip} mm · 💨 ${d.wind} km/h${d.sun_h != null ? ' · ☀︎ ' + d.sun_h + ' h' : ''}${d.sunrise ? ' · ↑' + d.sunrise + ' ↓' + d.sunset : ''}</div></div>`;
+  }).join('');
+  $('wx-foot').textContent = (w.error ? '⚠ ' + w.error + ' · ' : '') + 'Daten: Open-Meteo' + (w.updated ? ' · Stand ' + w.updated.slice(11, 16) + ' Uhr' : '');
+}
+loadWeather();
+setInterval(loadWeather, 600000);
+
+/* --- Ladeplan-Simulation (Test, nur Anzeige) --- */
+let psChart = null, psData = null;
+async function loadPlansim() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  const card = $('plansim-card');
+  if (!plansimEnabled) { card.hidden = true; return; }
+  try { psData = await (await fetch('/api/plan-sim')).json(); } catch (e) { return; }
+  if (!plansimEnabled) { card.hidden = true; return; }   // waehrend des Wartens ausgeschaltet worden - sonst zeigt dieser noch "veraltete" Aufruf die Kachel doch wieder
+  card.hidden = false;
+  renderPlansim();
+}
+function psWin(ws) {
+  const today = todayStr();
+  return ws.length ? ws.map(w => `${w.from}–${w.to}${w.day !== today ? ' (morgen)' : ''}`).join(', ') : 'kein Netzladen';
+}
+function renderPlansim() {
+  const d = psData;
+  if (!d.available) { $('ps-msg').textContent = d.reason || ''; $('ps-body').hidden = true; return; }
+  const r = d.result, fmtE = c => (c / 100).toFixed(2) + ' €';
+  $('ps-msg').textContent = '';
+  $('ps-body').hidden = false;
+  const smartLive = (d.current_strategy || '').startsWith('🧠');
+  $('ps-hint').textContent = `Horizont bis ${r.horizon_end.slice(5, 10).split('-').reverse().join('.')}. ${r.horizon_end.slice(11, 16)} Uhr · Stand ${d.computed.slice(11, 16)}`
+    + (d.manual ? ' · ⚠ manuelles Laden aktiv – Vergleich nicht aussagekräftig' : '')
+    + (smartLive ? ' · ℹ️ „Bisherige Steuerung" ist bereits die live laufende Intelligente Planung – kaum noch ein Unterschied zu erwarten' : '');
+  const tile = (t, big, sub, color) => `<div class="systile"><div class="systile-t">${t}</div><div class="systile-v" style="color:${color}">${big}</div><div class="systile-s">${sub}</div></div>`;
+  const diff = r.current.net_ct - r.sim.net_ct;
+  $('ps-tiles').innerHTML =
+    tile('🧠 Simulation', fmtE(r.sim.cost_ct), `lädt ${r.sim.grid_charge_kwh} kWh · Endstand ${r.sim.end_soc} %`, '#3ca2cb') +
+    tile('⚙️ Bisherige Steuerung', fmtE(r.current.cost_ct), `lädt ${r.current.grid_charge_kwh} kWh · Endstand ${r.current.end_soc} %`, '#f48c24') +
+    tile('⛔ Ohne Netzladen', fmtE(r.none.cost_ct), `Netzbezug ${r.none.grid_deficit_kwh} kWh · Endstand ${r.none.end_soc} %`, 'var(--muted)') +
+    tile('Unterschied', (diff >= 0 ? '−' : '+') + fmtE(Math.abs(diff)), (diff >= 0 ? 'Simulation wäre günstiger' : 'bisherige Steuerung wäre günstiger') + ' (inkl. Akku-Restwert)', diff >= 0 ? 'var(--cheap)' : 'var(--exp)');
+  $('ps-wins').innerHTML = `<b style="color:#3ca2cb">Simulation lädt:</b> ${psWin(r.sim.windows)}<br><b style="color:#f48c24">Bisherige Steuerung:</b> ${psWin(r.current.windows)}`
+    + (d.current_strategy ? ` <span class="muted">(${escH(d.current_strategy)})</span>` : '');
+  const labels = r.times.map(t => t.slice(11, 16));
+  const setup = () => new Chart($('ps-chart').getContext('2d'), {
+    data: { labels: [], datasets: [
+      { type: 'bar', label: 'Simulation lädt', data: [], backgroundColor: 'rgba(53,192,122,.7)', yAxisID: 'y2', order: 2 },
+      { type: 'line', label: 'Simulation', data: [], borderColor: '#3ca2cb', backgroundColor: '#3ca2cb', pointRadius: 0, borderWidth: 2.5, tension: .25, yAxisID: 'y', order: 0 },
+      { type: 'line', label: 'Bisherige Steuerung', data: [], borderColor: '#f48c24', pointRadius: 0, borderWidth: 2, tension: .25, yAxisID: 'y', order: 1 },
+      { type: 'line', label: 'Ohne Netzladen', data: [], borderColor: '#8b93a3', borderDash: [5, 4], pointRadius: 0, borderWidth: 1.5, tension: .25, yAxisID: 'y', order: 1 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: it => { const i = it[0].dataIndex; return psData.result.times[i].slice(5, 10).split('-').reverse().join('.') + ' ' + it[0].label + ' Uhr'; },
+        label: it => it.dataset.label === 'Simulation lädt' ? (it.parsed.y ? `Simulation lädt: ${it.parsed.y.toFixed(2)} kWh` : null) : `${it.dataset.label}: ${it.parsed.y.toFixed(0)} %`,
+        footer: it => { const i = it[0].dataIndex, x = psData.result; return `Preis ${x.prices[i]} ct · Solar ${x.pv_kwh[i]} kWh · Verbrauch ${x.cons_kwh[i]} kWh`; } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#9aa9b6', autoSkip: false, maxRotation: 0,
+          callback(v) { const l = this.getLabelForValue(v); if (!l.endsWith(':00')) return ''; return parseInt(l, 10) % 4 === 0 ? l : ''; } } },
+        y: { position: 'left', min: 0, max: 100, title: { display: true, text: 'Akku %', color: '#9aa9b6' }, grid: { color: '#34414e' }, ticks: { color: '#9aa9b6', callback: v => v + ' %' } },
+        y2: { position: 'right', beginAtZero: true, suggestedMax: 1, title: { display: true, text: 'Laden kWh', color: '#9aa9b6' }, grid: { drawOnChartArea: false }, ticks: { color: '#9aa9b6' } } } } });
+  if (!psChart) psChart = setup();
+  psChart.data.labels = labels;
+  psChart.data.datasets[0].data = r.sim.charge_kwh.map(v => v > 0 ? v : null);
+  psChart.data.datasets[1].data = r.sim.soc;
+  psChart.data.datasets[2].data = r.current.soc;
+  psChart.data.datasets[3].data = r.none.soc;
+  psChart.update('none');
+  const h = d.history || [];
+  if (h.length) {
+    const rows = h.slice(0, 10).map(x => { const df = x.current_net - x.sim_net;
+      return `<tr><td>${x.date.slice(8, 10)}.${x.date.slice(5, 7)}.</td><td>${(x.sim_net / 100).toFixed(2)} €</td><td>${(x.current_net / 100).toFixed(2)} €</td>
+        <td style="color:${df >= 0 ? 'var(--cheap)' : 'var(--exp)'};font-weight:600">${df >= 0 ? '−' : '+'}${(Math.abs(df) / 100).toFixed(2)} €</td>
+        <td class="muted">${escH(x.sim_windows || '–')}</td><td class="muted">${escH(x.current_windows || '–')}</td></tr>`; }).join('');
+    const avg = h.reduce((a, x) => a + (x.current_net - x.sim_net), 0) / h.length;
+    $('ps-hist').innerHTML = `<tr class="thead"><td>Tag (14 Uhr)</td><td>Simulation</td><td>Bisherig</td><td>Unterschied</td><td>Sim. lädt</td><td>Bisher lädt</td></tr>` + rows
+      + `<tr class="total"><td>Ø ${h.length} Tage</td><td></td><td></td><td>${avg >= 0 ? '−' : '+'}${(Math.abs(avg) / 100).toFixed(2)} €</td><td></td><td></td></tr>`;
+  } else $('ps-hist').innerHTML = '';
+  const a = r.assumptions;
+  $('ps-assume').innerHTML = `Der Planer rechnet stundenweise (Viertelstunden-Preise) bis zum Ende der bekannten Prognose und wählt die Ladezeiten, bei denen die Stromkosten am kleinsten sind.
+    Grundlage: Solarprognose des VRM, ${escH(d.cons_source)}, Tibber-Preise, dein Akku (Ladeleistung ${a.charge_kw} kW, Netzladen bis ${a.grid_cap_soc} %, Reserve ${a.floor_soc} %, Wirkungsgrad ${Math.round(a.eff_charge * 100)} %).
+    Die großen Zahlen sind der Netzbezug in €. Der „Unterschied" rechnet zusätzlich den Restwert der im Akku verbliebenen Energie ein (${a.terminal_value_ct} ct/kWh = Preis der günstigsten Viertelstunden), damit Pläne mit unterschiedlichem Endstand vergleichbar sind.
+    Einspeisevergütung ist nicht eingerechnet. Diese Karte ist ein <b>Test</b>: geschaltet wird weiterhin nach der bisherigen Steuerung.`;
+}
+loadPlansim();
+setInterval(loadPlansim, 120000);
+
+/* --- Ersparnis (Vergleich mit "alles aus dem Netz") --- */
+async function loadSavings() {
+  if (!MODULES.energy) return;                    // Modul Energie aus: keine Abfragen
+  const card = $('savings-card');
+  if (!savingsEnabled) { card.hidden = true; return; }
+  let d; try { d = await (await fetch('/api/savings')).json(); } catch (e) { return; }
+  if (!savingsEnabled) { card.hidden = true; return; }   // waehrend des Wartens ausgeschaltet worden (siehe applyTileVisibility) - sonst zeigt dieser noch "veraltete" Aufruf die Kachel doch wieder
+  if (!d.available) { card.hidden = true; return; }
+  card.hidden = false;
+  const eur = c => (c / 100).toFixed(2) + ' €';
+  const fixed = d.mode === 'fixed';
+  const tile = (title, t, sub) => t ? `<div class="systile"><div class="systile-t">${title}</div><div class="systile-v" style="color:${t.saving_eur >= 0 ? 'var(--cheap)' : 'var(--exp)'}">${t.saving_eur.toFixed(2)} €</div>
+      <div class="systile-s">${sub}ohne Anlage ${t.without_eur.toFixed(2)} € → bezahlt ${t.cost_eur.toFixed(2)} €</div></div>` : '';
+  const T = d.totals;
+  $('sv-tiles').innerHTML = tile('Heute (läuft)', T.today, 'bisher: ') + tile('7 Tage', T.d7, T.d7.days < 7 ? T.d7.days + ' Tage erfasst · ' : '') + tile('30 Tage', T.d30, T.d30.days < 30 ? T.d30.days + ' Tage erfasst · ' : '')
+    + (T.all.days > T.d30.days ? tile('Gesamt', T.all, T.all.days + ' Tage · ') : '');
+  const rows = d.days.slice(0, 14).map(r => `<tr><td>${r.date.slice(8, 10)}.${r.date.slice(5, 7)}.${r.date === todayStr() ? ' <span class="muted">(läuft)</span>' : ''}</td><td>${eur(r.without_ct)}</td><td>${eur(r.cost_ct)}</td>
+      <td style="color:var(--cheap);font-weight:600">${eur(r.saving_ct)}</td>${fixed ? '' : `<td>${eur(r.self_ct)}</td><td>${eur(r.timing_ct)}</td>`}</tr>`).join('');
+  $('sv-table').innerHTML = `<tr class="thead"><td>Tag</td><td>Ohne Anlage</td><td>Bezahlt</td><td>Ersparnis</td>${fixed ? '' : '<td>Eigenversorgung</td><td>Preis-Timing</td>'}</tr>` + rows;
+  $('sv-explain').innerHTML = `<b>Ohne Anlage</b>: dein Verbrauch, jede Viertelstunde komplett aus dem Netz ${fixed ? 'zum festen Preis' : 'zum damaligen Tibber-Preis'}. <b>Bezahlt</b>: dein echter Netzbezug × Preis.
+    <b>Ersparnis</b> = Differenz. ${fixed ? '' : '<b>Preis-Timing</b> ist der Anteil, der daher kommt, dass du eher in günstigen Stunden aus dem Netz beziehst (Vergleich mit dem Tagesdurchschnittspreis); <b>Eigenversorgung</b> ist der Rest (Sonne und Akku statt Netz).'}
+    Nicht enthalten: Einspeisevergütung, Grundgebühr, Netzentgelte und der Akkustand am Tagesende (gleicht sich über mehrere Tage aus).`;
+}
+loadSavings();
+setInterval(loadSavings, 300000);
+</script>
+{% endblock %}

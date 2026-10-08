@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Solarlogbuch · {{ app_display_name }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Solarlogbuch – VRM-Prognose vs. reale Erzeugung <span class="qhelp" role="button" tabindex="0" data-help="Jeder Tag stellt die morgens eingefrorene Tagesprognose des <b>Victron VRM</b> dem realen Ertrag gegenüber, damit der Vergleich fair bleibt. Justiert das VRM tagsüber nach, steht der aktuelle Wert beim laufenden Tag zusätzlich darunter.<br><br>„Ertrag“ ist die eigene Messung; darunter steht, was das VRM selbst gemessen hat. Die Prognose füllt sich ab dem Tag, an dem das VRM eingerichtet wurde – für frühere Tage gibt es nur den Ertrag.">?</span></h2>
+  <div class="sub">Prognose des Victron VRM im Vergleich zum realen Ertrag.</div>
+  <div class="table-scroll"><table id="log-table"></table></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const fmtDate = d => { const [Y, M, D] = d.split('-'); return `${D}.${M}.${Y}`; };
+
+function devColor(p) {
+  if (p == null) return 'var(--muted)';
+  if (Math.abs(p) < 8) return 'var(--cheap)';        // gut getroffen
+  return p > 0 ? 'var(--timer)' : 'var(--vexp)';     // + = mehr erzeugt, − = weniger
+}
+const devSpan = p => p != null
+  ? `<span style="color:${devColor(p)};font-weight:600">${p > 0 ? '+' : ''}${p.toFixed(0)} %</span>`
+  : '<span class="muted">–</span>';
+
+async function load() {
+  let d;
+  try { d = await (await fetch('/api/solar-log')).json(); }
+  catch (e) { $('log-table').innerHTML = '<tr><td class="muted">Fehler beim Laden.</td></tr>'; return; }
+  const head = `<tr class="thead"><td>Datum</td><td>Victron VRM (Prognose)</td><td>Ertrag</td></tr>`;
+  const rows = (d.rows || []).map(r => {
+    const prov = r.provisional ? ' <span class="muted">(läuft)</span>' : '';
+    const curt = r.curtailed
+      ? '<br><span style="color:var(--timer)">⚠ Akku voll – Ertrag evtl. gedeckelt</span>'
+      : '';
+    const upd = (r.provisional && r.vrm_latest != null && r.vrm_forecast != null && Math.abs(r.vrm_latest - r.vrm_forecast) >= 0.05)
+      ? `<br><span class="muted">aktuell nachjustiert: </span><b>${r.vrm_latest.toFixed(1)} kWh</b>` : '';
+    const vh = (r.vrm_history && r.vrm_history.length > 1)
+      ? `<details style="margin-top:4px"><summary class="muted" style="cursor:pointer">${r.vrm_history.length - 1}× nachjustiert</summary>`
+        + `<div class="muted" style="margin-top:2px">${r.vrm_history.map(x => `${x[0]} <b>${x[1].toFixed(1)}</b>`).join(' → ')} kWh</div></details>` : '';
+    const fc = r.vrm_forecast != null
+      ? `${r.vrm_forecast.toFixed(1)} kWh <span class="muted">(morgens)</span>${upd}<br><span class="muted">Abw. </span>${devSpan(r.vrm_deviation_pct)}${vh}`
+      : '<span class="muted">–</span>';
+    const vm = (r.vrm_measured != null && r.actual != null && r.vrm_measured > 0.5)
+      ? `<br><span class="muted">VRM misst ${r.vrm_measured.toFixed(1)} kWh · Abw. </span>${devSpan((r.actual - r.vrm_measured) / r.vrm_measured * 100)}`
+      : '';
+    return `<tr>
+      <td><b>${fmtDate(r.date)}</b>${prov}</td>
+      <td>${fc}</td>
+      <td>${r.actual != null ? r.actual.toFixed(1) + ' kWh' : '–'}${vm}${curt}</td>
+    </tr>`;
+  }).join('');
+  $('log-table').innerHTML = head + (rows || '<tr><td class="muted">Keine Einträge.</td></tr>');
+}
+load();
+</script>
+{% endblock %}

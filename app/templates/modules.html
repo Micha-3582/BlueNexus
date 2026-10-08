@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Module wählen{% endblock %}
+{% block content %}
+<style>
+  .mod-wrap { max-width: 640px; margin: 24px auto; }
+  .mod-opt { display: flex; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-top: 12px; cursor: pointer; background: var(--card2, transparent); }
+  .mod-opt:has(input:checked) { border-color: var(--accent); }
+  .mod-opt input { width: 20px; height: 20px; margin-top: 3px; flex: 0 0 auto; }
+  .mod-opt b { display: block; font-size: 16px; margin-bottom: 4px; }
+  .mod-err { background: rgba(229,84,74,.12); border: 1px solid rgba(229,84,74,.3); color: var(--red); padding: 10px 14px; border-radius: 10px; margin-top: 12px; }
+</style>
+<div class="card mod-wrap">
+  <h2 style="margin-top:0">Welche Module möchtest du nutzen? <span class="qhelp" role="button" tabindex="0" data-help="Alles, was du abwählst, bleibt ausgeblendet. Die Auswahl lässt sich jederzeit unter <b>Einstellungen → System → Module</b> ändern; gespeicherte Daten gehen dabei nie verloren.">?</span></h2>
+  <div class="muted">Nicht benötigte Teile bleiben ausgeblendet – später jederzeit änderbar.</div>
+  {% if error %}<div class="mod-err">{{ error }}</div>{% endif %}
+  <form method="post" action="/setup/modules">
+    <label class="mod-opt"><input type="checkbox" name="energy" value="1" {{ 'checked' if mods.energy }}>
+      <span><b>⚡ Energie <span class="qhelp" role="button" tabindex="0" data-help="Victron, Tibber oder fester Tarif, VRM, Ladeplan, Überschuss-Automatik, Verlauf und Ersparnis. Ohne PV-Anlage einfach abwählen.">?</span></b><span class="muted">Ladesteuerung, Strompreis und PV.</span></span></label>
+    <label class="mod-opt"><input type="checkbox" name="smarthome" value="1" {{ 'checked' if mods.smarthome }}>
+      <span><b>🏠 Smart Home <span class="qhelp" role="button" tabindex="0" data-help="Shelly, Tasmota/WLED, Tuya, Homematic (auch Rollläden), Zigbee und Klimaanlagen (Midea / NetHome Plus) – dazu Sensoren, Thermostate, Regeln und Abläufe, Wake-on-LAN und Telegram-Meldungen. Im nächsten Schritt wählst du nur die Systeme, die du besitzt.">?</span></b><span class="muted">Geräte, Sensoren, Regeln und Abläufe.</span></span></label>
+    <label class="mod-opt"><input type="checkbox" name="verlauf" value="1" {{ 'checked' if mods.verlauf }}>
+      <span><b>📈 Verläufe <span class="qhelp" role="button" tabindex="0" data-help="Messwerte fein aufzeichnen und als Diagramme zeigen (Strom, Preis, Sensoren, Temperaturen). Braucht Energie oder Smart Home.">?</span></b><span class="muted">Messwerte als Diagramme.</span></span></label>
+    <label class="mod-opt"><input type="checkbox" name="cameras" value="1" {{ 'checked' if mods.cameras }}>
+      <span><b>📷 Kameras <span class="qhelp" role="button" tabindex="0" data-help="Reolink und andere Kameras mit RTSP: Standbild, Live-Ansicht, Vollbild.">?</span></b><span class="muted">Reolink- und RTSP-Kameras.</span></span></label>
+    <label class="mod-opt"><input type="checkbox" name="alexa" value="1" {{ 'checked' if mods.alexa }}>
+      <span><b>🗣️ Alexa <span class="qhelp" role="button" tabindex="0" data-help="Freigegebene Geräte und eigene Schalter per Sprache schalten – lokal im Heimnetz, ohne Cloud. Braucht Smart Home und freien Port 80.">?</span></b><span class="muted">Sprachsteuerung ohne Cloud.</span></span></label>
+    <button type="submit" style="margin-top:18px">Weiter</button>
+  </form>
+</div>
+{% endblock %}

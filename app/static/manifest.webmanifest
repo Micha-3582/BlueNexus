@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "BlueNexus",
+  "short_name": "BlueNexus",
+  "description": "Smart-Home-Zentrale mit Energiemanagement (Victron, Tibber, Homematic, Shelly, Zigbee, Kameras).",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12181f",
+  "theme_color": "#1a2129",
+  "icons": [
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

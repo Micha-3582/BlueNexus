@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block title %}Kameras · {{ app_display_name }}{% endblock %}
+{% block content %}
+<style>
+  .cam-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cam-top h2 { margin: 0; }
+  .cam-top .grow { flex: 1; }
+  .camgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
+  .cam { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+  .cam.dragging { transform: scale(1.02); box-shadow: 0 10px 28px rgba(0,0,0,.5); opacity: .92; z-index: 5; position: relative; }
+  .camgrid.reordering .cam { cursor: grabbing; }
+  .cam-head, .cam-box { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .cam-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cam-head b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cam-box { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; }
+  .cam-box img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cam-box img.livefeed { position: absolute; inset: 0; z-index: 1; display: none; background: #000; }       /* Live-Strom liegt in eigener Ebene: ein Standbild kann ihn nie ueberschreiben */
+  .cam-box img.livefeed.show { display: block; }
+  /* Vollbild: das Bild fuellt den ganzen Bildschirm (funktioniert auch auf dem iPhone, das Element-Vollbild nicht kennt) */
+  .cam-box.fs { position: fixed; inset: 0; z-index: 2000; border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; height: 100dvh; background: #000; }
+  .cam-box.fs img { object-fit: contain; }
+  .cam-fsclose { display: none; position: absolute; right: 12px; top: 12px; z-index: 3; width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; border: 1px solid rgba(255,255,255,.35); cursor: pointer; padding: 0; margin: 0; align-items: center; justify-content: center; font-size: 24px; line-height: 1; }
+  .cam-box.fs .cam-fsclose { display: flex; }
+  .cam-fsreal { display: none; position: absolute; right: 12px; bottom: 34px; z-index: 3; padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.65); color: #fff; border: 1px solid rgba(255,255,255,.35); font-size: 12px; cursor: pointer; margin: 0; }
+  .cam-box.fs .cam-fsreal.avail { display: block; }
+  .cam-fshint { display: none; position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; color: rgba(255,255,255,.7); font-size: 12px; pointer-events: none; }
+  .cam-box.fs .cam-fshint { display: block; }
+  @media (orientation: landscape) { .cam-fshint { display: none !important; } }
+  .cam-chip { position: absolute; z-index: 2; left: 8px; top: 8px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(0,0,0,.6); color: #fff; }
+  .cam-chip.live { background: #e5544a; }
+  .cam-chip.off { background: #565c66; }
+  .cam-msg { position: absolute; z-index: 2; pointer-events: none; text-shadow: 0 0 6px #000; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: var(--muted); font-size: 14px; }
+  .cam-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .cam-bar .when { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .cbtn { width: 44px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--card2); color: var(--fg); border: 1px solid var(--border); cursor: pointer; margin: 0; }
+  .cbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .cbtn.on { background: #e5544a; border-color: #e5544a; color: #fff; }
+  .cbtn.dirty { background: var(--green); border-color: var(--green); color: #0d141b; }        /* Eingabe geaendert - mit dem Haekchen bestaetigen */
+  .cbtn.vis.on { background: var(--card2); border-color: var(--accent); color: var(--accent); }
+  .cbtn.del { color: var(--red); }
+  .cam-edit { display: none; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .cam-edit.open { display: block; }
+  .cam-edit .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .chk { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: normal; cursor: pointer; }
+  .chk input { width: auto; margin: 0; flex: 0 0 auto; }
+  html:not(.is-admin) .admin-only { display: none !important; }
+</style>
+
+<div class="card">
+  <div class="cam-top">
+    <h2>Kameras</h2><span class="grow"></span>
+    <label class="muted" style="margin:0;display:flex;align-items:center;gap:6px">Bild aktualisieren
+      <select id="cam-interval" style="width:auto"><option value="1">jede Sekunde</option><option value="5">alle 5 s</option><option value="10">alle 10 s</option><option value="30">alle 30 s</option></select></label>
+    <label class="muted" style="margin:0;display:flex;align-items:center;gap:6px" title="Klar = Hauptstrom der Kamera (hohe Auflösung, mehr Datenrate und Serverlast), Flüssig = Teilstrom (klein)">Live-Bild
+      <select id="cam-quality" style="width:auto"><option value="klar">Klar</option><option value="fluessig">Flüssig</option></select></label>
+    <button type="button" class="ghost admin-only" id="cam-add-toggle">＋ Kamera hinzufügen</button>
+  </div>
+  <div class="muted" id="cam-note" style="margin-top:8px"></div>
+  <div class="admin-only" id="cam-add" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+    <div class="sub" style="margin:0 0 10px">Lokale Anbindung – Zugangsdaten bleiben auf dem Server. <span class="qhelp" role="button" tabindex="0" data-help="Die App spricht die Kamera <b>lokal</b> an. Zugangsdaten und IP bleiben auf dem Server und werden nie an den Browser gesendet. Neue Kameras sind zunächst nur für Administratoren sichtbar.">?</span></div>
+    <div style="margin-bottom:10px"><label>Kameratyp <span class="qhelp" role="button" tabindex="0" data-help="Reolink: Anbindung über die lokale Schnittstelle der Kamera (Standbild in voller Auflösung). Andere Kamera: über RTSP, z. B. Wansview und viele weitere IP-Kameras.">?</span></label>
+      <select id="ca-kind"><option value="reolink">Reolink (LAN, PoE oder WLAN)</option><option value="rtsp">Andere Kamera mit RTSP (z. B. Wansview)</option></select></div>
+    <div class="muted" id="ca-rtsp-hint" style="display:none;margin-bottom:8px">Die Kamera braucht einen RTSP-Stream. <span class="qhelp" role="button" tabindex="0" data-help="Bei <b>Wansview</b> in der Wansview-App: Kamera → Einstellungen → <i>RTSP</i> bzw. <i>ONVIF</i> aktivieren (nicht jedes Modell und jede Firmware kann das) und ein Gerätepasswort setzen. Benutzer ist meist <code>admin</code>, das Passwort das <b>Gerätepasswort</b> (nicht das App-Konto). Den RTSP-Pfad sucht die App selbst.">?</span></div>
+    <div class="grid2">
+      <div><label>IP-Adresse der Kamera <span class="qhelp" role="button" tabindex="0" data-help="Adresse der Kamera im Heimnetz, z. B. 192.168.2.70. Am besten im Router eine feste IP vergeben.">?</span></label><input id="ca-host" placeholder="z. B. 192.168.2.70" autocomplete="off"></div>
+      <div><label>Name <span class="muted" style="font-weight:normal">(optional)</span> <span class="qhelp" role="button" tabindex="0" data-help="Anzeigename der Kamera, z. B. „Hof“. Leer = Modellname der Kamera.">?</span></label><input id="ca-name" placeholder="z. B. Hof" autocomplete="off"></div>
+      <div><label>Benutzer</label><input id="ca-user" value="admin" autocomplete="off"></div>
+      <div><label>Passwort</label><input id="ca-pass" type="password" autocomplete="new-password"></div>
+    </div>
+    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Erweitert (Port, Kanal)</summary>
+      <div class="grid2" style="margin-top:8px">
+        <div><label id="ca-port-l">Port <span class="muted" style="font-weight:normal">(optional)</span> <span class="qhelp" role="button" tabindex="0" data-help="Leer = Standard (80 bzw. 443). Nur ändern, wenn die Kamera auf einem anderen Port erreichbar ist.">?</span></label><input id="ca-port" inputmode="numeric" autocomplete="off"></div>
+        <div id="ca-channel-w"><label>Kanal <span class="qhelp" role="button" tabindex="0" data-help="0 = die Kamera selbst. Bei Rekordern (NVR) die Kanalnummer 0 bis n.">?</span></label><input id="ca-channel" inputmode="numeric" value="0" autocomplete="off"></div>
+        <div class="ca-rtsp" style="display:none"><label>RTSP-Pfad Hauptbild <span class="qhelp" role="button" tabindex="0" data-help="Pfad des Hauptstroms, z. B. /live/ch0. Leer = die App probiert die gängigen Pfade und merkt sich den passenden.">?</span></label><input id="ca-path" placeholder="z. B. /live/ch0" autocomplete="off"></div>
+        <div class="ca-rtsp" style="display:none"><label>RTSP-Pfad Teilbild <span class="qhelp" role="button" tabindex="0" data-help="Optional: Pfad des kleinen Teilstroms (z. B. /live/ch1) für die Live-Einstellung „Flüssig“.">?</span></label><input id="ca-path-sub" placeholder="z. B. /live/ch1" autocomplete="off"></div>
+      </div></details>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="ca-save">Verbindung prüfen &amp; hinzufügen</button><span class="muted" id="ca-msg"></span></div>
+  </div>
+</div>
+
+<div class="camgrid" id="camgrid"></div>
+<div class="muted" id="cam-empty" style="margin-top:14px" hidden>Noch keine Kamera freigegeben.</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const IS_ADMIN = {{ ((user_perms.user_management or 'none') == 'write') | tojson }};
+document.documentElement.classList.toggle('is-admin', IS_ADMIN);
+const $ = id => document.getElementById(id);
+const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const svg = p => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const I = {
+  play: svg('<polygon points="6 3 20 12 6 21 6 3"/>'), stop: svg('<rect x="5" y="5" width="14" height="14" rx="2"/>'),
+  big: svg('<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>'),
+  edit: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  check: svg('<polyline points="20 6 9 17 4 12"/>'), trash: svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
+  users: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+};
+let CAMS = [], LIVE_OK = true, MAX_MIN = 15;
+const state = {};                                   // id -> { live, fallback, last, visible }
+let interval = 5, quality = 'klar';
+try { interval = +(localStorage.getItem('camInterval') ?? 5); if (![1, 5, 10, 30].includes(interval)) interval = 5; quality = localStorage.getItem('camQuality') === 'fluessig' ? 'fluessig' : 'klar'; } catch (e) { /* egal */ }
+$('cam-quality').value = quality;
+$('cam-interval').value = String(interval);
+$('cam-quality').addEventListener('change', e => {
+  quality = e.target.value; try { localStorage.setItem('camQuality', quality); } catch (x) { /* egal */ }
+  document.querySelectorAll('.cam').forEach(card => { const id = card.dataset.cam; if (state[id]?.live) { stopLive(id, card, true); startLive(id, card); } });     // laufendes Live-Bild gleich in der neuen Qualitaet
+});
+$('cam-interval').addEventListener('change', e => { interval = +e.target.value; try { localStorage.setItem('camInterval', interval); } catch (x) { /* egal */ } });
+
+async function api(url, method, body) {
+  const r = await fetch(url, { method: method || 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Fehler ' + r.status);
+  return j;
+}
+function toast(t, err) {
+  let el = $('cam-toast');
+  if (!el) { el = document.createElement('div'); el.id = 'cam-toast'; el.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translateX(-50%);z-index:1100;padding:9px 18px;border-radius:999px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.45);transition:opacity .3s;pointer-events:none'; document.body.appendChild(el); }
+  el.textContent = t; el.style.background = err ? '#e5544a' : 'var(--green)'; el.style.color = err ? '#fff' : '#0b1f14'; el.style.opacity = 1;
+  clearTimeout(el._h); el._h = setTimeout(() => { el.style.opacity = 0; }, err ? 6000 : 1800);
+}
+
+function cardHtml(c) {
+  const id = escH(c.id);
+  const restricted = Array.isArray(c.users);
+  return `<div class="cam" data-cam="${id}">
+    <div class="cam-head"><b title="${escH(c.name)}">${escH(c.name)}</b><span class="muted" style="font-size:12px">${escH(c.model || '')}</span></div>
+    <div class="cam-box"><button type="button" class="cam-fsclose" data-act="exitfs" title="Vollbild beenden" aria-label="Vollbild beenden">✕</button><button type="button" class="cam-fsreal" data-act="realfs" title="Adressleiste ausblenden und Querformat sperren (Android blendet dabei einen Hinweis ein)">Adressleiste ausblenden</button><span class="cam-fshint">Handy quer halten für ein größeres Bild</span><img alt="${escH(c.name)}" data-img><img alt="" class="livefeed" data-live><span class="cam-chip off" data-chip>…</span><div class="cam-msg" data-msg>Lade Bild …</div></div>
+    <div class="cam-bar">
+      <button type="button" class="cbtn" data-act="live" title="Live ansehen" aria-label="Live ansehen">${I.play}</button>
+      <button type="button" class="cbtn" data-act="big" title="Vollbild" aria-label="Vollbild">${I.big}</button>
+      <button type="button" class="cbtn admin-only" data-act="edit" title="Bearbeiten: Name, Zugang, Sichtbarkeit, Entfernen" aria-label="Bearbeiten">${I.edit}</button>
+      <span class="when" data-when></span>
+    </div>
+    <div class="cam-edit admin-only" data-editpanel>
+      <div class="row"><input data-f="name" value="${escH(c.name)}" maxlength="60" style="flex:1;min-width:150px"><button type="button" class="cbtn" data-act="rename" title="Namen speichern" aria-label="Namen speichern">${I.check}</button></div>
+      <div class="row">
+        <button type="button" class="cbtn vis${restricted ? ' on' : ''}" data-act="vis" data-users="${escH(restricted ? JSON.stringify(c.users) : '')}" aria-label="Sichtbarkeit pro Benutzer" title="${escH(restricted ? (c.users.length ? 'Sichtbar nur für: ' + c.users.join(', ') : 'Sichtbar nur für Administratoren – antippen, um Benutzer freizugeben') : 'Sichtbar für: alle Benutzer')}">${I.users}</button>
+        <span class="muted" style="font-size:12px">${restricted ? (c.users.length ? 'nur ' + escH(c.users.join(', ')) : 'nur Administratoren') : 'alle Benutzer'}</span>
+        <button type="button" class="cbtn del" data-act="del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen">${I.trash}</button>
+      </div>
+      <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Zugang ändern (${escH(c.host || '')})</summary>
+        <div class="grid2" style="margin-top:8px">
+          <div><label>IP-Adresse <span class="qhelp" role="button" tabindex="0" data-help="Adresse der Kamera im Heimnetz.">?</span></label><input data-f="host" value="${escH(c.host || '')}"></div>
+          <div><label>Benutzer</label><input data-f="user" value="${escH(c.user || '')}"></div>
+          <div><label>Neues Passwort <span class="qhelp" role="button" tabindex="0" data-help="Leer lassen, um das gespeicherte Passwort zu behalten.">?</span></label><input data-f="password" type="password" autocomplete="new-password"></div>
+          ${c.kind === 'rtsp'
+            ? `<div><label>RTSP-Port <span class="qhelp" role="button" tabindex="0" data-help="Port des RTSP-Streams, meist 554.">?</span></label><input data-f="port" value="${escH(c.port ?? '')}" placeholder="554" inputmode="numeric"></div>
+               <div><label>RTSP-Pfad Hauptbild <span class="qhelp" role="button" tabindex="0" data-help="Pfad des Hauptstroms, z. B. /live/ch0. Leer = automatisch suchen.">?</span></label><input data-f="path_main" value="${escH(c.path_main || '')}"></div>
+               <div><label>RTSP-Pfad Teilbild <span class="qhelp" role="button" tabindex="0" data-help="Optional: Pfad des kleinen Teilstroms für die Live-Einstellung „Flüssig“.">?</span></label><input data-f="path_sub" value="${escH(c.path_sub || '')}"></div>`
+            : `<div><label>Port / Kanal <span class="qhelp" role="button" tabindex="0" data-help="Port der Kamera (leer = Standard) und Kanalnummer (0 = Kamera selbst, bei Rekordern 0 bis n).">?</span></label><div style="display:flex;gap:8px"><input data-f="port" value="${escH(c.port ?? '')}" placeholder="Port" inputmode="numeric"><input data-f="channel" value="${escH(c.channel ?? 0)}" placeholder="Kanal" inputmode="numeric"></div></div>`}
+        </div>
+        <div style="margin-top:8px"><button type="button" class="ghost" data-act="access">Zugang speichern</button></div>
+      </details>
+    </div>
+  </div>`;
+}
+
+function enterFs(card) {                              // Bild auf Bildschirmgroesse (Overlay) - ohne das echte Browser-Vollbild, damit Android keinen Hinweis einblendet
+  const box = card.querySelector('.cam-box'); box.classList.add('fs'); document.body.style.overflow = 'hidden';
+  const r = box.querySelector('.cam-fsreal'); if (r) { r.style.display = ''; r.classList.toggle('avail', CAN_REAL_FS); }
+}
+function realFs(btn) {                                // optional: echtes Vollbild (Adressleiste weg, Querformat) - Android zeigt dabei einen eigenen Hinweis
+  const box = btn.closest('.cam-box'); const f = box.requestFullscreen || box.webkitRequestFullscreen; if (!f) return;
+  try { const p = f.call(box); if (p && p.then) p.then(() => { try { screen.orientation?.lock?.('landscape').catch(() => {}); } catch (e) { /* egal */ } }).catch(() => {}); } catch (e) { /* egal */ }
+  btn.style.display = 'none';
+}
+const CAN_REAL_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+function exitFs() {
+  document.querySelectorAll('.cam-box.fs').forEach(b => b.classList.remove('fs')); document.body.style.overflow = '';
+  try { if (document.fullscreenElement) document.exitFullscreen(); screen.orientation?.unlock?.(); } catch (e) { /* egal */ }
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) exitFs(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') exitFs(); });
+function snapUrl(id) { return `/api/cameras/${encodeURIComponent(id)}/snapshot?t=${Date.now()}`; }
+function setChip(card, kind, text) { const ch = card.querySelector('[data-chip]'); ch.className = 'cam-chip ' + kind; ch.textContent = text; }
+function setMsg(card, text) { const m = card.querySelector('[data-msg]'); m.textContent = text || ''; m.style.display = text ? '' : 'none'; }
+
+function refreshSnap(id, card) {                       // Standbild laden (im Hintergrund, damit nichts flackert) - schreibt nur in die Standbild-Ebene
+  const st = state[id]; if (st.busy) return; st.busy = true;
+  const pre = new Image();
+  pre.onload = () => { st.busy = false; st.last = Date.now(); const img = card.querySelector('[data-img]'); img.src = pre.src; if (!st.live) { setMsg(card, ''); setChip(card, '', 'Standbild'); } };
+  pre.onerror = () => { st.busy = false; st.last = Date.now(); if (st.live) return; if (!card.querySelector('[data-img]').getAttribute('src')) setMsg(card, 'Kamera nicht erreichbar'); setChip(card, 'off', 'offline'); };
+  pre.src = snapUrl(id);
+}
+// Live: wird erzwungen, bis das Bild kommt - bei Fehlern, Abbruechen und langer Stille wird immer wieder neu verbunden (bis zum Beenden mit ■).
+// Waehrenddessen bleibt das letzte Standbild sichtbar; der Strom liegt in einer eigenen Ebene.
+function openStream(id, card, attempt) {
+  const st = state[id]; if (!st || !st.live) return;
+  const live = card.querySelector('[data-live]');
+  clearTimeout(st.wd); clearTimeout(st.retry);
+  const gen = st.gen = (st.gen || 0) + 1; st.got = false;
+  const fail = () => {
+    if (!st.live || gen !== st.gen) return;
+    clearTimeout(st.wd); live.onload = live.onerror = null; live.removeAttribute('src'); live.classList.remove('show');
+    if (!LIVE_OK) {                                    // kein ffmpeg auf dem Server: ersatzweise schnell hintereinander Standbilder
+      st.fallback = true; setChip(card, 'live', 'LIVE (Bild ca. 1×/s)'); setMsg(card, '');
+      card.querySelector('[data-when]').textContent = 'ffmpeg fehlt auf dem Server'; return;
+    }
+    setChip(card, 'live', 'LIVE …');
+    setMsg(card, attempt < 4 ? `Verbinde … (Versuch ${attempt + 1})` : `Kamera antwortet nicht – versuche es weiter … (Versuch ${attempt + 1})`);
+    st.retry = setTimeout(() => openStream(id, card, attempt + 1), Math.min(2000 + attempt * 500, 8000));      // Kameras halten alte Verbindungen manchmal kurz fest: etwas warten, dann neu
+  };
+  const ok = () => { if (!st.live || gen !== st.gen || st.got) return; st.got = true; clearTimeout(st.wd); setMsg(card, ''); setChip(card, 'live', 'LIVE'); live.classList.add('show'); };
+  live.onload = ok;
+  live.onerror = fail;
+  st.wd = setTimeout(() => { if (gen !== st.gen) return; if (live.naturalWidth > 0) ok(); else if (!st.got) fail(); }, 22000);       // Server wartet bis ~30 s auf das erste Bild: vorher aufgeben und neu anfragen
+  live.src = `/api/cameras/${encodeURIComponent(id)}/stream?q=${quality}&t=${Date.now()}`;
+}
+function startLive(id, card) {
+  document.querySelectorAll('.cam').forEach(c => { if (c.dataset.cam !== id && state[c.dataset.cam]?.live) stopLive(c.dataset.cam, c); });      // immer nur ein Live-Bild: das bisherige endet, wenn ein anderes startet
+  const st = state[id]; st.live = true; st.fallback = false; st.got = false;
+  const btn = card.querySelector('[data-act=live]'); btn.classList.add('on'); btn.innerHTML = I.stop; btn.title = 'Live beenden';
+  setChip(card, 'live', 'LIVE …'); setMsg(card, 'Verbinde …');
+  st.liveStarted = Date.now();
+  openStream(id, card, 1);
+}
+function stopLive(id, card, quiet) {
+  const st = state[id]; if (!st || !st.live) return;
+  st.live = false; st.fallback = false; st.gen = (st.gen || 0) + 1; clearTimeout(st.wd); clearTimeout(st.retry);
+  const live = card.querySelector('[data-live]'); live.onload = live.onerror = null; live.removeAttribute('src'); live.classList.remove('show');      // beendet die Verbindung zum Server
+  setMsg(card, '');
+  const btn = card.querySelector('[data-act=live]'); btn.classList.remove('on'); btn.innerHTML = I.play; btn.title = 'Live ansehen';
+  setChip(card, '', 'Standbild'); card.querySelector('[data-when]').textContent = '';
+  if (!quiet) refreshSnap(id, card);
+}
+
+function render() {
+  const grid = $('camgrid');
+  const open = [...grid.querySelectorAll('.cam-edit.open')].map(e => e.closest('.cam').dataset.cam);
+  const lives = Object.keys(state).filter(k => state[k].live);
+  grid.innerHTML = CAMS.map(cardHtml).join('');
+  $('cam-empty').hidden = CAMS.length > 0;
+  CAMS.forEach(c => {
+    state[c.id] = state[c.id] || { live: false, last: 0, busy: false };
+    const card = grid.querySelector(`[data-cam="${CSS.escape(c.id)}"]`);
+    if (open.includes(c.id)) card.querySelector('[data-editpanel]').classList.add('open');
+    state[c.id].busy = false; state[c.id].last = 0; if (lives.includes(c.id)) state[c.id].live = false;
+    io.observe(card);
+    refreshSnap(c.id, card);
+    if (lives.includes(c.id)) startLive(c.id, card);
+  });
+  $('cam-note').textContent = LIVE_OK ? `Standbilder aktualisieren sich automatisch. Mit ▶ startest du die Live-Ansicht (endet nach ${MAX_MIN} Minuten von selbst).`
+    : 'Live-Strom braucht ffmpeg auf dem Server (apt install ffmpeg). Bis dahin zeigt ▶ schnell hintereinander Standbilder.';
+}
+const io = new IntersectionObserver(es => es.forEach(e => { const id = e.target.dataset.cam; if (state[id]) state[id].visible = e.isIntersecting; }), { rootMargin: '100px' });
+
+async function load() {
+  try { const d = await api('/api/cameras'); CAMS = d.cameras || []; LIVE_OK = !!d.live; MAX_MIN = d.max_live_min || 15; }
+  catch (e) { $('cam-note').textContent = e.message; return; }
+  render();
+}
+
+// Takt: sichtbare Karten ausserhalb von "Live" nach Einstellung auffrischen; Fallback-Live jede Sekunde
+setInterval(() => {
+  if (document.hidden) return;
+  const now = Date.now();
+  document.querySelectorAll('.cam').forEach(card => {
+    const id = card.dataset.cam, st = state[id]; if (!st || st.visible === false) return;
+    if (st.live && !st.fallback && now - st.liveStarted > (MAX_MIN * 60 + 5) * 1000) stopLive(id, card);             // Server beendet den Strom selbst
+    if (st.live && !st.fallback && !st.got) { const lv = card.querySelector('[data-live]'); if (lv.naturalWidth > 0) lv.onload && lv.onload(); }      // Bild da, load-Ereignis fehlte
+    const every = st.live ? (st.fallback ? 1000 : 0) : interval * 1000;
+    if (every && now - st.last >= every) refreshSnap(id, card);
+    const w = card.querySelector('[data-when]'); if (!st.live && st.last) w.textContent = 'vor ' + Math.max(0, Math.round((now - st.last) / 1000)) + ' s';
+  });
+}, 1000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) document.querySelectorAll('.cam').forEach(c => stopLive(c.dataset.cam, c, true)); });   // Tab weg = kein Live-Verkehr
+window.addEventListener('pagehide', () => document.querySelectorAll('.cam').forEach(c => stopLive(c.dataset.cam, c, true)));
+
+function visDialog(names, current) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    const only = Array.isArray(current), sel = new Set(only ? current : []);
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:420px;max-height:90vh;overflow:auto">
+      <h3 style="margin:0 0 6px;font-size:17px">Wer darf diese Kamera sehen?</h3><div class="muted" style="margin-bottom:12px">Administratoren sehen immer alles. Zusätzlich ist das Recht „Kameras“ nötig.</div>
+      <label class="chk" style="display:flex;margin-bottom:8px"><input type="radio" name="vm" value="all" ${only ? '' : 'checked'}> Alle Benutzer</label>
+      <label class="chk" style="display:flex;margin-bottom:8px"><input type="radio" name="vm" value="some" ${only ? 'checked' : ''}> Nur ausgewählte Benutzer:</label>
+      <div id="vl" style="display:flex;flex-direction:column;gap:6px;margin:0 0 14px 26px">${names.length ? names.map(n => `<label class="chk"><input type="checkbox" value="${escH(n)}" ${sel.has(n.toLowerCase()) ? 'checked' : ''}> ${escH(n)}</label>`).join('') : '<span class="muted">Keine weiteren Benutzer angelegt.</span>'}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="ghost" id="vc">Abbrechen</button><button type="button" id="vo">Speichern</button></div></div>`;
+    document.body.appendChild(ov);
+    const done = v => { ov.remove(); resolve(v); };
+    const sync = () => { const some = ov.querySelector('input[name=vm]:checked').value === 'some'; ov.querySelectorAll('#vl input').forEach(i => { i.disabled = !some; }); ov.querySelector('#vl').style.opacity = some ? 1 : .45; };
+    ov.querySelectorAll('input[name=vm]').forEach(i => i.addEventListener('change', sync)); sync();
+    ov.querySelector('#vc').onclick = () => done(undefined);
+    ov.addEventListener('click', e => { if (e.target === ov) done(undefined); });
+    ov.querySelector('#vo').onclick = () => done(ov.querySelector('input[name=vm]:checked').value === 'all' ? null : [...ov.querySelectorAll('#vl input:checked')].map(i => i.value.toLowerCase()));
+  });
+}
+
+/* Namen-Haekchen: gruen, sobald der Name geaendert wurde (nach dem Speichern wird neu gezeichnet) */
+$('camgrid').addEventListener('input', e => {
+  const inp = e.target; if (!(inp instanceof HTMLInputElement) || inp.dataset.f !== 'name') return;
+  inp.closest('.row')?.querySelector('.cbtn[data-act="rename"]')?.classList.toggle('dirty', inp.value.trim() !== inp.defaultValue.trim());
+});
+$('camgrid').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const card = b.closest('.cam'), id = card.dataset.cam, act = b.dataset.act;
+  const val = f => card.querySelector(`[data-f="${f}"]`)?.value.trim();
+  try {
+    if (act === 'live') { state[id].live ? stopLive(id, card) : startLive(id, card); }
+    else if (act === 'big') { enterFs(card); }
+    else if (act === 'exitfs') { exitFs(); }
+    else if (act === 'realfs') { realFs(b); }
+    else if (act === 'edit') { card.querySelector('[data-editpanel]').classList.toggle('open'); }
+    else if (act === 'rename') { await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', { name: val('name') }); toast('Gespeichert ✓'); await load(); }
+    else if (act === 'access') {
+      const body = { host: val('host'), user: val('user'), port: val('port'), channel: val('channel') }; if (card.querySelector('[data-f=path_main]')) { body.path_main = val('path_main'); body.path_sub = card.querySelector('[data-f=path_sub]').value; } const pw = card.querySelector('[data-f=password]').value; if (pw) body.password = pw;
+      await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', body); toast('Zugang gespeichert ✓'); await load();
+    }
+    else if (act === 'vis') {
+      let names = []; try { names = (await api('/api/users')).users.filter(u => u.permissions.user_management !== 'write').map(u => u.username); } catch (x) { /* ohne Liste */ }
+      let cur = null; try { cur = b.dataset.users ? JSON.parse(b.dataset.users) : null; } catch (x) { /* alle */ }
+      const res = await visDialog(names, cur); if (res === undefined) return;
+      await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', { users: res }); toast(res === null ? 'Sichtbar für alle ✓' : 'Sichtbarkeit gespeichert ✓'); await load();
+    }
+    else if (act === 'del') {
+      try {
+        const u = await api('/api/rule-usage?kind=camera&id=' + encodeURIComponent(id));
+        if ((u.rules || []).length) { alert('Die Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wird in ' + (u.rules.length > 1 ? 'den Regeln ' : 'der Regel ') + u.rules.map(n => '„' + n + '“').join(', ') + ' verwendet.\n\nErst ' + (u.rules.length > 1 ? 'diese Regeln' : 'diese Regel') + ' löschen oder ausschalten, dann lässt sich die Kamera entfernen.'); return; }
+      } catch (e) { /* Pruefung nicht moeglich: der Server prueft beim Loeschen noch einmal */ }
+      if (!confirm('Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wirklich entfernen? (An der Kamera selbst ändert sich nichts.)')) return;
+      stopLive(id, card, true); await api('/api/cameras/' + encodeURIComponent(id), 'DELETE'); toast('Entfernt ✓'); await load();
+    }
+  } catch (err) { toast(err.message, true); }
+});
+
+/* Reihenfolge: Kachel lange druecken und verschieben (wie die Kacheln auf dem Dashboard). Gilt fuer dein Konto und gilt auf allen deinen Geraeten. */
+(function makeCamsSortable() {
+  const g = $('camgrid'), LONG_PRESS_MS = 500, MOVE_TOLERANCE = 10;
+  let pending = null, dragEl = null;
+  const cancelPending = () => { if (pending) { clearTimeout(pending.timer); pending = null; } };
+  const endDrag = () => {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging'); g.classList.remove('reordering');
+    const ids = [...g.querySelectorAll('.cam')].map(el => el.dataset.cam);
+    dragEl = null;
+    CAMS.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+    api('/api/cameras/my-order', 'POST', { ids }).then(() => toast('Reihenfolge gespeichert ✓')).catch(e => toast(e.message, true));
+  };
+  g.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.cam');
+    if (!el || e.target.closest('button, input, select, textarea, summary, label, .cam-edit, .cam-box.fs')) return;      // Bedienelemente bleiben normal bedienbar
+    cancelPending();
+    pending = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+      pending = null; dragEl = el; g.classList.add('reordering'); el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, LONG_PRESS_MS) };
+  });
+  g.addEventListener('pointermove', e => {
+    if (pending) { if (Math.abs(e.clientX - pending.x) > MOVE_TOLERANCE || Math.abs(e.clientY - pending.y) > MOVE_TOLERANCE) cancelPending(); return; }
+    if (!dragEl) return;
+    e.preventDefault();
+    const els = [...g.querySelectorAll('.cam')];
+    const target = els.find(el => { if (el === dragEl) return false; const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+    if (!target) return;
+    if (els.indexOf(dragEl) < els.indexOf(target)) g.insertBefore(dragEl, target.nextSibling); else g.insertBefore(dragEl, target);
+  }, { passive: false });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => g.addEventListener(ev, () => { cancelPending(); endDrag(); }));
+  g.addEventListener('contextmenu', e => { if (pending || dragEl) e.preventDefault(); });
+  g.addEventListener('touchmove', e => { if (dragEl && e.cancelable) e.preventDefault(); }, { passive: false });         // Verschieben aktiv: Seite nicht mitscrollen
+})();
+
+$('cam-add-toggle').addEventListener('click', () => { const f = $('cam-add'); f.style.display = f.style.display === 'none' ? '' : 'none'; });
+function syncKind() {
+  const rt = $('ca-kind').value === 'rtsp';
+  document.querySelectorAll('.ca-rtsp').forEach(e => { e.style.display = rt ? '' : 'none'; }); $('ca-channel-w').style.display = rt ? 'none' : ''; $('ca-rtsp-hint').style.display = rt ? '' : 'none';
+  $('ca-port-l').innerHTML = rt ? 'RTSP-Port <span class="muted" style="font-weight:normal">(leer = 554)</span>' : 'Port <span class="muted" style="font-weight:normal">(leer = 80 bzw. 443)</span>';
+  if (rt && $('ca-user').value === 'admin') { /* Wansview/RTSP: meist ebenfalls admin */ }
+}
+$('ca-kind').addEventListener('change', syncKind);
+$('ca-save').addEventListener('click', async () => {
+  const msg = $('ca-msg'), v = id => $(id).value.trim();
+  msg.style.color = ''; msg.textContent = 'Prüfe Verbindung …'; $('ca-save').disabled = true;
+  try {
+    const c = await api('/api/cameras', 'POST', { host: v('ca-host'), name: v('ca-name'), user: v('ca-user'), password: $('ca-pass').value, port: v('ca-port'), channel: v('ca-channel') || 0, kind: $('ca-kind').value, path_main: v('ca-path'), path_sub: v('ca-path-sub') });
+    ['ca-host', 'ca-name', 'ca-pass', 'ca-port', 'ca-path', 'ca-path-sub'].forEach(i => { $(i).value = ''; }); msg.textContent = '';
+    toast('Kamera „' + c.name + '“ hinzugefügt – zunächst nur für Admins sichtbar ✓'); $('cam-add').style.display = 'none'; await load();
+  } catch (e) { msg.style.color = '#e5544a'; msg.textContent = e.message; }
+  $('ca-save').disabled = false;
+});
+load();
+</script>
+{% endblock %}

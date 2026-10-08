@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <script src="{{ url_for('static', filename='sortable.js') }}"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_display_name }}{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icon-16.png') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
+  <meta name="theme-color" content="#1a2129">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
+  <style>
+    :root {
+      --bg: #12181f; --card: #1a2129; --card2: #232d38;
+      --fg: #eef2f5; --muted: #9aa9b6; --accent: #3ca2cb; --border: #34414e;
+      /* Signaturfarben: Orange (MA-Multiservice) + Victron-Blau. Orange = Hauptaktion/Warnung, Blau = aktiv/Auswahl/Links */
+      --brand: #f48c24; --brand2: #3ca2cb; --on: #3ca2cb; --glow: rgba(60,162,203,.35);
+      --green: #35c07a; --blue: #3ca2cb; --red: #e5544a;
+      /* Preis-Ampel wie Tibber Timer */
+      --cheap: #35c07a; --normal: #5fa8d3; --exp: #f48c24; --vexp: #e5544a;
+      --plan: #b072f5; --timer: #ffd54a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--fg);
+      background: radial-gradient(1100px 520px at 8% -8%, rgba(60,162,203,.10), transparent 62%),
+                  radial-gradient(900px 480px at 100% 108%, rgba(244,140,36,.08), transparent 60%), var(--bg);
+      background-attachment: fixed;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    header { display: flex; align-items: center; gap: 10px; padding: 14px 20px;
+      background: var(--card); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10; flex-wrap: wrap; row-gap: 6px; }
+    header h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .3px; }
+    header .sun { font-size: 22px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+    header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: linear-gradient(90deg, var(--brand2), var(--brand) 55%, transparent); opacity: .85; pointer-events: none; }
+    header nav { margin-left: auto; display: flex; gap: 6px; align-items: center;
+      flex-wrap: wrap; }
+    header nav a { color: var(--muted); text-decoration: none; font-size: 14px;
+      padding: 7px 12px; border-radius: 8px; white-space: nowrap; }
+    header nav a:hover { background: var(--card2); color: var(--fg); }
+    header nav a.active { background: rgba(60,162,203,.12); color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+    header nav .logout-btn { padding: 7px 12px; font-size: 14px; font-weight: 400;
+      border-radius: 8px; white-space: nowrap; }
+    @media (max-width: 480px) {
+      header h1 { font-size: 15px; }
+      header nav a, header nav .logout-btn { padding: 6px 9px; font-size: 13px; }
+      header nav .logout-full { display: none; }
+    }
+    @media (min-width: 481px) { header nav .logout-short { display: none; } }
+    header nav .nav-gear { display: none; }
+    @media (max-width: 480px) { header nav .nav-full { display: none; } header nav .nav-gear { display: block; } }
+    /* Desktop: volle Fensterbreite. Handy: schmal (passt automatisch). */
+    main { width: 100%; max-width: 1500px; margin: 0 auto; padding: 20px 24px; }
+    @media (max-width: 640px) {
+      main { padding: 12px; overflow-x: hidden; }   /* kein horizontaler Seitenüberlauf */
+      header { padding: 12px 14px; }
+      .card { padding: 14px; }
+    }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0) 60px), var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.22);
+      overflow: hidden; min-width: 0; }   /* breite Inhalte (Graph/Tabellen) einsperren */
+    .card h2 { margin: 0 0 12px; font-size: 14px; color: var(--muted);
+      font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .metric { flex: 1; min-width: 120px; }
+    .metric .val { font-size: 26px; font-weight: 700; }
+    .metric .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px;
+      font-size: 13px; font-weight: 600; }
+    .pill.green { background: rgba(63,185,80,.15); color: var(--green); }
+    .pill.grey  { background: rgba(138,160,180,.15); color: var(--muted); }
+    .pill.amber { background: rgba(244,140,36,.16); color: var(--brand); }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+    input, select { width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+      font-size: 15px; }
+    button { cursor: pointer; border: none; border-radius: 10px; padding: 11px 16px;
+      font-size: 15px; font-weight: 700; background: linear-gradient(180deg, #f79b3d, var(--brand)); color: #1c1105;
+      transition: filter .15s, transform .05s; }
+    input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+    button:hover:not(:disabled) { filter: brightness(1.07); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+    button.ghost { background: var(--card2); color: var(--fg); border: 1px solid var(--border); }
+    button.ghost:hover:not(:disabled) { border-color: var(--accent); filter: none; }
+    button.danger { background: rgba(248,81,73,.15); color: var(--red); }
+    button:disabled { opacity: .5; cursor: default; }
+    .switch { position: relative; width: 52px; height: 30px; flex: none; }
+    .switch input { display: none; }
+    .slider { position: absolute; inset: 0; background: var(--card2); border-radius: 999px;
+      transition: .2s; border: 1px solid var(--border); }
+    .slider:before { content: ""; position: absolute; width: 22px; height: 22px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .slider { background: var(--on); border-color: var(--on); box-shadow: 0 0 10px var(--glow); }
+    .switch input:checked + .slider:before { transform: translateX(22px); }
+    /* PIN-geschuetzt: gelber Rahmen am Schalter/Knopf, damit er sich von den ungeschuetzten abhebt */
+    .switch.pinned .slider, .tilebtn.pinned, .tgl.pinned, button.pinned { box-shadow: 0 0 0 2px #f0b429; }
+    .switch input:disabled + .slider { opacity: .4; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    td { padding: 8px 4px; border-bottom: 1px solid var(--border); }
+    .muted { color: var(--muted); font-size: 13px; }
+    tr.thead td { color: var(--muted); font-size: 12px; text-transform: uppercase;
+      letter-spacing: .04em; font-weight: 600; }
+    /* Beide Ladetabellen exakt gleiche Spaltenausrichtung */
+    #charge-log, #ev-list { table-layout: fixed; }
+    #charge-log td, #ev-list td { overflow: hidden; text-overflow: ellipsis; }
+    /* Wochenrückblick + Monatsüberblick: gleiche Spaltenbreiten, egal wie lang der
+       Zeilentext ist (z.B. "September 2026 (läuft)" ist viel länger als "Mo 14.09."
+       und würde die erste Spalte sonst je Tabelle unterschiedlich breit ziehen) */
+    #week-table, #month-table { table-layout: fixed; }
+    #week-table td, #month-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #week-table td:first-child, #month-table td:first-child { width: 20%; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: rgba(255,255,255,.04); }
+    tr.clickable.sel td { background: rgba(60,162,203,.14); }
+    #flow-card { scroll-margin-top: 70px; }
+    tr.total td { border-top: 2px solid var(--muted); border-bottom: none;
+      font-weight: 700; padding-top: 10px; }
+    tr.total td:first-child { color: var(--muted); text-transform: uppercase;
+      font-size: 12px; letter-spacing: .04em; }
+    /* Tabellen auf dem Handy horizontal scrollbar statt gequetscht */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin; scrollbar-color: #445666 transparent; }
+    .table-scroll::-webkit-scrollbar { height: 8px; }
+    .table-scroll::-webkit-scrollbar-track { background: transparent; }
+    .table-scroll::-webkit-scrollbar-thumb { background: #445666; border-radius: 4px; }
+    @media (max-width: 640px) {
+      #charge-log, #ev-list { table-layout: auto; font-size: 12px; }
+      #charge-log { min-width: 0; }          /* passt meist ohne Scrollen */
+      #ev-list { min-width: 480px; }         /* hat zusätzlich den Löschen-Button */
+      #charge-log td, #ev-list td { white-space: nowrap; padding: 6px 4px; }
+    }
+    .banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 14px; }
+    .banner.warn { background: rgba(244,140,36,.13); color: var(--brand);
+      border: 1px solid rgba(255,176,32,.3); }
+    .banner.err { background: rgba(248,81,73,.12); color: var(--red);
+      border: 1px solid rgba(248,81,73,.3); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+    /* Desktop-Dashboard: obere Reihe zweispaltig, Kurve volle Breite */
+    .dash { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+    .dash > * { min-width: 0; }   /* Grid-Kinder dürfen schrumpfen -> kein Überlauf */
+    .dash .full { grid-column: 1 / -1; }
+    .dash > .card { margin-bottom: 0 !important; }   /* Abstand kommt vom Grid-gap */
+    @media (max-width: 720px) { .dash { grid-template-columns: 1fr; } }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px;
+      font-size: 13px; color: var(--muted); }
+    .legend [data-k] { cursor: pointer; user-select: none; }
+    .legend [data-k].off { opacity: .4; text-decoration: line-through; }
+    .legend .sw-hatch-red { background: repeating-linear-gradient(45deg, #e5544a 0 2px, transparent 2px 4px); border: 1px solid #e5544a; }
+    .legend .sw-hatch { background: repeating-linear-gradient(45deg, #f48c24 0 2px, transparent 2px 4px); border: 1px solid #f48c24; }
+    .legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+      margin-right: 6px; vertical-align: -1px; }
+    .sw-cheap { background: var(--cheap); } .sw-normal { background: var(--normal); }
+    .sw-exp { background: var(--exp); } .sw-vexp { background: var(--vexp); }
+    .sw-plan { background: transparent; border: 2px solid var(--plan); }
+    /* Kurve mit Scroll (schmale Ansicht) + Drag-Auswahl */
+    .chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+      margin-top: 12px; max-width: 100%; scrollbar-width: thin; scrollbar-color: #445666 transparent; }
+    .chart-scroll::-webkit-scrollbar { height: 8px; }
+    .chart-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chart-scroll::-webkit-scrollbar-thumb { background: #445666; border-radius: 4px; }
+    .chart-inner { height: 300px; width: 100%; }
+    /* Handy: Kurve doppelt so breit -> ~12 h sichtbar, Rest seitlich scrollen.
+       Feste CSS-Breite statt JS verhindert das Aufschaukeln von Chart.js. */
+    @media (max-width: 720px) { .chart-inner { height: 250px; width: 200%; } }
+    .chart-scroll canvas { cursor: crosshair; touch-action: pan-x pan-y; }   /* pan-y: senkrecht wischen scrollt die Seite auch ueber dem Diagramm */
+    body.selecting .chart-scroll canvas { touch-action: none; }
+    .sel-btn[aria-pressed="true"] { background: var(--timer); color: #12181f; border-color: var(--timer); }
+    .daytab { font-size: 13px; padding: 6px 14px; }
+    /* roter Zaehler wie bei Handy-Apps: ungelesene Logbuch-Eintraege */
+    .log-badge { position: absolute; top: -7px; right: -7px; min-width: 19px; height: 19px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+      background: #e5544a; color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px var(--bg, #12181f); }
+    .log-badge[hidden] { display: none; }
+    input[type=range] { padding: 0; margin: 0; border: 0; background: transparent; height: 24px; accent-color: var(--accent, #3ca2cb); cursor: pointer; }      /* Schieberegler: volle Laenge, links = Minimum, rechts = Maximum (nicht wie ein Textfeld mit Innenabstand) */
+    input, select, textarea { color-scheme: dark; }      /* native Bedienelemente (Zeit-/Zahlenfelder, Auswahllisten) im dunklen Stil */
+    .chip { display:inline-flex; margin:0; font-weight:normal; cursor:pointer; }
+    .chip input { display:none; }
+    .chip span { border:1px solid var(--border); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--muted); }
+    .chip input:checked + span { background:var(--accent); border-color:var(--accent); color:#12181f; font-weight:600; }
+    .daytab.active { background: var(--accent); color: #12181f; border-color: var(--accent); }
+    /* Victron Live-Kacheln */
+    /* Festes Raster: 6 pro Zeile (Desktop), damit nichts springt */
+    .sysgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+    @media (max-width: 1200px) { .sysgrid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 640px)  { .sysgrid { grid-template-columns: repeat(2, 1fr); } }
+    .systile { background: var(--card2); border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; min-width: 0; transition: transform .15s, box-shadow .15s, opacity .15s;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      /* pan-y: senkrechtes Wischen scrollt die Seite normal (vorher 'none' -> auf den Kacheln liess sich am Handy nicht scrollen).
+         Der Verschiebe-Modus nach langem Druck sperrt das Scrollen erst dann per touchmove-preventDefault (siehe index.html). */
+      touch-action: pan-y; }
+    /* Kachel-Umsortieren: langes Klicken/Tippen aktiviert den Verschiebe-Modus */
+    .sysgrid.reordering .systile { cursor: grab; }
+    .systile.drag-armed { box-shadow: 0 0 0 2px var(--accent); }
+    .systile.dragging { cursor: grabbing; transform: scale(1.04); box-shadow: 0 10px 28px rgba(0,0,0,.45);
+      z-index: 5; opacity: .95; touch-action: none; user-select: none; }
+    .systile .tilebtn { width: 56px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+    .systile .tilebtn:active { transform: scale(.94); }
+    .systile-t { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .systile-v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .systile-s { font-size: 12px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+    /* gelbe Sonne (Text-Darstellung erzwungen, damit die Farbe greift) */
+    .sun-ico { color: var(--timer); font-variant-emoji: text; }
+    .systile-s .kv { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+    .systile-s .kv .k { color: var(--muted); }
+    .systile-s .kv .v { color: var(--fg); font-weight: 600; }
+    .plane-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr auto; gap: 8px;
+      align-items: end; margin-bottom: 8px; }
+    .plane-row label { margin: 0 0 3px; }
+    small.hint { color: var(--muted); font-size: 12px; }
+    /* Hilfe-Boxen in den Einstellungen */
+    .help-link { display: inline-block; margin-top: 6px; color: var(--accent);
+      text-decoration: none; font-size: 13px; }
+    .help-link:hover { text-decoration: underline; }
+    details.help { margin-top: 10px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0 12px; }
+    details.help > summary { cursor: pointer; padding: 10px 0; color: var(--accent);
+      font-size: 13px; font-weight: 600; list-style: none; }
+    details.help > summary::before { content: "❔ "; }
+    details.help[open] > summary { border-bottom: 1px solid var(--border); }
+    .help-body { padding: 12px 0; font-size: 14px; color: var(--fg); line-height: 1.55; }
+    .help-body ol { margin: 8px 0; padding-left: 20px; }
+    .help-body li { margin: 5px 0; }
+    .help-body b { color: var(--fg); }
+    .help-body code { background: var(--card2); padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+    .help-body .muted { color: var(--muted); }
+    /* Kompakte Feld-Hilfe: "?"-Knopf statt Dauertext unter dem Feld.
+       BEWUSST <span>, kein <button>: steckt oft innerhalb eines <label>, und
+       <button> gilt als "labelable" - der ganze <label>-Bereich hätte dann den
+       :hover-Zustand des Buttons ausgelöst, nicht nur der Knopf selbst. */
+    .qhelp { display: inline-flex; align-items: center; justify-content: center;
+      width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border);
+      background: var(--card2); color: var(--muted); font-size: 11px; font-weight: 700;
+      line-height: 1; cursor: pointer; padding: 0; margin-left: 6px; vertical-align: middle; }
+    .qhelp:hover, .qhelp[aria-expanded="true"] { color: #12181f; background: var(--accent);
+      border-color: var(--accent); }
+  /* Eigenes, dunkel gestyltes Kalender-Popup fuer die Tag-Auswahl (e-pick/f-pick/p-pick) statt des nativen
+     Browser-Datepickers - der bricht aus dem Design und erscheint nicht neben dem Icon (Michael, 28.09.). */
+  .calpop { position: fixed; z-index: 50; background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); width: 232px; }
+  .calpop .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .calpop .cal-head b { font-size: 13px; color: var(--fg); }
+  .calpop .cal-nav { background: none; border: none; color: var(--fg); cursor: pointer; font-size: 15px;
+    padding: 2px 10px; border-radius: 6px; line-height: 1.6; }
+  .calpop .cal-nav:hover { background: var(--bg); }
+  .calpop .cal-nav:disabled { color: #4a5266; cursor: default; background: none; }
+  .calpop .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .calpop .cal-wd { font-size: 11px; color: var(--muted); text-align: center; padding: 2px 0 4px; }
+  .calpop .cal-day { background: none; border: none; color: var(--fg); font-size: 13px; padding: 6px 0;
+    border-radius: 6px; cursor: pointer; }
+  .calpop .cal-day:hover:not(:disabled) { background: var(--bg); }
+  .calpop .cal-day.today { box-shadow: inset 0 0 0 1px var(--accent); }
+  .calpop .cal-day.sel { background: var(--accent); color: #12181f; font-weight: 600; }
+  .calpop .cal-day:disabled { color: #454c5c; cursor: default; }
+    .qpop { position: fixed; max-width: 360px; max-height: 72vh; overflow-y: auto; background: var(--card2);
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+      font-size: 13px; line-height: 1.5; color: var(--fg); box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      z-index: 80; }
+    .qpop b { color: var(--fg); }
+    .qpop a { color: var(--accent); font-weight: 600; }
+    .qpop ol, .qpop ul { margin: 6px 0; padding-left: 20px; } .qpop li { margin: 3px 0; }
+    /* Kurze Unterzeile unter einer Kartenueberschrift (Details stehen hinter dem ?) */
+    .card .sub { margin: -4px 0 14px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .card h2 .qhelp { text-transform: none; vertical-align: 1px; }
+    .qpop code { background: var(--bg); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  {% if sandbox %}<div style="position:sticky;top:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
+  {% if preview_user %}<div id="preview-bar" style="position:sticky;top:0;z-index:3000;background:#b45309;color:#fff;padding:8px 14px;display:flex;gap:6px 14px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:14px;text-align:center">
+    <span>👁 <b>Vorschau als „{{ preview_user }}“</b> – so sieht dieses Konto die App. Nur ansehen: Es wird nichts geändert oder geschaltet.</span>
+    <a href="/preview/stop" style="color:#fff;font-weight:700;text-decoration:underline;white-space:nowrap">Vorschau beenden</a></div>{% endif %}
+  <header>
+    <img class="sun" src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="28" height="28" style="border-radius:7px;flex:none">
+    <h1>{{ app_display_name }}{% if user_perms.dashboard == 'read' %} <span class="muted" style="font-size:13px;font-weight:normal">(nur Ansicht)</span>{% endif %}</h1>
+    <nav>
+      {% set _p = request.path %}
+      {% set _sh = _p.startswith('/smarthome') or _p.startswith('/rules') %}
+      {% if user_perms.dashboard != 'none' %}<a href="/"{% if _p == '/' %} class="active"{% endif %}>Dashboard</a>{% endif %}
+      {% if sh_tabs %}<a href="{{ sh_home }}"{% if _sh %} class="active"{% endif %}>Smart Home</a>{% endif %}
+      {% if user_perms.verlauf != 'none' %}<a href="/verlauf"{% if _p.startswith('/verlauf') %} class="active"{% endif %}>Verläufe</a>{% endif %}
+      {% if user_perms.kameras != 'none' %}<a href="/kameras"{% if _p.startswith('/kameras') %} class="active"{% endif %}>Kameras</a>{% endif %}
+      {% if settings_visible %}<a href="{{ settings_home }}"{% if _p.startswith('/admin') or _p.startswith('/automation') %} class="active"{% endif %} title="Einstellungen" aria-label="Einstellungen"><span class="nav-full">Einstellungen</span><svg class="nav-gear" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>{% endif %}
+      <form action="/logout" method="post" style="display:inline;margin:0" id="logout-form">
+        <button type="submit" class="ghost logout-btn"{% if preview_user %} disabled title="In der Vorschau gesperrt – erst „Vorschau beenden“ drücken" style="opacity:.4;cursor:not-allowed"{% endif %}>
+          <span class="logout-full">Abmelden</span>
+          <svg class="logout-short" viewBox="0 0 24 24" width="16" height="16"
+            stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v10"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+          </svg>
+        </button>
+      </form>
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  {% block scripts %}{% endblock %}
+  <script>
+    // Ungelesene Logbuch-Eintraege (Automatik / Regeln): roter Zaehler an den Logbuch-Knoepfen
+    (function () {
+      function put(el, n) {
+        if (!el) return;
+        let b = el.querySelector(':scope > .log-badge');
+        if (!b) { b = document.createElement('span'); b.className = 'log-badge'; el.appendChild(b); if (getComputedStyle(el).position === 'static') el.style.position = 'relative'; }
+        b.hidden = !n; b.textContent = n > 99 ? '99+' : String(n);
+      }
+      const LOG_BADGES = {{ (((user_perms.automation or 'none') != 'none') or ((user_perms.rules or 'none') != 'none')) | tojson }};      // ohne Recht auf Automatik/Regeln gibt es keine Logbuch-Zaehler
+      async function refresh() {
+        if (!LOG_BADGES) return;
+        let d; try { const r = await fetch('/api/automation/unread'); if (!r.ok) return; d = await r.json(); } catch (e) { return; }
+        for (const m of ['surplus', 'rules']) {
+          document.querySelectorAll('[data-log-badge="' + m + '"]').forEach(el => put(el, window.LOG_OPEN === m ? 0 : d[m]));
+        }
+      }
+      window.refreshLogBadges = refresh;
+      if (document.querySelector('header nav')) {
+        refresh(); setInterval(refresh, 4000);                                            // zeitnah: neue Eintraege erscheinen nach wenigen Sekunden
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });   // Browser bremsen Hintergrund-Tabs aus - beim Zurueckkehren sofort nachsehen
+        window.addEventListener('focus', refresh);
+      }
+    })();
+  </script>
+  <script>
+    // Kompakte Feld-Hilfe: Klick auf einen .qhelp-Knopf zeigt sein data-help
+    // als kleines Popover neben dem Knopf, Klick woanders schliesst es wieder.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.qhelp');
+      const wasOpen = btn && btn.getAttribute('aria-expanded') === 'true';
+      const openPop = document.querySelector('.qpop');
+      if (openPop) {
+        openPop.remove();
+        document.querySelectorAll('.qhelp[aria-expanded="true"]')
+          .forEach(b => b.setAttribute('aria-expanded', 'false'));
+      }
+      if (btn) e.preventDefault();                       // ? in einem Label/Link darf weder Haken setzen noch navigieren
+      if (!btn || wasOpen) return;
+      e.stopPropagation();
+      btn.setAttribute('aria-expanded', 'true');
+      const pop = document.createElement('div');
+      pop.className = 'qpop';
+      pop.innerHTML = btn.dataset.help || '';
+      document.body.appendChild(pop);
+      const r = btn.getBoundingClientRect();
+      let top = r.bottom + 6;
+      let left = r.left;
+      if (left + pop.offsetWidth > window.innerWidth - 10) left = window.innerWidth - pop.offsetWidth - 10;
+      if (top + pop.offsetHeight > window.innerHeight - 10) top = r.top - pop.offsetHeight - 6;
+      pop.style.left = Math.max(10, left) + 'px';
+      pop.style.top = Math.max(10, top) + 'px';
+    });
+    // .qhelp ist bewusst ein <span> statt <button> (siehe CSS-Kommentar oben) -
+    // dadurch fehlt die native Enter/Leertaste-Aktivierung, hier nachgerüstet.
+    document.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.qhelp')) {
+        e.preventDefault();
+        e.target.click();
+      }
+    });
+  </script>
+  <script>
+/* PIN-Abfrage (4 Ziffern, Zahlenfeld) - Rueckgabe: PIN oder null bei Abbruch */
+function askPin(title) {
+  return new Promise(resolve => {
+    let pin = '';
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1300;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:300px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <div style="font-weight:600;margin-bottom:4px">🔑 PIN eingeben</div><div class="muted pin-t" style="margin-bottom:12px"></div>
+      <div class="pin-dots" style="font-size:30px;letter-spacing:10px;height:40px">○○○○</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
+        ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" class="ghost" data-k="${n}" style="font-size:20px;padding:12px">${n}</button>`).join('')}
+        <button type="button" class="ghost" data-k="c" style="padding:12px">⌫</button><button type="button" class="ghost" data-k="0" style="font-size:20px;padding:12px">0</button><button type="button" class="ghost" data-k="x" style="padding:12px">✕</button></div></div>`;
+    ov.querySelector('.pin-t').textContent = title || '';
+    const dots = ov.querySelector('.pin-dots');
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const press = k => {
+      if (k === 'x') return close(null);
+      if (k === 'c') pin = pin.slice(0, -1); else if (/^\d$/.test(k) && pin.length < 4) pin += k;
+      dots.textContent = '●'.repeat(pin.length) + '○'.repeat(4 - pin.length);
+      if (pin.length === 4) setTimeout(() => close(pin), 120);
+    };
+    const onKey = e => { if (e.key === 'Escape') press('x'); else if (e.key === 'Backspace') press('c'); else if (/^\d$/.test(e.key)) press(e.key); };
+    ov.querySelectorAll('button').forEach(b => b.addEventListener('click', () => press(b.dataset.k)));
+    ov.addEventListener('mousedown', e => { if (e.target === ov) press('x'); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov);
+  });
+}
+  </script>
+  <script>
+    // Abmelden nur nach Rueckfrage (verhindert versehentliches Ausloggen, vor allem am Handy)
+    (function () {
+      const f = document.getElementById('logout-form'); if (!f) return;
+      f.addEventListener('submit', e => {
+        if (document.getElementById('preview-bar')) { e.preventDefault(); return; }          // Vorschau: Abmelden gesperrt
+        if (f.dataset.ok) return;
+        e.preventDefault();
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1400;padding:16px';
+        ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+          <h3 style="margin:0 0 8px;font-size:17px">Wirklich abmelden?</h3>
+          <div class="muted" style="margin-bottom:16px">Du musst dich danach neu anmelden.</div>
+          <div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="ghost" data-a="no">Abbrechen</button><button type="button" data-a="yes">Abmelden</button></div></div>`;
+        const close = () => { document.removeEventListener('keydown', onKey); ov.remove(); };
+        const onKey = ev => { if (ev.key === 'Escape') close(); };
+        ov.addEventListener('click', ev => {
+          if (ev.target === ov || ev.target.dataset.a === 'no') close();
+          else if (ev.target.dataset.a === 'yes') { f.dataset.ok = '1'; f.submit(); }
+        });
+        document.addEventListener('keydown', onKey); document.body.appendChild(ov);
+        ov.querySelector('[data-a=no]').focus();
+      });
+    })();
+  </script>
+  <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+</body>
+</html>

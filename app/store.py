@@ -1,0 +1,1850 @@
+"""
+Persistenz: Config, interner State (PersistentState) und E-Auto-Ladetermine.
+Alles als JSON neben der App.
+"""
+from __future__ import annotations
+
+import calendar
+import json
+import logging
+import os
+import shutil
+import threading
+import uuid
+from dataclasses import asdict
+from datetime import date, datetime, timedelta
+
+from logic import PersistentState
+
+_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(_DIR, "config.json")
+STATE_PATH = os.path.join(_DIR, "state.json")
+EV_PATH = os.path.join(_DIR, "ev_schedules.json")
+ENERGY_PATH = os.path.join(_DIR, "energy.json")
+CHARGE_LOG_PATH = os.path.join(_DIR, "charge_log.json")
+HISTORY_PATH = os.path.join(_DIR, "history.json")
+SOLAR_LOG_PATH = os.path.join(_DIR, "solar_log.json")
+WATCHDOG_PATH = os.path.join(_DIR, "battery_watchdog.json")
+MONTHLY_PATH = os.path.join(_DIR, "monthly_summary.json")
+HISTORY_ARCHIVE_DIR = os.path.join(_DIR, "history_archive")   # dauerhaftes Archiv, ein File pro Monat (siehe unten)
+
+_lock = threading.Lock()
+log = logging.getLogger("store")
+
+BACKUP_DIR = os.path.join(_DIR, "backups")
+_BACKUP_KEEP_DAYS = 14
+
+
+def _daily_backup(path: str):
+    """Einmal pro Tag den Stand VOR dem ersten Schreiben sichern (nur wenn lesbar und nicht leer),
+    14 Tage lang. Schutz gegen Datenverlust bei defekter/geleerter Statistikdatei."""
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) < 10:
+            return
+        name = os.path.basename(path)[:-5]
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        target = os.path.join(BACKUP_DIR, f"{name}-{datetime.now():%Y-%m-%d}.json")
+        if os.path.exists(target):
+            return
+        with open(path, encoding="utf-8") as f:
+            json.load(f)                                  # nur gueltige Dateien sichern
+        shutil.copyfile(path, target)
+        cutoff = datetime.now() - timedelta(days=_BACKUP_KEEP_DAYS)
+        for fn in os.listdir(BACKUP_DIR):
+            if fn.startswith(name + "-") and datetime.fromtimestamp(
+                    os.path.getmtime(os.path.join(BACKUP_DIR, fn))) < cutoff:
+                os.remove(os.path.join(BACKUP_DIR, fn))
+    except (OSError, ValueError) as e:
+        log.warning("Tagessicherung von %s fehlgeschlagen: %s", os.path.basename(path), e)
+
+
+def _forced_backup(path: str, tag: str):
+    """Sofortige Sicherung mit Zeitstempel (vor riskanten Aktionen)."""
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        name = os.path.basename(path)[:-5]
+        shutil.copyfile(path, os.path.join(BACKUP_DIR, f"{name}-{tag}-{datetime.now():%Y%m%d-%H%M%S}.json"))
+    except OSError as e:
+        log.warning("Sicherung (%s) fehlgeschlagen: %s", tag, e)
+
+
+def secure_file(path: str) -> None:
+    """Datei mit Zugangsdaten nur fuer den Besitzer lesbar machen (unter Windows wirkungslos)."""
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _dump_json(path: str, data, indent=2, backup: bool = False):
+    """Atomar schreiben: erst in eine Zwischendatei, dann umbenennen. Ein Absturz/Neustart mitten
+    im Schreiben hinterlaesst so nie eine halbe oder leere Datei."""
+    with _lock:
+        if backup:
+            _daily_backup(path)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        try:
+            os.chmod(path, 0o600)                                # Register enthalten teils Zugangsdaten: nur der Besitzer darf lesen (unter Windows wirkungslos)
+        except OSError:
+            pass
+
+
+def _load_json_recovering(path: str, default):
+    """Datei lesen. Ist sie unlesbar/leer: NICHT still durch Leerwerte ersetzen, sondern beiseitelegen,
+    laut warnen und die juengste Tagessicherung zurueckholen (sonst default())."""
+    if not os.path.exists(path):
+        return default()
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (ValueError, OSError) as e:
+        log.error("%s ist unlesbar (%s) - lege sie beiseite und versuche die Tagessicherung", os.path.basename(path), e)
+    try:
+        os.replace(path, f"{path}.corrupt-{datetime.now():%Y%m%d-%H%M%S-%f}")
+    except OSError:
+        pass
+    name = os.path.basename(path)[:-5]
+    try:
+        cands = sorted(fn for fn in os.listdir(BACKUP_DIR) if fn.startswith(name + "-") and fn.endswith(".json"))
+    except OSError:
+        cands = []
+    for fn in reversed(cands):
+        try:
+            with open(os.path.join(BACKUP_DIR, fn), encoding="utf-8") as f:
+                data = json.load(f)
+            log.warning("%s aus Sicherung %s wiederhergestellt", os.path.basename(path), fn)
+            return data
+        except (ValueError, OSError):
+            continue
+    return default()
+
+# Pflichtfelder, damit der Wizard weiß, ob die App eingerichtet ist.
+REQUIRED_KEYS = ("cerbo_host", "tibber_token")
+
+CONFIG_DEFAULTS = {
+    "cerbo_host": "",
+    "cerbo_port": 502,
+    "tibber_token": "",
+    "dry_run": True,
+    "poll_seconds": 300,
+    "energy_sample_seconds": 10,   # eigener, feiner Takt für die Energie-Messung
+    "manual_override": False,
+    "web_port": 5005,
+    "pv_inverters": [],            # [{"name": "...", "unit": 80}, ...] - einzeln benannte PV-Wechselrichter fuer die Live-Anzeige
+}
+
+
+# --- Config ---------------------------------------------------------------
+PRODUCT_NAME = "BlueNexus"
+
+
+def possessive_name(first: str) -> str:
+    """Michael -> "Michaels", Hans -> "Hans'" (deutsche Besitzform: nach s, ß, x, z nur ein Apostroph)."""
+    first = (first or "").strip()
+    if not first:
+        return ""
+    return first + ("'" if first[-1].lower() in "sßxz" else "s")
+
+
+def default_app_name(cfg: dict = None) -> str:
+    """Eigener Anzeigename, sonst "<Vorname>s BlueNexus" (Vorname aus der Erstinstallation), sonst nur "BlueNexus"."""
+    cfg = cfg if cfg is not None else load_config()
+    custom = (cfg.get("app_display_name") or "").strip()
+    if custom:
+        return custom
+    owner = possessive_name(cfg.get("owner_first_name"))
+    return f"{owner} {PRODUCT_NAME}" if owner else PRODUCT_NAME
+
+
+def load_config():
+    cfg = dict(CONFIG_DEFAULTS)
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg.update(json.load(f))
+    return cfg
+
+
+def save_config(cfg: dict):
+    _dump_json(CONFIG_PATH, cfg, indent=2)
+
+
+# --- Module: Energie (Victron/Tibber), Smart Home, Kameras. Reine Konfiguration: Fehlt der Schluessel "modules" (alle bestehenden
+# Installationen), sind ALLE Module an - nichts aendert sich. Ein ausgeschaltetes Modul pausiert nur seine Hintergrundarbeit und blendet
+# Menues/Kacheln/Rechte aus; gespeicherte Daten (Verlauf, Preise, Geraete, Regeln ...) werden nie geloescht oder veraendert.
+MODULES = ("energy", "smarthome", "verlauf", "cameras", "alexa")        # alexa (Sprachsteuerung) ist standardmaessig AUS; verlauf (Diagramme) wirkt nur zusammen mit Energie oder Smart Home
+
+
+def modules(cfg=None) -> dict:
+    cfg = cfg if cfg is not None else load_config()
+    m = cfg.get("modules")
+    out = {k: k != "alexa" for k in MODULES} if not isinstance(m, dict) else {k: bool(m.get(k, k != "alexa")) for k in MODULES}
+    out["verlauf"] = out["verlauf"] and (out["energy"] or out["smarthome"])           # ohne Energie und Smart Home gibt es nichts aufzuzeichnen
+    return out
+
+
+def module_on(name: str, cfg=None) -> bool:
+    return modules(cfg).get(name, True)
+
+
+def modules_chosen(cfg=None) -> bool:
+    cfg = cfg if cfg is not None else load_config()
+    return isinstance(cfg.get("modules"), dict)
+
+
+def is_configured(cfg=None) -> bool:
+    """Minimal nötig: Cerbo + eine gültige Strompreis-Quelle (Tibber-Token bei
+    dynamischem Tarif, sonst ein fester Preis > 0). Die PV-Prognose kommt aus dem VRM
+    (optional einzurichten) - ohne VRM rechnet die Steuerung mit dem Durchschnitt der letzten Tageserträge."""
+    cfg = cfg or load_config()
+    if not cfg.get("cerbo_host"):
+        return False
+    if cfg.get("tariff_mode") == "fixed":
+        return bool(cfg.get("fixed_price_ct", 0) > 0)
+    return bool(cfg.get("tibber_token"))
+
+
+# --- Interner State -------------------------------------------------------
+def load_state() -> PersistentState:
+    if os.path.exists(STATE_PATH):
+        with open(STATE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        base = PersistentState().__dict__
+        return PersistentState(**{k: data[k] for k in data if k in base})
+    return PersistentState()
+
+
+def save_state(state: PersistentState):
+    _dump_json(STATE_PATH, asdict(state), indent=2)
+
+
+# --- E-Auto-Ladetermine ---------------------------------------------------
+def _load_ev():
+    if os.path.exists(EV_PATH):
+        with open(EV_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def _save_ev(items):
+    _dump_json(EV_PATH, items, indent=2)
+
+
+def cleanup_ev(now: datetime | None = None):
+    """Löscht Termine, deren End-Tag vorbei ist (also am Folgetag um 00:00).
+    Ein heute abgelaufener Termin bleibt bis Mitternacht als 'abgelaufen'
+    sichtbar und verschwindet dann automatisch."""
+    now = now or datetime.now()
+    today = now.date()
+    items = _load_ev()
+    kept = []
+    for i in items:
+        try:
+            end = datetime.fromisoformat(i["end"])
+        except (ValueError, KeyError):
+            continue  # kaputte Einträge entfernen
+        if end.date() >= today:
+            kept.append(i)
+    if len(kept) != len(items):
+        _save_ev(kept)
+    return kept
+
+
+def list_ev():
+    return cleanup_ev()
+
+
+def add_ev(start_iso, end_iso, note=""):
+    items = _load_ev()
+    entry = {"id": uuid.uuid4().hex[:8], "start": start_iso,
+             "end": end_iso, "note": note, "enabled": True}
+    items.append(entry)
+    _save_ev(items)
+    return entry
+
+
+def delete_ev(eid):
+    items = _load_ev()
+    new = [i for i in items if i["id"] != eid]
+    if len(new) == len(items):
+        return False
+    _save_ev(new)
+    return True
+
+
+def stop_ev(eid, now: datetime | None = None):
+    """Beendet einen bereits laufenden Termin sofort (setzt Ende = jetzt).
+    Das bis dahin Geladene bleibt über das Lade-Protokoll in den Ladevorgängen
+    erhalten. Gibt None zurück, wenn der Termin nicht existiert oder noch nicht
+    gestartet ist (dann wäre Löschen der richtige Weg)."""
+    now = now or datetime.now()
+    ts = now.isoformat(timespec="minutes")
+    items = _load_ev()
+    for i in items:
+        if i["id"] == eid:
+            try:
+                start = datetime.fromisoformat(i["start"])
+                end = datetime.fromisoformat(i["end"])
+            except (ValueError, KeyError):
+                return None
+            if start > now or end <= now:
+                return None  # nicht laufend
+            i["end"] = ts
+            _save_ev(items)
+            return i
+    return None
+
+
+def toggle_ev(eid, enabled):
+    items = _load_ev()
+    for i in items:
+        if i["id"] == eid:
+            i["enabled"] = bool(enabled)
+            _save_ev(items)
+            return i
+    return None
+
+
+def get_grid_correction(now: datetime | None = None) -> dict:
+    """Manuelle Tages-Korrektur (kWh) fuer Netzbezug/-einspeisung, sofern
+    heute eine gesetzt wurde (siehe set_grid_today)."""
+    now = now or datetime.now()
+    today = now.date().isoformat()
+    data = {}
+    if os.path.exists(ENERGY_PATH):
+        try:
+            with open(ENERGY_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+        except (ValueError, OSError):
+            data = {}
+    if data.get("stamp") != today:
+        return {"import": 0.0, "export": 0.0}
+    return {"import": data.get("import_adj", 0.0), "export": data.get("export_adj", 0.0)}
+
+
+def set_grid_today(import_today, export_today, now=None):
+    """Speichert eine Korrektur, damit die heutigen Netzwerte (Import/Export)
+    den angegebenen Werten (z.B. aus der Victron-App) entsprechen. Die Korrektur
+    wird als Aufschlag auf die selbst gemessene Tagessumme (energy_grid_today,
+    aus den erfassten Leistungsfluessen) gespeichert - die Cerbo-Zaehlerregister
+    zaehlen auf manchen Anlagen unzuverlaessig und werden dafuer nicht genutzt."""
+    now = now or datetime.now()
+    imp, exp = _raw_grid_sum(now)
+    data = {
+        "stamp": now.date().isoformat(),
+        "import_adj": round(import_today - imp, 3),
+        "export_adj": round(export_today - exp, 3),
+    }
+    _dump_json(ENERGY_PATH, data, indent=2)
+    return {"import": round(import_today, 2), "export": round(export_today, 2)}
+
+
+def _load_charge():
+    if os.path.exists(CHARGE_LOG_PATH):
+        try:
+            with open(CHARGE_LOG_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        except (ValueError, OSError):
+            pass
+    return {}
+
+
+def log_charge_state(is_charging, strategy, now=None):
+    """Protokolliert automatische Ladevorgänge: öffnet eine Session, wenn geladen
+    wird, und schließt sie, wenn nicht mehr. Reset um Mitternacht (per Tages-Stempel)."""
+    now = now or datetime.now()
+    today = now.date().isoformat()
+    ts = now.isoformat(timespec="minutes")
+    data = _load_charge()
+    if data.get("stamp") != today:
+        data = {"stamp": today, "sessions": [], "open": None}
+    open_s = data.get("open")
+    if is_charging and not open_s:
+        data["open"] = {"start": ts, "strategy": strategy}
+    elif not is_charging and open_s:
+        data["sessions"].append({"start": open_s["start"], "end": ts,
+                                 "strategy": open_s.get("strategy", "")})
+        data["open"] = None
+    _dump_json(CHARGE_LOG_PATH, data, indent=2)
+
+
+def list_charge_sessions(now=None):
+    now = now or datetime.now()
+    data = _load_charge()
+    if data.get("stamp") != now.date().isoformat():
+        return {"sessions": [], "open": None}
+    return {"sessions": data.get("sessions", []), "open": data.get("open")}
+
+
+# --- Energie-Verlauf (15-Min-Slots, nur echte Messwerte) ------------------
+# history.json: {"hours": {"YYYY-MM-DDTHH:MM": {verbrauch, solar, 7 Flüsse,
+#   soc_min, soc_max, soc_sum, soc_n}}, "last": {ts, pv, load, grid, bc, bd}}
+# (Schlüssel "hours" historisch beibehalten, enthält jetzt Viertelstunden-Slots.)
+# Nur der LAUFENDE Tag (+ ein kurzer Puffer um Mitternacht) bleibt hier "heiss" und wird bei
+# jedem Sample komplett neu geschrieben - deshalb muss diese Datei klein bleiben. Abgeschlossene
+# Tage wandern mit voller Aufloesung dauerhaft in HISTORY_ARCHIVE_DIR (ein File pro Monat, wird
+# pro Tag nur EINMAL geschrieben) und werden hier entfernt. Das haelt die 10-Sekunden-Schreibungen
+# immer gleich schnell, egal wie alt die Anlage schon laeuft.
+_MAX_SAMPLE_GAP_S = 900           # Lücken (z.B. nach Downtime) auf 15 min kappen
+# Wie weit vrm_import.run() bei "fehlende Tage nachholen" zurueckschaut - unabhaengig von der
+# heissen Datei (die deckt ja nur noch den laufenden Tag ab), war frueher an _HISTORY_KEEP_DAYS gekoppelt.
+VRM_RESTORE_LOOKBACK_DAYS = 35
+
+
+def _archive_month_path(month_key: str) -> str:
+    return os.path.join(HISTORY_ARCHIVE_DIR, f"{month_key}.json")
+
+
+def _load_archive_month(month_key: str) -> dict:
+    """{"YYYY-MM-DD": {slot_key: bucket, ...}, ...} eines Monats aus dem dauerhaften Archiv."""
+    return _load_json_recovering(_archive_month_path(month_key), lambda: {"days": {}}).get("days", {})
+
+
+def _append_full_days_to_archive(per_day_full: dict) -> None:
+    """Schreibt die vollen Viertelstunden-Werte abgeschlossener Tage dauerhaft ins Monats-Archiv.
+    Passiert nur EINMAL pro abgeschlossenem Tag (nicht bei jedem Sample) - kostet also so gut wie
+    nichts, auch wenn das Archiv über Jahre waechst. Ergaenzt slot-weise, ueberschreibt nie einen
+    ganzen Tag auf einen Schlag (falls ein Tag aus irgendeinem Grund zweimal hier ankommt)."""
+    if not per_day_full:
+        return
+    os.makedirs(HISTORY_ARCHIVE_DIR, exist_ok=True)
+    by_month: dict[str, dict] = {}
+    for day, buckets in per_day_full.items():
+        by_month.setdefault(day[:7], {})[day] = buckets
+    for month, days in by_month.items():
+        path = _archive_month_path(month)
+        existing = _load_json_recovering(path, lambda: {"days": {}})
+        existing.setdefault("days", {})
+        for day, buckets in days.items():
+            existing["days"].setdefault(day, {}).update(buckets)
+        _dump_json(path, existing, indent=None, backup=True)
+
+
+def _sum_days_into_monthly(per_day_full: dict) -> None:
+    """Aggregiert abgeschlossene Tage in die dauerhaften Monatssummen (monthly_summary.json,
+    Basis fuer den Monatsüberblick) - je Tag genau einmal (days_archived-Liste als Schutz)."""
+    if not per_day_full:
+        return
+    mdata = _load_monthly()
+    archived = set(mdata.get("days_archived", []))
+    months = mdata.setdefault("months", {})
+    changed = False
+    for day, buckets in per_day_full.items():
+        if day in archived:
+            continue
+        row = {"solar": 0.0, "verbrauch": 0.0, "import": 0.0, "export": 0.0,
+               "cost_ct": 0.0, "batt_charge": 0.0, "batt_discharge": 0.0}
+        for b in buckets.values():
+            row["solar"] += b.get("solar", 0.0)
+            row["verbrauch"] += b.get("verbrauch", 0.0)
+            row["import"] += b.get("g_load", 0.0) + b.get("g_batt", 0.0)
+            row["export"] += b.get("s_grid", 0.0) + b.get("b_grid", 0.0)
+            row["cost_ct"] += b.get("grid_cost_ct", 0.0)
+            row["batt_charge"] += b.get("s_batt", 0.0) + b.get("g_batt", 0.0)
+            row["batt_discharge"] += b.get("b_load", 0.0) + b.get("b_grid", 0.0)
+        m = months.setdefault(day[:7], {"solar": 0.0, "verbrauch": 0.0, "import": 0.0,
+                                         "export": 0.0, "cost_ct": 0.0, "batt_charge": 0.0, "batt_discharge": 0.0})
+        for key in row:
+            m[key] = m.get(key, 0.0) + row[key]
+        archived.add(day)
+        changed = True
+    if changed:
+        mdata["days_archived"] = sorted(archived)
+        _save_monthly(mdata)
+
+
+def _archive_finished_days_inplace(data: dict, now: datetime) -> bool:
+    """Nimmt abgeschlossene Tage (vor heute) aus `data['hours']` heraus, archiviert sie dauerhaft
+    (volle Aufloesung + Monatssumme) und mutiert `data` direkt (kuerzt 'hours'). True, wenn etwas
+    entfernt wurde - der Aufrufer muss `data` dann selbst speichern."""
+    today = now.date().isoformat()
+    hours = data.get("hours", {})
+    finished: dict[str, dict] = {}
+    for k in list(hours.keys()):
+        d = k[:10]
+        if len(d) == 10 and d < today:
+            finished.setdefault(d, {})[k] = hours.pop(k)
+    if not finished:
+        return False
+    _append_full_days_to_archive(finished)
+    # Sicherheitsnetz gegen Datenverlust: nachlesen, ob wirklich alles im Archiv angekommen ist,
+    # BEVOR es aus der heissen Datei verschwindet. Fehlt etwas (z.B. Schreibfehler), bleibt der
+    # betroffene Slot lieber (faelschlich als "aktueller Tag" markiert) in hours stehen, statt
+    # unwiederbringlich weg zu sein - lieber einmal zu vorsichtig als einen Messwert zu verlieren.
+    for day, buckets in finished.items():
+        stored = _load_archive_month(day[:7]).get(day, {})
+        missing = [k for k in buckets if k not in stored]
+        if missing:
+            log.error("history.json: %d Slot(e) von %s liessen sich im Archiv nicht verifizieren "
+                      "- bleiben sicherheitshalber in der laufenden Datei", len(missing), day)
+            for k in missing:
+                hours[k] = buckets[k]
+    _sum_days_into_monthly(finished)
+    return True
+
+
+def _day_buckets(day: str, hot_hours: dict | None = None) -> dict:
+    """Alle Viertelstunden-Buckets EINES Tages: aus der 'heissen' Datei, falls dort (noch) vorhanden
+    (normalerweise nur der laufende Tag), sonst aus dem dauerhaften Monats-Archiv. `hot_hours` optional
+    vorab geladen uebergeben, wenn man mehrere Tage hintereinander abfragt (spart wiederholtes Laden)."""
+    hot_hours = _load_history().get("hours", {}) if hot_hours is None else hot_hours
+    found = {k: v for k, v in hot_hours.items() if k[:10] == day}
+    return found if found else _load_archive_month(day[:7]).get(day, {})
+
+
+def archive_finished_days(now: datetime | None = None) -> None:
+    """Oeffentlicher Einstieg fuer Aufrufer, die history.json noch nicht geladen haben (z.B. der
+    Monatsueberblick als Sicherheitsnetz). Im Normalbetrieb erledigt das schon jeder Regeltick von
+    selbst (siehe _log_energy_sample) - hier billig, wenn nichts zu tun ist."""
+    now = now or datetime.now()
+    with _HISTORY_LOCK:
+        data = _load_history()
+        if _archive_finished_days_inplace(data, now):
+            _dump_json(HISTORY_PATH, data, indent=2, backup=True)
+
+
+def _slot_key(dt: datetime) -> str:
+    """Viertelstunden-Slot-Schlüssel, z.B. 2026-07-22T13:15."""
+    m = (dt.minute // 15) * 15
+    return f"{dt:%Y-%m-%dT%H}:{m:02d}"
+
+# Die 7 Energieflüsse (wie Victron VRM). Werte in W bzw. aufintegriert in kWh.
+_FLOW_KEYS = ("s_load", "s_batt", "s_grid", "b_load", "b_grid", "g_load", "g_batt")
+
+
+def decompose_flows(pv, load, grid_import, grid_export, batt_charge, batt_discharge):
+    """Zerlegt die Momentanleistungen in die 7 Pfade (greedy, feste Priorität):
+    PV deckt zuerst Verbrauch, dann Batterie, dann Netz-Einspeisung.
+    Rest-Verbrauch aus Batterie, dann Netz. Batterie-Ladung aus PV, dann Netz.
+    Alle Rückgaben >= 0. Einheit = Einheit der Eingaben."""
+    pv = max(0.0, pv); load = max(0.0, load)
+    gi = max(0.0, grid_import); ge = max(0.0, grid_export)
+    bc = max(0.0, batt_charge); bd = max(0.0, batt_discharge)
+
+    s_load = min(pv, load);          pv -= s_load;  load -= s_load
+    s_batt = min(pv, bc);            pv -= s_batt;  bc -= s_batt
+    s_grid = min(pv, ge);            pv -= s_grid;  ge -= s_grid
+
+    b_load = min(bd, load);          bd -= b_load;  load -= b_load
+    b_grid = min(bd, ge);            bd -= b_grid;  ge -= b_grid
+
+    g_load = min(gi, load);          gi -= g_load;  load -= g_load
+    g_batt = min(gi, bc);            gi -= g_batt;  bc -= g_batt
+
+    return {"s_load": s_load, "s_batt": s_batt, "s_grid": s_grid,
+            "b_load": b_load, "b_grid": b_grid, "g_load": g_load, "g_batt": g_batt}
+
+
+def _powers_from_system(system: dict) -> dict:
+    """Momentanleistungen (W) aus read_system(), konsistent zur VRM-Darstellung.
+
+    - Verbrauch = loads.total (AC-Verbrauch, = VRM „Gesamtverbrauch").
+    - Batterie-Fluss wird als REST der AC-Energiebilanz abgeleitet, nicht aus dem
+      DC-Register 842. So landen AC↔DC-Wandlungsverluste (beim Netzladen) korrekt
+      bei „Netz zur Batterie" und werden nicht dem Verbrauch zugeschlagen.
+      net = PV + Netz − Verbrauch  →  >0 laden, <0 entladen."""
+    pv = float(system["solar_total"])
+    grid = float(system["grid"]["total"])           # + Bezug / − Einspeisung
+    load = max(0.0, float(system["loads"]["total"]))
+    net = pv + grid - load
+    bc = max(0.0, net)
+    bd = max(0.0, -net)
+    return {"pv": pv, "load": load, "grid": grid, "bc": bc, "bd": bd}
+
+
+def _flows_from_system(system: dict) -> dict:
+    """Momentane Flüsse (W) aus einem read_system()-Dict."""
+    p = _powers_from_system(system)
+    return decompose_flows(p["pv"], p["load"], max(0.0, p["grid"]),
+                           max(0.0, -p["grid"]), p["bc"], p["bd"])
+
+
+def _new_bucket(soc: float) -> dict:
+    b = {"verbrauch": 0.0, "solar": 0.0, "soc_min": soc, "soc_max": soc,
+         "soc_sum": 0.0, "soc_n": 0, "grid_cost_ct": 0.0}
+    for k in _FLOW_KEYS:
+        b[k] = 0.0
+    return b
+
+
+def _load_history() -> dict:
+    d = _load_json_recovering(HISTORY_PATH, lambda: {"hours": {}, "last": None})
+    if not isinstance(d, dict):
+        d = {"hours": {}, "last": None}
+    d.setdefault("hours", {})
+    d.setdefault("last", None)
+    return d
+
+
+_HISTORY_LOCK = threading.RLock()      # history.json wird gelesen-veraendert-geschrieben: Regeltakt und VRM-Import nie gleichzeitig
+
+
+def log_energy_sample(system: dict | None, now: datetime | None = None,
+                       price_ct: float | None = None):
+    with _HISTORY_LOCK:
+        _log_energy_sample(system, now, price_ct)
+
+
+def _log_energy_sample(system: dict | None, now: datetime | None = None,
+                        price_ct: float | None = None):
+    """Integriert Momentanleistung zu Stunden-kWh auf: Verbrauch, Solar, die 7
+    Energieflüsse (VRM-Stil), SOC (Min/Ø/Max) und - falls price_ct übergeben -
+    die Netzbezugskosten (ct), fuer den Wochenrueckblick. Nur echte Messwerte.
+    Wird bei jedem Regelzyklus aufgerufen."""
+    if not system:
+        return
+    now = now or datetime.now()
+    try:
+        p = _powers_from_system(system)
+        pv_w, load_w = p["pv"], p["load"]
+        soc = float(system["battery"]["soc"])
+        flow_now = decompose_flows(p["pv"], p["load"], max(0.0, p["grid"]),
+                                   max(0.0, -p["grid"]), p["bc"], p["bd"])
+    except (KeyError, TypeError, ValueError):
+        return
+
+    data = _load_history()
+    hours = data["hours"]
+    n_before = len(hours)
+    prev_ts = (data.get("last") or {}).get("ts")
+    slot_key = _slot_key(now)
+    b = hours.get(slot_key) or _new_bucket(soc)
+    hours[slot_key] = b
+
+    # Energie via Trapez zwischen letztem und aktuellem Sample
+    last = data.get("last")
+    if last:
+        try:
+            dt_s = (now - datetime.fromisoformat(last["ts"])).total_seconds()
+        except (ValueError, KeyError):
+            dt_s = 0.0
+        if 0 < dt_s <= _MAX_SAMPLE_GAP_S:
+            h = dt_s / 3600.0
+            b["verbrauch"] += (last["load"] + load_w) / 2.0 / 1000.0 * h
+            b["solar"] += (last["pv"] + pv_w) / 2.0 / 1000.0 * h
+            # Flüsse: Momentanzerlegung an beiden Stützstellen, trapezförmig
+            flow_last = decompose_flows(last["pv"], last["load"],
+                                        max(0.0, last["grid"]), max(0.0, -last["grid"]),
+                                        last["bc"], last["bd"])
+            for k in _FLOW_KEYS:
+                b[k] += (flow_last[k] + flow_now[k]) / 2.0 / 1000.0 * h
+            if price_ct is not None:
+                import_inc = ((flow_last["g_load"] + flow_now["g_load"]) / 2.0 / 1000.0 * h
+                              + (flow_last["g_batt"] + flow_now["g_batt"]) / 2.0 / 1000.0 * h)
+                b["grid_cost_ct"] = b.get("grid_cost_ct", 0.0) + import_inc * price_ct
+
+    # SOC-Statistik (jedes Sample zählt)
+    b["soc_min"] = min(b["soc_min"], soc)
+    b["soc_max"] = max(b["soc_max"], soc)
+    b["soc_sum"] += soc
+    b["soc_n"] += 1
+
+    data["last"] = {"ts": now.isoformat(timespec="seconds"),
+                    "pv": p["pv"], "load": p["load"], "grid": p["grid"],
+                    "bc": p["bc"], "bd": p["bd"]}
+
+    # Abgeschlossene Tage (vor heute) dauerhaft archivieren (volle Aufloesung + Monatssumme) und
+    # aus der heissen Datei entfernen - inkl. Nachlese-Sicherheitsnetz (siehe dort). Das ist der
+    # einzige Ort, an dem hours nennenswert schrumpft, und zwar bewusst jede Nacht um Mitternacht.
+    archived_now = _archive_finished_days_inplace(data, now)
+
+    # Notbremse: schrumpft der Verlauf DANEBEN (also nicht durch die taegliche Archivierung oben
+    # erklaert) drastisch, ohne dass eine Zeitluecke dahintersteckt, ist das ein Fehler - dann
+    # nicht speichern. n_before ist jetzt klein (nur der laufende Tag), darum ein kleinerer Schwellwert.
+    try:
+        gap_s = (now - datetime.fromisoformat(prev_ts)).total_seconds() if prev_ts else 0.0
+    except ValueError:
+        gap_s = 0.0
+    if not archived_now and n_before >= 20 and len(hours) < n_before * 0.5:
+        if abs(gap_s) <= 86400:
+            log.error("history.json: Verlauf waere von %d auf %d Slots geschrumpft (ohne Zeitluecke) - "
+                      "NICHT gespeichert, Sicherung bleibt erhalten", n_before, len(hours))
+            return
+        # Grosse Luecke (lange Ausfallzeit ODER falsche Systemuhr): pruefen wir nicht, sichern aber vorher
+        log.warning("history.json: grosses Aufraeumen (%d -> %d Slots, Luecke %.0f h) - Sicherung vorab",
+                    n_before, len(hours), gap_s / 3600)
+        _forced_backup(HISTORY_PATH, "vorAufraeumen")
+    _dump_json(HISTORY_PATH, data, indent=2, backup=True)
+
+
+def history_keys() -> set:
+    """Alle vorhandenen Viertelstunden-Slots (Schluessel) - heisse Datei UND dauerhaftes Archiv -
+    damit z.B. der VRM-Nachhol-Import weiss, was schon (irgendwo) vorliegt und nichts doppelt holt."""
+    keys = set(_load_history().get("hours", {}).keys())
+    try:
+        if os.path.isdir(HISTORY_ARCHIVE_DIR):
+            for fn in os.listdir(HISTORY_ARCHIVE_DIR):
+                if fn.endswith(".json"):
+                    for day_buckets in _load_json_recovering(
+                            os.path.join(HISTORY_ARCHIVE_DIR, fn), lambda: {"days": {}}).get("days", {}).values():
+                        keys |= set(day_buckets.keys())
+    except OSError:
+        pass
+    return keys
+
+
+def import_history_slots(slots: dict) -> int:
+    """Ergaenzt fehlende Viertelstunden (z. B. aus dem VRM). Vorhandene Slots werden NIE ueberschrieben;
+    vorher wird eine Sicherung angelegt. Rueckgabe: Anzahl neu eingetragener Slots."""
+    with _HISTORY_LOCK:
+        data = _load_history()
+        hours = data["hours"]
+        new = {k: v for k, v in slots.items() if k not in hours}
+        if not new:
+            return 0
+        if os.path.exists(HISTORY_PATH):
+            _forced_backup(HISTORY_PATH, "vorVrmImport")
+        hours.update(new)
+        _dump_json(HISTORY_PATH, data, indent=2, backup=True)
+        return len(new)
+
+
+FIXED_COST_MARKER = os.path.join(_DIR, "fixed_cost_repair.json")
+
+
+def _reprice_fixed(day_from: str | None, only_zero: bool) -> dict:
+    """Kosten (Netzbezug x Festpreis des jeweiligen Tages) in heisser Datei, Monats-Archiv UND aufsummierten Monatswerten setzen.
+    only_zero: nur Viertelstunden ohne Kosten (Nachrechnen alter VRM-Tage); sonst alle ab `day_from` neu (Tarifwechsel mit
+    rueckwirkendem "gilt ab"). Bei dynamischem Tarif passiert nichts."""
+    cfg = load_config()
+    if cfg.get("tariff_mode") != "fixed" or float(cfg.get("fixed_price_ct") or 0.0) <= 0:
+        return {"skipped": True, "buckets": 0, "eur": 0.0}
+    prices: dict[str, float] = {}
+
+    def price_for(day: str) -> float:
+        if day not in prices:
+            prices[day] = fixed_price_for_day(day)
+        return prices[day]
+
+    def fix(buckets: dict) -> tuple[int, float, dict]:
+        n, delta, per_day = 0, 0.0, {}
+        for k, b in buckets.items():
+            day = k[:10]
+            if day_from and day < day_from:
+                continue
+            imp = b.get("g_load", 0.0) + b.get("g_batt", 0.0)
+            if imp <= 0:
+                continue
+            old = b.get("grid_cost_ct") or 0.0
+            if only_zero and old:
+                continue
+            new = round(imp * price_for(day), 4)
+            if abs(new - old) < 1e-9:
+                continue
+            b["grid_cost_ct"] = new
+            n += 1
+            delta += new - old
+            per_day[day] = per_day.get(day, 0.0) + (new - old)
+        return n, delta, per_day
+
+    total_n, total_ct = 0, 0.0
+    archived_days = set(_load_monthly().get("days_archived", []))
+    month_delta: dict[str, float] = {}
+    with _HISTORY_LOCK:
+        data = _load_history()                                                        # heisse Datei: wird beim Archivieren ohnehin mit aufsummiert
+        n, d, _ = fix(data.get("hours", {}))
+        if n:
+            _dump_json(HISTORY_PATH, data, indent=2, backup=True)
+            total_n += n
+            total_ct += d
+        if os.path.isdir(HISTORY_ARCHIVE_DIR):
+            for fn in sorted(os.listdir(HISTORY_ARCHIVE_DIR)):
+                if not fn.endswith(".json") or (day_from and fn[:7] < day_from[:7]):
+                    continue
+                path = os.path.join(HISTORY_ARCHIVE_DIR, fn)
+                doc = _load_json_recovering(path, lambda: {"days": {}})
+                changed = False
+                for day, buckets in (doc.get("days") or {}).items():
+                    n, d, per_day = fix(buckets)
+                    if n:
+                        changed = True
+                        total_n += n
+                        total_ct += d
+                        for dd, v in per_day.items():
+                            if dd in archived_days:                                    # dieser Tag steckt schon in den Monatssummen
+                                month_delta[dd[:7]] = month_delta.get(dd[:7], 0.0) + v
+                if changed:
+                    _dump_json(path, doc, indent=None, backup=True)
+        if month_delta:
+            mdata = _load_monthly()
+            for month, d in month_delta.items():
+                if month in mdata.get("months", {}):
+                    mdata["months"][month]["cost_ct"] = round(mdata["months"][month].get("cost_ct", 0.0) + d, 4)
+            _save_monthly(mdata)
+    if total_n:
+        log.info("Festpreis-Kosten nachgerechnet: %d Viertelstunden, %+.2f EUR", total_n, total_ct / 100.0)
+    return {"skipped": False, "buckets": total_n, "eur": round(total_ct / 100.0, 2)}
+
+
+def repair_fixed_costs() -> dict:
+    """Festpreis-Tarif: Viertelstunden mit Netzbezug, aber ohne Kosten (aus dem VRM nachgeholte Tage - dort war der Preis von damals
+    unbekannt, bei Festpreis ist er es aber) bekommen Netzbezug x den an dem Tag gueltigen Preis. Fasst nur Viertelstunden OHNE Kosten an -
+    ein zweiter Lauf aendert nichts. Bei dynamischem Tarif passiert nichts."""
+    return _reprice_fixed(None, True)
+
+
+def restate_fixed_costs(day_from: str) -> dict:
+    """Tarifwechsel mit rueckwirkendem "gilt ab": alle Kosten ab diesem Tag mit dem dann gueltigen Festpreis neu rechnen (Tage davor bleiben)."""
+    return _reprice_fixed(day_from, False)
+
+
+def repair_fixed_costs_once() -> dict | None:
+    """Beim Start einmal je Festpreis (Marker-Datei): holt Kosten alter, nachgeholter Tage nach. Fehler sind unkritisch."""
+    try:
+        price = float(load_config().get("fixed_price_ct") or 0.0)
+        marker = _load_json_recovering(FIXED_COST_MARKER, lambda: {})
+        if load_config().get("tariff_mode") != "fixed" or price <= 0 or (isinstance(marker, dict) and marker.get("price_ct") == price):
+            return None
+        res = repair_fixed_costs()
+        _dump_json(FIXED_COST_MARKER, {"price_ct": price}, indent=2)
+        return res
+    except Exception as e:                                   # noqa: BLE001
+        log.warning("Festpreis-Kosten nachrechnen: %s", e)
+        return None
+
+
+def _row_from_bucket(label: str, b: dict | None) -> dict:
+    if b and (b.get("soc_n") or b.get("restored")):
+        n = b.get("soc_n") or 0            # aus dem VRM nachgeholte Slots koennen ohne SOC sein
+        row = {
+            "hour": label,
+            "verbrauch": round(b["verbrauch"], 3),
+            "solar": round(b["solar"], 3),
+            "soc_avg": round(b["soc_sum"] / n, 1) if n else None,
+            "soc_min": round(b["soc_min"], 1) if b.get("soc_min") is not None else None,
+            "soc_max": round(b["soc_max"], 1) if b.get("soc_max") is not None else None,
+        }
+        for k in _FLOW_KEYS:
+            row[k] = round(b.get(k, 0.0), 3)
+        row["grid_cost_ct"] = round(b.get("grid_cost_ct", 0.0), 2)
+    else:
+        row = {"hour": label, "verbrauch": 0.0, "solar": 0.0,
+               "soc_avg": None, "soc_min": None, "soc_max": None, "grid_cost_ct": 0.0}
+        for k in _FLOW_KEYS:
+            row[k] = 0.0
+    return row
+
+
+def energy_history_for_day(day: str, now: datetime | None = None) -> list:
+    """Alle 96 15-Min-Slots eines Tages (00:00–23:45, YYYY-MM-DD). Feste
+    Zeitachse – noch nicht erfasste Slots kommen als Leerwerte zurück."""
+    now = now or datetime.now()
+    try:
+        d0 = datetime.strptime(day, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return []
+    hours = _day_buckets(day)
+    end = d0.replace(hour=23, minute=45)
+    t = d0.replace(hour=0, minute=0)
+    out = []
+    while t <= end:
+        out.append(_row_from_bucket(f"{t:%H:%M}", hours.get(_slot_key(t))))
+        t += timedelta(minutes=15)
+    # Manuelle Netz-Korrektur (falls fuer diesen Tag gesetzt) in den ersten
+    # Slot einrechnen, damit sie in Kacheln und Chart tatsaechlich ankommt.
+    if day == now.date().isoformat() and out:
+        corr = get_grid_correction(now)
+        if corr["import"] or corr["export"]:
+            out[0] = dict(out[0])
+            out[0]["g_load"] = out[0].get("g_load", 0.0) + corr["import"]
+            out[0]["s_grid"] = out[0].get("s_grid", 0.0) + corr["export"]
+    return out
+
+
+def energy_history_today(now: datetime | None = None) -> list:
+    """15-Min-Werte des heutigen Tages (00:00 bis aktueller Slot) für die Charts."""
+    now = now or datetime.now()
+    return energy_history_for_day(now.strftime("%Y-%m-%d"), now)
+
+
+def energy_min_day() -> str | None:
+    """Frühester Tag, für den Verlaufsdaten vorliegen (YYYY-MM-DD) oder None - heisse Datei UND
+    dauerhaftes Archiv (das reicht potenziell bis zur Inbetriebnahme zurück)."""
+    hours = _load_history().get("hours", {})
+    days = {k[:10] for k in hours.keys() if len(k) >= 10}
+    try:
+        if os.path.isdir(HISTORY_ARCHIVE_DIR):
+            months = sorted(fn[:-5] for fn in os.listdir(HISTORY_ARCHIVE_DIR) if fn.endswith(".json"))
+            if months:
+                earliest = _load_archive_month(months[0])
+                if earliest:
+                    days.add(min(earliest.keys()))
+    except OSError:
+        pass
+    return min(days) if days else None
+
+
+def energy_week_summary(now: datetime | None = None, days: int = 7, offset_weeks: int = 0) -> dict:
+    """Tagesweise Bilanz (Solar/Verbrauch/Netz/Kosten) einer 7-Tage-Woche fuer
+    den Wochenrueckblick. offset_weeks=0 ist die aktuelle Woche (bis heute),
+    1 die davor usw. - so bleibt die Statistik blaetterbar, statt beim naechsten
+    Tag aus der Anzeige zu verschwinden (Rohdaten bleiben dauerhaft erhalten,
+    siehe history_archive/). Kosten sind so genau wie der Preis, der
+    beim jeweiligen Sample gerade bekannt war (siehe log_energy_sample) - bei
+    Tagen vor Einfuehrung dieser Auswertung fehlen sie und stehen als 0."""
+    now = now or datetime.now()
+    hot_hours = _load_history().get("hours", {})
+    end_day = now.date() - timedelta(days=days * offset_weeks)
+    day_keys = [(end_day - timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
+    per_day = {d: {"solar": 0.0, "verbrauch": 0.0, "import": 0.0, "export": 0.0, "cost_ct": 0.0}
+               for d in day_keys}
+    for d in day_keys:
+        for b in _day_buckets(d, hot_hours).values():
+            row = per_day[d]
+            row["solar"] += b.get("solar", 0.0)
+            row["verbrauch"] += b.get("verbrauch", 0.0)
+            row["import"] += b.get("g_load", 0.0) + b.get("g_batt", 0.0)
+            row["export"] += b.get("s_grid", 0.0) + b.get("b_grid", 0.0)
+            row["cost_ct"] += b.get("grid_cost_ct", 0.0)
+    corr = get_grid_correction(now)
+    today_iso = now.date().isoformat()
+    if today_iso in per_day and (corr["import"] or corr["export"]):
+        per_day[today_iso]["import"] += corr["import"]
+        per_day[today_iso]["export"] += corr["export"]
+    days_out = []
+    totals = {"solar": 0.0, "verbrauch": 0.0, "import": 0.0, "export": 0.0, "cost_ct": 0.0}
+    for d in day_keys:
+        row = per_day[d]
+        autarky = (round(max(0.0, min(100.0, (1 - row["import"] / row["verbrauch"]) * 100)), 0)
+                   if row["verbrauch"] > 0 else None)
+        day_cost = round(row["cost_ct"] / 100.0, 2)
+        days_out.append({
+            "day": d,
+            "solar": round(row["solar"], 2), "verbrauch": round(row["verbrauch"], 2),
+            "import": round(row["import"], 2), "export": round(row["export"], 2),
+            "cost_eur": day_cost, "autarky": autarky,
+            "cost_incl_fees_eur": cost_incl_fees_eur_for_range(day_cost, d, d),
+        })
+        for key in totals:
+            totals[key] += row[key]
+    total_autarky = (round(max(0.0, min(100.0, (1 - totals["import"] / totals["verbrauch"]) * 100)), 0)
+                      if totals["verbrauch"] > 0 else None)
+    min_day = energy_min_day()
+    can_go_older = bool(min_day) and min_day < day_keys[0]
+    total_cost = round(totals["cost_ct"] / 100.0, 2)
+    return {
+        "days": days_out,
+        "totals": {"solar": round(totals["solar"], 2), "verbrauch": round(totals["verbrauch"], 2),
+                   "import": round(totals["import"], 2), "export": round(totals["export"], 2),
+                   "cost_eur": total_cost, "autarky": total_autarky,
+                   "cost_incl_fees_eur": cost_incl_fees_eur_for_range(total_cost, day_keys[0], day_keys[-1])},
+        "offset_weeks": offset_weeks,
+        "can_go_older": can_go_older,
+    }
+
+
+def _load_monthly() -> dict:
+    d = _load_json_recovering(MONTHLY_PATH, lambda: {"months": {}, "days_archived": []})
+    return d if isinstance(d, dict) else {"months": {}, "days_archived": []}
+
+
+def _save_monthly(data: dict):
+    _dump_json(MONTHLY_PATH, data, indent=2, backup=True)
+
+
+def contract_fixed_cost_eur(cfg: dict, days: float) -> float:
+    """Netto-Fixkosten des Stromvertrags (Grundgebühr, Netznutzung, Messstelle, abzüglich der Reduzierung
+    nach §14a EnWG) für `days` Tage, MIT DEN AKTUELL EINGESTELLTEN WERTEN - siehe Einstellungen → Stromtarif →
+    Vertragskosten. Fuer eine punktuelle Ja/Nein-Frage ("gibt es ueberhaupt Vertragskosten?", z.B.
+    webapp.has_contract_fees) unproblematisch, aber NICHT fuer echte vergangene Zeitraeume verwenden - dafuer
+    gibt es contract_fixed_cost_for_range(), das die zum jeweiligen Tag gueltige Periode nimmt (siehe
+    record_contract_period_if_changed() weiter unten: Michael, 28.09. - bei einem Anbieterwechsel duerfen sich
+    vergangene Monate nicht rueckwirkend mit den neuen Konditionen aendern)."""
+    return _fee_per_day(_period_values(cfg)) * days
+
+
+def cost_incl_fees_eur(cfg: dict, energy_cost_eur: float, days: float) -> float:
+    """Wie contract_fixed_cost_eur(): mit den AKTUELLEN Einstellungen, fuer punktuelle Faelle (z.B. notify.py -
+    der heutige Tag ist ja per Definition die aktuelle Periode). Fuer echte vergangene Zeitraeume siehe
+    cost_incl_fees_eur_for_range()."""
+    vat = float(cfg.get("vat_percent", 0) or 0) / 100.0
+    return round((energy_cost_eur + contract_fixed_cost_eur(cfg, days)) * (1 + vat), 2)
+
+
+# --- Vertragskosten-Perioden: Aenderungen an Grundgebuehr/Netznutzung/Messstelle/§14a/MwSt wirken sich nur ab
+# ihrem Gueltigkeitsdatum aus, nicht rueckwirkend auf die ganze Historie (siehe contract_fixed_cost_eur oben).
+CONTRACT_PERIODS_PATH = os.path.join(_DIR, "contract_periods.json")
+_CONTRACT_FIELDS = ("contract_fee_month_eur", "grid_fee_day_eur", "meter_fee_day_eur",
+                     "section14a_credit_day_eur", "vat_percent", "fixed_price_ct")
+
+
+def _period_values(cfg: dict) -> dict:
+    return {k: float(cfg.get(k, 0) or 0) for k in _CONTRACT_FIELDS}
+
+
+def _fee_per_day(p: dict) -> float:
+    return (float(p.get("contract_fee_month_eur", 0) or 0) / 30.44
+            + float(p.get("grid_fee_day_eur", 0) or 0)
+            + float(p.get("meter_fee_day_eur", 0) or 0)
+            - float(p.get("section14a_credit_day_eur", 0) or 0))
+
+
+def _load_contract_periods() -> list:
+    d = _load_json_recovering(CONTRACT_PERIODS_PATH, lambda: {"periods": []})
+    periods = d.get("periods") if isinstance(d, dict) else None
+    return periods if isinstance(periods, list) else []
+
+
+def _save_contract_periods(periods: list):
+    _dump_json(CONTRACT_PERIODS_PATH, {"periods": periods}, indent=2, backup=True)
+
+
+def validate_valid_from(day: str | None, today: date | None = None) -> str | None:
+    """Pruefung des optionalen "gilt ab"-Datums (Vertragswechsel). Erlaubt: heute oder frueher, aber nicht vor der letzten schon
+    gespeicherten Aenderung. Zukunft geht nicht (die Steuerung rechnet mit dem aktuell eingetragenen Preis). Rueckgabe: ISO-Datum | None."""
+    if not day:
+        return None
+    today = today or datetime.now().date()
+    try:
+        d = date.fromisoformat(str(day))
+    except ValueError:
+        raise ValueError("Datum „gilt ab“ ist ungültig")
+    if d > today:
+        raise ValueError("Das Datum „gilt ab“ darf nicht in der Zukunft liegen – trag den neuen Tarif ein, sobald er gilt (rückwirkend ist möglich)")
+    periods = _load_contract_periods()
+    if periods and periods[-1].get("from", "") not in ("2000-01-01", "") and d.isoformat() < periods[-1]["from"]:
+        raise ValueError(f"Das Datum „gilt ab“ liegt vor der letzten Tarif-Änderung ({periods[-1]['from']})")
+    return d.isoformat()
+
+
+def record_contract_period_if_changed(cfg: dict, day: str | None = None) -> bool:
+    """Bei jedem Speichern der Einstellungen (webapp.py /api/config) aufrufen. Legt eine neue, ab `day`
+    (Standard: heute) gueltige Periode an, WENN sich einer der Vertragskosten-Werte, die MwSt oder der Festpreis geaendert hat -
+    vergangene Tage/Monate rechnen weiter mit der bisherigen Periode (siehe contract_period_for_day()).
+    Beim allerersten Aufruf (noch keine Periode gespeichert) wird rueckwirkend ab 2000-01-01 die aktuelle
+    Config uebernommen - das entspricht dem bisherigen Verhalten (aktuelle Werte gelten fuer die gesamte
+    bekannte Vergangenheit), bis der Nutzer zum ersten Mal wirklich etwas aendert. Aeltere Perioden ohne Festpreis
+    (vor Einfuehrung dieses Felds gespeichert) bekommen beim ersten Aufruf den aktuellen Preis - er galt bis dahin. Rueckgabe: True bei Aenderung."""
+    day = day or datetime.now().date().isoformat()
+    vals = _period_values(cfg)
+    periods = _load_contract_periods()
+    if not periods:
+        _save_contract_periods([{"from": "2000-01-01", **vals}])
+        return False
+    if any("fixed_price_ct" not in p for p in periods):
+        for p in periods:
+            p.setdefault("fixed_price_ct", vals["fixed_price_ct"])
+        _save_contract_periods(periods)
+    last = periods[-1]
+    if all(abs(float(last.get(k, 0.0)) - vals[k]) < 1e-9 for k in _CONTRACT_FIELDS):
+        return False
+    if last.get("from") == day:
+        periods[-1] = {"from": day, **vals}    # zweite Aenderung am selben Tag ueberschreibt statt zu duplizieren
+    else:
+        periods.append({"from": day, **vals})
+    _save_contract_periods(periods)
+    return True
+
+
+def migrate_contract_periods() -> bool:
+    """Beim Start: Perioden aus der Zeit vor dem Festpreis-Feld bekommen den AKTUELLEN Preis - er galt bis jetzt. Muss laufen, BEVOR
+    jemand einen neuen Preis speichert (sonst bekaemen auch die alten Perioden den neuen Preis)."""
+    periods = _load_contract_periods()
+    if not periods or all("fixed_price_ct" in p for p in periods):
+        return False
+    price = float(load_config().get("fixed_price_ct") or 0.0)
+    for p in periods:
+        p.setdefault("fixed_price_ct", price)
+    _save_contract_periods(periods)
+    return True
+
+
+def fixed_price_for_day(day: str) -> float:
+    """Der am angegebenen Tag gueltige Festpreis (ct/kWh) - aus den Vertrags-Perioden, sonst der aktuell eingetragene."""
+    cur = float(load_config().get("fixed_price_ct") or 0.0)
+    try:
+        v = contract_period_for_day(day).get("fixed_price_ct")
+        return float(v) if v else cur
+    except (TypeError, ValueError):
+        return cur
+
+
+def contract_period_for_day(day: str) -> dict:
+    """Die am angegebenen Tag (YYYY-MM-DD) gueltigen Vertragskosten-Werte. Ohne je gespeicherte Periode (z.B.
+    frisch installierte App, noch nie etwas an den Vertragskosten gespeichert) Ruecksprung auf die aktuelle
+    Config - reine Rueckwaertskompatibilitaet."""
+    periods = _load_contract_periods()
+    if not periods:
+        return {"from": "1970-01-01", **_period_values(load_config())}
+    applicable = [p for p in periods if p.get("from", "") <= day]
+    return applicable[-1] if applicable else periods[0]   # Tag vor der ersten Periode -> aelteste bekannte nehmen
+
+
+def contract_fixed_cost_for_range(day_from: str, day_to: str) -> float:
+    """Netto-Fixkosten ueber einen Datumsbereich (beide Enden inklusive), Tag fuer Tag mit der jeweils zu dem
+    Zeitpunkt gueltigen Periode - damit eine Vertragsaenderung waehrend des Zeitraums nur ab ihrem
+    Gueltigkeitsdatum wirkt (siehe record_contract_period_if_changed())."""
+    periods = _load_contract_periods() or [{"from": "1970-01-01", **_period_values(load_config())}]
+    d0 = datetime.strptime(day_from, "%Y-%m-%d").date()
+    d1 = datetime.strptime(day_to, "%Y-%m-%d").date()
+    total, d = 0.0, d0
+    while d <= d1:
+        iso = d.isoformat()
+        applicable = [p for p in periods if p.get("from", "") <= iso]
+        total += _fee_per_day(applicable[-1] if applicable else periods[0])
+        d += timedelta(days=1)
+    return total
+
+
+def cost_incl_fees_eur_for_range(energy_cost_eur: float, day_from: str, day_to: str) -> float:
+    """Wie cost_incl_fees_eur(), aber periodenkorrekt ueber einen echten Datumsbereich. Die MwSt wird mit dem am
+    LETZTEN Tag des Zeitraums gueltigen Satz auf die Summe angewendet (der MwSt-Satz aendert sich in der Praxis
+    praktisch nie - eine tagegenaue Aufteilung wuerde eine vollstaendige Tages-Kosten-Historie je Monat
+    voraussetzen, die monthly_summary.json aus Platzgruenden bewusst nicht vorhaelt, siehe deren Kommentar)."""
+    fees = contract_fixed_cost_for_range(day_from, day_to)
+    vat = float(contract_period_for_day(day_to).get("vat_percent", 0) or 0) / 100.0
+    return round((energy_cost_eur + fees) * (1 + vat), 2)
+
+
+def monthly_overview(now: datetime | None = None, limit_months: int = 120) -> dict:
+    """Monatsuebersicht - EINE Zeile pro Kalendermonat (Solar/Verbrauch/Netz/
+    Autarkie/Kosten), wie die Summenzeile des Wochenrueckblicks, nur je Monat statt
+    je Woche. Liest aus dem dauerhaften Archiv (monthly_summary.json, waechst nie
+    ueber die 35-Tage-Grenze von history.json hinaus zurueck) plus dem laufenden,
+    noch nicht archivierten aktuellen Monat live aus history.json dazugerechnet.
+    limit_months=120 (10 Jahre) als grosszuegige Obergrenze - das Archiv selbst wird
+    nie automatisch beschnitten."""
+    now = now or datetime.now()
+    cfg = load_config()
+    archive_finished_days(now)   # sicherstellen, dass nichts Vergangenes fehlt
+    data = _load_monthly()
+    months = {k: dict(v) for k, v in data.get("months", {}).items()}
+    cur_key = now.strftime("%Y-%m")
+    hours = _load_history().get("hours", {})
+    archived_days = set(data.get("days_archived", []))
+    cur = dict(months.get(cur_key) or {"solar": 0.0, "verbrauch": 0.0, "import": 0.0,
+                                       "export": 0.0, "cost_ct": 0.0, "batt_charge": 0.0, "batt_discharge": 0.0})
+    cur.setdefault("batt_charge", 0.0); cur.setdefault("batt_discharge", 0.0)   # aeltere Archiv-Monate kennen die Felder noch nicht
+    for k, b in hours.items():
+        if k[:7] != cur_key or k[:10] in archived_days:      # archivierte Tage stecken schon in `cur`
+            continue
+        cur["solar"] += b.get("solar", 0.0)
+        cur["verbrauch"] += b.get("verbrauch", 0.0)
+        cur["import"] += b.get("g_load", 0.0) + b.get("g_batt", 0.0)
+        cur["export"] += b.get("s_grid", 0.0) + b.get("b_grid", 0.0)
+        cur["cost_ct"] += b.get("grid_cost_ct", 0.0)
+        cur["batt_charge"] += b.get("s_batt", 0.0) + b.get("g_batt", 0.0)
+        cur["batt_discharge"] += b.get("b_load", 0.0) + b.get("b_grid", 0.0)
+    corr = get_grid_correction(now)
+    if corr["import"] or corr["export"]:
+        cur["import"] += corr["import"]
+        cur["export"] += corr["export"]
+    months[cur_key] = cur
+
+    # Fehlende Monate DIESES Jahres (vor dem ersten lokal bekannten Monat) aus dem VRM auffuellen - ohne
+    # Preis-Historie aus der Zeit gibt es dafuer keine Kosten, nur die Energiemengen. Import-Fehler sind
+    # unkritisch: dann bleiben diese Monate einfach in der Uebersicht aus, wie bisher.
+    earliest_local = min(months.keys(), default=cur_key)
+    year_start_key = f"{now.year}-01"
+    if earliest_local > year_start_key:
+        try:
+            import vrm
+            vrm_months = vrm.monthly_energy_totals(datetime(now.year, 1, 1), datetime.fromisoformat(earliest_local + "-01"))
+        except Exception as e:                               # noqa: BLE001
+            log.warning("Monatsuebersicht: Auffuellen aus dem VRM fehlgeschlagen: %s", e)
+            vrm_months = None
+        # Bei festem Tarif ist der Preis kein Geheimnis aus der Vergangenheit - anders als bei Tibber lassen
+        # sich die Kosten dieser nachgeholten Monate ganz normal ausrechnen (Netzbezug x fester Preis).
+        fixed_mode = cfg.get("tariff_mode") == "fixed" and float(cfg.get("fixed_price_ct") or 0.0) > 0
+        for key, m in (vrm_months or {}).items():
+            if key < year_start_key or key >= earliest_local:
+                continue
+            fixed_price_ct = 0.0
+            if fixed_mode:                                  # Preis je Tag des Monats (Tarifwechsel mitten im Monat) gemittelt
+                ky, km = int(key[:4]), int(key[5:7])
+                ndays = calendar.monthrange(ky, km)[1]
+                fixed_price_ct = sum(fixed_price_for_day(f"{key}-{dd:02d}") for dd in range(1, ndays + 1)) / ndays
+            cost_ct = m["import"] * fixed_price_ct if fixed_price_ct else 0.0
+            months[key] = {"solar": m["solar"], "verbrauch": m["verbrauch"], "import": m["import"],
+                           "export": m["export"], "cost_ct": cost_ct, "batt_charge": 0.0, "batt_discharge": 0.0,
+                           "vrm_only": True, "cost_known": bool(fixed_price_ct)}
+
+    rows = []
+    for key in sorted(months.keys(), reverse=True)[:limit_months]:
+        m = months[key]
+        autarky = (round(max(0.0, min(100.0, (1 - m["import"] / m["verbrauch"]) * 100)), 0)
+                   if m["verbrauch"] > 0 else None)
+        y, mo = key.split("-")
+        days = now.day if key == cur_key else calendar.monthrange(int(y), int(mo))[1]     # laufender Monat: bisherige Tage
+        month_from = f"{key}-01"
+        month_to = f"{key}-{days:02d}"
+        rows.append({
+            "month": key, "year": int(y), "month_num": int(mo),
+            "solar": round(m["solar"], 2), "verbrauch": round(m["verbrauch"], 2),
+            "import": round(m["import"], 2), "export": round(m["export"], 2),
+            "cost_eur": round(m["cost_ct"] / 100.0, 2), "autarky": autarky,
+            "cost_incl_fees_eur": cost_incl_fees_eur_for_range(m["cost_ct"] / 100.0, month_from, month_to),
+            "batt_charge_kwh": round(m.get("batt_charge", 0.0), 2), "batt_discharge_kwh": round(m.get("batt_discharge", 0.0), 2),
+            "vrm_only": bool(m.get("vrm_only")), "cost_known": m.get("cost_known", not m.get("vrm_only")),
+        })
+    return {"months": rows}
+
+
+def battery_cycle_stats(now: datetime | None = None) -> dict:
+    """Lebenslaufende Akku-Nutzung: Durchsatz (geladen/entladen) und daraus die 'aequivalenten Vollzyklen'
+    (Durchsatz / nutzbare Kapazitaet - ein Vollzyklus = einmal die ganze Kapazitaet ein- UND ausgeladen).
+    Holt die komplette Historie vom Victron-VRM (seit der eingetragenen Inbetriebnahme, siehe Einstellungen ->
+    Anlage, sonst seit dem ersten VRM-Datenpunkt) - nur wenn das nicht klappt (kein VRM-Zugang, Fehler), gilt
+    ersatzweise das eigene, dauerhafte Monats-Archiv (waechst nie ueber die 35-Tage-Grenze von history.json
+    hinaus zurueck, kennt aber logischerweise nichts von vor Einfuehrung dieser Auswertung)."""
+    import vrm                          # spaet importieren (vrm importiert nichts von hier)
+    now = now or datetime.now()
+    cfg = load_config()
+    cap = float((cfg or {}).get("battery_usable_kwh") or 0.0)
+    expected_cycles = float(cfg.get("battery_expected_cycles") or 0.0)
+
+    def project(cycles, since_date):
+        """Bei wie vielen Zyklen pro Jahr (aus dem bisherigen Tempo) reicht die vom Hersteller angegebene
+        Zyklenzahl noch wie viele Jahre - grobe Hochrechnung, geht von gleichbleibender Nutzung aus."""
+        if cycles is None or not since_date or not expected_cycles:
+            return None, None
+        try:
+            days = max(1, (now.date() - datetime.fromisoformat(since_date).date()).days)
+        except ValueError:
+            return None, None
+        per_year = cycles / days * 365.25
+        if per_year <= 0:
+            return round(per_year, 1), None
+        return round(per_year, 1), round(max(0.0, expected_cycles - cycles) / per_year, 1)
+
+    install_date = cfg.get("battery_install_date")
+    start = None
+    if install_date:
+        try:
+            start = datetime.fromisoformat(install_date)
+        except ValueError:
+            start = None
+    lt = None
+    try:
+        lt = vrm.battery_lifetime_kwh(now, start)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning("Akku-Lebenslauf vom VRM nicht abrufbar, nutze eigene Historie: %s", e)
+    if lt:
+        cycles = round((lt["charge_kwh"] + lt["discharge_kwh"]) / 2.0 / cap, 1) if cap > 0 else None
+        per_year, years_left = project(cycles, lt["since"])
+        return {"charge_kwh": lt["charge_kwh"], "discharge_kwh": lt["discharge_kwh"], "battery_usable_kwh": cap,
+                "equivalent_full_cycles": cycles, "since_month": lt["since"][:7], "since_date": lt["since"], "source": "vrm",
+                "battery_expected_cycles": expected_cycles or None, "cycles_per_year": per_year, "years_remaining": years_left}
+    mo = monthly_overview(now, limit_months=10_000)
+    charge = sum(m.get("batt_charge_kwh", 0.0) for m in mo["months"])
+    discharge = sum(m.get("batt_discharge_kwh", 0.0) for m in mo["months"])
+    cycles = round((charge + discharge) / 2.0 / cap, 1) if cap > 0 else None
+    first_month = min((m["month"] for m in mo["months"]), default=None)
+    since_date = (first_month + "-01") if first_month else None
+    per_year, years_left = project(cycles, since_date)
+    return {"charge_kwh": round(charge, 1), "discharge_kwh": round(discharge, 1),
+            "battery_usable_kwh": cap, "equivalent_full_cycles": cycles, "since_month": first_month,
+            "since_date": since_date, "source": "lokal",
+            "battery_expected_cycles": expected_cycles or None, "cycles_per_year": per_year, "years_remaining": years_left}
+
+
+def energy_grid_today(now: datetime | None = None) -> dict:
+    """Tages-Netzbezug/-Einspeisung aus der integrierten Netzleistung (nicht aus
+    den kumulierten Zählerregistern, die unzuverlässig zählen). Aus/Zum Netz =
+    Summe der heutigen Netz-Flüsse plus manuelle Korrektur (siehe set_grid_today).
+    Reset um Mitternacht ergibt sich automatisch."""
+    now = now or datetime.now()
+    imp, exp = _raw_grid_sum(now)
+    corr = get_grid_correction(now)
+    return {"import": round(imp + corr["import"], 2), "export": round(exp + corr["export"], 2)}
+
+
+def _raw_grid_sum(now: datetime) -> tuple:
+    """Reine Tagessumme der gemessenen Netz-Fluesse, ohne manuelle Korrektur."""
+    today = now.strftime("%Y-%m-%d")
+    imp = exp = 0.0
+    for k, b in _load_history().get("hours", {}).items():
+        if k[:10] == today:
+            imp += b.get("g_load", 0.0) + b.get("g_batt", 0.0)   # Netz→Verbrauch/Batterie
+            exp += b.get("s_grid", 0.0) + b.get("b_grid", 0.0)   # Solar/Batterie→Netz
+    return imp, exp
+
+
+# --- Solar-Logbuch (Prognose vs. reale Erzeugung) -------------------------
+def _load_solar_log() -> dict:
+    if os.path.exists(SOLAR_LOG_PATH):
+        try:
+            with open(SOLAR_LOG_PATH, encoding="utf-8") as f:
+                d = json.load(f)
+            d.setdefault("days", {})
+            return d
+        except (ValueError, OSError):
+            pass
+    return {"days": {}}
+
+
+def _solar_actual_for_day(day: str) -> float:
+    """Realer Tagesertrag (kWh) aus der integrierten PV-Leistung."""
+    return round(sum(b.get("solar", 0.0) for b in _day_buckets(day).values()), 2)
+
+
+def solar_measured_today(now: datetime | None = None) -> float:
+    """Oeffentlicher Zugriff auf den bisher heute real gemessenen Solarertrag
+    (kWh) - fuer die Regelung (siehe webapp.tick(): loest die reine
+    Tagesprognose ab, sobald ein Teil des Tages schon gemessen ist)."""
+    now = now or datetime.now()
+    return _solar_actual_for_day(now.date().isoformat())
+
+
+# Akku gilt als "voll" (MPPT drosselt evtl. → Ertrag gedeckelt) ab diesem SOC.
+_SOC_FULL_THRESHOLD = 99.0
+
+
+def _solar_socmax_for_day(day: str):
+    """Höchster erreichter Batterie-SOC des Tages (aus der History) oder None."""
+    vals = [b.get("soc_max") for b in _day_buckets(day).values() if b.get("soc_max") is not None]
+    return max(vals) if vals else None
+
+
+def _finalize_vrm(e: dict):
+    """Abweichung der VRM-Prognose vom realen Ertrag: (real - Prognose) / Prognose."""
+    vrm_kwh, actual = e.get("vrm_forecast"), e.get("actual")
+    if vrm_kwh and actual is not None:
+        e["vrm_deviation_pct"] = round((actual - vrm_kwh) / vrm_kwh * 100, 1)
+
+
+def _day_is_restored(day: str) -> bool:
+    """True, wenn (mindestens) ein Slot dieses Tages aus dem VRM nachgeholt wurde -
+    heisse Datei oder dauerhaftes Archiv."""
+    return any(b.get("restored") for b in _day_buckets(day).values())
+
+
+def _finalize_solar_days(days: dict, now: datetime):
+    """Schließt vergangene Tage ab: realer Ertrag, Abweichung der VRM-Prognose, Akku-voll-Markierung
+    (PV evtl. gedeckelt)."""
+    today = now.date().isoformat()
+    # Tage, deren Verlauf nachtraeglich aus dem VRM ergaenzt wurde (Datenverlust), EINMAL neu abschliessen -
+    # sonst bleibt ein damals falsch (z. B. 0 kWh) festgehaltener Ertrag stehen.
+    for day, e in days.items():
+        if day < today and not e.get("vrm_refixed") and _day_is_restored(day):
+            e["actual"] = None
+            e["vrm_refixed"] = True
+        if day < today and e.get("actual") is None:
+            e["actual"] = _solar_actual_for_day(day)
+            _finalize_vrm(e)
+            smax = _solar_socmax_for_day(day)
+            e["soc_max"] = round(smax, 1) if smax is not None else None
+            e["curtailed"] = bool(smax is not None and smax >= _SOC_FULL_THRESHOLD)
+        elif day < today:
+            # Nachrüstung für Tage, die vor neuen Features finalisiert wurden.
+            if "curtailed" not in e:
+                smax = _solar_socmax_for_day(day)
+                if smax is not None:
+                    e["soc_max"] = round(smax, 1)
+                    e["curtailed"] = bool(smax >= _SOC_FULL_THRESHOLD)
+            if e.get("vrm_deviation_pct") is None:
+                _finalize_vrm(e)
+
+
+VRM_HISTORY_MIN_STEP = 0.1     # kWh: kleinere Schwankungen der VRM-Tagesprognose gelten nicht als Nachjustierung
+
+
+def record_vrm_forecast(vrm_kwh: float | None, now: datetime | None = None):
+    """Friert die VRM-Tagesprognose EINMAL pro Tag ein (erster Durchlauf des Tages; Grundlage der Abweichungs-
+    Statistik), merkt sich daneben den laufenden Stand ("vrm_latest") und schließt vergangene Tage ab."""
+    now = now or datetime.now()
+    today = now.date().isoformat()
+    data = _load_solar_log()
+    days = data["days"]
+    _finalize_solar_days(days, now)
+    v = round(vrm_kwh, 2) if vrm_kwh and vrm_kwh > 0 else None
+    if today not in days:
+        if v is not None:
+            days[today] = {"vrm_forecast": v, "vrm_deviation_pct": None, "actual": None}
+    elif v is not None and days[today].get("vrm_forecast") is None:
+        days[today]["vrm_forecast"] = v
+    if v is not None and today in days:
+        days[today]["vrm_latest"] = v            # laufender Stand (das VRM justiert nach) - nur fuer die Anzeige des heutigen Tages
+        hist = days[today].setdefault("vrm_history", [])       # [[HH:MM, kWh], ...] - jede Aenderung ab 0,1 kWh
+        if not hist or abs(hist[-1][1] - v) >= VRM_HISTORY_MIN_STEP:
+            hist.append([now.strftime("%H:%M"), v])
+            del hist[:-60]
+    _dump_json(SOLAR_LOG_PATH, data, indent=2)
+
+
+def solar_log(now: datetime | None = None) -> dict:
+    """Logbuch-Einträge (neueste zuerst). Der heutige Tag erscheint mit dem bisherigen Ertrag
+    als vorläufig."""
+    now = now or datetime.now()
+    today = now.date().isoformat()
+    data = _load_solar_log()
+    days = data["days"]
+    _finalize_solar_days(days, now)
+    rows = []
+    for day in sorted(days.keys(), reverse=True):
+        e = dict(days[day])
+        e["date"] = day
+        if day == today and e.get("actual") is None:
+            e["actual"] = _solar_actual_for_day(day)
+            e["provisional"] = True
+        rows.append(e)
+    return {"rows": rows}
+
+
+def recent_solar_average(days: int = 7, now: datetime | None = None) -> float | None:
+    """Mittlerer realer Tagesertrag (kWh) der letzten `days` vollständig aufgezeichneten Tage aus history.json.
+    Rückfall der Steuerung, wenn das VRM keine Prognose liefert. None, wenn zu wenig Tage vorliegen."""
+    now = now or datetime.now()
+    today = now.date()
+    want = {(today - timedelta(days=i)).isoformat() for i in range(1, days + 1)}
+    hot_hours = _load_history().get("hours", {})
+    slots: dict[str, int] = {}
+    sums: dict[str, float] = {}
+    for d in want:
+        buckets = _day_buckets(d, hot_hours)
+        slots[d] = len(buckets)
+        sums[d] = sum(b.get("solar", 0.0) for b in buckets.values())
+    vals = [sums[d] for d in want if slots.get(d, 0) >= 80]      # nur (fast) lückenlose Tage
+    if len(vals) < 3:
+        return None
+    return round(sum(vals) / len(vals), 2)
+
+
+# --- Preis-Historie (Tibber-Preise je Viertelstunde, lange aufbewahrt) --------------------------
+# price_history.json: {"days": {"YYYY-MM-DD": {"p": [96 Werte in ct/kWh oder null], "lvl": [96 Tibber-Level-Strings
+#   'VERY_CHEAP'/'CHEAP'/'NORMAL'/'EXPENSIVE'/'VERY_EXPENSIVE' oder null], "src": "tibber" | "derived"}}}
+# "tibber" = Originalpreise (inkl. Tibbers eigener Einstufung), "derived" = aus Bezugskosten/-menge im Verlauf
+# zurueckgerechnet (nur Slots mit Netzbezug, lueckenhaft, kein "lvl" - der Preis allein war ja bekannt, nicht die
+# Einstufung). "lvl" existiert erst seit 28.09.2026 (Michael: Rueckblick soll dieselben Farben zeigen wie am Tag
+# selbst bei Tibber) - aeltere Tage haben das Feld schlicht nicht bzw. es steht auf null; der Rueckblick im
+# Frontend (index.html loadHistPrices) faellt dafuer auf eine grobe Schaetzung relativ zum Tagesdurchschnitt zurueck.
+PRICE_HISTORY_PATH = os.path.join(_DIR, "price_history.json")
+_PRICE_KEEP_DAYS = 800            # rund 2 Jahre; die Datei bleibt trotzdem klein (~0,5 MB)
+_PRICE_LOCK = threading.Lock()
+_price_cache: dict | None = None
+
+
+def _price_days() -> dict:
+    global _price_cache
+    if _price_cache is None:
+        d = _load_json_recovering(PRICE_HISTORY_PATH, lambda: {"days": {}})
+        _price_cache = d.get("days", {}) if isinstance(d, dict) and isinstance(d.get("days"), dict) else {}
+    return _price_cache
+
+
+def _save_price_days(days: dict):
+    for old in sorted(days)[:-_PRICE_KEEP_DAYS]:
+        del days[old]
+    _dump_json(PRICE_HISTORY_PATH, {"days": days}, indent=None, backup=True)
+
+
+def record_prices(entries: list) -> int:
+    """Haelt die Tibber-Preise UND Tibbers eigene Einstufung (level: CHEAP/NORMAL/...) fest (heute UND morgen,
+    sobald sie da sind). Schreibt nur bei Aenderungen; ein Tag mit Originalpreisen wird nur ergaenzt bzw.
+    korrigiert, nie durch weniger Daten ersetzt. Rueckgabe: Anzahl geaenderter Tage."""
+    from logic import _parse_iso
+    starts = []
+    for e in entries or []:
+        try:
+            starts.append((_parse_iso(e["startsAt"]), round(float(e["total"]) * 100, 2), e.get("level") or None))
+        except (KeyError, TypeError, ValueError):
+            continue
+    starts.sort(key=lambda x: x[0])
+    new: dict[str, dict] = {}
+    for i, (t, ct, lvl) in enumerate(starts):
+        if i + 1 < len(starts):
+            gap = (starts[i + 1][0] - t).total_seconds() / 60
+        else:                                                       # letzter Eintrag: gleiche Dauer wie der davor
+            gap = (t - starts[i - 1][0]).total_seconds() / 60 if i else 15
+        n = 4 if gap >= 55 else 1                                  # Stundenpreis gilt fuer alle 4 Viertelstunden
+        rec = new.setdefault(t.date().isoformat(), {"p": [None] * 96, "lvl": [None] * 96})
+        base = t.hour * 4 + t.minute // 15
+        for k in range(n):
+            if base + k < 96:
+                rec["p"][base + k] = ct
+                rec["lvl"][base + k] = lvl
+    changed = 0
+    with _PRICE_LOCK:
+        days = _price_days()
+        for day, rec_new in new.items():
+            rec = days.get(day)
+            if rec and rec.get("src") == "tibber":
+                old_lvl = rec.get("lvl") or [None] * len(rec["p"])
+                merged_p = [v if v is not None else o for v, o in zip(rec_new["p"], rec["p"])]
+                merged_lvl = [v if v is not None else o for v, o in zip(rec_new["lvl"], old_lvl)]
+                if merged_p == rec["p"] and merged_lvl == old_lvl:
+                    continue
+                rec_new = {"p": merged_p, "lvl": merged_lvl}
+            days[day] = {"p": rec_new["p"], "lvl": rec_new["lvl"], "src": "tibber"}
+            changed += 1
+        if changed:
+            _save_price_days(days)
+    return changed
+
+
+def price_slots(day: str):
+    """96 Viertelstunden-Preise (ct) eines Tages aus der Preis-Historie (nur Original-Tibber-Preise) oder None."""
+    rec = _price_days().get(day)
+    return list(rec["p"]) if rec and rec.get("src") == "tibber" and len(rec.get("p") or []) == 96 else None
+
+
+def backfill_prices_from_history() -> int:
+    """Rechnet fuer Tage OHNE Tibber-Originalpreise aus dem Verlauf zurueck: Preis = Bezugskosten / Bezugsmenge (nur Slots mit
+    Netzbezug). Idempotent; laeuft beim Start (heisse Datei UND dauerhaftes Archiv). Rueckgabe: Anzahl neu gefuellter Slots."""
+    per_day: dict[str, dict[int, float]] = {}
+
+    def _scan(items):
+        for key, b in items:
+            imp = b.get("g_load", 0.0) + b.get("g_batt", 0.0)
+            cost = b.get("grid_cost_ct", 0.0)
+            if imp > 0.005 and cost > 0 and len(key) >= 16:
+                try:
+                    slot = int(key[11:13]) * 4 + int(key[14:16]) // 15
+                except ValueError:
+                    continue
+                per_day.setdefault(key[:10], {})[slot] = round(cost / imp, 2)
+
+    _scan(_load_history().get("hours", {}).items())
+    try:
+        if os.path.isdir(HISTORY_ARCHIVE_DIR):
+            for fn in os.listdir(HISTORY_ARCHIVE_DIR):
+                if fn.endswith(".json"):
+                    for day_buckets in _load_json_recovering(
+                            os.path.join(HISTORY_ARCHIVE_DIR, fn), lambda: {"days": {}}).get("days", {}).values():
+                        _scan(day_buckets.items())
+    except OSError:
+        pass
+    filled = 0
+    with _PRICE_LOCK:
+        days = _price_days()
+        for day, m in per_day.items():
+            rec = days.get(day)
+            if rec and rec.get("src") == "tibber":
+                continue
+            vals = list(rec["p"]) if rec else [None] * 96
+            for slot, p in m.items():
+                if vals[slot] is None:
+                    vals[slot] = p
+                    filled += 1
+            days[day] = {"p": vals, "src": "derived"}
+        if filled:
+            _save_price_days(days)
+    return filled
+
+
+def price_history_info() -> dict:
+    with _PRICE_LOCK:
+        days = _price_days()
+        real = sum(1 for r in days.values() if r.get("src") == "tibber")
+        return {"days": len(days), "tibber_days": real, "derived_days": len(days) - real,
+                "first": min(days) if days else None, "last": max(days) if days else None}
+
+
+def price_history(days: int = 90) -> dict:
+    with _PRICE_LOCK:
+        d = _price_days()
+        return {k: d[k] for k in sorted(d)[-days:]}
+
+
+def price_day(day: str) -> dict | None:
+    """96 Viertelstunden-Preise (ct, Luecken als None) UND Tibbers Einstufung (lvl, falls vorhanden) EINES Tages
+    inkl. Quelle - fuer den Tage-zurueck-Blick im Strompreis-Diagramm (anders als price_slots(): gibt auch
+    "derived" zurueck, nicht nur Original-Tibber)."""
+    with _PRICE_LOCK:
+        rec = _price_days().get(day)
+        if not rec:
+            return None
+        return {"p": list(rec["p"]), "lvl": list(rec.get("lvl") or [None] * len(rec["p"])), "src": rec["src"]}
+
+
+def energy_grid_charge_buckets(day: str) -> dict:
+    """{slot_key 'YYYY-MM-DDTHH:MM': gemessene Netz→Batterie-kWh} eines Tages.
+    Basis für die tatsächliche (statt geschätzte) Lademenge in den Ladevorgängen."""
+    return {k: round(b.get("g_batt", 0.0), 4) for k, b in _day_buckets(day).items()}
+
+
+def active_ev(now: datetime | None = None):
+    """Gibt den aktuell laufenden E-Auto-Termin zurück (oder None)."""
+    now = now or datetime.now()
+    for i in _load_ev():
+        if not i.get("enabled"):
+            continue
+        try:
+            s = datetime.fromisoformat(i["start"])
+            e = datetime.fromisoformat(i["end"])
+        except (ValueError, KeyError):
+            continue
+        if s <= now < e:
+            return i
+    return None
+
+
+# --- Batterie-Watchdog ------------------------------------------------------
+# Erkennt den Multiplus-Ladealgorithmus-Haenger vom 01.09.2026 (siehe Projekt-
+# Notiz): Batterie laedt/entlaedt praktisch nicht (|Strom| < 0.5 A), obwohl
+# gleichzeitig ein nennenswerter Netzfluss da ist (>150 W) - normalerweise
+# wuerde die Batterie mithelfen. Reine Erkennung + Protokollierung, KEIN
+# automatischer Eingriff (ein manueller ESS-Mode-Befehl blieb beim echten
+# Vorfall wirkungslos, nur ein physischer Reset half).
+def _load_watchdog() -> dict:
+    if os.path.exists(WATCHDOG_PATH):
+        with open(WATCHDOG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {"active": False, "since": None, "notified": False,
+            "last_detail": None, "events": []}
+
+
+def battery_watchdog_update(is_frozen: bool, now: datetime, detail: dict,
+                            threshold_min: float = 15.0) -> dict:
+    """Fuehrt die Zustandsverfolgung fort und persistiert sie. Gibt zurueck,
+    ob der Aufrufer gerade jetzt warnen ('just_warned') bzw. Entwarnung geben
+    soll ('just_resolved', mit Episoden-Details oder None)."""
+    data = _load_watchdog()
+    result = {"just_warned": False, "just_resolved": None}
+    if is_frozen:
+        if not data.get("active"):
+            data["active"] = True
+            data["since"] = now.isoformat(timespec="seconds")
+            data["notified"] = False
+        data["last_detail"] = detail
+        since = datetime.fromisoformat(data["since"])
+        duration_min = (now - since).total_seconds() / 60.0
+        if not data.get("notified") and duration_min >= threshold_min:
+            data["notified"] = True
+            result["just_warned"] = True
+        result["duration_min"] = round(duration_min, 1)
+    else:
+        if data.get("active"):
+            since = datetime.fromisoformat(data["since"])
+            duration_min = (now - since).total_seconds() / 60.0
+            if data.get("notified"):
+                event = {"start": data["since"], "end": now.isoformat(timespec="seconds"),
+                         "duration_min": round(duration_min, 1), "detail": data.get("last_detail")}
+                events = [event] + data.get("events", [])
+                data["events"] = events[:50]
+                result["just_resolved"] = event
+        data["active"] = False
+        data["since"] = None
+        data["notified"] = False
+        data["last_detail"] = None
+    _dump_json(WATCHDOG_PATH, data, indent=2)
+    return result
+
+
+def battery_watchdog_state() -> dict:
+    """Fuer die UI/API: aktueller Zustand + juengste abgeschlossene Episoden."""
+    data = _load_watchdog()
+    status = {"active": bool(data.get("active")), "since": data.get("since"),
+              "detail": data.get("last_detail")}
+    if status["active"] and status["since"]:
+        try:
+            since = datetime.fromisoformat(status["since"])
+            status["duration_min"] = round((datetime.now() - since).total_seconds() / 60.0, 1)
+        except ValueError:
+            status["duration_min"] = None
+    return {"status": status, "events": data.get("events", [])[:20]}
+
+
+# --- Ladeplan-Simulation: Tages-Schnappschuss fuers Vergleichen ueber mehrere Tage ---------------
+PLANSIM_LOG_PATH = os.path.join(_DIR, "plansim_log.json")
+
+
+def _win_text(ws: list) -> str:
+    return ", ".join(f"{w['from']}-{w['to']}" for w in ws)
+
+
+def record_plansim(now: datetime, res: dict):
+    """Haelt pro Tag EINMAL (ab 14 Uhr, wenn die Preise von morgen bekannt sind) fest, was Simulation und bisherige
+    Steuerung laut Modell gekostet haetten. Nach ein paar Tagen zeigt das, welcher Ansatz besser ist."""
+    if now.hour < 14 or not res:
+        return
+    data = _load_json_recovering(PLANSIM_LOG_PATH, lambda: {"days": {}})
+    days = data.setdefault("days", {})
+    day = now.date().isoformat()
+    if day in days:
+        return
+    days[day] = {"horizon_end": res["horizon_end"],
+                 "sim_net": res["sim"]["net_ct"], "current_net": res["current"]["net_ct"], "none_net": res["none"]["net_ct"],
+                 "sim_charge_kwh": res["sim"]["grid_charge_kwh"], "current_charge_kwh": res["current"]["grid_charge_kwh"],
+                 "sim_windows": _win_text(res["sim"]["windows"]), "current_windows": _win_text(res["current"]["windows"])}
+    for old in sorted(days)[:-60]:
+        del days[old]
+    _dump_json(PLANSIM_LOG_PATH, data, indent=2)
+
+
+def plansim_log(limit: int = 30) -> list:
+    data = _load_json_recovering(PLANSIM_LOG_PATH, lambda: {"days": {}})
+    days = data.get("days", {}) if isinstance(data, dict) else {}
+    return [{"date": d, **days[d]} for d in sorted(days, reverse=True)[:limit]]
+
+
+# --- VRM-Stundenprognose je Tag aufheben (das VRM zeigt sie nach Tagesende nicht mehr) -----------------
+FORECAST_HOURS_PATH = os.path.join(_DIR, "forecast_hours.json")
+FORECAST_KEEP_DAYS = 800
+
+
+def record_forecast_hours(vrm_data: dict | None, now: datetime | None = None):
+    """Merkt sich je Tag die stuendliche VRM-Prognose (Solar + Verbrauch). Der Folgetag wird bei jedem Abruf aktualisiert;
+    sobald der Tag laeuft, bleibt der zuletzt gemerkte Stand stehen (so sieht man spaeter, was vorhergesagt war)."""
+    if not vrm_data or not vrm_data.get("hours"):
+        return
+    now = now or datetime.now()
+    keys = {"today": now.date().isoformat(), "tomorrow": (now.date() + timedelta(days=1)).isoformat()}
+    data = _load_json_recovering(FORECAST_HOURS_PATH, lambda: {"days": {}})
+    days = data.setdefault("days", {})
+    changed = False
+    frozen = {(keys["today"], f) for f in ("solar", "cons") if (days.get(keys["today"]) or {}).get(f)}   # laufender Tag: schon gemerkt
+    for src, field in ((vrm_data, "solar"), (vrm_data.get("cons") or {}, "cons")):
+        for h in src.get("hours") or []:
+            day = keys.get(h.get("day"))
+            if day is None or (day, field) in frozen:
+                continue
+            e = days.setdefault(day, {})
+            e.setdefault(field, {})[str(int(h["hour"]))] = round(float(h["wh"]), 1)
+            changed = True
+    if not changed:
+        return
+    for old in sorted(days)[:-FORECAST_KEEP_DAYS]:
+        del days[old]
+    _dump_json(FORECAST_HOURS_PATH, data, indent=None)
+
+
+def forecast_hours_for_day(day: str) -> dict:
+    """{'solar': {stunde: Wh}, 'cons': {stunde: Wh}} des gemerkten Tages (leer, wenn nichts gemerkt)."""
+    data = _load_json_recovering(FORECAST_HOURS_PATH, lambda: {"days": {}})
+    e = (data.get("days", {}) if isinstance(data, dict) else {}).get(day) or {}
+    return {"solar": e.get("solar") or {}, "cons": e.get("cons") or {}}
+
+
+# --- Ersparnis-Auswertung ------------------------------------------------------------------------------
+# Vergleich je Tag: "ohne Anlage" = derselbe Verbrauch, jede Viertelstunde komplett aus dem Netz zum damaligen Preis.
+# "Bezahlt" = Netzbezug x Preis. Die Tageswerte bleiben in savings_days.json (der Verlauf haelt nur 35 Tage).
+SAVINGS_PATH = os.path.join(_DIR, "savings_days.json")
+SAVINGS_KEEP_DAYS = 800
+_SAVINGS_MIN_COVERAGE = 0.9
+
+
+def _savings_day(items: list, prices, fixed_ct: float):
+    """items: [(viertelstunde_index, bucket)]. prices: 96 Preise (ct) oder None. Rueckgabe: Tagesergebnis (ct) oder None."""
+    without = cost = imp_sum = cons_sum = 0.0
+    total = missing = 0
+    for idx, b in items:
+        v = b.get("verbrauch", 0.0) or 0.0
+        imp = (b.get("g_load", 0.0) or 0.0) + (b.get("g_batt", 0.0) or 0.0)
+        if v <= 0 and imp <= 0:
+            continue
+        total += 1
+        price = fixed_ct if fixed_ct else (prices[idx] if prices and idx < len(prices) else None)
+        if price is None:
+            missing += 1
+            continue
+        without += v * price
+        cost += imp * price
+        imp_sum += imp
+        cons_sum += v
+    if not total or cons_sum <= 0 or missing > (1 - _SAVINGS_MIN_COVERAGE) * total:
+        return None
+    known = [p for p in prices if p is not None] if prices else []
+    avg = fixed_ct if fixed_ct else (sum(known) / len(known) if known else None)
+    if avg is None:
+        return None
+    timing = imp_sum * avg - cost                    # Netzbezug guenstiger (+) bzw. teurer (-) als zum Tagesdurchschnittspreis
+    saving = without - cost
+    return {"verbrauch": round(cons_sum, 2), "import": round(imp_sum, 2), "without_ct": round(without, 1), "cost_ct": round(cost, 1),
+            "saving_ct": round(saving, 1), "timing_ct": round(timing, 1), "self_ct": round(saving - timing, 1), "avg_price": round(avg, 2)}
+
+
+def _savings_total(rows: list) -> dict:
+    t = {k: sum(r[k] for r in rows) for k in ("without_ct", "cost_ct", "saving_ct", "timing_ct", "self_ct")}
+    return {"days": len(rows), **{k[:-3] + "_eur": round(v / 100.0, 2) for k, v in t.items()}}
+
+
+def savings(cfg: dict, now: datetime | None = None, keep_days: int = 60) -> dict:
+    """Ersparnis heute (laufend), 7/30 Tage und gesamt. Abgeschlossene Tage werden einmal berechnet und dauerhaft gespeichert."""
+    now = now or datetime.now()
+    today = now.date().isoformat()
+    fixed_mode = cfg.get("tariff_mode") == "fixed"
+    fixed = float(cfg.get("fixed_price_ct") or 0) if fixed_mode else 0.0
+    if fixed_mode and fixed <= 0:
+        return {"available": False, "reason": "Kein fester Preis eingetragen."}
+    by_day: dict = {}
+
+    def _index_bucket(k, b):
+        try:
+            idx = int(k[11:13]) * 4 + int(k[14:16]) // 15
+        except ValueError:
+            return
+        by_day.setdefault(k[:10], []).append((idx, b))
+
+    for k, b in _load_history().get("hours", {}).items():
+        _index_bucket(k, b)
+    pdays = _price_days()
+    data = _load_json_recovering(SAVINGS_PATH, lambda: {"days": {}})
+    if not isinstance(data, dict):
+        data = {"days": {}}
+    saved = data.setdefault("days", {})
+    # Tage, die noch nicht "eingefroren" sind, aber (normal - schon archiviert) nicht mehr in der
+    # heissen Datei stehen: gezielt aus dem dauerhaften Archiv nachladen, statt bei jedem Aufruf
+    # das ganze Archiv zu durchsuchen. Bewusst begrenzter Rueckblick (z.B. nach laengerer
+    # Ausfallzeit) - genau wie zuvor, als die heisse Datei selbst nur begrenzt weit zurueckreichte.
+    d = now.date() - timedelta(days=1)
+    oldest = now.date() - timedelta(days=VRM_RESTORE_LOOKBACK_DAYS)
+    while d >= oldest:
+        day = d.isoformat()
+        if day not in saved and day not in by_day:
+            for k, b in _day_buckets(day).items():
+                _index_bucket(k, b)
+        d -= timedelta(days=1)
+    changed = False
+    live = None
+    for day in sorted(by_day):
+        if day < today and day in saved:
+            continue                                                # eingefroren
+        items = by_day[day]
+        if day < today and len(items) < 80:
+            continue                                                # unvollstaendig aufgezeichneter Tag
+        rec = pdays.get(day)
+        prices = rec["p"] if rec and rec.get("src") == "tibber" else None
+        res = _savings_day(items, prices, fixed)
+        if res is None:
+            continue
+        res["mode"] = "fixed" if fixed_mode else "tibber"
+        if day == today:
+            live = {"date": day, **res}
+        else:
+            saved[day] = res
+            changed = True
+    if changed:
+        for old in sorted(saved)[:-SAVINGS_KEEP_DAYS]:
+            del saved[old]
+        _dump_json(SAVINGS_PATH, data, indent=None)
+    rows = ([live] if live else []) + [{"date": d, **saved[d]} for d in sorted(saved, reverse=True) if d != today]
+    if not rows:
+        return {"available": False, "reason": "Noch keine Tage mit vollständigen Preisdaten – füllt sich ab dem ersten vollständigen Tag."}
+    d7 = (now.date() - timedelta(days=6)).isoformat()
+    d30 = (now.date() - timedelta(days=29)).isoformat()
+    return {"available": True, "mode": "fixed" if fixed_mode else "tibber", "days": rows[:keep_days],
+            "totals": {"today": _savings_total([live]) if live else None,
+                       "d7": _savings_total([r for r in rows if r["date"] >= d7]),
+                       "d30": _savings_total([r for r in rows if r["date"] >= d30]),
+                       "all": _savings_total(rows)}}
+
+
+# --- Automatische Kalibrierung der VRM-Prognose --------------------------------------------------------
+PV_CAL_MIN_DAYS = 5
+PV_CAL_WINDOW = 14
+
+
+def pv_calibration(now: datetime | None = None) -> dict:
+    """Lernt aus dem Solarlogbuch, um wie viel die VRM-Tagesprognose im Schnitt daneben liegt: Faktor = Ertrag / Prognose ueber die
+    letzten Tage (begrenzt auf 0,6-1,1). Tage mit vollem Akku (Ertrag evtl. gedeckelt) zaehlen nicht, wenn der Ertrag unter der Prognose lag."""
+    now = now or datetime.now()
+    good = []
+    for r in solar_log(now)["rows"]:
+        fc, act = r.get("vrm_forecast"), r.get("actual")
+        if r.get("provisional") or not fc or fc < 1 or not act or act <= 0:
+            continue
+        if r.get("curtailed") and act < fc:
+            continue
+        good.append(r)
+        if len(good) >= PV_CAL_WINDOW:
+            break
+    n = len(good)
+    if n < PV_CAL_MIN_DAYS:
+        return {"ready": False, "factor": 1.0, "days": n, "min_days": PV_CAL_MIN_DAYS}
+    f = max(0.6, min(1.1, sum(r["actual"] for r in good) / sum(r["vrm_forecast"] for r in good)))
+    return {"ready": True, "factor": round(f, 2), "days": n, "min_days": PV_CAL_MIN_DAYS, "avg_dev_pct": round((f - 1) * 100)}

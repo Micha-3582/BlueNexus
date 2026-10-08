@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Batterie-Watchdog · {{ app_display_name }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Batterie-Watchdog <span class="qhelp" role="button" tabindex="0" data-help="Erkennt, wenn die Batterie trotz nennenswertem Netzfluss (&gt; 150 W) über <b>15 Minuten oder länger</b> praktisch nicht lädt oder entlädt (Strom &lt; 0,5 A). Das kann auf einen hängenden Ladealgorithmus im MultiPlus/Quattro hindeuten. Reine Beobachtung, kein automatischer Eingriff.">?</span></h2>
+  <div class="sub">Erkennt hängende Ladealgorithmen im MultiPlus/Quattro.</div>
+
+  <div id="active-box" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;
+       border:1px solid var(--exp);background:rgba(200,60,60,.12)">
+    <b style="color:var(--exp)">⚠ Aktuell aktiv</b>
+    <div id="active-detail" class="muted" style="margin-top:6px"></div>
+  </div>
+  <div id="ok-box" style="display:none;margin-bottom:14px" class="muted">
+    Aktuell kein Verdachtsfall – Batterie reagiert normal.
+  </div>
+
+  <h3 style="margin-top:8px">Vergangene Episoden</h3>
+  <div class="table-scroll"><table id="log-table"></table></div>
+</div>
+
+<div class="card">
+  <h2>Akku-Nutzung &amp; Lebensdauer <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, wie viel Energie insgesamt durch den Akku geflossen ist, umgerechnet in <b>äquivalente Vollzyklen</b> (einmal die ganze nutzbare Kapazität ein- und wieder ausgeladen = 1 Zyklus). Eine grobe Kennzahl für den Verschleiß, z. B. im Vergleich mit der Zyklenzahl des Herstellers. Gezählt wird seit Einführung dieser Auswertung – ältere Nutzung ist nicht enthalten.">?</span></h2>
+  <div class="sub">Durchgesetzte Energie als äquivalente Vollzyklen.</div>
+  <div id="cyc-msg" class="muted"></div>
+  <div id="cyc-body" class="sysgrid" style="display:none"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const fmtTs = iso => { try {
+  const d = new Date(iso);
+  return d.toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+} catch (e) { return iso || '–'; } };
+
+async function load() {
+  let d;
+  try { d = await (await fetch('/api/watchdog')).json(); }
+  catch (e) { $('log-table').innerHTML = '<tr><td class="muted">Fehler beim Laden.</td></tr>'; return; }
+
+  const s = d.status || {};
+  if (s.active) {
+    $('active-box').style.display = '';
+    $('ok-box').style.display = 'none';
+    const det = s.detail || {};
+    $('active-detail').textContent =
+      `Seit ${fmtTs(s.since)} (${s.duration_min ?? '?'} Min) – ` +
+      `Netz ${det.grid_w ?? '?'} W, Batteriestrom ${det.battery_a ?? '?'} A, SOC ${det.soc ?? '?'} %`;
+  } else {
+    $('active-box').style.display = 'none';
+    $('ok-box').style.display = '';
+  }
+
+  const head = `<tr class="thead"><td>Start</td><td>Ende</td><td>Dauer</td><td>Details bei Start</td></tr>`;
+  const rows = (d.events || []).map(e => {
+    const det = e.detail || {};
+    return `<tr>
+      <td>${fmtTs(e.start)}</td>
+      <td>${fmtTs(e.end)}</td>
+      <td>${e.duration_min} Min</td>
+      <td class="muted">Netz ${det.grid_w ?? '?'} W · Batt ${det.battery_a ?? '?'} A · SOC ${det.soc ?? '?'} %</td>
+    </tr>`;
+  }).join('');
+  $('log-table').innerHTML = head + (rows || '<tr><td class="muted">Keine Episoden protokolliert.</td></tr>');
+}
+load();
+setInterval(load, 30000);
+
+async function loadCycles() {
+  let c;
+  try { c = await (await fetch('/api/battery-cycles')).json(); }
+  catch (e) { $('cyc-msg').textContent = 'Fehler beim Laden.'; return; }
+  if (!c.battery_usable_kwh || c.equivalent_full_cycles == null) {
+    $('cyc-msg').textContent = 'Noch keine nutzbare Akkukapazität eingetragen (Einstellungen → Anlage & Speicher).';
+    return;
+  }
+  $('cyc-msg').textContent = c.source === 'vrm' ? '' :
+    'Hinweis: Ohne VRM-Zugang zählt nur, was diese App selbst seit ihrer Einführung gemessen hat (nicht die ganze Lebenszeit des Akkus).';
+  const tile = (t, big, sub) => `<div class="systile"><div class="systile-t">${t}</div><div class="systile-v">${big}</div><div class="systile-s">${sub}</div></div>`;
+  const since = c.since_date ? `${c.since_date.slice(8, 10)}.${c.since_date.slice(5, 7)}.${c.since_date.slice(0, 4)}` : '–';
+  let tiles =
+    tile('Äquivalente Vollzyklen', c.equivalent_full_cycles, `seit ${since}${c.source === 'vrm' ? ' (VRM-Verlauf)' : ''}`) +
+    tile('Geladen', c.charge_kwh.toFixed(0) + ' kWh', 'Solar + Netz → Akku') +
+    tile('Entladen', c.discharge_kwh.toFixed(0) + ' kWh', 'Akku → Verbrauch + Netz') +
+    tile('Nutzbare Kapazität', c.battery_usable_kwh + ' kWh', 'aus den Einstellungen');
+  if (c.soh_pct != null) {
+    tiles += tile('Alterungszustand (SOH)', c.soh_pct.toFixed(0) + ' %', 'direkt vom BMS, wie am Cerbo');
+  }
+  if (c.battery_expected_cycles && c.years_remaining != null) {
+    tiles += tile('Reicht noch rechnerisch', c.years_remaining + ' Jahre',
+      `bei ${c.cycles_per_year} Zyklen/Jahr bis ${c.battery_expected_cycles} Zyklen (Herstellerangabe)`);
+  }
+  $('cyc-body').style.display = '';
+  $('cyc-body').innerHTML = tiles;
+}
+loadCycles();
+</script>
+{% endblock %}
