@@ -45,11 +45,11 @@
     <!-- Schritt 1: Cerbo -->
     <div class="wiz-step" data-step="1">
       <div class="wiz-step-label">Verbindung zur Anlage</div>
-      <h2 class="wiz-title">Victron Cerbo GX <span class="qhelp" role="button" tabindex="0" data-help="Die App liest Live-Werte (SOC, Leistungen) direkt vom Cerbo und schaltet darüber das Netzladen. Ohne Adresse kann sie nichts sehen und nichts steuern.<ol><li><b>Modbus aktivieren:</b> am Cerbo (oder in VRM/Remote Console) unter <b>Einstellungen → Dienste → Modbus TCP</b> auf <b>AN</b>.</li><li><b>IP-Adresse finden:</b> unter <b>Einstellungen → Ethernet</b> (oder WLAN), z. B. 192.168.1.50.</li><li><b>Port:</b> bleibt bei 502.</li></ol>Tipp: Dem Cerbo im Router eine feste IP geben.">?</span></h2>
-      <div class="wiz-sub">Adresse deines Cerbo GX im Heimnetz.</div>
+      <h2 class="wiz-title">Victron GX-Gerät <span class="qhelp" role="button" tabindex="0" data-help="Die App liest Live-Werte (SOC, Leistungen) direkt vom Cerbo und schaltet darüber das Netzladen. Ohne Adresse kann sie nichts sehen und nichts steuern.<ol><li><b>Modbus aktivieren:</b> am Cerbo (oder in VRM/Remote Console) unter <b>Einstellungen → Dienste → Modbus TCP</b> auf <b>AN</b>.</li><li><b>IP-Adresse finden:</b> unter <b>Einstellungen → Ethernet</b> (oder WLAN), z. B. 192.168.1.50.</li><li><b>Port:</b> bleibt bei 502.</li></ol>Tipp: Dem Cerbo im Router eine feste IP geben.">?</span></h2>
+      <div class="wiz-sub">Adresse deines GX-Geräts im Heimnetz (Cerbo GX oder MultiPlus-II GX).</div>
       <div class="wiz-body">
         <div class="grid2">
-          <div><label>Cerbo IP-Adresse <span class="qhelp" role="button" tabindex="0" data-help="IP-Adresse des Cerbo GX im Heimnetz (Einstellungen → Ethernet bzw. WLAN). Am Cerbo muss Modbus TCP eingeschaltet sein.">?</span></label><input id="cerbo_host" value="{{ cfg.cerbo_host }}" placeholder="192.168.1.50"></div>
+          <div><label>GX-Gerät IP-Adresse <span class="qhelp" role="button" tabindex="0" data-help="IP-Adresse des Cerbo GX im Heimnetz (Einstellungen → Ethernet bzw. WLAN). Am Cerbo muss Modbus TCP eingeschaltet sein.">?</span></label><input id="cerbo_host" value="{{ cfg.cerbo_host }}" placeholder="192.168.1.50"></div>
           <div><label>Port <span class="qhelp" role="button" tabindex="0" data-help="Port für Modbus TCP. Fast immer 502 – nur ändern, wenn du ihn am Cerbo umgestellt hast.">?</span></label><input id="cerbo_port" value="{{ cfg.cerbo_port }}"></div>
         </div>
       </div>
