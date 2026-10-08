@@ -722,7 +722,17 @@ def api_nfc_tags():
 @app.route("/api/nfc/tags/<tid>", methods=["PATCH", "DELETE"])
 def api_nfc_tag(tid):
     if request.method == "DELETE":
-        return (jsonify(ok=True), 200) if nfc.remove_tag(tid) else (jsonify(error="nicht gefunden"), 404)
+        tag = next((x for x in nfc.load()["tags"] if x["id"] == tid), None)
+        if not tag:
+            return jsonify(error="nicht gefunden"), 404
+        target = tag.get("target")
+        busy = _in_use("virtual", target) if target else None
+        if busy:
+            return busy                                                      # der Knopf des Tags steckt noch in einer Regel
+        nfc.remove_tag(tid)
+        if target and not nfc.is_target(target) and virtual.remove(target):    # Tag und sein Knopf gehoeren zusammen
+            alexa.remove_ref("virtual", target)
+        return jsonify(ok=True)
     b = request.get_json(silent=True) or {}
     try:
         ok = nfc.update_tag(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, phones=b.get("phones") if isinstance(b.get("phones"), list) else None,
@@ -4134,6 +4144,8 @@ def api_virtual_modify(vid):
     if hidden:
         return hidden
     if request.method == "DELETE":
+        if nfc.is_target(vid):
+            return jsonify(error="Dieser Knopf gehört zu einem NFC-Tag und wird mit dem Tag unter Smart Home → NFC-Tags gelöscht."), 400
         busy = _in_use("virtual", vid)
         if busy:
             return busy

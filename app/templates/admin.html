@@ -2207,14 +2207,14 @@ async function loadVirtualAdmin() {
       <button type="button" class="tgl${isSw && v.on ? ' on' : ''}${v.pin_set ? ' pinned' : ''}" style="opacity:1" title="${isSw ? (v.on ? 'Ausschalten' : 'Einschalten') : 'Drücken'}" aria-label="${isSw ? 'Schalten' : 'Drücken'}" onclick="virtAct('${vid}', ${isSw ? 'true' : 'false'}, ${v.on ? 'true' : 'false'}, ${v.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(v.name)}">${isSw ? I_SWITCH : I_PLAY}</button>
       </div></div>
       <div class="edit-panel" id="vedit-${vid}">
-        ${v.nfc ? '<div class="muted">🏷️ NFC-Knopf: Name und Freigaben änderst du unter <b>NFC-Tags</b>.</div>' : `<div class="edit-row"><input id="vname-${vid}" value="${escH(v.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')virtRenameSave('${vid}')">
+        ${v.nfc ? '<div class="muted">🏷️ NFC-Knopf: Name, Freigaben und Löschen gehören zum NFC-Tag – das alles erledigst du unter <b>NFC-Tags</b>. Hier kannst du nur festlegen, ob der Knopf auf dem Dashboard erscheint und wer ihn sehen darf.</div>' : `<div class="edit-row"><input id="vname-${vid}" value="${escH(v.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')virtRenameSave('${vid}')">
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="virtRenameSave('${vid}')">${I_CHECK}</button></div>`}
         ${v.kind === 'timer' ? `<div class="edit-row" style="margin-top:10px"><span class="muted">Nachlaufzeit</span><input id="vmin-${vid}" type="number" min="1" max="1440" step="1" value="${v.minutes}" style="width:80px"><span class="muted">Minuten</span>
           <button type="button" class="tgl" title="Nachlaufzeit speichern" aria-label="Nachlaufzeit speichern" onclick="virtPatch('${vid}', { minutes: document.getElementById('vmin-${vid}').value })">${I_CHECK}</button></div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(v.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'virtual','${vid}','show','Dashboard')`)}
           ${visBtn('virtual', vid, v.users)}
-          <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="virtRemove('${vid}')">${I_TRASH}</button>
+          ${v.nfc ? '' : `<button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="virtRemove('${vid}')">${I_TRASH}</button>`}
         </div>
       </div>
       <div id="vicons-${vid}" style="display:none;flex-wrap:wrap;gap:4px;width:100%;margin-top:8px">${[...new Set([...VIRT_ICONS, ...shellyIcons])].map(ic => `<button class="ghost" style="font-size:20px;padding:2px 8px" onclick="virtPatch('${vid}', { icon: '${ic}' })">${ic}</button>`).join('')}</div></div>`; }).join('')
@@ -2875,7 +2875,8 @@ async function nfcDelPhone(pid) {
 }
 async function nfcDelTag(tid) {
   const t = nfcData.tags.find(x => x.id === tid);
-  if (!await uiDialog({ title: 'Tag löschen?', message: `Der Tag „${t ? t.name : ''}“ löst danach nichts mehr aus. Den physischen Tag kannst du überschreiben oder wegwerfen. Der zugehörige Knopf bleibt erhalten.`, okText: 'Löschen' })) return;
+  if (!await uiDialog({ title: 'Tag löschen?', message: `Der Tag „${t ? t.name : ''}“ und sein Knopf werden gelöscht. Den physischen Tag kannst du überschreiben oder wegwerfen.`, okText: 'Löschen' })) return;
+  if (t && t.target && await inUseBlock('virtual', t.target, t.name)) return;          // der Knopf wird noch in einer Regel verwendet
   try { await shellyApi('/api/nfc/tags/' + encodeURIComponent(tid), 'DELETE'); savedToast('Gelöscht'); } catch (e) { nfcMsg(e.message, true); }
   nfcLoad();
 }
