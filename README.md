@@ -561,7 +561,7 @@ und einer SQLite-Datenbank im Ordner `app/` und sind **nicht in Git**.
 
 ## Lizenz / Haftung
 
-BlueNexus ist **freie Software** unter der **GNU General Public License, Version 3** (siehe [LICENSE](LICENSE)): Du darfst sie nutzen, ändern und weitergeben; Weitergaben und Weiterentwicklungen müssen wieder unter derselben Lizenz offen stehen. Es ist ein **privates, nicht-kommerzielles Hobbyprojekt** und steht in keiner Verbindung zu anderen Firmen oder Produkten gleichen oder ähnlichen Namens.
+BlueNexus ist **freie Software** unter der **GNU General Public License, Version 3** (siehe [LICENSE](LICENSE)): Du darfst sie nutzen, ändern und weitergeben; Weitergaben und Weiterentwicklungen müssen wieder unter derselben Lizenz offen stehen. Es ist ein **privates, nicht-kommerzielles Open-Source-Projekt** und steht in keiner Verbindung zu anderen Firmen oder Produkten gleichen oder ähnlichen Namens.
 
 Nutzung auf **eigene Verantwortung**. Die Software steuert die Netzladung einer Batterieanlage und schaltet
 Verbraucher im Haus – vor dem Scharfschalten (Dry-Run bzw. Trockenlauf aus) unbedingt im Parallelbetrieb
