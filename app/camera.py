@@ -173,6 +173,65 @@ def _call(item: dict, cmd: str, param: dict | None = None, action: int = 0) -> d
     raise CameraError(f"Die Kamera meldet einen Fehler ({_detail(last or {})}) – Reolink-Kamera, Firmware und Benutzerrechte (Administrator?) prüfen")
 
 
+# ---------------------------------------------------------------- Chime (Tuergong zur Reolink-Video-Tuerklingel)
+CHIME_TONES = {0: "Vogelgezwitscher", 1: "Originalmelodie", 2: "Klaviertöne", 3: "Schleife", 4: "Attraktion", 5: "Hüpfer", 6: "Guten Tag", 7: "Operette", 8: "Mondlicht", 9: "Heimweg"}
+CHIME_VOLUMES = {0: "Stumm", 1: "Sehr leise", 2: "Leise", 3: "Mittel", 4: "Laut"}
+
+
+def chime_list(item: dict) -> list[dict]:
+    """Die mit der Tuerklingel gekoppelten Chimes: [{"id", "name", "online", "volume", "led"}]. Leer, wenn die Kamera keinen Chime kennt."""
+    ch = int(item.get("channel") or 0)
+    v = _call(item, "GetDingDongList", {"channel": ch})
+    out = []
+    for d in ((v.get("DingDongList") or {}).get("pairedlist") or []):
+        try:
+            did = int(d.get("deviceId"))
+        except (TypeError, ValueError):
+            continue
+        e = {"id": did, "name": d.get("deviceName") or f"Chime {did}", "online": d.get("netState") == 2, "volume": None, "led": None}
+        try:
+            dd = (_call(item, "DingDongOpt", {"channel": ch, "option": 2, "id": did}).get("DingDong") or {})
+            e["volume"] = dd.get("volLevel")
+            e["led"] = dd.get("ledState") == 1 if "ledState" in dd else None
+            if dd.get("name"):
+                e["name"] = dd["name"]
+        except CameraError:
+            pass
+        out.append(e)
+    return out
+
+
+def _chime_id(item: dict, chime_id) -> int:
+    try:
+        return int(chime_id)
+    except (TypeError, ValueError):
+        raise CameraError("Chime: ungültige Nummer")
+
+
+def chime_ring(item: dict, chime_id, tone) -> None:
+    """Laesst den Chime mit dem gewaehlten Klingelton laeuten (zum Ausprobieren oder als Gong aus einer Regel)."""
+    try:
+        tone = int(tone)
+    except (TypeError, ValueError):
+        raise CameraError("Klingelton: ungültig")
+    if tone not in CHIME_TONES:
+        raise CameraError("Klingelton: ungültig")
+    _call(item, "DingDongOpt", {"channel": int(item.get("channel") or 0), "option": 4, "id": _chime_id(item, chime_id), "musicId": tone})
+
+
+def chime_set_volume(item: dict, chime_id, volume) -> None:
+    """Lautstaerke des Chimes (0 = stumm bis 4 = laut); Name und LED bleiben unveraendert."""
+    try:
+        volume = int(volume)
+    except (TypeError, ValueError):
+        raise CameraError("Lautstärke: ungültig")
+    if volume not in CHIME_VOLUMES:
+        raise CameraError("Lautstärke: 0 bis 4")
+    ch, did = int(item.get("channel") or 0), _chime_id(item, chime_id)
+    cur = (_call(item, "DingDongOpt", {"channel": ch, "option": 2, "id": did}).get("DingDong") or {})
+    _call(item, "DingDongOpt", {"channel": ch, "option": 3, "id": did, "name": cur.get("name") or "", "volLevel": volume, "ledState": 1 if cur.get("ledState") == 1 else 0})
+
+
 # ---------------------------------------------------------------- Aufnahmen auf der SD-Karte (Video zum Ereignis)
 VIDEO_TYPES = ("animal", "person", "vehicle", "motion")                        # Ereignisarten, nach denen sich filtern laesst
 VIDEO_LABEL = {"animal": "Tier", "person": "Person", "vehicle": "Fahrzeug", "motion": "Bewegung"}

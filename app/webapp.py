@@ -249,7 +249,7 @@ ENDPOINT_AREA = {
     "verlauf_page": "verlauf", "api_verlauf_catalog": "verlauf", "api_verlauf_series": "verlauf", "api_verlauf_series_add": "verlauf", "api_verlauf_series_modify": "verlauf",
     "api_verlauf_data": "verlauf", "api_verlauf_charts": "verlauf", "api_verlauf_charts_save": "verlauf",
     "kameras_page": "kameras", "api_cameras_list": "kameras", "api_cameras_add": "kameras", "api_camera_modify": "kameras",
-    "api_camera_snapshot": "kameras", "api_camera_stream": "kameras", "api_cameras_order": "kameras", "api_cameras_my_order": "kameras",
+    "api_camera_snapshot": "kameras", "api_camera_chimes": "kameras", "api_camera_chime": "kameras", "api_camera_stream": "kameras", "api_cameras_order": "kameras", "api_cameras_my_order": "kameras",
     "api_tuya_info": "smarthome_einrichten", "api_tuya_credentials": "smarthome_einrichten",
     "api_tuya_scan": "smarthome_einrichten", "api_tuya_add": "smarthome_einrichten",
     "api_device_families": "smarthome_einrichten", "api_homematic_info": "smarthome_einrichten", "api_homematic_credentials": "smarthome_einrichten", "api_homematic_push": "smarthome_einrichten", "api_rule_usage": "settings_geraete", "api_homematic_events": "smarthome_einrichten", "api_homematic_radio": "smarthome_einrichten", "api_homematic_pause": "smarthome_einrichten", "api_homematic_resume": "smarthome_einrichten",
@@ -4131,6 +4131,45 @@ def api_camera_modify(cid):
     except camera.CameraError as e:
         return jsonify(error=str(e)), 400
     return jsonify(ok=True) if ok else (jsonify(error="nicht gefunden"), 404)
+
+
+@app.route("/api/cameras/<cid>/chimes", methods=["GET"])
+def api_camera_chimes(cid):
+    """Chimes (Tuergong) einer Reolink-Video-Tuerklingel samt Klingeltoenen und Lautstaerken - nur Administratoren."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    cam = camera.get(cid)
+    if not cam or cam.get("kind", "reolink") != "reolink":
+        return jsonify(error="nicht gefunden"), 404
+    try:
+        chimes = camera.chime_list(cam)
+    except camera.CameraError as e:
+        return jsonify(error=str(e)), 503
+    return jsonify(chimes=chimes, tones=[{"id": k, "name": v} for k, v in camera.CHIME_TONES.items()],
+                   volumes=[{"id": k, "name": v} for k, v in camera.CHIME_VOLUMES.items()])
+
+
+@app.route("/api/cameras/<cid>/chime", methods=["POST"])
+def api_camera_chime(cid):
+    """Chime laeuten lassen (action "ring", mit tone) oder Lautstaerke setzen (action "volume") - nur Administratoren."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    cam = camera.get(cid)
+    if not cam or cam.get("kind", "reolink") != "reolink":
+        return jsonify(error="nicht gefunden"), 404
+    b = request.get_json(silent=True) or {}
+    try:
+        if b.get("action") == "ring":
+            camera.chime_ring(cam, b.get("chime"), b.get("tone"))
+        elif b.get("action") == "volume":
+            camera.chime_set_volume(cam, b.get("chime"), b.get("volume"))
+        else:
+            return jsonify(error="unbekannte Aktion"), 400
+    except camera.CameraError as e:
+        return jsonify(error=str(e)), 503
+    return jsonify(ok=True)
 
 
 def _camera_for_me(cid):

@@ -139,6 +139,9 @@ function cardHtml(c) {
         <span class="muted" style="font-size:12px">${restricted ? (c.users.length ? 'nur ' + escH(c.users.join(', ')) : 'nur Administratoren') : 'alle Benutzer'}</span>
         <button type="button" class="cbtn del" data-act="del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen">${I.trash}</button>
       </div>
+      ${c.kind === 'rtsp' ? '' : `<details style="margin-top:8px" data-chime><summary class="muted" style="cursor:pointer">🔔 Chime (Türgong)</summary>
+        <div data-chimebox class="muted" style="margin-top:8px">Wird geladen …</div>
+      </details>`}
       <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Zugang ändern (${escH(c.host || '')})</summary>
         <div class="grid2" style="margin-top:8px">
           <div><label>IP-Adresse <span class="qhelp" role="button" tabindex="0" data-help="Adresse der Kamera im Heimnetz.">?</span></label><input data-f="host" value="${escH(c.host || '')}"></div>
@@ -292,6 +295,35 @@ function visDialog(names, current) {
 $('camgrid').addEventListener('input', e => {
   const inp = e.target; if (!(inp instanceof HTMLInputElement) || inp.dataset.f !== 'name') return;
   inp.closest('.row')?.querySelector('.cbtn[data-act="rename"]')?.classList.toggle('dirty', inp.value.trim() !== inp.defaultValue.trim());
+});
+// Chime (Tuergong der Video-Tuerklingel): beim Aufklappen laden, Ton waehlen + laeuten, Lautstaerke setzen
+$('camgrid').addEventListener('toggle', async e => {
+  const det = e.target; if (!det.matches || !det.matches('details[data-chime]') || !det.open) return;
+  const card = det.closest('.cam'), id = card.dataset.cam, box = det.querySelector('[data-chimebox]');
+  box.textContent = 'Wird geladen …';
+  try {
+    const r = await api('/api/cameras/' + encodeURIComponent(id) + '/chimes');
+    if (!r.chimes.length) { box.textContent = 'Diese Kamera meldet keinen gekoppelten Chime. Chime in der Reolink-App mit der Türklingel koppeln.'; return; }
+    const opt = (l, sel) => l.map(x => `<option value="${x.id}"${x.id === sel ? ' selected' : ''}>${escH(x.name)}</option>`).join('');
+    box.innerHTML = r.chimes.map(c => `<div data-chimerow="${c.id}" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="color:var(--fg)"><b>${escH(c.name)}</b> <span class="muted">${c.online ? '· verbunden' : '· nicht erreichbar'}</span></div>
+      <div class="row" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select data-ct style="width:auto">${opt(r.tones, 1)}</select><button type="button" class="ghost" data-chimeact="ring">🔔 Läuten</button>
+      </div>
+      <div class="row" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select data-cv style="width:auto">${opt(r.volumes, c.volume)}</select><button type="button" class="ghost" data-chimeact="volume">Lautstärke speichern</button>
+      </div></div>`).join('');
+  } catch (err) { box.textContent = err.message; }
+}, true);
+$('camgrid').addEventListener('click', async e => {
+  const b = e.target.closest('[data-chimeact]'); if (!b) return;
+  const card = b.closest('.cam'), id = card.dataset.cam, row = b.closest('[data-chimerow]'), chime = +row.dataset.chimerow;
+  b.disabled = true;
+  try {
+    if (b.dataset.chimeact === 'ring') { await api('/api/cameras/' + encodeURIComponent(id) + '/chime', 'POST', { action: 'ring', chime, tone: +row.querySelector('[data-ct]').value }); toast('Chime läutet 🔔'); }
+    else { await api('/api/cameras/' + encodeURIComponent(id) + '/chime', 'POST', { action: 'volume', chime, volume: +row.querySelector('[data-cv]').value }); toast('Lautstärke gespeichert ✓'); }
+  } catch (err) { toast(err.message, true); }
+  b.disabled = false;
 });
 $('camgrid').addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
