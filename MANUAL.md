@@ -394,7 +394,7 @@ Jedes schaltbare Ding kann mit einer **4-stelligen PIN** geschützt werden: Ger�
 
 - **Setzen/Ändern/Entfernen:** nur durch **Admins** (Recht „Benutzerverwaltung“ = Schreiben), in der Aktorenliste unter Smart Home (🔑). Das Auge-Symbol zeigt die Eingabe.
 - **Benutzen:** Beim Tippen auf die Kachel erscheint ein Ziffernblock. Auch Admins geben die PIN ein.
-- **Schutz gegen Raten:** Nach 5 falschen Eingaben ist das Gerät 5 Minuten gesperrt.
+- **Schutz gegen Raten:** Nach 5 falschen PIN-Eingaben ist das Gerät 5 Minuten gesperrt. Bei der **Anmeldung** gilt: nach 10 falschen Versuchen von derselben Adresse innerhalb von 5 Minuten ist diese Adresse 5 Minuten gesperrt.
 - Die PIN wird nur als Hash gespeichert, nie im Klartext.
 - **Regeln und Abläufe sind von der PIN nicht betroffen** – die PIN schützt nur das Schalten von Hand am Dashboard.
 

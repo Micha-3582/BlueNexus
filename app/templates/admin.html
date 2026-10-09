@@ -2897,7 +2897,7 @@ async function tnLoad() {
   document.getElementById('tn-install-hint').textContent = n.can_install ? ' lädt das offizielle Programm von Cloudflare (' + n.asset + ')' : ' automatisch nur unter Linux – bitte cloudflared von Hand installieren';
   document.getElementById('tn-token').placeholder = n.has_token ? '(gespeichert – leer lassen = unverändert)' : 'eyJ…';
   document.getElementById('tn-setup').open = !n.has_token;
-  const tnp = document.getElementById('tn-port'); if (tnp) tnp.textContent = location.port || '80';
+  const tnq = document.querySelector('#tn-setup .qhelp'); if (tnq) tnq.dataset.help = tnq.dataset.help.replace(/(id="tn-port">)[^<]*/, '$1' + (location.port || '80'));      // Port in der Anleitung = Port dieser Seite
   const log = document.getElementById('tn-log'); if (log.closest('details').open) { try { log.textContent = (await (await fetch('/api/tunnel/log', { cache: 'no-store' })).json()).lines.join('\n'); } catch (e) { /* egal */ } }
 }
 document.getElementById('tn-warn').addEventListener('click', () => uiDialog({ title: '⚠ Sicherheitswarnung', okText: 'Verstanden', info: true, html: `
