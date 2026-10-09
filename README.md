@@ -390,7 +390,7 @@ umgekehrter Reihenfolge wieder abgeschaltet. Mit Trockenlauf, Pause nach Handsch
 
 Die App ist dafür gebaut, auch erreichbar zu sein, wenn man will – deshalb ist Sicherheit eingebaut:
 
-- **Anmeldung** mit gesalzenen Passwort-Hashes, Zugriffssperre nach Fehlversuchen, gleiche Rechenzeit bei
+- **Anmeldung** mit gesalzenen Passwort-Hashes, Zugriffssperre (nach 10 falschen Anmeldungen 5 Minuten, bei PINs nach 5), gleiche Rechenzeit bei
   unbekannten Konten (kein Erraten gültiger Benutzernamen).
 - **Rechte nach dem Prinzip „standardmäßig verboten“:** Jede Funktion ist einem Bereich zugeordnet; was keinem
   Recht zugeordnet ist, darf niemand.
