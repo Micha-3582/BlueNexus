@@ -872,6 +872,7 @@ def set_setpoints(ids: list[str], value: float) -> list[tuple]:
     """Solltemperatur setzen ('*' = alle angelegten Thermostate). Rueckgabe: [(name, gesetzter Wert, Fehlertext|None)]."""
     items = load_setpoints()
     chosen = items if "*" in ids else [s for s in items if s["id"] in ids]
+    value = min(30.0, max(5.0, float(value)))                   # Einstellbereich der Thermostate: 5 bis 30 Grad (auch bei aelteren Regeln mit anderem Wert)
     out = []
     for s in chosen:
         v = min(float(s.get("max", 30.5)), max(float(s.get("min", 4.5)), float(value)))

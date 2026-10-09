@@ -369,7 +369,7 @@ Sensoren sind in Regeln als Bedingung nutzbar („WENN Sensor wahr/falsch“ bzw
 
 ### Thermostate
 
-Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B. „alle Thermostate auf 25 °C“. Der Wert wird auf den Bereich des Geräts begrenzt (0 °C = „aus“, meist 4,5 °C).
+Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B. „alle Thermostate auf 25 °C“. Der Einstellbereich ist **5 bis 30 °C** (kleinere oder größere Werte werden darauf begrenzt, auch in älteren Regeln); zusätzlich gilt der Bereich des Geräts.
 
 ### Türschlösser (Homematic IP und klassisches Keymatic)
 
@@ -481,7 +481,7 @@ Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die
 | **Gerät ein-/ausschalten** | Schaltet ein Gerät. | nein |
 | **Gerät umschalten (an ↔ aus)** | Dreht den aktuellen Zustand um. | ja |
 | **Warten** | Wartet x Sekunden/Minuten/Stunden (blockiert nichts anderes). | ja |
-| **Thermostate: Solltemperatur setzen** | Setzt ein oder mehrere Thermostate auf einen Wert. | ja |
+| **Thermostate: Solltemperatur setzen** (5 bis 30 °C) | Setzt ein oder mehrere Thermostate auf einen Wert. | ja |
 | **Telegram-Nachricht senden** | Schickt einen freien Text aufs Handy (auch für Fehlersuche in Abläufen). | ja |
 | **Telegram: Kamera-Standbild senden** | Holt ein aktuelles Standbild der gewählten Kamera und schickt es mit einem optionalen Text aufs Handy (ohne Text steht der Kameraname dabei). Im Trockenlauf wird nichts gesendet. Wird die Kamera gelöscht, verschwindet der Schritt aus den Regeln. | ja |
 | **Telegram: Video zum Ereignis senden** | Schickt ein kurzes Video (10 Sekunden, 720p, ab 3 Sekunden vor dem Auslösen) aus der **Aufnahme auf der SD-Karte** der Kamera. Optional mit **Filter auf die Ereignisart** (Tier, Person, Fahrzeug, Bewegung): Nur wenn die Aufnahme eine gewählte Art enthält, wird das Video gesendet. Das Video kommt erst, wenn die Aufnahme fertig ist (meist 1 bis 2 Minuten, höchstens 4); dieselbe Aufnahme wird nie doppelt gesendet. Nur Telegram (Pushover kann kein Video). **Nur für Reolink-Kameras** (andere Kameras bieten diese Schnittstelle nicht; sie erscheinen im Schritt nicht zur Auswahl). Braucht SD-Karte mit eingeschalteter Aufnahme und **ffmpeg** auf dem Server. Im Trockenlauf wird nichts gesendet. | ja |

@@ -361,7 +361,7 @@ function actRow(a, branch, flow) {
       <select class="a-wunit" style="width:auto" onchange="ruleEdited(this)">${optHtml([['s', 'Sekunden'], ['min', 'Minuten'], ['h', 'Stunden']], unit)}</select>`;
   } else if (t === 'setpoint') {
     const all = (a.device_ids || []).includes('*'), list = S.setpoints || [];
-    body = `<b>🌡 Thermostate auf</b> <input class="a-spv" type="number" step="0.5" value="${escH(a.value ?? 21)}" style="width:80px" oninput="ruleEdited(this)"> °C
+    body = `<b>🌡 Thermostate auf</b> <input class="a-spv" type="number" min="5" max="30" step="0.5" value="${escH(a.value ?? 21)}" style="width:80px" oninput="ruleEdited(this)" onchange="this.value = Math.min(30, Math.max(5, +this.value || 21)); ruleEdited(this)"> °C <span class="muted">(5–30)</span>
       <div style="display:flex;gap:10px;flex-wrap:wrap;width:100%;align-items:center">
         <label class="chk"><input type="checkbox" class="a-spall" ${all ? 'checked' : ''} onchange="spAll(this)"> alle</label>
         ${list.map(x => `<label class="chk"><input type="checkbox" class="a-sp" value="${escH(x.id)}" ${all || (a.device_ids || []).includes(x.id) ? 'checked' : ''} ${all ? 'disabled' : ''} onchange="ruleEdited(this)"> ${escH(x.name)}</label>`).join('')}
@@ -438,7 +438,7 @@ function collectAct(x) {
   const t = x.dataset.type, q = c => x.querySelector('.' + c);
   if (t === 'toggle') return { type: t, device_id: q('a-dev').value };
   if (t === 'wait') return { type: t, seconds: Math.round((+q('a-wval').value || 0) * ({ s: 1, min: 60, h: 3600 }[q('a-wunit').value])) };
-  if (t === 'setpoint') return { type: t, device_ids: q('a-spall').checked ? ['*'] : [...x.querySelectorAll('.a-sp:checked')].map(c => c.value), value: q('a-spv').value };
+  if (t === 'setpoint') return { type: t, device_ids: q('a-spall').checked ? ['*'] : [...x.querySelectorAll('.a-sp:checked')].map(c => c.value), value: Math.min(30, Math.max(5, +q('a-spv').value || 21)) };
   if (t === 'notify') return { type: t, text: q('a-text').value, ...toVal(q) };
   if (t === 'chime') return { type: t, id: q('a-cid').value, tone: +q('a-tone').value };
   if (t === 'photo') return { type: t, id: q('a-cid').value, text: q('a-text').value, ...toVal(q) };

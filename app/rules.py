@@ -245,6 +245,7 @@ AC_FANS = ("auto", "silent", "low", "medium", "high", "max")
 VIDEO_FILTERS = ("animal", "person", "vehicle", "motion")                      # Ereignisarten fuer "Video zum Ereignis" (leer = jede Aufnahme)
 STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime")
 MAX_WAIT_S = 7 * 86400
+SETPOINT_MIN, SETPOINT_MAX = 5.0, 30.0              # Solltemperatur der Thermostate (°C), gilt fuer Regeln und beim Setzen
 
 
 def _normalize_action(a: dict, flow: bool = False) -> dict:
@@ -389,7 +390,7 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
         ids = [str(i) for i in (a.get("device_ids") or []) if str(i).strip()]
         if not ids:
             raise RuleError("Thermostate wählen")
-        return {"type": t, "device_ids": ids, "value": _num(a.get("value"), 0, 40, "Temperatur (°C)")}
+        return {"type": t, "device_ids": ids, "value": min(SETPOINT_MAX, max(SETPOINT_MIN, _num(a.get("value"), 0, 40, "Temperatur (°C)")))}      # Einstellbereich der Thermostate: 5 bis 30 °C
     if t == "notify":
         text = str(a.get("text") or "").strip()
         if not text:
