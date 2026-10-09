@@ -128,7 +128,7 @@ def dry_run(cfg: dict) -> bool:
 
 
 # Einstellungen der Regeln (eigene Werte, unabhaengig von der Ueberschuss-Automatik)
-DEFAULTS = {"manual_hold_min": 60, "failsafe_min": 10}
+DEFAULTS = {"manual_hold_min": 0, "failsafe_min": 0}      # neu eingerichtet: Regeln laufen sofort, ohne Pause nach Handschaltung und ohne Shelly-Eigentimer (einstellbar unter Feineinstellungen)
 BOUNDS = {"manual_hold_min": (0, 1440), "failsafe_min": (0, 120)}
 
 

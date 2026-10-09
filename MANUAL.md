@@ -406,7 +406,7 @@ Menü **Einstellungen → Automatik** (rechts neben „VRM“; gehört zur Energ
 - **Trockenlauf:** Nur protokollieren/melden, nichts schalten.
 - **Geräte im Überschuss:** Geräte aus der Liste hinzufügen und per Ziehen sortieren.
 - **Akku mindestens (%):** Ab diesem Ladestand gilt Überschuss als vorhanden (bei Ladelimit 90 % z. B. 88).
-- **Feineinstellungen** (aufklappbar): Zeiten, Pause nach Handschaltung, Sicherheits-Timer. „Alle auf Standard“ stellt die Voreinstellung wieder her.
+- **Feineinstellungen** (aufklappbar): Zeiten, Pause nach Handschaltung, Sicherheits-Timer. Beide stehen ab Werk auf **0** (Regeln laufen sofort, kein Eigentimer am Gerät); wer nach Handschaltung eine Pause oder einen Rückschalt-Timer will, trägt hier Minuten ein. „Alle auf Standard“ stellt die Voreinstellung wieder her.
 - Änderungen gelten erst mit **Speichern** (Leiste unten).
 - **Logbuch:** Zeigt, was die Automatik wann und warum geschaltet hat.
 
