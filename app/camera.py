@@ -46,6 +46,7 @@ _snap_locks: dict[str, threading.Lock] = {}
 _tokens: dict[str, tuple[float, str]] = {}
 _motion_cache: dict[str, tuple[float, object]] = {}      # Kamera-ID -> (Zeit, Zustand | CameraError)
 _motion_locks: dict[str, threading.Lock] = {}
+_events_ok: dict[str, bool] = {}                          # Kamera -> kennt GetEvents (True) oder nur GetAiState (False)
 _slots = threading.BoundedSemaphore(MAX_STREAMS)
 
 
@@ -363,10 +364,22 @@ def motion_states(item: dict, force: bool = False) -> dict:
         try:
             v = _call(item, "GetMdState", {"channel": ch})
             out = {"md": bool(int(v.get("state") or 0)), "support": {"md"}}
-            try:
-                ai = _call(item, "GetAiState", {"channel": ch})
-            except CameraError:
-                ai = {}                                              # aeltere Kameras: keine KI-Erkennung
+            ai = {}
+            if _events_ok.get(cid) is not False:                     # neuere Firmware (u. a. Video-Tuerklingeln): GetEvents liefert KI + Klingel (ai/md/visitor)
+                try:
+                    ev = _call(item, "GetEvents", {"channel": ch}, strict=False)
+                    if isinstance(ev.get("ai"), dict) or isinstance(ev.get("visitor"), dict):
+                        ai = {**(ev.get("ai") or {}), **({"visitor": ev["visitor"]} if isinstance(ev.get("visitor"), dict) else {})}
+                        _events_ok[cid] = True
+                    else:
+                        _events_ok[cid] = False
+                except CameraError:
+                    _events_ok[cid] = False
+            if _events_ok.get(cid) is not True:
+                try:
+                    ai = _call(item, "GetAiState", {"channel": ch})
+                except CameraError:
+                    ai = {}                                          # aeltere Kameras: keine KI-Erkennung
             for k in ("people", "vehicle", "dog_cat", "visitor"):                # visitor = Klingeltaste (nur Video-Tuerklingeln)
                 e = ai.get(k)
                 if isinstance(e, dict) and "alarm_state" in e:
