@@ -203,6 +203,13 @@ def _avg_price_on_day(slots: list, day, h_from: int, h_to: int) -> float | None:
     return sum(vals) / len(vals) if vals else None
 
 
+def slots_to_limit(soc: float, p: Params) -> int:
+    """Wie viele Viertelstunden Netzladen noch in den Akku passen, bis das Ladelimit (max_charge_soc) erreicht ist (nur fuer die Anzeige des Plans)."""
+    room_kwh = max(0.0, p.battery_usable_kwh * p.max_charge_soc / 100.0 - (soc / 100.0) * p.battery_usable_kwh)
+    per_slot = max(0.1, p.charge_power_w / 1000.0 * 0.25)
+    return int(math.ceil(room_kwh / per_slot))
+
+
 def merge_into_windows(picked: list) -> str:
     if not picked:
         return ""
@@ -492,6 +499,8 @@ def decide(soc: float, price_entries: list, solar_today_raw: float,
 
     ess_mode = ESS_CHARGE if allow_now else ESS_IDLE
     reason_text = f"{strategy or 'Idle'} | Bal: {balance:.1f}kWh | SoC: {soc}%"
+    if strategy.startswith("Supergünstig") and p.absolute_cheap_price:
+        picked = [s for s in slots_all if s.price <= p.absolute_cheap_price][:slots_to_limit(soc, p)]          # Anzeige: die Viertelstunden unter der Preisschwelle, soweit sie bis zum Ladelimit noch in den Akku passen
 
     return Decision(
         allow_now=allow_now, ess_mode=ess_mode, now_slot=now_slot_name,

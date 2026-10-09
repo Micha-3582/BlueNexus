@@ -68,6 +68,7 @@ import backup
 from auth import UserError, UserStore, is_expired, new_secret_key
 from datasources import build_fixed_price_entries, fetch_tibber_prices
 from logic import ESS_CHARGE, ESS_IDLE, Params, Slot, decide, merge_into_windows
+from logic import slots_to_limit as logic_slots_to_limit
 from logic import _parse_iso as logic_parse_iso
 import victron
 from victron import Cerbo
@@ -1448,6 +1449,11 @@ class Controller:
         charge_now = charge_kwh[0] > 1e-6
         plan_slots = [Slot(name="", price=res["prices"][i], start=logic_parse_iso(t))
                       for i, t in enumerate(res["times"]) if charge_kwh[i] > 1e-6]
+        if params.absolute_cheap_price:                      # Preisschwelle ("Immer laden unter"): diese Viertelstunden werden zusaetzlich geladen -> im Plan mit anzeigen
+            have = {s.start for s in plan_slots}
+            room = max(0, logic_slots_to_limit(soc, params) - len(plan_slots))             # nur so viele, wie bis zum Ladelimit noch in den Akku passen
+            plan_slots += [s for s in slots if s.price <= params.absolute_cheap_price and s.start not in have][:room]
+            plan_slots.sort(key=lambda s: s.start)
         # Commitment: einmal in dieser Viertelstunde "laden" beschlossen -> bis zum Slot-Ende dabei bleiben.
         now_slot_name = now_q.isoformat(timespec="minutes")
         committed = ""
