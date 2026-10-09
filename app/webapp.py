@@ -1611,6 +1611,9 @@ class Controller:
         except (KeyError, TypeError):
             return
         is_frozen = abs(grid_w) > 150 and abs(batt_a) < 0.5
+        floor = self.soc_floor                           # Akku am Mindest-SOC (leer): er liefert dann bewusst nichts, das Haus laeuft am Netz - kein Haenger, kein Alarm
+        if is_frozen and floor is not None and soc is not None and soc <= float(floor) + 2.0:
+            is_frozen = False
         detail = {"grid_w": round(grid_w, 1), "battery_a": round(batt_a, 2), "soc": soc}
         try:
             wd = store.battery_watchdog_update(is_frozen, now, detail)

@@ -588,7 +588,7 @@ Klimaanlagen, die du mit der App **NetHome Plus** bedienst (auch Comfee, Invento
 | **Logbuch** (Automatik/Regeln) | Buttons „📒 Logbuch“ auf Automatik und Regeln | Was wann und warum geschaltet wurde, auch Trockenlauf-Einträge und Fehler. Ungelesene Einträge zeigen ein Abzeichen. |
 | **Betriebsbericht** | Einstellungen → Meldungen | Ein Blick genügt: läuft die Regelung, sind Prognose, Preise und Daten vollständig? Dazu Tagestabelle, Ereignisprotokoll und Betriebsstatistik (Ø/maximale Dauer eines Regeldurchlaufs, größte Lücke). Mit einem Klick als Text kopierbar, um die Anlage gemeinsam mit Claude auszuwerten. |
 | **Solarlogbuch** | Einstellungen → PV-Prognose | VRM-Prognose gegen realen Ertrag der letzten Tage, Abweichung und der Korrekturfaktor, der den Tag getroffen hätte. |
-| **Batterie-Watchdog** | Einstellungen | Erkennt und protokolliert, wenn die Batterie trotz Netzfluss über 15 Minuten nicht reagiert (Multiplus-Ladehänger). Zeigt auch Vollzyklen und Lebensdauer-Hochrechnung. |
+| **Batterie-Watchdog** | Einstellungen | Erkennt und protokolliert, wenn die Batterie trotz Netzfluss über 15 Minuten nicht reagiert (Multiplus-Ladehänger). **Kein Alarm bei leerem Akku:** Steht der Akku am Mindest-SOC (minus/plus 2 %), liefert er bewusst nichts und das Haus läuft am Netz – das ist normal. Zeigt auch Vollzyklen und Lebensdauer-Hochrechnung. |
 
 ---
 
