@@ -268,8 +268,9 @@ const MODULES = {{ modules | tojson }};              // Module der Installation 
   items += li('<b>Energie nachrüsten:</b> Hast du eine Victron-Anlage oder einen dynamischen Stromtarif, aktivierst du das Modul jederzeit unter Einstellungen → System → Module. Dann führt dich ein Assistent durch die Einrichtung.');
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
-  ov.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">' +
-    '<h2 style="margin:0 0 8px">Willkommen bei BlueNexus 👋</h2>' +
+  ov.innerHTML = '<style>#welcome-box a{color:var(--accent-t)}</style><div id="welcome-box" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="48" height="48" style="border-radius:11px;flex:none">' +
+    '<h2 style="margin:0;font-size:22px;line-height:1.2"><span style="font-weight:600">Willkommen bei</span><br><span style="color:var(--accent-t);font-weight:800">Blue</span><span style="color:var(--fg);font-weight:800">Nexus</span> 👋</h2></div>' +
     '<div class="muted" style="margin-bottom:10px">Schön, dass du da bist! Hier ein kurzer Überblick, wo du was findest:</div>' +
     '<ul style="padding-left:20px;margin:0">' + items + '</ul>' +
     '<div class="muted" style="margin-top:12px">Viel Spaß mit BlueNexus!</div>' +
