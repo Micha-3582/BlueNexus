@@ -86,6 +86,12 @@ class Params:
         fields = cls().__dict__
         kwargs = {k: cfg[k] for k in fields if k in cfg and cfg[k] is not None}
         kwargs["dynamic_pricing"] = cfg.get("tariff_mode", "tibber") != "fixed"
+        if cfg.get("pv_reserve_soc") is not None:            # neu: "PV-Reserve" als Ladestand in % (bis dahin laedt die Steuerung aus dem Netz); der Rest bis 100 % bleibt fuer die Sonne frei
+            try:
+                cap = float(kwargs.get("battery_usable_kwh", cls().battery_usable_kwh))
+                kwargs["pv_reserve_kwh"] = max(0.0, cap * (100.0 - min(100.0, max(0.0, float(cfg["pv_reserve_soc"])))) / 100.0)
+            except (TypeError, ValueError):
+                pass
         return cls(**kwargs)
 
 

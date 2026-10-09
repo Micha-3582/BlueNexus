@@ -293,7 +293,7 @@ SMARTHOME_AREAS = ("settings_geraete", "smarthome_sicherheit", "smarthome_einric
 ANY_READ = {"smarthome_page": SMARTHOME_AREAS, "api_device_families": SMARTHOME_AREAS, "api_automation_unread": ("automation", "rules")}
 FIELD_AREA = {}
 for _f in ("cerbo_host", "cerbo_port", "has_pv_inverter", "has_mppt", "battery_usable_kwh",
-           "daily_usage_kwh", "pv_reserve_kwh", "battery_install_date", "battery_expected_cycles",
+           "daily_usage_kwh", "pv_reserve_kwh", "pv_reserve_soc", "battery_install_date", "battery_expected_cycles",
            ):
     FIELD_AREA[_f] = "settings_anlage"
 FIELD_AREA["pv_inverters"] = "settings_anlage"
@@ -2859,6 +2859,9 @@ def api_config():
         defaults = Params().__dict__
         for k, v in defaults.items():
             cfg.setdefault(k, v)
+        if cfg.get("pv_reserve_soc") is None:                # alte Einstellung (kWh Platz) als Ladestand in % anzeigen
+            cap = float(cfg.get("battery_usable_kwh") or 0)
+            cfg["pv_reserve_soc"] = round(max(0.0, min(100.0, (cap - float(cfg.get("pv_reserve_kwh") or 0)) / cap * 100.0)), 1) if cap > 0 else 100.0
         cfg.setdefault("has_pv_inverter", True)
         cfg.setdefault("has_mppt", True)
         cfg.setdefault("tariff_mode", "tibber")
@@ -2889,7 +2892,7 @@ def api_config():
                "fixed_price_ct", "pv_inverters",
                "contract_fee_month_eur", "grid_fee_day_eur", "meter_fee_day_eur",
                "section14a_credit_day_eur", "vat_percent", "battery_install_date",
-               "battery_expected_cycles"] + list(Params().__dict__.keys())
+               "battery_expected_cycles", "pv_reserve_soc"] + list(Params().__dict__.keys())
     allowed = allowed + ["surplus_" + k for k in surplus.DEFAULTS]     # einstellbare Automatik-Werte
     if "scan_networks" in body:
         try:
@@ -2907,6 +2910,11 @@ def api_config():
             denied.append(key)         # dieses Feld darf dieses Konto nicht aendern - stillschweigend uebergehen,
             continue                   # sonst wuerde das gemeinsame "Speichern" ueber alle Reiter hinweg immer scheitern
         cfg[key] = body[key]
+    if cfg.get("pv_reserve_soc") is not None:               # PV-Reserve als Ladestand: 0 bis 100 %
+        try:
+            cfg["pv_reserve_soc"] = min(100.0, max(0.0, float(cfg["pv_reserve_soc"])))
+        except (TypeError, ValueError):
+            cfg.pop("pv_reserve_soc", None)
     store.save_config(cfg)
     try:                                    # neue Vertragskosten-Periode ab heute, falls sich etwas geaendert hat
         changed = store.record_contract_period_if_changed(cfg, day=valid_from)

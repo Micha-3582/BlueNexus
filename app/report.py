@@ -266,7 +266,7 @@ def build(days: int = 7, ctrl: dict | None = None, now: datetime | None = None) 
     plan = ctrl.get("plansim") or {}
     sv = _safe(store.savings, cfg, now)
     cal = _safe(store.pv_calibration, now)
-    settings = {k: cfg.get(k) for k in ("battery_usable_kwh", "daily_usage_kwh", "charge_power_w", "pv_reserve_kwh", "max_charge_soc", "absolute_cheap_price",
+    settings = {k: cfg.get(k) for k in ("battery_usable_kwh", "daily_usage_kwh", "charge_power_w", "pv_reserve_soc", "pv_reserve_kwh", "max_charge_soc", "absolute_cheap_price",
                                         "pv_tom_morning_factor", "min_peak_soc", "night_safety_soc", "target_safe_soc", "hysterese_soc",
                                         "peak_avoid_price", "poll_seconds", "dry_run", "rules_enabled", "rules_dry_run", "rules_manual_hold_min", "surplus_enabled", "surplus_dry_run", "surplus_min_soc", "tariff_mode")
                 if cfg.get(k) is not None}

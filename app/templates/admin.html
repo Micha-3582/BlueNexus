@@ -363,9 +363,10 @@
         <option value="48" selected>48 V</option>
       </select>
       <small class="hint">Ladeleistung: <b id="charge_power_preview">–</b></small></div>
-    <div><label>PV-Reserve (kWh)
-        <span class="qhelp" role="button" tabindex="0" data-help="Platz, der beim Netzladen im Akku frei bleibt, damit mittags noch Solarstrom hineinpasst. Die Steuerung plant nur so viel Netzstrom ein, dass Kapazität minus PV-Reserve nicht überschritten wird. Nur bei dynamischem Tarif relevant. 0 = kein Puffer. Das Ladelimit (max. SOC) bleibt davon unabhängig die harte Obergrenze.">?</span>
-      </label><input id="pv_reserve_kwh" type="number" step="0.5"></div>
+    <div><label>PV-Reserve: Netzladen bis (%)
+        <span class="qhelp" role="button" tabindex="0" data-help="<b>Bis zu diesem Ladestand</b> lädt die Steuerung aus dem Netz (Intelligente Planung und die klassischen Strategien). Der Rest bis 100 % bleibt frei, damit mittags noch Solarstrom hineinpasst. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz für die Sonne. 100 = kein Puffer. Nur bei dynamischem Tarif relevant.<br><br><b>Das Ladelimit</b> (rechts) ist die harte Obergrenze darüber: Sie gilt für <u>alles</u>, was aus dem Netz lädt, auch für Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Das Ladelimit sollte also gleich hoch oder höher sein als die PV-Reserve.">?</span>
+      </label><input id="pv_reserve_soc" type="number" step="1" min="0" max="100">
+      <small class="hint" id="pv_reserve_hint"></small></div>
     <div><label>Ladelimit / max. SOC (%)
         <span class="qhelp" role="button" tabindex="0" data-help="Harte Obergrenze: ab diesem Ladestand wird nie aus dem Netz geladen - auch nicht bei manuellen Ladeterminen oder Sofort-Override.">?</span>
       </label><input id="max_charge_soc" type="number" min="1" max="100"></div>
@@ -941,7 +942,7 @@ window.USER_PERMS = {{ user_perms | tojson }};
 window.TILE_CEILING = {{ tile_ceiling | tojson }};          // null = alle Kacheln erlaubt, sonst Liste der fuer dieses Konto erlaubten
 window.IS_ADMIN = (window.USER_PERMS || {}).user_management === 'write' || {{ 'true' if demo_view else 'false' }};      // Demo-Ansicht: Admin-Knoepfe (Stift, PIN, Sichtbarkeit) zeigen, speichern geht nicht
 document.documentElement.classList.toggle('is-admin', window.IS_ADMIN);       // nur Administratoren legen PINs fest oder entfernen sie   // Rechte je Bereich dieses Kontos - siehe Einstellungen -> System -> Weitere Benutzer
-const PARAM_KEYS = ['battery_usable_kwh','daily_usage_kwh','pv_reserve_kwh',
+const PARAM_KEYS = ['battery_usable_kwh','daily_usage_kwh','pv_reserve_soc',
   'max_charge_soc','absolute_cheap_price','pv_tom_morning_factor',
   'morning_peak_start','morning_peak_end',
   'evening_peak_start','evening_peak_end','min_peak_soc','peak_avoid_price',
@@ -1053,6 +1054,7 @@ async function init() {
   document.getElementById('fixed_price_ct').value = cfg.fixed_price_ct ?? '';
   updateTariffFields();
   PARAM_KEYS.forEach(k => { const el = document.getElementById(k); if (el) el.value = cfg[k] ?? ''; });
+  updatePvReserveHint();
   document.getElementById('battery_install_date').value = cfg.battery_install_date || '';
   (cfg.pv_inverters || []).forEach(addPvInverter);
   // Ladestrom war bisher nur als W gespeichert - grob mit der gewaehlten
@@ -1102,6 +1104,16 @@ function updateLegacyStrategyCards() {
   document.querySelectorAll('#legacy-strategy-cards > .card:not(#legacy-strategy-note)').forEach(c => { c.style.display = smart ? 'none' : ''; });      // nicht "hidden": die Reiterleiste setzt hidden bei jedem Reiterwechsel neu und wuerde die Karten wieder einblenden
 }
 document.getElementById('smart_planner_enabled').addEventListener('change', updateLegacyStrategyCards);
+// PV-Reserve (Ladestand in %): Hinweis, wie viel Platz fuer die Sonne das in kWh ist, und Vergleich mit dem Ladelimit
+function updatePvReserveHint() {
+  const pct = parseFloat(String(document.getElementById('pv_reserve_soc').value).replace(',', '.')), cap = parseFloat(String(document.getElementById('battery_usable_kwh').value).replace(',', '.')),
+        lim = parseFloat(String(document.getElementById('max_charge_soc').value).replace(',', '.')), h = document.getElementById('pv_reserve_hint');
+  if (!h) return;
+  if (isNaN(pct) || isNaN(cap) || cap <= 0) { h.textContent = ''; return; }
+  const free = Math.max(0, cap * (100 - pct) / 100);
+  h.textContent = 'Platz für die Sonne: ' + free.toFixed(1).replace('.', ',') + ' kWh' + (!isNaN(lim) && pct > lim ? ' – höher als das Ladelimit, es gilt das Ladelimit.' : '');
+}
+['pv_reserve_soc', 'battery_usable_kwh', 'max_charge_soc'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', updatePvReserveHint); });
 document.querySelectorAll('input[name="tariff_mode"]').forEach(r => r.addEventListener('change', updateTariffFields));
 document.getElementById('tibber_token').addEventListener('input', updateTariffFields);
 

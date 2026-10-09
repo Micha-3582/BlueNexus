@@ -242,8 +242,8 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 | Erwartete Zyklenzahl | Herstellerangabe (z. B. 6000), für die Lebensdauer-Hochrechnung. |
 | Tagesverbrauch (kWh) | Durchschnitt pro Tag – Basis für die Planung. |
 | Ladestrom (A) / Systemspannung (V) | Daraus errechnet sich die Ladeleistung beim Netzladen. |
-| PV-Reserve (kWh) | Platz, der beim Netzladen für die Mittagssonne frei bleibt. |
-| Ladelimit / max. SOC (%) | Harte Obergrenze für Netzladen – gilt immer. |
+| **PV-Reserve: Netzladen bis (%)** | Bis zu diesem **Ladestand** lädt die Steuerung aus dem Netz (Intelligente Planung und klassische Strategien); der Rest bis 100 % bleibt für die Mittagssonne frei. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz (das Feld zeigt den Platz in kWh darunter an). 100 = kein Puffer. Früher stand hier „PV-Reserve (kWh)“; ein alter Wert wird beim Öffnen automatisch in Prozent umgerechnet. |
+| Ladelimit / max. SOC (%) | Harte Obergrenze für **alles**, was aus dem Netz lädt, auch Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Es sollte gleich hoch oder höher als die PV-Reserve sein. |
 | **Minimaler Akkustand am Cerbo (%)** | Wie „Minimaler SOC“ im VRM; darunter entlädt der Akku nicht. Wird **direkt am Cerbo** gesetzt. |
 | **Sollwert Netz am Cerbo (W)** | ESS-Netz-Sollwert (−1000 … 1000 W in 10er-Schritten). 0 = möglichst kein Bezug/Einspeisung. Wird **direkt am Cerbo** gesetzt. |
 

@@ -497,7 +497,7 @@ Alle Strategie-Werte lassen sich pro Anlage im Admin-Bereich anpassen. Defaults:
 | `battery_usable_kwh` | 24,0 | nutzbare Akkukapazität |
 | `daily_usage_kwh` | 30,0 | angenommener Tagesverbrauch |
 | `charge_power_w` | 3500 | Netz-Ladeleistung |
-| `pv_reserve_kwh` | 5,0 | Kapazitätspuffer für Mittags-PV |
+| `pv_reserve_soc` | 78 (aus 5 kWh) | Netzladen bis zu diesem Ladestand (%); der Rest bleibt für die Mittags-PV frei (früher `pv_reserve_kwh`) |
 | `pv_korrektur_faktor` | 0,68 | Dämpfung Prognose → real |
 | `pv_tom_morning_factor` | 0,15 | Anteil morgiger PV vor dem Morgen-Peak (Winter 0,05 / Sommer 0,25) |
 | `min_peak_soc` | 40 % | Mindest-SOC vor jedem Peak |

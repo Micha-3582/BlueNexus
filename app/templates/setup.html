@@ -65,7 +65,7 @@
           <div><label>Nutzbare Batteriekapazität (kWh) <span class="qhelp" role="button" tabindex="0" data-help="Gesucht ist die „Usable Capacity“, nicht die Nennkapazität aus dem Datenblatt. Steht sie dort nicht: ca. 95 % der Nennkapazität ansetzen. Beispiel: Pylontech US5000 – 4,8 kWh nominal, 4,56 kWh nutzbar. Mehrere Batterien: Werte addieren.">?</span></label><input id="battery_usable_kwh" value="{{ cfg.battery_usable_kwh or '' }}" placeholder="z.B. 10"></div>
           <div><label>Ø Tagesverbrauch Haushalt (kWh) <span class="qhelp" role="button" tabindex="0" data-help="Durchschnittlicher Stromverbrauch pro Tag: Jahresverbrauch laut Stromrechnung geteilt durch 365.">?</span></label><input id="daily_usage_kwh" value="{{ cfg.daily_usage_kwh or '' }}" placeholder="z.B. 15"></div>
           <div><label>Ladelimit / max. SOC (%) <span class="qhelp" role="button" tabindex="0" data-help="Maximaler Ladestand, bis zu dem aus dem Netz geladen wird. 90 % ist ein üblicher Wert.">?</span></label><input id="max_charge_soc" value="{{ cfg.max_charge_soc or '' }}" placeholder="z.B. 90"></div>
-          <div><label>PV-Reserve (kWh) <span class="qhelp" role="button" tabindex="0" data-help="Platz, der beim Netzladen im Akku frei bleibt, damit mittags noch Solarstrom hineinpasst. Wirkt nur bei dynamischem Tarif. Unsicher? 0 eintragen.">?</span></label><input id="pv_reserve_kwh" value="{{ cfg.pv_reserve_kwh if cfg.pv_reserve_kwh is defined else '' }}" placeholder="z.B. 0"></div>
+          <div><label>PV-Reserve: Netzladen bis (%) <span class="qhelp" role="button" tabindex="0" data-help="Bis zu diesem Ladestand lädt die Steuerung aus dem Netz. Der Rest bis 100 % bleibt frei, damit mittags noch Solarstrom hineinpasst. Beispiel: 80 %. Wirkt nur bei dynamischem Tarif. Unsicher? 100 eintragen (kein Puffer). Das Ladelimit gilt immer als harte Obergrenze.">?</span></label><input id="pv_reserve_soc" value="{{ cfg.pv_reserve_soc if cfg.pv_reserve_soc is defined else '' }}" placeholder="z.B. 100"></div>
         </div>
 
         <div class="grid2" style="margin-top:10px">
@@ -262,7 +262,7 @@ function collect() {
     daily_usage_kwh: numDE(document.getElementById('daily_usage_kwh').value),
     charge_power_w: Math.round(numDE(document.getElementById('charge_current_a').value) * parseInt(document.getElementById('battery_voltage_v').value)),
     max_charge_soc: numDE(document.getElementById('max_charge_soc').value),
-    pv_reserve_kwh: numDE(document.getElementById('pv_reserve_kwh').value),
+    pv_reserve_soc: numDE(document.getElementById('pv_reserve_soc').value),
     has_pv_inverter: document.getElementById('has_pv_inverter').checked,
     has_mppt: document.getElementById('has_mppt').checked,
     pv_inverters: collectPvInverters(),
