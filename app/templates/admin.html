@@ -339,7 +339,7 @@
 
 <div class="card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/></svg>Anlage &amp; Speicher</h2>
-  <div class="sub">Akku-Kenndaten, Ladegrenzen und Sollwerte am Cerbo.</div>
+  <div class="sub">Akku-Kenndaten und Sollwerte am Cerbo. PV-Reserve, Ladelimit und Preisschwelle stehen unter <a href="#tarif">Tarif &amp; Laden</a> → „Laden aus dem Netz“.</div>
   <div class="grid2">
     <div><label>Nutzbare Akkukapazität (kWh)
         <span class="qhelp" role="button" tabindex="0" data-help="Nicht die „Nennkapazität“ aus dem Datenblatt, sondern die „Usable Capacity“. Nicht angegeben: ca. 95 % der Nennkapazität ansetzen.">?</span>
@@ -363,13 +363,6 @@
         <option value="48" selected>48 V</option>
       </select>
       <small class="hint">Ladeleistung: <b id="charge_power_preview">–</b></small></div>
-    <div><label>PV-Reserve: Netzladen bis (%)
-        <span class="qhelp" role="button" tabindex="0" data-help="<b>Bis zu diesem Ladestand</b> lädt die Steuerung aus dem Netz (Intelligente Planung und die klassischen Strategien). Der Rest bis 100 % bleibt frei, damit mittags noch Solarstrom hineinpasst. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz für die Sonne. 100 = kein Puffer. Nur bei dynamischem Tarif relevant.<br><br><b>Das Ladelimit</b> (rechts) ist die harte Obergrenze darüber: Sie gilt für <u>alles</u>, was aus dem Netz lädt, auch für Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Das Ladelimit sollte also gleich hoch oder höher sein als die PV-Reserve.">?</span>
-      </label><input id="pv_reserve_soc" type="number" step="1" min="0" max="100">
-      <small class="hint" id="pv_reserve_hint"></small></div>
-    <div><label>Ladelimit / max. SOC (%)
-        <span class="qhelp" role="button" tabindex="0" data-help="Harte Obergrenze: ab diesem Ladestand wird nie aus dem Netz geladen - auch nicht bei manuellen Ladeterminen oder Sofort-Override.">?</span>
-      </label><input id="max_charge_soc" type="number" min="1" max="100"></div>
     <div><label>Minimaler Akkustand am Cerbo (%)
         <span class="qhelp" role="button" tabindex="0" data-help="Dieselbe Einstellung wie im VRM-Portal unter „Minimaler SOC (es sei denn, Netz fällt aus)“: Darunter entlädt der Akku nicht weiter, das Haus läuft dann aus dem Netz. Wird direkt am Cerbo gesetzt, nicht erst mit „Speichern“.">?</span>
       </label>
@@ -398,6 +391,34 @@
 </div>
 
 <div id="dynamic-pricing-cards">
+<div class="card" id="grid-charge-card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/><path d="M9 9l-2 3h4l-2 3"/></svg>Laden aus dem Netz <span class="qhelp" role="button" tabindex="0" data-help="Hier legst du fest, <b>bis wohin</b> und <b>ab welchem Preis</b> die App Strom aus dem Netz in den Akku lädt. Die kleine Tabelle darunter zeigt, welche Grenze für welchen Weg gilt.">?</span></h2>
+  <div class="sub">Bis wohin und ab welchem Preis die App aus dem Netz lädt.</div>
+  <div class="grid2">
+    <div><label>PV-Reserve: Netzladen bis (%)
+        <span class="qhelp" role="button" tabindex="0" data-help="<b>Bis zu diesem Ladestand</b> lädt die Steuerung aus dem Netz (Intelligente Planung und die klassischen Strategien). Der Rest bis 100 % bleibt frei, damit mittags noch Solarstrom hineinpasst. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz für die Sonne. 100 = kein Puffer. Nur bei dynamischem Tarif relevant.<br><br><b>Das Ladelimit</b> (rechts) ist die harte Obergrenze darüber: Sie gilt für <u>alles</u>, was aus dem Netz lädt, auch für Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Das Ladelimit sollte also gleich hoch oder höher sein als die PV-Reserve.">?</span>
+      </label><input id="pv_reserve_soc" type="number" step="1" min="0" max="100">
+      <small class="hint" id="pv_reserve_hint"></small></div>
+    <div><label>Ladelimit / max. SOC (%)
+        <span class="qhelp" role="button" tabindex="0" data-help="Harte Obergrenze: ab diesem Ladestand wird nie aus dem Netz geladen - auch nicht bei manuellen Ladeterminen oder Sofort-Override.">?</span>
+      </label><input id="max_charge_soc" type="number" min="1" max="100"></div>
+    <div><label>Immer laden unter (ct/kWh)
+        <span class="qhelp" role="button" tabindex="0" data-help="Gegenstück zum Ladelimit: Fällt der Preis auf oder unter diesen Wert, wird sofort geladen – unabhängig davon, ob eine Strategie gerade Bedarf sieht. Gedacht für Preise, die an diesem Tag mit hoher Wahrscheinlichkeit nicht mehr unterboten werden. Das Ladelimit oben gilt weiterhin. 0 = deaktiviert.">?</span>
+      </label><input id="absolute_cheap_price" type="number" step="0.5" min="0"></div>
+    <div><label>Sicherheitspuffer beim Nachtladen (%-Punkte) <span class="muted" style="font-weight:normal">· nur Intelligente Planung</span>
+    <span class="qhelp" role="button" tabindex="0" data-help="Die Planung rechnet nachts mit einem um diesen Wert höheren Mindest-Akkustand und plant dadurch vorsichtiger: Sie lädt tendenziell früher und mehr, statt auf die Sonnenprognose zu setzen. Die Ladesperre am Cerbo (Minimaler Akkustand unter „Anlage & Speicher“) bleibt unverändert. 0 = kein Puffer. Beispiel: Minimaler Akkustand 15 %, Puffer 5 % → die Planung rechnet mit 20 %.">?</span></label>
+    <input id="smart_planner_safety_buffer_pct" type="number" step="1" min="0" max="30" placeholder="z.B. 5"></div>
+  </div>
+  <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">Was gilt wo? (PV-Reserve und Ladelimit)</summary>
+    <div class="table-scroll" style="margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Was lädt gerade</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Stoppt bei</th></tr>
+      <tr><td style="padding:6px 8px">Intelligente Planung, klassische Strategien</td><td style="padding:6px 8px"><b>PV-Reserve</b> (Rest bleibt für die Sonne frei)</td></tr>
+      <tr><td style="padding:6px 8px">Preisschwelle „Immer laden unter“</td><td style="padding:6px 8px"><b>Ladelimit</b></td></tr>
+      <tr><td style="padding:6px 8px">Sofort-Override, manueller Ladetermin</td><td style="padding:6px 8px"><b>Ladelimit</b></td></tr>
+    </table></div>
+  </details>
+</div>
+
 <div class="card">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>Intelligente Planung <span class="qhelp" role="button" tabindex="0" data-help="Standard bei dynamischem Tarif. Bei jedem Durchlauf wird mit dem aktuellen Akkustand und der neuesten VRM-Prognose für Sonne und Verbrauch neu berechnet, wann Netzladen über den sichtbaren Zeitraum (heute und, sobald bekannt, morgen) am günstigsten ist.<br><br>Ersetzt Peak-Schutz, SOC-Strategie und Günstig-Vorkauf; Ladelimit, PV-Reserve und der minimale Akkustand am Cerbo gelten weiter. Ohne Wirkung bei manuellem Override, Ladeterminen und festem Tarif.<br><br><b>Unterschied zu den Strategien:</b> Diese reagieren stufenweise auf feste Schwellen und schauen nur bis zur nächsten Stufe voraus. Die Planung rechnet in einem Schritt über den ganzen Zeitraum, berücksichtigt die erwartete Sonne stundengenau und passt sich bei abweichender Prognose beim nächsten Durchlauf selbst an.">?</span></h2>
   <div class="sub">Berechnet das günstigste Netzladen über den gesamten bekannten Zeitraum.</div>
@@ -405,12 +426,6 @@
     <label class="switch" style="margin:0"><input type="checkbox" id="smart_planner_enabled"><span class="slider"></span></label>
     <div><b>Intelligente Planung aktiv</b><div class="muted">Aus = feste Strategien von Hand einstellen.</div></div>
   </div>
-  <div style="margin-top:14px"><label>Sicherheitspuffer beim Nachtladen (%-Punkte)
-    <span class="qhelp" role="button" tabindex="0" data-help="Die Planung rechnet nachts mit einem um diesen Wert höheren Mindest-Akkustand und plant dadurch vorsichtiger: Sie lädt tendenziell früher und mehr, statt auf die Sonnenprognose zu setzen. Die Ladesperre am Cerbo (Minimaler Akkustand unter „Anlage & Speicher“) bleibt unverändert. 0 = kein Puffer. Beispiel: Minimaler Akkustand 15 %, Puffer 5 % → die Planung rechnet mit 20 %.">?</span></label>
-    <input id="smart_planner_safety_buffer_pct" type="number" step="1" min="0" max="30" placeholder="z.B. 5" style="width:100px"></div>
-  <div style="margin-top:14px"><label>Immer laden unter (ct/kWh)
-        <span class="qhelp" role="button" tabindex="0" data-help="Gegenstück zum Ladelimit: Fällt der Preis auf oder unter diesen Wert, wird sofort geladen – unabhängig davon, ob eine Strategie gerade Bedarf sieht. Gedacht für Preise, die an diesem Tag mit hoher Wahrscheinlichkeit nicht mehr unterboten werden. Das Ladelimit oben gilt weiterhin. 0 = deaktiviert.">?</span>
-      </label><input id="absolute_cheap_price" type="number" step="0.5" min="0"></div>
 </div>
 
 <div id="legacy-strategy-cards">
@@ -3296,7 +3311,7 @@ const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', '
 const IS_SH = window.PAGE_MODE === 'smarthome';
 const ADMIN_TABS = [
   { id: 'anlage', label: 'Anlage', match: ['Victron Cerbo', 'Ladesteuerung', 'Anlage', 'Batterie-Watchdog', 'Netz-Zähler', 'Periodische Vollladung'] },
-  { id: 'tarif', label: 'Tarif & Laden', match: ['Tibber', 'Stromtarif', 'Vertragskosten', 'Intelligente Planung', 'Peak-Schutz', 'SOC-Strategie', 'PV-Prognose'] },
+  { id: 'tarif', label: 'Tarif & Laden', match: ['Tibber', 'Stromtarif', 'Vertragskosten', 'Laden aus dem Netz', 'Intelligente Planung', 'Peak-Schutz', 'SOC-Strategie', 'PV-Prognose'] },
   { id: 'solar', label: 'Solar', match: ['PV-Wechselrichter'] },
   { id: 'vrm', label: 'VRM', match: ['Victron VRM'] },
   { id: 'automatik', label: 'Automatik', href: '/automation', area: 'automation', match: [] },
@@ -3312,7 +3327,7 @@ const ADMIN_TABS = [
     ['App-Version', 'blue'], ['Uhrzeit', 'normal'], ['Betrieb', 'green'], ['Module', 'green'], ['Fernzugriff', 'accent-t'], ['Sicherung', 'blue'], ['Testmodus', 'plan'],
     ['Diagramme', 'blue'], ['Darstellung', 'timer'], ['Meine Ansicht', 'plan'],
     ['Victron Cerbo', 'accent-t'], ['Ladesteuerung', 'green'], ['Anlage', 'green'], ['Batterie-Watchdog', 'exp'], ['Periodische Vollladung', 'accent-t'], ['Netz-Z', 'normal'],
-    ['Stromtarif', 'timer'], ['Vertragskosten', 'exp'], ['PV-Prognose', 'timer'], ['Intelligente Planung', 'plan'], ['Peak-Schutz', 'red'], ['SOC-Strategie', 'blue'],
+    ['Stromtarif', 'timer'], ['Laden aus dem Netz', 'green'], ['Vertragskosten', 'exp'], ['PV-Prognose', 'timer'], ['Intelligente Planung', 'plan'], ['Peak-Schutz', 'red'], ['SOC-Strategie', 'blue'],
     ['Victron VRM \u2013 Zugang', 'accent-t'], ['Victron VRM \u2013 Verlauf', 'green'], ['Wettervorhersage', 'blue'], ['Benachrichtigungen', 'exp'],
     ['Konto', 'accent-t'], ['Weitere Benutzer', 'plan'], ['Neuer Benutzer', 'green'], ['Betriebsbericht', 'green'],
   ];

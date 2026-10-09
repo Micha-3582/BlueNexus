@@ -242,10 +242,25 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 | Erwartete Zyklenzahl | Herstellerangabe (z. B. 6000), für die Lebensdauer-Hochrechnung. |
 | Tagesverbrauch (kWh) | Durchschnitt pro Tag – Basis für die Planung. |
 | Ladestrom (A) / Systemspannung (V) | Daraus errechnet sich die Ladeleistung beim Netzladen. |
-| **PV-Reserve: Netzladen bis (%)** | Bis zu diesem **Ladestand** lädt die Steuerung aus dem Netz (Intelligente Planung und klassische Strategien); der Rest bis 100 % bleibt für die Mittagssonne frei. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz (das Feld zeigt den Platz in kWh darunter an). 100 = kein Puffer. Früher stand hier „PV-Reserve (kWh)“; ein alter Wert wird beim Öffnen automatisch in Prozent umgerechnet. |
-| Ladelimit / max. SOC (%) | Harte Obergrenze für **alles**, was aus dem Netz lädt, auch Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Es sollte gleich hoch oder höher als die PV-Reserve sein. |
 | **Minimaler Akkustand am Cerbo (%)** | Wie „Minimaler SOC“ im VRM; darunter entlädt der Akku nicht. Wird **direkt am Cerbo** gesetzt. |
 | **Sollwert Netz am Cerbo (W)** | ESS-Netz-Sollwert (−1000 … 1000 W in 10er-Schritten). 0 = möglichst kein Bezug/Einspeisung. Wird **direkt am Cerbo** gesetzt. |
+
+> **PV-Reserve, Ladelimit und Preisschwelle** stehen im Reiter **Tarif & Laden** in der Karte **„Laden aus dem Netz“** (siehe 4.4).
+
+**Periodische Vollladung:** Alle X Tage wird das Ladelimit auf ein Ziel (meist 100 %) angehoben, damit das BMS die Zellen balancieren kann. *Wann* geladen wird, entscheidet weiterhin die Planung – nur bei günstigem Preis bzw. genug Sonne. 0 = aus.
+
+### 4.4 Stromtarif und Ladestrategie
+
+#### Karte „Laden aus dem Netz“ (Reiter Tarif & Laden)
+
+Hier legst du fest, **bis wohin** und **ab welchem Preis** die App aus dem Netz lädt:
+
+| Feld | Bedeutung |
+|---|---|
+| **PV-Reserve: Netzladen bis (%)** | Bis zu diesem **Ladestand** lädt die Steuerung aus dem Netz (Intelligente Planung und klassische Strategien); der Rest bis 100 % bleibt für die Mittagssonne frei. Beispiel: 80 % bei 22,8 kWh = rund 4,6 kWh Platz (das Feld zeigt den Platz in kWh darunter an). 100 = kein Puffer. Früher stand hier „PV-Reserve (kWh)“; ein alter Wert wird beim Öffnen automatisch in Prozent umgerechnet. |
+| Ladelimit / max. SOC (%) | Harte Obergrenze für **alles**, was aus dem Netz lädt, auch Sofort-Override, Ladetermine und die Preisschwelle „Immer laden unter“. Diese Wege kennen die PV-Reserve nicht, sie stoppen erst am Ladelimit. Es sollte gleich hoch oder höher als die PV-Reserve sein. |
+| **Immer laden unter (ct/kWh)** („Preisschwelle“) | Fällt der Preis auf oder unter diesen Wert, wird geladen, unabhängig von der Strategie (0 = aus). Das gilt **auch bei eingeschalteter Intelligenter Planung**: Liegt der Preis unter der Schwelle, lädt die App sofort, statt auf noch billigere Viertelstunden zu warten (nur das Ladelimit bremst weiterhin). Im Preisdiagramm des Dashboards zeigt „Preisschwelle greift“ diese Stunden an. Die „Geplanten Ladefenster“ führen diese Viertelstunden mit auf (soweit sie bis zum Ladelimit noch in den Akku passen). |
+| **Sicherheitspuffer beim Nachtladen (%-Punkte)** | Nur für die **Intelligente Planung**: Sie rechnet nachts mit einem entsprechend höheren Mindest-Akkustand und plant vorsichtiger. |
 
 **Bis wohin wird aus dem Netz geladen?** Zwei Grenzen wirken zusammen: die **PV-Reserve** (Ladestand, bis zu dem die „klugen“ Wege laden) und das **Ladelimit** (harte Obergrenze für alles). Beispiel mit PV-Reserve 80 % und Ladelimit 95 %:
 
@@ -258,11 +273,6 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 
 Merksatz: Die PV-Reserve gilt nur für die automatische Planung. Alles, was du selbst auslöst (Override, Ladetermin) oder was als „immer laden“ eingestellt ist (Preisschwelle), geht bis zum Ladelimit. Das Ladelimit verhindert in allen Fällen, dass der Akku auf 100 % lädt. Liegt die PV-Reserve über dem Ladelimit, gilt das Ladelimit. Wer nachts bei sehr niedrigen Preisen nicht über die PV-Reserve hinaus laden will, senkt die Preisschwelle (dann entscheidet die Planung) oder setzt das Ladelimit niedriger.
 
-**Periodische Vollladung:** Alle X Tage wird das Ladelimit auf ein Ziel (meist 100 %) angehoben, damit das BMS die Zellen balancieren kann. *Wann* geladen wird, entscheidet weiterhin die Planung – nur bei günstigem Preis bzw. genug Sonne. 0 = aus.
-
-### 4.4 Stromtarif und Ladestrategie
-
-> **Immer laden unter (ct/kWh)** (die „Preisschwelle“) steht im Reiter **Tarif & Laden** in der Karte **Intelligente Planung**: Fällt der Preis auf oder unter diesen Wert, wird geladen, unabhängig von der Strategie (0 = aus). Das gilt **auch bei eingeschalteter Intelligenter Planung**: Liegt der Preis unter der Schwelle, lädt die App sofort, statt auf noch billigere Viertelstunden zu warten (nur das Ladelimit bremst weiterhin). Im Preisdiagramm des Dashboards zeigt „Preisschwelle greift“ diese Stunden an. Die „Geplanten Ladefenster“ führen diese Viertelstunden mit auf (soweit sie bis zum Ladelimit noch in den Akku passen).
 
 - **Dynamischer Tarif (Tibber):** Access-Token von developer.tibber.com eintragen. Die Steuerung lädt in den günstigsten Viertelstunden.
 - **Fester Preis:** Preis pro kWh (brutto) eintragen. Es gibt dann **keine Preisplanung**, die App lädt nie aktiv aus dem Netz. PV-Vorrang, Ladelimit und Sofort-Override wirken weiter.

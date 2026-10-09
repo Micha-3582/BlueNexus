@@ -303,7 +303,8 @@ for _f in ("tibber_token", "tariff_mode", "fixed_price_ct", "max_charge_soc", "a
            "evening_peak_end", "min_peak_soc", "peak_avoid_price", "evening_comfort_soc",
            "valley_min_saving_ct", "night_safety_soc", "target_safe_soc", "hysterese_soc",
            "contract_fee_month_eur", "grid_fee_day_eur", "meter_fee_day_eur",
-           "section14a_credit_day_eur", "vat_percent", "smart_planner_enabled", "pv_auto_calibration"):
+           "section14a_credit_day_eur", "vat_percent", "smart_planner_enabled", "pv_auto_calibration",
+           "pv_reserve_soc", "pv_reserve_kwh", "smart_planner_safety_buffer_pct"):
     FIELD_AREA[_f] = "settings_tarif"
 for _f in ("app_display_name", "show_live_values", "show_energy_chart", "show_flow_chart",
            "show_week_overview", "show_month_overview", "show_tibber_card", "show_override_card",
