@@ -472,8 +472,10 @@ Läuft mit Python 3.9+. Alternativ per **pm2** oder **systemd** als Dienst.
 
 1. **Konto anlegen** – Vorname angeben (daraus entsteht der Name der App, z. B. „Michaels BlueNexus“); das erste Konto wird zum Administrator.
 2. **Module wählen** – Energie, Smart Home, Kameras, Alexa. Ohne PV-Anlage „Energie“ einfach abwählen.
-3. **Einrichtungsassistent** (nur mit Energie): Cerbo-IP, Tibber-Token oder Festpreis, VRM-Zugang. Ein
-   Verbindungstest prüft Cerbo und Tibber, bevor es losgeht.
+   Wer eine Sicherung hat, stellt sie gleich auf der Seite „Konto anlegen“ wieder her (Dateien `.bnx`, auch ältere `.hnx`).
+3. **Einrichtungsassistent** (nur mit Energie): Victron-GX-Gerät (Cerbo GX oder MultiPlus-II GX), Tibber-Token oder Festpreis, VRM-Zugang. Ein
+   Verbindungstest prüft Cerbo und Tibber, bevor es losgeht. Im ersten Schritt führt **„← Module ändern“** zurück zur Modulwahl,
+   falls du die Auswahl korrigieren möchtest.
 4. **Geräte suchen** (*Smart Home → Geräte suchen*): Systeme ankreuzen, suchen, Treffer benennen, hinzufügen.
 5. **Regeln bauen** – erst im **Trockenlauf** beobachten, dann scharf schalten.
 
