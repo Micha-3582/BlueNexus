@@ -93,6 +93,14 @@ Die App besteht aus Modulen, die du einzeln an- und ausschalten kannst:
 
 Beim ersten Start legt man einen Zugang an (`/create-account`) bzw. meldet sich mit dem Admin-Konto an. Danach werden weitere Benutzer unter **Einstellungen → Konto & Benutzer → Weitere Benutzer** angelegt.
 
+**Passwort vergessen.** Auf der Anmeldeseite führt **„Passwort vergessen?“** zu drei Wegen:
+
+1. **Code per Telegram oder Pushover:** Dieser Weg erscheint **nur**, wenn Telegram bzw. Pushover eingerichtet ist (mit mindestens einem Empfänger, der als *System*-Empfänger markiert ist). Benutzernamen eingeben, **Code senden**: ein 6-stelliger Code geht an die System-Empfänger. Er gilt 10 Minuten, nur einmal, und nach 5 falschen Eingaben ist er ungültig; höchstens 3 Codes je 15 Minuten. Mit dem Code vergibst du ein neues Passwort. Dieser Weg gilt nur für **Konten mit vollen Administratorrechten**, weil der Code an die Empfänger des Admins geht.
+2. **Wiederherstellungsschlüssel:** Beim **Konto anlegen** zeigt die App einmal einen Schlüssel der Form `XXXXX-XXXXX-XXXXX-XXXXX`. Aufschreiben und sicher aufbewahren (nicht auf demselben Gerät wie die App)! Mit Benutzername und Schlüssel vergibst du ein neues Passwort, ganz ohne Telegram oder Internet. Der benutzte Schlüssel ist danach verbraucht, die App zeigt gleich einen neuen. Wer schon vor dieser Funktion ein Konto hatte, erzeugt den Schlüssel unter *Einstellungen → Konto & Benutzer → Konto & Zugang → Wiederherstellungsschlüssel* (mit dem aktuellen Passwort; ein alter Schlüssel wird dabei ungültig).
+3. **Letzte Rettung auf dem Gerät:** `python reset_password.py` im App-Ordner (per SSH oder am Rechner). Auf dem Pi z. B. `sudo -u bluenexus /opt/bluenexus/app/.venv/bin/python /opt/bluenexus/app/reset_password.py`.
+
+Nach jedem Zurücksetzen kommt eine Nachricht an Telegram und Pushover („Passwort wurde zurückgesetzt“), und das Logbuch hält es fest. Die Antworten der Seite verraten nie, ob ein Benutzername existiert. Bei anderen Konten (Familie, Gäste) vergibt der Administrator ein neues Passwort unter *Weitere Benutzer*. In der Demo ist die Funktion abgeschaltet.
+
 **Rechte pro Bereich.** Die Rechte sind nach den Menüpunkten der App geordnet. Pro Zeile stellst du mit drei Knöpfen **Kein**, **Lesen** oder **Schreiben** ein. Über „alle:“ in der Gruppenüberschrift setzt du eine ganze Gruppe auf einmal.
 
 | Gruppe | Bereich | Bedeutung |

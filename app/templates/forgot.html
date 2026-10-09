@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Passwort vergessen · {{ app_display_name }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta name="theme-color" content="#1b1f24">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    :root {
+      --bg: #121519; --card: #1b1f24; --card2: #252a30;
+      --fg: #f2f3f5; --muted: #a3a9b0; --accent: #005fbe; --accent-t: #4b9be6; --brand: #f48c24; --border: #363c44;
+      --red: #e5544a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--fg);
+      background: radial-gradient(1000px 500px at 10% -10%, rgba(60,162,203,.14), transparent 62%), radial-gradient(800px 460px at 100% 110%, rgba(244,140,36,.10), transparent 60%), var(--bg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 28px 26px; width: 100%; max-width: 360px; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .brand .sun { font-size: 26px; }
+    .brand h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 4px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 15px; }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 42px; }
+    .pw-toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; margin: 0; width: 34px; height: 34px; padding: 0;
+      display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; }
+    .pw-toggle:hover { color: var(--fg); }
+    .pw-toggle svg { width: 20px; height: 20px; }
+    .check { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
+    .check input { width: auto; }
+    button { width: 100%; margin-top: 18px; cursor: pointer; border: none; border-radius: 10px;
+      padding: 12px 16px; font-size: 15px; font-weight: 600; background: linear-gradient(180deg, #0a6fd3, #005fbe); color: #fff; box-shadow: 0 2px 10px rgba(0,95,190,.3); }
+    .error { background: rgba(229,84,74,.12); border: 1px solid rgba(229,84,74,.3);
+      color: var(--red); padding: 10px 14px; border-radius: 10px; font-size: 14px; margin-bottom: 4px; }
+    input[type=checkbox] { accent-color: var(--accent); }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(60,162,203,.35); }
+    .card { box-shadow: 0 10px 34px rgba(0,0,0,.35); }
+  </style>
+</head>
+<body>
+  <div class="card" id="box" style="max-width:400px">
+    <div class="brand">
+      <img class="sun" src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="28" height="28" style="border-radius:7px;flex:none">
+      <h1>Passwort vergessen</h1>
+    </div>
+    <p class="error" id="err" style="display:none"></p>
+    <div id="ok" style="display:none"></div>
+
+    <div id="step-choose">
+      <p class="muted" style="margin:0 0 6px;font-size:14px;color:var(--muted)">Wie möchtest du dein Passwort zurücksetzen?</p>
+      {% for c in channels %}
+      <button type="button" class="alt" data-ch="{{ c.id }}">Code per {{ c.name }} senden</button>
+      {% endfor %}
+      <button type="button" class="alt" id="use-key">Ich habe meinen Wiederherstellungsschlüssel</button>
+      {% if not channels %}<p style="font-size:13px;margin-top:12px;color:var(--muted)">Telegram oder Pushover sind nicht eingerichtet, deshalb gibt es hier keinen Code. Ohne Schlüssel hilft nur das Skript auf dem Gerät: <code>python reset_password.py</code> im App-Ordner (siehe Handbuch).</p>{% endif %}
+    </div>
+
+    <div id="step-code" style="display:none">
+      <label>Benutzername</label>
+      <input type="text" id="u1" autocomplete="username" autocapitalize="off" spellcheck="false">
+      <p id="code-hint" style="font-size:13px;margin:10px 0 0;color:var(--muted)"></p>
+      <button type="button" id="send-code">Code senden</button>
+      <div id="code-fields" style="display:none">
+        <label>Code (6 Ziffern)</label>
+        <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+      </div>
+    </div>
+
+    <div id="step-key" style="display:none">
+      <label>Benutzername</label>
+      <input type="text" id="u2" autocomplete="username" autocapitalize="off" spellcheck="false">
+      <label>Wiederherstellungsschlüssel</label>
+      <input type="text" id="key" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </div>
+
+    <div id="step-new" style="display:none">
+      <label>Neues Passwort <span style="font-weight:normal">(mindestens 8 Zeichen)</span></label>
+      <input type="password" id="p1" autocomplete="new-password">
+      <label>Neues Passwort wiederholen</label>
+      <input type="password" id="p2" autocomplete="new-password">
+      <button type="button" id="do-reset">Passwort ändern</button>
+    </div>
+
+    <a href="/login" class="back">← Zurück zur Anmeldung</a>
+  </div>
+
+  <style>
+    input[type="text"], input[type="password"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); font-size: 15px; }
+    button.alt { background: var(--card2); color: var(--fg); border: 1px solid var(--border); box-shadow: none; margin-top: 10px; }
+    .back { display: block; margin-top: 18px; text-align: center; color: var(--accent-t); font-size: 14px; text-decoration: none; }
+    .ok-box { background: rgba(53,192,122,.12); border: 1px solid rgba(53,192,122,.35); padding: 10px 14px; border-radius: 10px; font-size: 14px; margin-bottom: 8px; }
+    .keybox { font-family: ui-monospace, Consolas, monospace; font-size: 18px; letter-spacing: 1px; text-align: center; padding: 14px 10px; border-radius: 10px; border: 1px dashed var(--accent-t); background: var(--bg); margin: 10px 0; word-break: break-all; user-select: all; }
+  </style>
+  <script>
+    (function () {
+      var $ = function (id) { return document.getElementById(id); }, mode = '', channel = '';
+      function show(id, on) { $(id).style.display = on ? '' : 'none'; }
+      function err(t) { $('err').textContent = t || ''; show('err', !!t); }
+      function post(url, body) {
+        return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || 'Fehler ' + r.status); return j; }); });
+      }
+      document.querySelectorAll('[data-ch]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          mode = 'code'; channel = b.dataset.ch; err(''); show('step-choose', false); show('step-code', true);
+          $('code-hint').textContent = 'Der Code geht an die als Administrator eingerichteten Empfänger in ' + b.textContent.replace('Code per ', '').replace(' senden', '') + '.';
+          $('u1').focus();
+        });
+      });
+      $('use-key').addEventListener('click', function () { mode = 'key'; err(''); show('step-choose', false); show('step-key', true); show('step-new', true); $('u2').focus(); });
+      $('send-code').addEventListener('click', function () {
+        var u = $('u1').value.trim(); if (!u) { err('Bitte den Benutzernamen eingeben.'); return; }
+        err(''); $('send-code').disabled = true;
+        post('/api/forgot/send', { username: u, channel: channel }).then(function (j) {
+          $('ok').className = 'ok-box'; $('ok').textContent = j.message; show('ok', true); show('code-fields', true); show('step-new', true); $('send-code').textContent = 'Code erneut senden'; $('code').focus();
+        }).catch(function (e) { err(e.message); }).then(function () { $('send-code').disabled = false; });
+      });
+      $('do-reset').addEventListener('click', function () {
+        var u = mode === 'key' ? $('u2').value.trim() : $('u1').value.trim(), s = mode === 'key' ? $('key').value : $('code').value;
+        if (!u || !s) { err(mode === 'key' ? 'Benutzername und Schlüssel eingeben.' : 'Benutzername und Code eingeben.'); return; }
+        err(''); $('do-reset').disabled = true;
+        post('/api/forgot/reset', { username: u, method: mode, secret: s, password: $('p1').value, password2: $('p2').value }).then(function (j) {
+          var h = '<div class="ok-box">Das Passwort wurde geändert. Du kannst dich jetzt anmelden.</div>';
+          if (j.new_key) h += '<p style="margin:12px 0 4px;font-size:14px"><b>Neuer Wiederherstellungsschlüssel</b> – der alte ist verbraucht. Bitte jetzt aufschreiben:</p><div class="keybox">' + j.new_key + '</div>';
+          h += '<a href="/login" class="back" style="margin-top:14px">Zur Anmeldung →</a>';
+          $('box').innerHTML = '<div class="brand"><h1>Passwort geändert</h1></div>' + h;
+        }).catch(function (e) { err(e.message); $('do-reset').disabled = false; });
+      });
+    })();
+  </script>
+  <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+</body>
+</html>

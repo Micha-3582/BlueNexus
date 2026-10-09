@@ -882,6 +882,13 @@
     <button id="btn-pw">Speichern</button>
     <span id="pw-msg" class="muted" style="margin-left:12px"></span>
   </div>
+  {% if user_perms.account == 'write' %}
+  <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+    <b>Wiederherstellungsschlüssel</b> <span class="qhelp" role="button" tabindex="0" data-help="Mit dem Schlüssel setzt du dein Passwort zurück, falls du es vergisst (Anmeldeseite → „Passwort vergessen?“). Er wird nur einmal angezeigt und nur als Prüfwert gespeichert. Ein neuer Schlüssel macht den alten ungültig.">?</span>
+    <div class="muted" id="rk-state" style="margin:6px 0">…</div>
+    <button class="ghost" id="rk-new">Neuen Schlüssel erzeugen</button>
+  </div>
+  {% endif %}
 </div>
 
 {% if user_perms.user_management != 'none' %}
@@ -1281,6 +1288,22 @@ document.getElementById('btn-update').addEventListener('click', async () => {
   } catch (e) { st.textContent = 'Fehler beim Update.'; }
 });
 
+// Wiederherstellungsschluessel (Passwort vergessen)
+(function () {
+  const st = document.getElementById('rk-state'), btn = document.getElementById('rk-new'); if (!st || !btn) return;
+  const load = async () => { try { const r = await (await fetch('/api/recovery-key')).json(); st.textContent = r.has ? 'Eingerichtet – du kannst damit dein Passwort zurücksetzen.' : 'Noch nicht eingerichtet. Erzeuge einen Schlüssel und bewahre ihn sicher auf.'; btn.textContent = r.has ? 'Neuen Schlüssel erzeugen' : 'Schlüssel erzeugen'; } catch (e) { st.textContent = ''; } };
+  btn.addEventListener('click', async () => {
+    const pw = await uiDialog({ title: 'Wiederherstellungsschlüssel erzeugen', message: 'Zur Bestätigung dein aktuelles Passwort. Ein vorhandener Schlüssel wird dadurch ungültig.', label: 'Aktuelles Passwort', type: 'password', okText: 'Erzeugen' });
+    if (!pw) return;
+    try {
+      const r = await fetch('/api/recovery-key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) }); const j = await r.json();
+      if (!r.ok) { await uiDialog({ title: 'Nicht möglich', message: j.error || 'Fehler', info: true }); return; }
+      await uiDialog({ title: 'Dein neuer Schlüssel', html: '<div style="font-family:ui-monospace,Consolas,monospace;font-size:19px;letter-spacing:1px;text-align:center;padding:14px 8px;border:1px dashed var(--accent-t);border-radius:10px;margin:6px 0 10px;word-break:break-all;user-select:all">' + escH(j.key) + '</div>Schreib ihn jetzt auf und bewahre ihn sicher auf (nicht auf demselben Gerät wie die App). Er wird nur dieses eine Mal angezeigt.', info: true, okText: 'Aufgeschrieben' });
+      load();
+    } catch (e) { await uiDialog({ title: 'Fehler', message: 'Verbindung fehlgeschlagen.', info: true }); }
+  });
+  load();
+})();
 document.getElementById('btn-pw').addEventListener('click', async () => {
   const msg = document.getElementById('pw-msg');
   const body = {

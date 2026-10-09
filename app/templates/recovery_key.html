@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Anmelden · {{ app_display_name }}</title>
+  <title>Wiederherstellungsschlüssel · {{ app_display_name }}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <meta name="theme-color" content="#1b1f24">
@@ -11,9 +11,6 @@
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}">
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="{{ app_display_name }}">
   <style>
     :root {
       --bg: #121519; --card: #1b1f24; --card2: #252a30;
@@ -53,48 +50,34 @@
   </style>
 </head>
 <body>
-  {% if demo %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🎬 <b>DEMO</b> – alle Daten, Geräte und Kameras sind erfunden. Es wird nichts geschaltet und nichts gesendet.</div>{% elif sandbox %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
-  <form class="card" method="post" autocomplete="on">
+  <div class="card" style="max-width:440px">
     <div class="brand">
       <img class="sun" src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="28" height="28" style="border-radius:7px;flex:none">
-      <h1>{{ app_display_name }}</h1>
+      <h1>Dein Wiederherstellungsschlüssel</h1>
     </div>
+    <p style="font-size:14px;margin:0 0 6px;color:var(--muted)">Mit diesem Schlüssel setzt du später dein Passwort zurück, falls du es vergisst – auch ohne Telegram oder Pushover. Er wird <b style="color:var(--fg)">nur jetzt einmal</b> angezeigt.</p>
+    <div class="keybox" id="key">{{ key }}</div>
+    <p style="font-size:13px;margin:0 0 6px;color:var(--muted)">Schreib ihn auf Papier und leg ihn an einen sicheren Ort (nicht auf dasselbe Gerät wie die App). Wer den Schlüssel hat, kann das Passwort dieses Kontos ändern.</p>
+    <button type="button" class="alt" id="copy">In die Zwischenablage kopieren</button>
+    <label class="check" style="margin-top:16px"><input type="checkbox" id="saved"> <span>Ich habe den Schlüssel aufgeschrieben.</span></label>
+    <a href="{{ next }}" id="go" class="go off">Weiter</a>
+  </div>
 
-    {% if error %}
-      <p class="error">{{ error }}</p>
-    {% endif %}
-
-    <label>Benutzername</label>
-    <input type="text" name="username" autocomplete="username"
-           autocapitalize="off" spellcheck="false" required autofocus>
-
-    <label>Passwort</label>
-    <div class="pw-wrap">
-      <input type="password" id="pw" name="password" autocomplete="current-password" required>
-      <button type="button" class="pw-toggle" id="pw-toggle" tabindex="-1" aria-label="Passwort anzeigen" title="Passwort anzeigen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-      </button>
-    </div>
-
-    <label class="check">
-      <input type="checkbox" name="remember" value="1" checked>
-      <span>Angemeldet bleiben</span>
-    </label>
-
-    <button type="submit">Anmelden</button>
-    {% if not demo %}<a href="/forgot" style="display:block;margin-top:14px;text-align:center;color:var(--accent-t);font-size:14px;text-decoration:none">Passwort vergessen?</a>{% endif %}
-  </form>
+  <style>
+    button.alt { background: var(--card2); color: var(--fg); border: 1px solid var(--border); box-shadow: none; margin-top: 10px; }
+    .keybox { font-family: ui-monospace, Consolas, monospace; font-size: 20px; letter-spacing: 1px; text-align: center; padding: 16px 10px; border-radius: 10px; border: 1px dashed var(--accent-t); background: var(--bg); margin: 14px 0; word-break: break-all; user-select: all; }
+    .go { display: block; margin-top: 14px; text-align: center; padding: 12px 16px; border-radius: 10px; font-size: 15px; font-weight: 600; background: linear-gradient(180deg, #0a6fd3, #005fbe); color: #fff; text-decoration: none; }
+    .go.off { opacity: .4; pointer-events: none; }
+  </style>
   <script>
-    document.getElementById('pw-toggle').addEventListener('click', function () {
-      var pw = document.getElementById('pw');
-      var showing = pw.type === 'text';
-      pw.type = showing ? 'password' : 'text';
-      this.setAttribute('aria-label', showing ? 'Passwort anzeigen' : 'Passwort verbergen');
-      this.title = showing ? 'Passwort anzeigen' : 'Passwort verbergen';
-    });
+    (function () {
+      var saved = document.getElementById('saved'), go = document.getElementById('go');
+      saved.addEventListener('change', function () { go.classList.toggle('off', !saved.checked); });
+      document.getElementById('copy').addEventListener('click', function () {
+        var t = document.getElementById('key').textContent.trim(), b = this;
+        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = 'Kopiert ✓'; }, function () { b.textContent = 'Zum Kopieren den Schlüssel markieren'; });
+      });
+    })();
   </script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
 </body>

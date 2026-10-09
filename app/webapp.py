@@ -41,6 +41,7 @@ import planner
 import autolog
 import notify
 import pushover
+import pwreset
 import tunnel
 import opslog
 import price_cache
@@ -157,7 +158,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"login", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -272,7 +273,7 @@ ENDPOINT_AREA = {
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
     "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
-    "api_check_update": "settings_system", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
+    "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
@@ -528,7 +529,12 @@ def create_account():
     session.clear()
     session["user"] = username.strip().lower()
     session.permanent = True
-    return redirect(url_for("setup_modules") if not store.modules_chosen() else url_for("setup"))
+    nxt = url_for("setup_modules") if not store.modules_chosen() else url_for("setup")
+    try:
+        key = users.set_recovery(username)
+    except UserError:
+        return redirect(nxt)
+    return render_template("recovery_key.html", key=key, next=nxt)
 
 
 def _restart_soon() -> bool:
@@ -829,6 +835,95 @@ def login():
     session["user"] = username.strip().lower()
     session.permanent = remember
     return redirect(_safe_next(request.args.get("next")))
+
+
+# ---------------------------------------------------------------- Passwort vergessen (Code per Telegram/Pushover oder Wiederherstellungsschluessel)
+GENERIC_SENT = "Wenn der Benutzername stimmt und der Dienst erreichbar ist, kommt der Code in wenigen Augenblicken an."
+
+
+@app.route("/forgot", methods=["GET"])
+def forgot():
+    if users.is_empty() or demo.ACTIVE:
+        return redirect(url_for("login"))
+    return render_template("forgot.html", channels=pwreset.channels())
+
+
+@app.route("/api/forgot/send", methods=["POST"])
+def api_forgot_send():
+    """Code zum Zuruecksetzen anfordern. Die Antwort ist immer dieselbe (verraet nicht, ob es das Konto gibt)."""
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo nicht möglich."), 403
+    ip = client_ip()
+    if too_many_attempts(ip):
+        return jsonify(error="Zu viele Versuche. Bitte einige Minuten warten."), 429
+    b = request.get_json(silent=True) or {}
+    name, ch = str(b.get("username") or "").strip().lower(), str(b.get("channel") or "")
+    note_failed_attempt(ip)                                   # jede Anforderung zaehlt (gegen Dauerfeuer auf Telegram/Pushover)
+    u = users.get(name) if name else None
+    if u and auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))) and ch in {c["id"] for c in pwreset.channels()} and pwreset.may_send(name):
+        try:
+            pwreset.send_code(name, ch)
+            opslog.log("rules", f"Passwort vergessen: Code für „{name}“ per {ch} gesendet", dry=False)
+        except Exception as e:                               # noqa: BLE001
+            log.warning("Passwort vergessen: Code konnte nicht gesendet werden (%s)", e)
+    return jsonify(ok=True, message=GENERIC_SENT)
+
+
+@app.route("/api/forgot/reset", methods=["POST"])
+def api_forgot_reset():
+    """Neues Passwort vergeben - mit Code (method "code") oder Wiederherstellungsschluessel (method "key")."""
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo nicht möglich."), 403
+    ip = client_ip()
+    if too_many_attempts(ip):
+        return jsonify(error="Zu viele Versuche. Bitte einige Minuten warten."), 429
+    b = request.get_json(silent=True) or {}
+    name, method, secret = str(b.get("username") or "").strip().lower(), str(b.get("method") or ""), str(b.get("secret") or "")
+    pw, pw2 = str(b.get("password") or ""), str(b.get("password2") or "")
+    if pw != pw2:
+        return jsonify(error="Die Passwörter stimmen nicht überein."), 400
+    if len(pw) < auth.MIN_PASSWORD_LEN:
+        return jsonify(error=f"Passwort muss mindestens {auth.MIN_PASSWORD_LEN} Zeichen haben."), 400
+    u = users.get(name) if name else None
+    ok = False
+    if u and method == "code" and auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))):
+        ok = pwreset.check_code(name, secret)
+    elif u and method == "key":
+        ok = users.verify_recovery(name, secret)
+    elif method not in ("code", "key"):
+        return jsonify(error="Unbekannte Methode."), 400
+    if not ok:
+        note_failed_attempt(ip)
+        return jsonify(error="Die Angaben stimmen nicht oder der Code ist abgelaufen."), 400
+    try:
+        users.update_password(name, pw)
+    except UserError as e:
+        return jsonify(error=str(e)), 400
+    pwreset.clear(name)
+    new_key = users.set_recovery(name) if method == "key" else None       # ein benutzter Schluessel ist verbraucht: neuer Schluessel
+    msg = f"🔐 Das Passwort des Kontos „{name}“ wurde zurückgesetzt ({'Wiederherstellungsschlüssel' if method == 'key' else 'Code'}). Warst du das nicht, ändere sofort die Zugänge."
+    opslog.log("rules", f"Passwort von „{name}“ zurückgesetzt ({method})", dry=False)
+    try:
+        notify.message(msg)
+    except Exception:                                        # noqa: BLE001
+        pass
+    try:
+        pushover.message(msg)
+    except Exception:                                        # noqa: BLE001
+        pass
+    return jsonify(ok=True, new_key=new_key)
+
+
+@app.route("/api/recovery-key", methods=["GET", "POST"])
+def api_recovery_key():
+    """Eigener Wiederherstellungsschluessel: GET = ist einer eingerichtet; POST (mit aktuellem Passwort) = neuen erzeugen (der alte wird ungueltig)."""
+    if request.method == "GET":
+        return jsonify(has=users.has_recovery(g.user))
+    if not users.verify(g.user, (request.get_json(silent=True) or {}).get("password") or ""):
+        return jsonify(error="Passwort ist falsch."), 400
+    key = users.set_recovery(g.user)
+    opslog.log("rules", f"Wiederherstellungsschlüssel für „{g.user}“ neu erzeugt", dry=False)
+    return jsonify(ok=True, key=key)
 
 
 def _safe_next(target) -> str:

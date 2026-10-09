@@ -235,6 +235,19 @@ def is_expired(user: dict) -> bool:
         return False
 
 
+_RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"                  # ohne I, O, 0, 1 (Verwechslungsgefahr beim Abschreiben)
+
+
+def new_recovery_key() -> str:
+    """20 Zeichen (100 Bit) in 4er-Gruppen zu je 5: XXXXX-XXXXX-XXXXX-XXXXX."""
+    raw = "".join(secrets.choice(_RECOVERY_ALPHABET) for _ in range(20))
+    return "-".join(raw[i:i + 5] for i in range(0, 20, 5))
+
+
+def _norm_recovery(key: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(key or "").upper())
+
+
 class UserStore:
     """Benutzerspeicher, der sich mit der Datei auf der Platte abgleicht."""
 
@@ -314,7 +327,9 @@ class UserStore:
             out = []
             for u in self._users.values():
                 d = dict(u)
+                d["has_recovery"] = bool(d.get("recovery_hash"))
                 d.pop("pw_hash", None)
+                d.pop("recovery_hash", None)
                 d["permissions"] = normalize_permissions(d.get("permissions"))
                 d["dashboard_tiles"] = normalize_tiles(d.get("dashboard_tiles"))
                 d["dashboard_order"] = normalize_tile_order(d.get("dashboard_order"))
@@ -488,6 +503,31 @@ class UserStore:
                 raise UserError("Der letzte Zugang mit Benutzerverwaltung kann nicht gelöscht werden.")
             del self._users[key]
             self._write()
+
+    # ---- Wiederherstellungsschluessel: einmal angezeigt, nur als Hash gespeichert; setzt das Passwort dieses Kontos zurueck (siehe pwreset.py)
+    def set_recovery(self, username: str) -> str:
+        key = new_recovery_key()
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            user["recovery_hash"] = generate_password_hash(_norm_recovery(key))
+            self._write()
+        return key
+
+    def has_recovery(self, username: str) -> bool:
+        with self._lock:
+            self._sync()
+            return bool((self._users.get(_norm(username)) or {}).get("recovery_hash"))
+
+    def verify_recovery(self, username: str, key: str) -> bool:
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            h = (user or {}).get("recovery_hash")
+            ok = check_password_hash(h or _DUMMY_HASH, _norm_recovery(key) or "x")      # gleich lange Pruefung, auch ohne Konto/Schluessel
+            return bool(user and h and ok and not is_expired(user))
 
     def update_password(self, username: str, password: str) -> dict:
         key = _norm(username)
