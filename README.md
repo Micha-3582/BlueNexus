@@ -437,7 +437,8 @@ betreiben möchte, findet den Demo-Modus im [Handbuch](MANUAL.md#15-update-siche
 
 ### Raspberry Pi / Debian / Ubuntu – ein Befehl
 
-Auf dem Gerät (Raspberry Pi OS, Debian oder Ubuntu, am besten Pi 3/4/5) per SSH oder im Terminal:
+Auf dem Gerät (Raspberry Pi OS, Debian oder Ubuntu, am besten Pi 3/4/5) per SSH oder im Terminal.
+**Getestet:** Raspberry Pi 4 mit Raspberry Pi OS Lite 64-Bit (Debian 13 „Trixie“, Python 3.13): Installation ohne Warnungen, Dienst läuft und startet beim Hochfahren, Konto anlegen, Module, Update und Wiederherstellung einer Sicherung funktionieren. Zusätzlich getestet: Debian-12-Container (Proxmox).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Micha-3582/BlueNexus/main/app/deploy/install.sh | bash
