@@ -192,7 +192,7 @@
   <div class="muted" id="bk-msg" style="margin-top:8px"></div>
 </div>
 
-<div class="card">
+<div class="card"{% if demo %} style="display:none"{% endif %}>
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></svg>Testmodus <span class="qhelp" role="button" tabindex="0" data-help="Im Testmodus läuft die App normal, darf aber das Gerät nicht verlassen: Cerbo, Homematic, Shelly, Kameras, Tibber, Telegram, Tunnel, Alexa – nichts wird geschaltet oder gesendet. So prüfst du eine eingespielte Sicherung oder ein Update, ohne dass die echte Anlage etwas merkt.">?</span></h2>
   <div class="muted" id="tmode-text">…</div>
   <div style="margin-top:12px"><button class="ghost" id="tmode-btn" disabled>…</button></div>
