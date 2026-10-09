@@ -144,7 +144,7 @@ def _auth(item: dict) -> dict:
         return {"user": item.get("user", ""), "password": item.get("password", "")}
 
 
-def _call(item: dict, cmd: str, param: dict | None = None, action: int = 0) -> dict:
+def _call(item: dict, cmd: str, param: dict | None = None, action: int = 0, strict: bool = True) -> dict:
     last = None
     for attempt in (0, 1):
         auth = _auth(item) if attempt == 0 else {"user": item.get("user", ""), "password": item.get("password", "")}   # 2. Versuch: Benutzer/Passwort in der Adresse
@@ -169,7 +169,9 @@ def _call(item: dict, cmd: str, param: dict | None = None, action: int = 0) -> d
                 except CameraError:
                     pass
                 continue
-            raise _CredsError("Anmeldung an der Kamera fehlgeschlagen – Benutzer/Passwort prüfen")
+            if strict:
+                raise _CredsError("Anmeldung an der Kamera fehlgeschlagen – Benutzer/Passwort prüfen")
+            # nicht strikt (Chime): der Code -6/-7 heisst dort oft "Parameter/Recht" - dann den echten Fehler zeigen statt "Anmeldung"
     raise CameraError(f"Die Kamera meldet einen Fehler ({_detail(last or {})}) – Reolink-Kamera, Firmware und Benutzerrechte (Administrator?) prüfen")
 
 
@@ -181,7 +183,7 @@ CHIME_VOLUMES = {0: "Stumm", 1: "Sehr leise", 2: "Leise", 3: "Mittel", 4: "Laut"
 def chime_list(item: dict) -> list[dict]:
     """Die mit der Tuerklingel gekoppelten Chimes: [{"id", "name", "online", "volume", "led"}]. Leer, wenn die Kamera keinen Chime kennt."""
     ch = int(item.get("channel") or 0)
-    v = _call(item, "GetDingDongList", {"channel": ch})
+    v = _call(item, "GetDingDongList", {"channel": ch}, strict=False)
     out = []
     for d in ((v.get("DingDongList") or {}).get("pairedlist") or []):
         try:
@@ -190,7 +192,7 @@ def chime_list(item: dict) -> list[dict]:
             continue
         e = {"id": did, "name": d.get("deviceName") or f"Chime {did}", "online": d.get("netState") == 2, "volume": None, "led": None}
         try:
-            dd = (_call(item, "DingDongOpt", {"channel": ch, "option": 2, "id": did}).get("DingDong") or {})
+            dd = (_call(item, "DingDongOpt", {"DingDong": {"channel": ch, "option": 2, "id": did}}, strict=False).get("DingDong") or {})
             e["volume"] = dd.get("volLevel")
             e["led"] = dd.get("ledState") == 1 if "ledState" in dd else None
             if dd.get("name"):
@@ -216,7 +218,7 @@ def chime_ring(item: dict, chime_id, tone) -> None:
         raise CameraError("Klingelton: ungültig")
     if tone not in CHIME_TONES:
         raise CameraError("Klingelton: ungültig")
-    _call(item, "DingDongOpt", {"channel": int(item.get("channel") or 0), "option": 4, "id": _chime_id(item, chime_id), "musicId": tone})
+    _call(item, "DingDongOpt", {"DingDong": {"channel": int(item.get("channel") or 0), "option": 4, "id": _chime_id(item, chime_id), "musicId": tone}}, strict=False)
 
 
 def chime_set_volume(item: dict, chime_id, volume) -> None:
@@ -228,8 +230,8 @@ def chime_set_volume(item: dict, chime_id, volume) -> None:
     if volume not in CHIME_VOLUMES:
         raise CameraError("Lautstärke: 0 bis 4")
     ch, did = int(item.get("channel") or 0), _chime_id(item, chime_id)
-    cur = (_call(item, "DingDongOpt", {"channel": ch, "option": 2, "id": did}).get("DingDong") or {})
-    _call(item, "DingDongOpt", {"channel": ch, "option": 3, "id": did, "name": cur.get("name") or "", "volLevel": volume, "ledState": 1 if cur.get("ledState") == 1 else 0})
+    cur = (_call(item, "DingDongOpt", {"DingDong": {"channel": ch, "option": 2, "id": did}}, strict=False).get("DingDong") or {})
+    _call(item, "DingDongOpt", {"DingDong": {"channel": ch, "option": 3, "id": did, "name": cur.get("name") or "", "volLevel": volume, "ledState": 1 if cur.get("ledState") == 1 else 0}}, strict=False)
 
 
 # ---------------------------------------------------------------- Aufnahmen auf der SD-Karte (Video zum Ereignis)
