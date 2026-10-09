@@ -2833,6 +2833,8 @@ def api_version():
 
 @app.route("/api/check-update")
 def api_check_update():
+    if demo.ACTIVE:                                           # Demo: immer "aktuell" (Updates der Demo laufen ueber die Konsole)
+        return jsonify({"git": True, "current": updater.current_version(), "update_available": False, "behind": 0})
     return jsonify(updater.check_update())
 
 
