@@ -83,7 +83,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const IS_ADMIN = {{ ((user_perms.user_management or 'none') == 'write') | tojson }};
+const IS_ADMIN = {{ (((user_perms.user_management or 'none') == 'write') or demo_view) | tojson }};
 document.documentElement.classList.toggle('is-admin', IS_ADMIN);
 const $ = id => document.getElementById(id);
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -278,7 +278,7 @@
   {% if demo %}<style>
     /* Demo: Gesperrte (nur lesbare) Karten sehen aus wie bedienbare - es laesst sich trotzdem nichts aendern (Klicks gesperrt, Speichern serverseitig abgelehnt) */
     .ro-locked { opacity: 1 !important; }
-    {% if user_perms.dashboard == 'read' %}.ro-locked { pointer-events: auto !important; }{% endif %}
+    {% if demo_view %}.ro-locked { pointer-events: auto !important; }{% endif %}
     .switch input:disabled + .slider { opacity: 1 !important; cursor: default; }
     /* gesperrte Knoepfe normal darstellen - ausgenommen solche, die aus Bedienlogik grau sind (naechster Tag, Termin anlegen, Kalender) */
     button:disabled:not(.daytab):not(.cal-nav):not(.cal-day):not([id$="-prev"]):not([id$="-next"]):not(#ev-confirm):not(#ev-discard) { opacity: 1 !important; cursor: default; }
@@ -430,7 +430,7 @@ function askPin(title) {
     })();
   </script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
-{% if demo and user_perms.dashboard == 'read' %}<script>
+{% if demo and demo_view %}<script>
 /* Demo mit Nur-Lese-Konto: Klicks in gesperrten Bereichen zeigen einen freundlichen Hinweis; Servermeldungen "Kein Zugriff" werden dadurch ersetzt. */
 (function () {
   var MSG = '🔒 Nur Ansicht in der Demo – du kannst alles ansehen, aber nichts verändern.';
@@ -446,6 +446,18 @@ function askPin(title) {
     t.textContent = MSG; t.style.borderColor = 'var(--border)'; t.style.opacity = '1';
     clearTimeout(timer); timer = setTimeout(function () { t.style.opacity = '0'; }, 3600);
   }
+  /* Demo-Ansicht: Die Oberflaeche sieht bedienbar aus (Stifte, Formulare, Schalter). Schreibzugriffe gehen gar nicht erst an den Server,
+     stattdessen erscheint der Hinweis; Lesen (GET) laeuft normal. */
+  var realFetch = window.fetch;
+  window.fetch = function (input, init) {
+    var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+    var url = String((input && input.url) || input || '');
+    if (method !== 'GET' && method !== 'HEAD' && !/\/(login|logout)(\?|$)/.test(url)) {
+      toast();
+      return Promise.resolve(new Response(JSON.stringify({ ok: false, error: MSG }), { status: 403, headers: { 'Content-Type': 'application/json' } }));
+    }
+    return realFetch.apply(this, arguments);
+  };
   function blocked(e) {
     var t = e.target; if (!t || !t.closest) return false;
     if (t.closest('.qhelp, summary, .tilt, .lb')) return false;           // Hilfe-Knoepfe und Aufklapp-Pfeile bleiben bedienbar

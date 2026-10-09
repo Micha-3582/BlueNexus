@@ -477,13 +477,19 @@ def _smarthome_tabs(perms: dict) -> list:
 @app.context_processor
 def inject_role():
     perms = _perms()
+    # Demo-Ansicht: Ein reines Nur-Lese-Konto sieht in der Demo die Oberflaeche wie ein Administrator (Stifte, Knoepfe, Formulare, Hilfetexte).
+    # Nur die Anzeige: Die Server-Pruefungen laufen weiter mit den echten Rechten ("Lesen"), und der Browser sendet im Demo-Modus keine
+    # Schreibzugriffe (siehe base.html). Konto und Benutzerverwaltung bleiben wie sie sind (kein Passwort-/Konten-Aendern in der Demo).
+    demo_view = demo.ACTIVE and not any(v == "write" for v in perms.values())
+    if demo_view:
+        perms = {k: ("write" if v == "read" and k not in ("account", "user_management") else v) for k, v in perms.items()}
     settings_areas = [a for a in auth.AREA_IDS if a.startswith("settings_")]
     can_save_settings = any(perms.get(a) == "write" for a in settings_areas)
     tabs = _smarthome_tabs(perms)
     admin_page = any(perms.get(a, "none") != "none" for a in SETTINGS_PAGE_AREAS)       # irgendein Reiter auf /admin sichtbar?
     return {"modules": store.modules(), "settings_visible": admin_page or perms.get("automation", "none") != "none",
             "settings_home": "/admin" if admin_page else "/automation",
-            "user_role": "admin" if auth.is_full_admin(perms) else "custom", "user_perms": perms,
+            "user_role": "admin" if auth.is_full_admin(perms) else "custom", "user_perms": perms, "demo_view": demo_view,
             "can_save_settings": can_save_settings, "sh_tabs": tabs, "tile_ceiling": getattr(g, "dashboard_tiles", None),
             "sh_home": ("/smarthome" if any(t["href"].startswith("/smarthome") for t in tabs) else (tabs[0]["href"] if tabs else "/"))}
 

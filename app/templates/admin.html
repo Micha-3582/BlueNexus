@@ -943,7 +943,7 @@ function collectPvInverters() {
 
 window.USER_PERMS = {{ user_perms | tojson }};
 window.TILE_CEILING = {{ tile_ceiling | tojson }};          // null = alle Kacheln erlaubt, sonst Liste der fuer dieses Konto erlaubten
-window.IS_ADMIN = (window.USER_PERMS || {}).user_management === 'write';
+window.IS_ADMIN = (window.USER_PERMS || {}).user_management === 'write' || {{ 'true' if demo_view else 'false' }};      // Demo-Ansicht: Admin-Knoepfe (Stift, PIN, Sichtbarkeit) zeigen, speichern geht nicht
 document.documentElement.classList.toggle('is-admin', window.IS_ADMIN);       // nur Administratoren legen PINs fest oder entfernen sie   // Rechte je Bereich dieses Kontos - siehe Einstellungen -> System -> Weitere Benutzer
 const PARAM_KEYS = ['battery_usable_kwh','daily_usage_kwh','pv_reserve_kwh',
   'max_charge_soc','absolute_cheap_price','pv_tom_morning_factor',
@@ -1215,6 +1215,7 @@ document.getElementById('tmode-btn').addEventListener('click', async e => {
   async function load() {
     try {
       srv = await (await fetch('/api/system/time')).json(); t0 = Date.now();
+      if (!srv || srv.error || !srv.offset) { srv = null; return; }                       // kein Zugriff (z. B. reine Leseansicht): Karte bleibt still
       $('tm-server').textContent = srv.local; $('tm-zone').textContent = '(' + srv.zone + ', UTC' + srv.offset + ')';
       $('tm-input').value = srv.zone;
       $('tm-zones').innerHTML = srv.zones.map(z => '<option value="' + z + '">').join('');
@@ -2888,7 +2889,7 @@ function tnMsg(t, err) { const m = document.getElementById('tn-msg'); m.textCont
 async function tnLoad() {
   let n; try { n = await (await fetch('/api/tunnel', { cache: 'no-store' })).json(); } catch (e) { return; }
   if (n.error) return;
-  const st = document.getElementById('tn-state'); st.textContent = n.text + (n.version ? ' · cloudflared ' + n.version : '') + (n.last_error && !n.connected ? ' · ' + n.last_error : '');
+  const st = document.getElementById('tn-state'); if (!st) return; st.textContent = n.text + (n.version ? ' · cloudflared ' + n.version : '') + (n.last_error && !n.connected ? ' · ' + n.last_error : '');
   st.style.color = n.connected ? 'var(--green)' : (n.last_error && n.enabled ? '#e5544a' : '');
   document.getElementById('tn-enabled').checked = !!n.enabled;
   document.getElementById('tn-install-row').style.display = n.installed ? 'none' : '';
@@ -2896,7 +2897,7 @@ async function tnLoad() {
   document.getElementById('tn-install-hint').textContent = n.can_install ? ' lädt das offizielle Programm von Cloudflare (' + n.asset + ')' : ' automatisch nur unter Linux – bitte cloudflared von Hand installieren';
   document.getElementById('tn-token').placeholder = n.has_token ? '(gespeichert – leer lassen = unverändert)' : 'eyJ…';
   document.getElementById('tn-setup').open = !n.has_token;
-  document.getElementById('tn-port').textContent = location.port || '80';
+  const tnp = document.getElementById('tn-port'); if (tnp) tnp.textContent = location.port || '80';
   const log = document.getElementById('tn-log'); if (log.closest('details').open) { try { log.textContent = (await (await fetch('/api/tunnel/log', { cache: 'no-store' })).json()).lines.join('\n'); } catch (e) { /* egal */ } }
 }
 document.getElementById('tn-warn').addEventListener('click', () => uiDialog({ title: '⚠ Sicherheitswarnung', okText: 'Verstanden', info: true, html: `

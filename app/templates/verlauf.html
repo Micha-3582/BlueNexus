@@ -63,7 +63,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const IS_ADMIN = ({{ user_perms | tojson }} || {}).user_management === 'write';
+const IS_ADMIN = ({{ user_perms | tojson }} || {}).user_management === 'write' || {{ 'true' if demo_view else 'false' }};
 const APP_NAME = {{ app_display_name | tojson }};
 const COLORS = VLChart.COLORS;
 let SERIES = {}, CHARTS = [], RANGE = { hours: 12 }, INST = {}, CATALOG = null, TIMER = null, ZOOM_STACK = [], LAST = {};     // LAST: zuletzt gezeigte Daten je Diagramm (fuer den PNG-Export)
