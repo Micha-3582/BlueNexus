@@ -8,7 +8,7 @@
  */
 'use strict';
 
-const VERSION = 'bluenexus-v6';
+const VERSION = 'bluenexus-v7';
 const STATIC_CACHE = VERSION + '-static';
 
 self.addEventListener('install', ev => {

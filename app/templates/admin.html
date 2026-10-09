@@ -218,6 +218,10 @@
   <div class="seg" id="theme-seg" role="group" aria-label="Darstellung" style="display:inline-flex;font-size:15px"><style>#theme-seg button{padding:10px 18px;font-size:15px}</style>
     <button type="button" data-t="dark">🌙 Dunkel</button><button type="button" data-t="light">☀️ Hell</button><button type="button" data-t="auto">🖥️ Automatisch</button>
   </div>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:16px">
+    <label class="switch" style="margin:0"><input type="checkbox" id="bg-anim"><span class="slider"></span></label>
+    <div><b>Hintergrund-Animation</b> <span class="qhelp" role="button" tabindex="0" data-help="Das leuchtende Knotennetz hinter den Karten. Bei schwacher Hardware (älterer Pi, altes Tablet) oder Akkusparen ausschalten. Der blaue Verlauf bleibt. Gilt nur für dieses Gerät; bei „Bewegung reduzieren“ im Betriebssystem läuft sie nie.">?</span></div>
+  </div>
 </div>
 
 <div class="card" data-tab="anzeige" data-area="personal">
@@ -3259,6 +3263,7 @@ if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
 (function () {                                   // Darstellung (hell/dunkel): gilt pro Geraet (localStorage), siehe static/theme.js
   const seg = document.getElementById('theme-seg'); if (!seg || !window.HNTheme) return;
   const mark = () => seg.querySelectorAll('button').forEach(b => { const on = b.dataset.t === HNTheme.get(); b.classList.toggle('on', on); b.classList.toggle('read', on); });
+  const bgs = document.getElementById('bg-anim'); if (bgs) { bgs.checked = !window.HNBg || HNBg.get(); bgs.addEventListener('change', () => { if (window.HNBg) HNBg.set(bgs.checked); }); }
   seg.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; HNTheme.set(b.dataset.t); mark(); });
   mark();
 })();

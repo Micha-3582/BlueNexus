@@ -277,6 +277,7 @@ Ersparnis · Wetter.
 - Schalten per Antippen, bei Bedarf mit **PIN**.
 - **Hell oder dunkel:** Unter *Einstellungen → Dashboard → Darstellung* wählt jedes Gerät **Dunkel, Hell oder Automatisch**
   (folgt dem Gerät). Gilt auch auf Anmelde- und NFC-Seiten. Mobil optimiertes Design in den Farben Blau (Victron-Herkunft) und Orange.
+  Der Hintergrund hat einen blauen Verlauf, ein feines Gitter und ein **leuchtendes Knotennetz** hinter den Karten; die Animation lässt sich pro Gerät abschalten (*Darstellung → Hintergrund-Animation*).
 
 ---
 

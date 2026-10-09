@@ -15,5 +15,9 @@
   };
   apply();
   document.addEventListener('DOMContentLoaded', apply);
+  try {                                                  // Hintergrund-Knotennetz (static/bg.js) auf allen Seiten, die das Theme laden
+    var me = document.currentScript, s = document.createElement('script');
+    if (me && me.src) { s.src = me.src.replace(/theme\.js(\?.*)?$/, 'bg.js'); s.defer = true; document.head.appendChild(s); }
+  } catch (e) { /* nur Optik */ }
   if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (get() === 'auto') apply(); });
 })();

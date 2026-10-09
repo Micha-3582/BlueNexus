@@ -10,3 +10,16 @@
 }
 :root[data-theme="light"] .card { box-shadow: 0 4px 16px rgba(20,40,70,.08); }
 :root[data-theme="light"] header { box-shadow: 0 1px 0 rgba(20,40,70,.04); }
+
+/* Hintergrund wie die Homepage: tiefes Dunkel, zwei blaue Lichtflecken (fest am Fenster), feines Gitter. Das Knotennetz zeichnet static/bg.js.
+   body-Hintergrund hier mit !important: jede Seite legt sonst ihre eigenen Verlaeufe darueber. */
+:root { --line: #26303c; --glow2: rgba(75,155,230,.16); }
+:root[data-theme="dark"] { --bg: #0a0d12; --line: #26303c; --glow: rgba(0,95,190,.38); --glow2: rgba(75,155,230,.16); }
+:root[data-theme="light"] { --bg: #f2f5f9; --line: #d4dce6; --glow: rgba(0,95,190,.2); --glow2: rgba(0,95,190,.08); }
+body { background: var(--bg) !important; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: radial-gradient(1100px 560px at 82% -10%, var(--glow), transparent 70%), radial-gradient(900px 520px at -10% 38%, var(--glow2), transparent 70%); }
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 72%); mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 72%); }
+#net { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; opacity: .75; pointer-events: none; }
