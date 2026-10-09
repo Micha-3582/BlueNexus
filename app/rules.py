@@ -243,7 +243,7 @@ def normalize_condition(c: dict) -> dict:
 AC_MODES = ("auto", "cool", "dry", "heat", "fan_only", "smart_dry")
 AC_FANS = ("auto", "silent", "low", "medium", "high", "max")
 VIDEO_FILTERS = ("animal", "person", "vehicle", "motion")                      # Ereignisarten fuer "Video zum Ereignis" (leer = jede Aufnahme)
-STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http")
+STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime")
 MAX_WAIT_S = 7 * 86400
 
 
@@ -325,6 +325,11 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
         except webhook.WebhookError as e:
             raise RuleError(f"Adresse aufrufen: {e}")
         return {"type": t, "url": url, "method": method, "label": str(a.get("label") or "").strip()[:60]}
+    if t == "chime":                                 # Chime (Tuergong) der Reolink-Video-Tuerklingel laeuten lassen (camera.py)
+        cid = str(a.get("id") or "").strip()
+        if not cid:
+            raise RuleError("Türklingel für den Chime wählen")
+        return {"type": t, "id": cid, "tone": int(_num(a.get("tone", 1), 0, 9, "Klingelton"))}
     if t == "photo":                                 # Kamera-Standbild per Telegram (camera.py + notify.py)
         cid = str(a.get("id") or "").strip()
         if not cid:
@@ -482,7 +487,7 @@ def compile_all(items: list[dict]) -> list[dict]:
 
 
 _ACTION_OF = {"wol": "wol", "lock": "lock", "camera": "photo", "sound": "sound", "blind": "blind"}
-_CAMERA_STEPS = ("photo", "video")
+_CAMERA_STEPS = ("photo", "video", "chime")
 
 
 def used_by(kind: str, rid: str) -> list[str]:
@@ -693,7 +698,7 @@ def remove_device(dev_id: str):
     d = load()
     keep, changed = [], False
     for r in d["rules"]:
-        if "when" in r and (dev_id in devices_of(r) or any(dev_id in (a.get("device_ids") or []) or (a.get("type") in ("lock", "wol", "photo", "video", "sound", "blind", "wled", "ac") and a.get("id") == dev_id)
+        if "when" in r and (dev_id in devices_of(r) or any(dev_id in (a.get("device_ids") or []) or (a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac") and a.get("id") == dev_id)
                                                             or (a.get("type") == "pushover" and a.get("camera") == dev_id) for a in r["then"] + r["else"])):
             def strip(lst):
                 out = []
@@ -702,7 +707,7 @@ def remove_device(dev_id: str):
                         ids = [i for i in a["device_ids"] if i != dev_id]
                         if ids:
                             out.append({**a, "device_ids": ids})
-                    elif a.get("type") in ("lock", "wol", "photo", "video", "sound", "blind", "wled", "ac") and a.get("id") == dev_id:
+                    elif a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac") and a.get("id") == dev_id:
                         continue
                     elif a.get("type") == "pushover" and a.get("camera") == dev_id:
                         out.append({k: v for k, v in a.items() if k != "camera"})              # Kamera entfernt: die Nachricht geht ohne Bild raus

@@ -1916,6 +1916,23 @@ class Controller:
                 sent = notify.photo(lambda cam=cam: camera.snapshot(cam, max_age=0.0), cap, cfg, st.get("to"))
                 who = (" an " + notify.names(st.get("to"))) if st.get("to") else ""
                 jobs.append(("notify", cam["name"], f"Standbild von {cam['name']} {'wird per Telegram' + who + ' gesendet' if sent else 'NICHT gesendet (Telegram nicht eingerichtet)'}", None if sent else "Telegram nicht eingerichtet"))
+        elif t == "chime":
+            cam = camera.get(st["id"])
+            tname = camera.CHIME_TONES.get(st.get("tone"), str(st.get("tone")))
+            if not store.module_on("cameras", cfg if cfg else None):
+                jobs.append(("fail", st["id"], "Chime nicht möglich: Modul Kameras ist ausgeschaltet", "aus"))
+            elif not cam:
+                jobs.append(("fail", st["id"], "Türklingel für den Chime existiert nicht mehr", "weg"))
+            elif cam.get("kind", "reolink") != "reolink":
+                jobs.append(("fail", cam["name"], f"Chime von {cam['name']} nicht möglich: nur Reolink-Türklingeln werden unterstützt", "kein Reolink"))
+            elif dry:
+                jobs.append(("sound", cam["name"], f"Chime von {cam['name']} würde läuten ({tname})", None))
+            else:
+                try:
+                    n = camera.chime_ring_all(cam, st["tone"])
+                    jobs.append(("sound", cam["name"], f"Chime von {cam['name']} läutet ({tname}{', ' + str(n) + ' Chimes' if n > 1 else ''})", None))
+                except camera.CameraError as e:
+                    jobs.append(("fail", cam["name"], f"Chime von {cam['name']}: {e}", str(e)))
         elif t == "video":
             cam = camera.get(st["id"])
             what = ", ".join(camera.VIDEO_LABEL[x] for x in camera.VIDEO_TYPES if x in (st.get("filter") or [])) or "jedes Ereignis"
@@ -3209,7 +3226,7 @@ def api_automation_save():
                 for a in x.get("then", []) + x.get("else", []):
                     if a.get("type") == "video" and a["id"] in cam_ids and next((c for c in camera.load() if c["id"] == a["id"]), {}).get("kind", "reolink") != "reolink":
                         raise rules.RuleError(f"Regel „{x['name']}“: Video zum Ereignis gibt es nur für Reolink-Kameras")
-                    if a.get("type") in ("photo", "video") and a["id"] not in cam_ids:
+                    if a.get("type") in ("photo", "video", "chime") and a["id"] not in cam_ids:
                         raise rules.RuleError(f"Regel „{x['name']}“: Die Kamera für das Standbild existiert nicht (mehr)")                                         # Entriegeln/Oeffnen nur bei Schloessern mit ausdruecklicher Freigabe
                 for a in x.get("then", []) + x.get("else", []):
                     if a.get("type") == "lock":

@@ -316,7 +316,8 @@ function collectCond(row) {
   if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
   return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
 }
-const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)']];
+const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)'], ['chime', 'Chime läuten (Türklingel-Gong, Reolink)']];
+const CHIME_TONES = ['Vogelgezwitscher', 'Originalmelodie', 'Klaviertöne', 'Schleife', 'Attraktion', 'Hüpfer', 'Guten Tag', 'Operette', 'Mondlicht', 'Heimweg'];
 const videoCams = () => (S.cameras || []).filter(x => (x.kind || 'reolink') === 'reolink');
 function toRow(a, rs) {                              // "Senden an": nur wenn es mehr als einen Empfaenger gibt (Telegram: S.recipients, Pushover: S.prec)
   rs = rs || S.recipients || [];
@@ -330,6 +331,7 @@ function stepAvailable(t) {
   const has = k => (S.devs || []).some(d => d.kind === k);
   if (t === 'photo') return !!MODULES.cameras;
   if (t === 'video') return !!MODULES.cameras && videoCams().length > 0;                 // nur Reolink-Kameras (SD-Karte, Aufnahmen per Kamera-Schnittstelle)
+  if (t === 'chime') return !!MODULES.cameras && videoCams().length > 0;                 // nur Reolink-Kameras
   if (t === 'pushover') return (S.prec || []).length > 0;                 // nur mit eingerichtetem Pushover
   if (t === 'ac') return !!FAMS.midea || has('midea');
   if (t === 'wled') return !!FAMS.tasmota || has('wled');
@@ -401,6 +403,9 @@ function actRow(a, branch, flow) {
     const kinds = [['animal', 'Tier'], ['person', 'Person'], ['vehicle', 'Fahrzeug'], ['motion', 'Bewegung']];
     body = `<b>🎥 Video per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Video (optional)" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">
       <span class="a-vf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;width:100%"><span class="muted">Nur senden bei ${helpQ('Das Video wird nur gesendet, wenn die Aufnahme der Kamera eine dieser Ereignisarten enthält. Nichts angehakt = bei jeder Aufnahme. Gesendet werden 10 Sekunden in 720p, ab 3 Sekunden vor dem Auslösen; das Video kommt erst, wenn die Aufnahme fertig ist (meist 1 bis 2 Minuten). Nur für Reolink-Kameras mit SD-Karte.')}:</span>${kinds.map(([k, l]) => `<label class="chk" style="margin:0"><input type="checkbox" value="${k}" ${flt.includes(k) ? 'checked' : ''} onchange="ruleEdited(this)"> ${l}</label>`).join('')}</span>${list.length ? '' : '<span class="muted">Keine Reolink-Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
+  } else if (t === 'chime') {
+    const list = videoCams(), opts = list.map(x => [escH(x.id), '🔔 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Türklingel fehlt)']);
+    body = `<b>🔔 Chime läuten</b> ${sel('a-cid', a.id, opts)} ${sel('a-tone', String(a.tone ?? 1), CHIME_TONES.map((n, i) => [String(i), n]))} ${helpQ('Lässt alle mit der Türklingel verbundenen Chimes mit dem gewählten Klingelton läuten (z. B. als Gong bei einem Ereignis). Die Lautstärke stellst du unter Kameras → Stift → Chime ein.')}${list.length ? '' : '<span class="muted">Noch keine Reolink-Türklingel angelegt – Kameras → Kamera hinzufügen.</span>'}`;
   } else if (t === 'pushover') {
     const cams = S.cameras || [], camOpts = [['', '— kein Bild —'], ...cams.map(x => [escH(x.id), '📷 ' + escH(x.name)])];
     if (a.camera && !cams.some(x => x.id === a.camera)) camOpts.push([escH(a.camera), '(Kamera fehlt)']);
@@ -435,6 +440,7 @@ function collectAct(x) {
   if (t === 'wait') return { type: t, seconds: Math.round((+q('a-wval').value || 0) * ({ s: 1, min: 60, h: 3600 }[q('a-wunit').value])) };
   if (t === 'setpoint') return { type: t, device_ids: q('a-spall').checked ? ['*'] : [...x.querySelectorAll('.a-sp:checked')].map(c => c.value), value: q('a-spv').value };
   if (t === 'notify') return { type: t, text: q('a-text').value, ...toVal(q) };
+  if (t === 'chime') return { type: t, id: q('a-cid').value, tone: +q('a-tone').value };
   if (t === 'photo') return { type: t, id: q('a-cid').value, text: q('a-text').value, ...toVal(q) };
   if (t === 'video') return { type: t, id: q('a-cid').value, text: q('a-text').value, filter: [...x.querySelectorAll('.a-vf input:checked')].map(i => i.value), ...toVal(q) };
   if (t === 'pushover') { const o = { type: t, text: q('a-text').value, title: q('a-title').value, priority: +q('a-prio').value, sound: q('a-snd').value, ...toVal(q) }; const c = q('a-pcam'); if (c && c.value) o.camera = c.value; return o; }
@@ -519,6 +525,7 @@ function actAddSel(sel, branch) {
     wol: () => ({ type: 'wol', id: ((S.wol || [])[0] || {}).id || '' }),
     http: () => ({ type: 'http', method: 'GET', url: '', label: '' }),
     sound: () => ({ type: 'sound', id: ((S.sounds || [])[0] || {}).id || '', track: 1, volume: 100, repeats: 1 }),
+    chime: () => ({ type: 'chime', id: (videoCams()[0] || {}).id || '', tone: 1 }),
     photo: () => ({ type: 'photo', id: ((S.cameras || [])[0] || {}).id || '', text: '' }),
     video: () => ({ type: 'video', id: (videoCams()[0] || {}).id || '', text: '', filter: ['animal'] }),
     pushover: () => ({ type: 'pushover', text: '', priority: 0 }),
@@ -637,6 +644,7 @@ const actSummary = a => {
   if (t === 'wled') { const k = dev(a.id); return `WLED ${k ? k.name : '?'} ${a.mode === 'color' ? 'Farbe ' + a.color + (a.brightness ? ', ' + a.brightness + ' %' : '') : 'Voreinstellung ' + a.preset}`; }
   if (t === 'blind') { const k = (S.blinds || []).find(x => x.id === a.id); return `Rollladen ${k ? k.name : '?'} ${a.action === 'stop' ? 'anhalten' : 'auf ' + a.level + ' %'}`; }
   if (t === 'sound') { const k = (S.sounds || []).find(x => x.id === a.id); return `Sound ${k ? k.name : '?'} (Titel ${a.track})`; }
+  if (t === 'chime') { const k = (S.cameras || []).find(x => x.id === a.id); return `Chime ${k ? k.name : '?'} läuten (${CHIME_TONES[a.tone] || a.tone})`; }
   if (t === 'photo') { const k = (S.cameras || []).find(x => x.id === a.id); return `Standbild ${k ? k.name : '?'} per Telegram${toNames(a)}`; }
   if (t === 'video') { const k = (S.cameras || []).find(x => x.id === a.id); const L = { animal: 'Tier', person: 'Person', vehicle: 'Fahrzeug', motion: 'Bewegung' }; return `Video ${k ? k.name : '?'} per Telegram${(a.filter || []).length ? ' bei ' + a.filter.map(f => L[f]).join('/') : ''}${toNames(a)}`; }
   if (t === 'pushover') return `Pushover${toNames(a, S.prec)} „${(a.text || '').slice(0, 25)}${(a.text || '').length > 25 ? '…' : ''}“${a.priority > 0 ? ' (' + (a.priority === 2 ? 'Notfall' : 'hoch') + ')' : ''}${a.camera ? ' mit Bild' : ''}`;

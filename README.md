@@ -140,7 +140,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
 - **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel.
 - **Klingel:** Reolink-Türklingel als Auslöser („Klingel gedrückt“) – zum Beispiel für einen Gong im Haus.
-- **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen.
+- **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen; als Regel-Schritt „Chime läuten“ löst er auch automatisch einen Gong aus.
 - **Sicherheits-Timer (optional):** Geräte schalten sich nach einer einstellbaren Zeit selbst wieder ab, falls eine Regel hängt. Ab Werk aus (0), genau wie die Pause nach Handschaltung.
 
 ---

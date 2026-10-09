@@ -221,6 +221,18 @@ def chime_ring(item: dict, chime_id, tone) -> None:
     _call(item, "DingDongOpt", {"DingDong": {"channel": int(item.get("channel") or 0), "option": 4, "id": _chime_id(item, chime_id), "musicId": tone}}, strict=False)
 
 
+def chime_ring_all(item: dict, tone) -> int:
+    """Laesst alle verbundenen Chimes der Tuerklingel laeuten (fuer Regeln). Gibt die Anzahl zurueck."""
+    ch = int(item.get("channel") or 0)
+    v = _call(item, "GetDingDongList", {"channel": ch}, strict=False)
+    ids = [d.get("deviceId") for d in ((v.get("DingDongList") or {}).get("pairedlist") or []) if d.get("netState") == 2 and d.get("deviceId") is not None]
+    if not ids:
+        raise CameraError("Kein Chime verbunden")
+    for i in ids:
+        chime_ring(item, i, tone)
+    return len(ids)
+
+
 def chime_set_volume(item: dict, chime_id, volume) -> None:
     """Lautstaerke des Chimes (0 = stumm bis 4 = laut); Name und LED bleiben unveraendert."""
     try:
