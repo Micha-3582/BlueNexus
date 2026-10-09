@@ -321,6 +321,9 @@ def activate() -> None:
     """Ersetzt die Netzwerk-Zugriffe auf Geraete/Kameras/CCU durch die Simulation (nur wenn BLUENEXUS_DEMO=1)."""
     if not ACTIVE:
         return
+    if hasattr(time, "tzset"):                              # Demo laeuft immer in deutscher Zeit (Container steht oft auf UTC: Tagesverlauf, Uhrzeit-Karte)
+        os.environ["TZ"] = "Europe/Berlin"
+        time.tzset()
     try:                                                    # Historie mitrutschen lassen (siehe demo_roll.py)
         import demo_roll
         demo_roll.roll(os.path.dirname(os.path.abspath(__file__)))
