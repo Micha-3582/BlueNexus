@@ -251,7 +251,7 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 
 ### 4.4 Stromtarif und Ladestrategie
 
-> **Immer laden unter (ct/kWh)** (die „Preisschwelle“) steht im Reiter **Tarif & Laden** in der Karte **Intelligente Planung**: Fällt der Preis auf oder unter diesen Wert, wird geladen, unabhängig von der Strategie (0 = aus). Im Preisdiagramm des Dashboards zeigt „Preisschwelle greift“ diese Stunden an.
+> **Immer laden unter (ct/kWh)** (die „Preisschwelle“) steht im Reiter **Tarif & Laden** in der Karte **Intelligente Planung**: Fällt der Preis auf oder unter diesen Wert, wird geladen, unabhängig von der Strategie (0 = aus). Das gilt **auch bei eingeschalteter Intelligenter Planung**: Liegt der Preis unter der Schwelle, lädt die App sofort, statt auf noch billigere Viertelstunden zu warten (nur das Ladelimit bremst weiterhin). Im Preisdiagramm des Dashboards zeigt „Preisschwelle greift“ diese Stunden an.
 
 - **Dynamischer Tarif (Tibber):** Access-Token von developer.tibber.com eintragen. Die Steuerung lädt in den günstigsten Viertelstunden.
 - **Fester Preis:** Preis pro kWh (brutto) eintragen. Es gibt dann **keine Preisplanung**, die App lädt nie aktiv aus dem Netz. PV-Vorrang, Ladelimit und Sofort-Override wirken weiter.

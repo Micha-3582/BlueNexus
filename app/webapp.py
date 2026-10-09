@@ -1211,9 +1211,10 @@ class Controller:
         # Intelligente Planung (Beta, Standard aus): ersetzt die stufenweisen Schwellenwerte oben durch eine
         # jeden Tick neu berechnete, kostenoptimale Planung. Greift NICHT bei manuellem Override/Ladetermin, festem
         # Tarif, fehlenden Preisen oder wenn die harte Ladesperre (Ladelimit) bereits gezogen hat - diese
-        # Sicherheitsfaelle bleiben unveraendert bei der bewaehrten Logik oben.
+        # Sicherheitsfaelle und die Preisschwelle ("Immer laden unter") bleiben unveraendert bei der bewaehrten Logik oben.
         if (cfg.get("smart_planner_enabled", True) and not forced and cfg.get("tariff_mode") != "fixed"
-                and d.reason != "Keine Preisdaten" and "Ladelimit" not in d.strategy):
+                and d.reason != "Keine Preisdaten" and "Ladelimit" not in d.strategy
+                and not d.strategy.startswith("Supergünstig")):                 # "Immer laden unter X ct" gilt auch mit Planung (sonst wartet die Planung auf noch billigere Slots, obwohl der Preis unter der Schwelle liegt)
             try:
                 sm = self._smart_decision(now, soc, prices, vrm_data, params, state)
                 if sm is not None:
