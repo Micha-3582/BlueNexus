@@ -101,6 +101,13 @@
 <div id="tab-settings">
 
 <div class="card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></svg>Testmodus <span class="qhelp" role="button" tabindex="0" data-help="Im Testmodus läuft die App normal, darf aber das Gerät nicht verlassen: Cerbo, Homematic, Shelly, Kameras, Tibber, Telegram, Tunnel, Alexa – nichts wird geschaltet oder gesendet. So prüfst du eine eingespielte Sicherung oder ein Update, ohne dass die echte Anlage etwas merkt.">?</span></h2>
+  <div class="muted" id="tmode-text">…</div>
+  <div style="margin-top:12px"><button class="ghost" id="tmode-btn" disabled>…</button></div>
+  <div class="muted" id="tmode-note" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>Uhrzeit & Zeitzone <span class="qhelp" role="button" tabindex="0" data-help="Regeln, Zeitpläne und Sonnenzeiten richten sich nach der Uhr des Servers. Geht sie falsch (z. B. falsche Zeitzone, Unterschied von Stunden), schalten Regeln zur falschen Zeit. Hier siehst du die Serverzeit im Vergleich zu deinem Gerät.">?</span></h2>
   <div class="muted">Uhr des Servers: <b id="tm-server">…</b> <span id="tm-zone" class="muted"></span></div>
   <div class="muted">Dein Gerät: <b id="tm-client">…</b></div>
@@ -1159,6 +1166,25 @@ document.getElementById('btn-grid').addEventListener('click', async () => {
   setTimeout(() => msg.textContent = '', 3000);
 });
 
+// Testmodus
+function testmodeShow(s) {
+  const b = document.getElementById('tmode-btn'), t = document.getElementById('tmode-text');
+  if (s.testmode_fixed) { t.textContent = 'Der Testmodus ist hier fest eingeschaltet (Demo oder Testserver) und lässt sich nicht umschalten.'; b.style.display = 'none'; return; }
+  b.style.display = ''; b.disabled = false; b.dataset.on = s.testmode ? '1' : '';
+  t.innerHTML = s.testmode ? '<span style="color:var(--exp)"><b>Eingeschaltet:</b> Die App sendet und schaltet nichts. Prüfe jetzt Sicherung oder Update und beende den Testmodus danach.</span>'
+                           : '<b>Aus:</b> Die App steuert deine Anlage normal. Schalte den Testmodus ein, bevor du eine Sicherung einspielst oder ein Update prüfst.';
+  b.textContent = s.testmode ? 'Testmodus beenden' : 'Testmodus einschalten';
+}
+document.getElementById('tmode-btn').addEventListener('click', async e => {
+  const on = !e.target.dataset.on;
+  if (!await uiDialog({ title: on ? 'Testmodus einschalten?' : 'Testmodus beenden?', message: on ? 'Die App startet neu und darf danach nichts mehr nach außen senden.' : 'Die App startet neu und steuert danach wieder deine echte Anlage (Cerbo, Geräte, Meldungen, Tunnel). Prüfe vorher, ob alles stimmt.', okText: on ? 'Einschalten' : 'Beenden' })) return;
+  try {
+    const d = await (await fetch('/api/system/testmode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }) })).json();
+    if (d.error) { document.getElementById('tmode-note').textContent = d.error; return; }
+    document.getElementById('tmode-note').textContent = d.restarting ? 'App startet neu – die Seite lädt gleich neu …' : 'Gespeichert – bitte die App von Hand neu starten.';
+    if (d.restarting) setTimeout(() => location.reload(), 8000);
+  } catch (err) { document.getElementById('tmode-note').textContent = 'Fehler beim Umschalten.'; }
+});
 // Uhrzeit & Zeitzone
 (function () {
   const $ = id => document.getElementById(id);
@@ -1183,6 +1209,7 @@ document.getElementById('btn-grid').addEventListener('click', async () => {
       $('tm-server').textContent = srv.local; $('tm-zone').textContent = '(' + srv.zone + ', UTC' + srv.offset + ')';
       $('tm-input').value = srv.zone;
       $('tm-zones').innerHTML = srv.zones.map(z => '<option value="' + z + '">').join('');
+      testmodeShow(srv);
       if (!srv.can_set) { $('tm-save').disabled = $('tm-berlin').disabled = $('tm-input').disabled = true; $('tm-note').textContent = 'Auf diesem System lässt sich die Zeitzone nicht in der App ändern.'; }
       tick();
     } catch (e) { $('tm-server').textContent = '–'; }
@@ -3240,7 +3267,7 @@ const ADMIN_TABS = [
   { id: 'wetter', label: 'Wetter', match: ['Wettervorhersage'] },
   { id: 'meldungen', label: 'Meldungen', match: ['Benachrichtigungen'] },
   { id: 'anzeige', label: 'Dashboard', match: ['Kacheln', 'Diagramme'] },
-  { id: 'system', label: 'System', match: ['App-Version', 'Betrieb', 'Uhrzeit'] },
+  { id: 'system', label: 'System', match: ['App-Version', 'Betrieb', 'Uhrzeit', 'Testmodus'] },
   { id: 'konto', label: 'Konto & Benutzer', match: ['Konto', 'Weitere Benutzer', 'Neuer Benutzer'] },
 ];
 (function initAdminTabs() {

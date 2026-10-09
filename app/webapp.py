@@ -148,7 +148,7 @@ users = UserStore(os.path.join(BASE_DIR, "users.json"))
 def inject_app_display_name():
     """Personalisierbarer Anzeigename (Kopfzeile/Titel) - fuer alle Templates
     verfuegbar, auch Login/Konto-Anlage (kein DB-Zugriff, nur die lokale Datei)."""
-    return {"app_display_name": store.default_app_name(), "sandbox": sandbox.ACTIVE, "demo": demo.ACTIVE}
+    return {"app_display_name": store.default_app_name(), "sandbox": sandbox.ACTIVE, "sandbox_switchable": sandbox.ACTIVE and not sandbox.FIXED, "demo": demo.ACTIVE}
 
 
 @app.context_processor
@@ -272,7 +272,7 @@ ENDPOINT_AREA = {
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
     "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
-    "api_check_update": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
+    "api_check_update": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
@@ -2862,13 +2862,13 @@ def api_system_time():
     cfg = store.load_config()
     return jsonify(epoch=time.time(), local=now.strftime("%d.%m.%Y %H:%M:%S"), offset=now.strftime("%z"),
                    zone=cfg.get("timezone") or os.environ.get("TZ") or now.tzname(),
-                   can_set=hasattr(time, "tzset") and not sandbox.ACTIVE, ntp=ntp, zones=_zone_names())
+                   can_set=hasattr(time, "tzset") and not sandbox.FIXED, testmode=sandbox.ACTIVE, testmode_fixed=sandbox.FIXED, ntp=ntp, zones=_zone_names())
 
 
 @app.route("/api/system/timezone", methods=["POST"])
 def api_system_timezone():
     """Zeitzone der App einstellen (z. B. Europe/Berlin). Gilt sofort und bleibt nach einem Neustart erhalten."""
-    if sandbox.ACTIVE:
+    if sandbox.FIXED:
         return jsonify(error="Im Testmodus gesperrt."), 403
     name = str((request.get_json(silent=True) or {}).get("timezone") or "").strip()
     if name not in _zone_names():
@@ -2882,9 +2882,33 @@ def api_system_timezone():
     return jsonify(ok=True, local=datetime.now().astimezone().strftime("%d.%m.%Y %H:%M:%S"))
 
 
+@app.route("/api/system/testmode", methods=["POST"])
+def api_system_testmode():
+    """Testmodus ein-/ausschalten (App startet dabei neu). Im Testmodus darf die App das Geraet nicht verlassen: Sicherung oder Update gefahrlos pruefen."""
+    if sandbox.FIXED:
+        return jsonify(error="Der Testmodus ist hier fest eingestellt (Demo/Testserver) und lässt sich nicht umschalten."), 400
+    on = bool((request.get_json(silent=True) or {}).get("on"))
+    try:
+        if on:
+            with open(sandbox.FLAG, "w", encoding="utf-8") as f:
+                f.write("Testmodus: eingeschaltet in den Einstellungen")
+        elif os.path.exists(sandbox.FLAG):
+            os.remove(sandbox.FLAG)
+    except OSError as e:
+        return jsonify(error=f"Konnte den Testmodus nicht umstellen: {e}"), 500
+    opslog.log("rules", "Testmodus " + ("eingeschaltet" if on else "ausgeschaltet"), dry=False)
+    restarting = _under_process_manager()
+    if restarting:
+        def _restart():
+            time.sleep(1.5)
+            os._exit(0)
+        threading.Thread(target=_restart, daemon=True).start()
+    return jsonify(ok=True, on=on, restarting=restarting)
+
+
 @app.route("/api/update", methods=["POST"])
 def api_update():
-    if sandbox.ACTIVE:
+    if sandbox.FIXED:
         return jsonify(error="Im Testmodus gesperrt."), 403
     result = updater.do_update()
     if result.get("ok"):

@@ -10,7 +10,9 @@ import socket
 import threading
 from contextlib import contextmanager
 
-ACTIVE = os.environ.get("BLUENEXUS_SANDBOX") == "1"
+FLAG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "testmode.flag")       # in den Einstellungen umschaltbar; bewusst NICHT in der Konfiguration, damit eine eingespielte Sicherung ihn nicht ausschaltet
+FIXED = os.environ.get("BLUENEXUS_SANDBOX") == "1"                                         # per Umgebungsvariable (Demo, Testserver): nicht umschaltbar
+ACTIVE = FIXED or os.path.exists(FLAG)
 _done = False
 
 
