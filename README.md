@@ -56,6 +56,7 @@ Smart-Home-Zentrale mit Kameras – wer nur Energie will, blendet den Rest aus.
   - [Überschuss-Automatik](#überschuss-automatik)
 - [Sicherheit](#sicherheit)
 - [Fernzugriff von unterwegs](#fernzugriff-von-unterwegs)
+- [Live-Demo](#live-demo)
 - [Installation](#installation)
 - [Einrichtung](#einrichtung)
 - [Konfigurierbare Parameter](#konfigurierbare-parameter)
@@ -421,6 +422,14 @@ Unter *Einstellungen → System → Fernzugriff* richtest du einen **Cloudflare-
 Token eintragen, fertig. Keine Portfreigabe im Router, keine feste IP, kein eigener Server im Internet nötig. Die
 App installiert und überwacht den Tunnel-Dienst selbst (inklusive Neustart bei Verbindungsabbruch). Läuft auch
 auf dem Raspberry Pi.
+
+---
+
+## Live-Demo
+
+Eine öffentliche Demo-Instanz mit erfundenen Geräten und Messwerten (nur ansehen, nichts wird geschaltet) läuft unter
+**[demo.bluenexus-home.de](https://demo.bluenexus-home.de)**; das Nur-Lesen-Konto steht auf der Projektseite. Wer selbst eine Demo
+betreiben möchte, findet den Demo-Modus im [Handbuch](MANUAL.md#15-update-sicherung-datenhaltung) (Kapitel 15).
 
 ---
 
