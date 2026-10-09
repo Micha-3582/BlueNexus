@@ -213,6 +213,7 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 ### 4.1 Betrieb und System
 
 - **Anzeigename:** Steht in der Kopfzeile und im Browser-Tab (praktisch bei mehreren Anlagen).
+- *(Reihenfolge im Reiter **System**: App-Version & Update, Uhrzeit & Zeitzone, Betrieb, Module, Fernzugriff, Betriebsbericht, Sicherung & Wiederherstellung, Testmodus. Dry-Run, Regel-Intervall und Energie-Messtakt stehen in der Karte **Ladesteuerung** im Reiter **Anlage**, direkt unter den Cerbo-Angaben.)*
 - **Dry-Run:** An = die Ladesteuerung rechnet und protokolliert nur, am Cerbo wird nichts geschaltet. Für den echten Betrieb ausschalten. Läuft parallel noch eine andere Steuerung (z. B. ioBroker), die den ESS-Modus setzt, diese vorher stoppen.
 - **Regel-Intervall:** Wie oft die Ladesteuerung neu rechnet (Standard 300 s, ausgerichtet aufs Viertelstunden-Raster). Strompreise ändern sich nur viertelstündlich, daher reicht das.
 - **Energie-Messtakt:** Wie oft Solar/Verbrauch/Netz/Akku für Verlauf und Tagesbilanz gemessen werden (Standard 10 s).

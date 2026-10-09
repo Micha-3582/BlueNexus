@@ -101,10 +101,14 @@
 <div id="tab-settings">
 
 <div class="card">
-  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></svg>Testmodus <span class="qhelp" role="button" tabindex="0" data-help="Im Testmodus läuft die App normal, darf aber das Gerät nicht verlassen: Cerbo, Homematic, Shelly, Kameras, Tibber, Telegram, Tunnel, Alexa – nichts wird geschaltet oder gesendet. So prüfst du eine eingespielte Sicherung oder ein Update, ohne dass die echte Anlage etwas merkt.">?</span></h2>
-  <div class="muted" id="tmode-text">…</div>
-  <div style="margin-top:12px"><button class="ghost" id="tmode-btn" disabled>…</button></div>
-  <div class="muted" id="tmode-note" style="margin-top:8px"></div>
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>App-Version & Update <span class="qhelp" role="button" tabindex="0" data-help="Holt neue Versionen von GitHub. Einstellungen, Geräte und Verläufe bleiben erhalten – nur der Programmcode wird ersetzt.<ol><li><b>Nach Updates suchen</b> prüft, ob eine neuere Version vorliegt.</li><li><b>Jetzt aktualisieren</b> lädt sie und startet die App neu (als Dienst automatisch, sonst einmal von Hand).</li></ol>">?</span></h2>
+  <div class="muted">Installierte Version: <b id="app-version">…</b></div>
+  <div id="update-status" style="margin-top:8px"></div>
+  <pre id="update-output" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;overflow:auto;max-height:180px;white-space:pre-wrap"></pre>
+  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="ghost" id="btn-check">Nach Updates suchen</button>
+    <button id="btn-update" style="display:none">Jetzt aktualisieren</button>
+  </div>
 </div>
 
 <div class="card">
@@ -122,31 +126,77 @@
 </div>
 
 <div class="card">
-  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>App-Version & Update <span class="qhelp" role="button" tabindex="0" data-help="Holt neue Versionen von GitHub. Einstellungen, Geräte und Verläufe bleiben erhalten – nur der Programmcode wird ersetzt.<ol><li><b>Nach Updates suchen</b> prüft, ob eine neuere Version vorliegt.</li><li><b>Jetzt aktualisieren</b> lädt sie und startet die App neu (als Dienst automatisch, sonst einmal von Hand).</li></ol>">?</span></h2>
-  <div class="muted">Installierte Version: <b id="app-version">…</b></div>
-  <div id="update-status" style="margin-top:8px"></div>
-  <pre id="update-output" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;overflow:auto;max-height:180px;white-space:pre-wrap"></pre>
-  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-    <button class="ghost" id="btn-check">Nach Updates suchen</button>
-    <button id="btn-update" style="display:none">Jetzt aktualisieren</button>
-  </div>
-</div>
-
-<div class="card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>Betrieb</h2>
-  <div class="sub">Anzeigename, Testbetrieb und Taktung der Ladesteuerung.</div>
+  <div class="sub">Anzeigename der App.</div>
   <label>Anzeigename
     <span class="qhelp" role="button" tabindex="0" data-help="Steht oben in der Kopfzeile und im Browser-Tab. Nur zur Unterscheidung, z.B. wenn mehrere Anlagen laufen.">?</span>
   </label>
   <input id="app_display_name" placeholder="BlueNexus" style="margin-bottom:16px">
-  <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
-    <label class="switch" style="margin:0"><input type="checkbox" id="dry_run"><span class="slider"></span></label>
-    <div><b>Dry-Run</b> <span class="qhelp" role="button" tabindex="0" data-help="Trockenlauf der Ladesteuerung: Die App rechnet und protokolliert alles, schaltet aber am Cerbo nichts (auch der minimale Akkustand und der Sollwert Netz lassen sich dann nicht setzen). Zum Beobachten beim Einrichten, für den echten Betrieb ausschalten. Läuft parallel noch eine andere Automatisierung, die den ESS-Modus setzt (z. B. ioBroker), diese vorher stoppen – sonst schreiben zwei Regler gegeneinander.">?</span><div class="muted">Testbetrieb: berechnen, aber nicht am Cerbo schalten.</div></div>
+</div>
+
+<div class="card" id="modules-card" data-tab="system" data-area="settings_system">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Module <span class="qhelp" role="button" tabindex="0" data-help="Ausgeschaltete Module verschwinden aus Menüs, Dashboard und Rechten. <b>Gespeicherte Daten bleiben erhalten</b> und sind beim Wiedereinschalten wieder da. Solange „Energie“ aus ist, wird nichts geregelt und nichts aufgezeichnet.">?</span></h2>
+  <div class="sub">Nicht genutzte Teile der App ausblenden.</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <label class="chk"><input type="checkbox" id="mod-energy"> <b>⚡ Energie</b> <span class="qhelp" role="button" tabindex="0" data-help="Victron, Tibber oder fester Tarif, VRM, Ladeplan, Überschuss-Automatik, Energie-Verlauf, Ersparnis.">?</span></label>
+    <label class="chk"><input type="checkbox" id="mod-smarthome"> <b>🏠 Smart Home</b> <span class="qhelp" role="button" tabindex="0" data-help="Geräte, Sensoren, Thermostate, Regeln, Wake-on-LAN, Soundmodule, Rollläden, Klimaanlagen.">?</span></label>
+    <label class="chk"><input type="checkbox" id="mod-verlauf"> <b>📈 Verläufe</b> <span class="qhelp" role="button" tabindex="0" data-help="Messwerte aufzeichnen und als Diagramme zeigen. Braucht Energie oder Smart Home.">?</span></label>
+    <label class="chk"><input type="checkbox" id="mod-cameras"> <b>📷 Kameras</b> <span class="qhelp" role="button" tabindex="0" data-help="Reolink- und RTSP-Kameras: Standbild, Live-Ansicht.">?</span></label>
+    <label class="chk"><input type="checkbox" id="mod-alexa"> <b>🗣️ Alexa</b> <span class="qhelp" role="button" tabindex="0" data-help="Sprachsteuerung für freigegebene Geräte und eigene Schalter – lokal, über Port 80. Braucht Smart Home.">?</span></label>
   </div>
+  <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="mod-save" class="ghost">Speichern</button><span class="muted" id="mod-msg"></span></div>
+</div>
+
+<div class="card" id="tunnel-card" data-tab="system" data-area="settings_system">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 1 0 5 14.5"/><path d="M12 12v9M9 18l3 3 3-3"/></svg>Fernzugriff (Cloudflare Tunnel) <span class="qhelp" role="button" tabindex="0" data-help="Die App baut selbst eine gesicherte Verbindung zu Cloudflare auf. Voraussetzung: ein kostenloses Cloudflare-Konto und eine Domain bei Cloudflare.">?</span></h2>
+  <div class="sub">Zugriff von unterwegs – ohne Portfreigabe im Router.</div>
+  <div style="margin-bottom:12px"><button type="button" id="tn-warn" class="ghost" style="border-color:#f0a030;color:#f0a030">⚠ Sicherheitswarnung</button></div>
+  <div id="tn-setup" class="sub" style="margin:0 0 12px">Anleitung zur Einrichtung (einmalig, ca. 10 Minuten) <span class="qhelp" role="button" tabindex="0" data-help="<ol><li>Bei <a href=&quot;https://dash.cloudflare.com/sign-up&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>cloudflare.com</a> ein Konto anlegen und die Domain hinzufügen (Nameserver umstellen).</li><li><a href=&quot;https://one.dash.cloudflare.com&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>one.dash.cloudflare.com</a> (Zero-Trust-Dashboard) öffnen → <b>Networks → Connectors → Tunnel erstellen → Cloudflared</b>, Namen vergeben (z. B. „Steuerung“).</li><li>Den <b>Token</b> kopieren (langer Text, beginnt mit <code>eyJ</code>), hier einfügen und <b>Token speichern</b>. „Install connector“ überspringen – das übernimmt die App. <a href=&quot;https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Anleitung von Cloudflare</a></li><li>Im Tunnel unter <b>Public Hostname</b> eine Adresse anlegen, z. B. <code>steuerung.deine-domain.de</code>, Dienst <b>HTTP</b>, URL <code>localhost:<span id=&quot;tn-port&quot;>8080</span></code>.</li><li>Hier ggf. <b>cloudflared installieren</b> und <b>Fernzugriff einschalten</b>. Nach kurzer Zeit steht „Verbunden“.</li><li>Bei Cloudflare unter <b>Access</b> eine Anwendung für die Adresse anlegen (siehe Sicherheitswarnung). <a href=&quot;https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Anleitung von Cloudflare</a></li></ol>">?</span></div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0">
+    <label class="switch" style="margin:0"><input type="checkbox" id="tn-enabled"><span class="slider"></span></label>
+    <div><b>Fernzugriff einschalten</b><div class="muted" id="tn-state">…</div></div>
+  </div>
+  <div id="tn-install-row" style="display:none;margin-bottom:10px"><button id="tn-install" class="ghost" type="button">cloudflared installieren</button>
+    <span class="muted" id="tn-install-hint"></span></div>
   <div class="grid2">
-    <div><label>Regel-Intervall (Sekunden) <span class="qhelp" role="button" tabindex="0" data-help="Wie oft (in Sekunden) die Steuerung neu rechnet und bei Bedarf den Lademodus am Cerbo umschaltet. Standard: 300 (5 Minuten) – Strompreise ändern sich nur viertelstündlich. Kleinere Werte reagieren schneller, belasten aber Cerbo und Preisabfrage stärker. Die Live-Kacheln aktualisieren unabhängig davon alle 2 Sekunden.">?</span></label><input id="poll_seconds" type="number"></div>
-    <div><label>Energie-Messtakt (Sekunden) <span class="qhelp" role="button" tabindex="0" data-help="Wie oft (in Sekunden) Solar, Verbrauch, Netz und Akku für Verlauf, Diagramme und Tagesbilanz gemessen werden. Kleiner = feinere Kurven, dafür mehr gespeicherte Daten.">?</span></label><input id="energy_sample_seconds" type="number"></div>
+    <div><label>Tunnel-Token <span class="qhelp" role="button" tabindex="0" data-help="Token des Cloudflare-Tunnels (beginnt mit eyJ). Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="tn-token" type="password" autocomplete="new-password" placeholder="eyJ…"><button type="button" class="pw-toggle" data-for="tn-token" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap"><button id="tn-save" class="ghost" type="button">Token speichern</button>
+      <button id="tn-forget" class="ghost" type="button" style="color:#e5544a" title="Tunnel stoppen und den Token löschen">Token löschen</button></div>
   </div>
+  <div class="muted" id="tn-msg" style="margin-top:8px"></div>
+  <details style="margin-top:8px"><summary>Protokoll von cloudflared</summary><pre id="tn-log" style="max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:8px 0 0"></pre></details>
+</div>
+
+<div class="card" id="report-admin">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.">?</span></h2>
+  <div class="sub">Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.</div>
+  <a href="/report"><button type="button" class="ghost">📋 Betriebsbericht öffnen</button></a>
+</div>
+
+<div class="card" id="backup-card" data-tab="system" data-area="user_management">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Sicherung &amp; Wiederherstellung <span class="qhelp" role="button" tabindex="0" data-help="Die Sicherung enthält Konten, Zugangsdaten, Geräte, Regeln, Kameras, Telegram, Fernzugriff und Dashboard. Bei einer neuen Installation spielst du sie auf der Startseite („Schon eine Sicherung?“) wieder ein – ohne Terminal und SSH.<br><br>Die Datei ist mit deinem Passwort verschlüsselt. <b>Ohne dieses Passwort ist sie wertlos</b> – bitte gut aufbewahren.">?</span></h2>
+  <div class="sub">Alle Einstellungen in einer verschlüsselten Datei sichern und zurückspielen.</div>
+  <h3 style="margin:0 0 6px;font-size:14px">Sicherung herunterladen</h3>
+  <div class="grid2">
+    <div><label>Passwort für die Sicherung <span class="qhelp" role="button" tabindex="0" data-help="Mindestens 8 Zeichen. Wird zum Öffnen der Sicherung benötigt – nicht vergessen.">?</span></label><div class="pw-wrap"><input id="bk-pw" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="bk-pw" aria-label="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div style="display:flex;align-items:flex-end"><button id="bk-export" class="ghost" type="button">Sicherung herunterladen</button></div>
+  </div>
+  <label class="chk" style="margin-top:10px"><input type="checkbox" id="bk-data" checked> Verläufe und Historie mitnehmen <span class="qhelp" role="button" tabindex="0" data-help="Energie-Historie, Ladeprotokoll und Diagramm-Daten. Die Datei wird größer; ohne Haken enthält sie nur die Einstellungen.">?</span></label>
+  <h3 style="margin:18px 0 6px;font-size:14px">Sicherung einspielen</h3>
+  <div class="muted" style="margin-bottom:8px">Ersetzt alle aktuellen Einstellungen und Konten <span class="qhelp" role="button" tabindex="0" data-help="Der bisherige Stand wird vorher im Ordner app/backups abgelegt. Danach startet die App neu und du meldest dich mit den Konten der Sicherung an.">?</span></div>
+  <div class="grid2">
+    <div><label>Sicherungsdatei <span class="qhelp" role="button" tabindex="0" data-help="Datei mit der Endung .bnx aus einer früheren Sicherung.">?</span></label><input id="bk-file" type="file" accept=".bnx,.hnx,application/octet-stream"></div>
+    <div><label>Passwort der Sicherung <span class="qhelp" role="button" tabindex="0" data-help="Das Passwort, das beim Erstellen der Sicherung vergeben wurde.">?</span></label><div class="pw-wrap"><input id="bk-pw2" type="password" autocomplete="off"><button type="button" class="pw-toggle" data-for="bk-pw2" aria-label="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+  </div>
+  <div style="margin-top:10px"><button id="bk-import" class="ghost" type="button">Prüfen und einspielen …</button></div>
+  <div class="muted" id="bk-msg" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></svg>Testmodus <span class="qhelp" role="button" tabindex="0" data-help="Im Testmodus läuft die App normal, darf aber das Gerät nicht verlassen: Cerbo, Homematic, Shelly, Kameras, Tibber, Telegram, Tunnel, Alexa – nichts wird geschaltet oder gesendet. So prüfst du eine eingespielte Sicherung oder ein Update, ohne dass die echte Anlage etwas merkt.">?</span></h2>
+  <div class="muted" id="tmode-text">…</div>
+  <div style="margin-top:12px"><button class="ghost" id="tmode-btn" disabled>…</button></div>
+  <div class="muted" id="tmode-note" style="margin-top:8px"></div>
 </div>
 
 <div class="card">
@@ -204,6 +254,19 @@
     </label>
     <div id="pv-inverter-rows" style="margin-top:10px"></div>
     <button class="ghost" type="button" onclick="addPvInverter()">+ Wechselrichter</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>Ladesteuerung</h2>
+  <div class="sub">Testlauf (Dry-Run) und Taktung der Ladesteuerung am Cerbo.</div>
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
+    <label class="switch" style="margin:0"><input type="checkbox" id="dry_run"><span class="slider"></span></label>
+    <div><b>Dry-Run</b> <span class="qhelp" role="button" tabindex="0" data-help="Trockenlauf der Ladesteuerung: Die App rechnet und protokolliert alles, schaltet aber am Cerbo nichts (auch der minimale Akkustand und der Sollwert Netz lassen sich dann nicht setzen). Zum Beobachten beim Einrichten, für den echten Betrieb ausschalten. Läuft parallel noch eine andere Automatisierung, die den ESS-Modus setzt (z. B. ioBroker), diese vorher stoppen – sonst schreiben zwei Regler gegeneinander.">?</span><div class="muted">Testbetrieb: berechnen, aber nicht am Cerbo schalten.</div></div>
+  </div>
+  <div class="grid2">
+    <div><label>Regel-Intervall (Sekunden) <span class="qhelp" role="button" tabindex="0" data-help="Wie oft (in Sekunden) die Steuerung neu rechnet und bei Bedarf den Lademodus am Cerbo umschaltet. Standard: 300 (5 Minuten) – Strompreise ändern sich nur viertelstündlich. Kleinere Werte reagieren schneller, belasten aber Cerbo und Preisabfrage stärker. Die Live-Kacheln aktualisieren unabhängig davon alle 2 Sekunden.">?</span></label><input id="poll_seconds" type="number"></div>
+    <div><label>Energie-Messtakt (Sekunden) <span class="qhelp" role="button" tabindex="0" data-help="Wie oft (in Sekunden) Solar, Verbrauch, Netz und Akku für Verlauf, Diagramme und Tagesbilanz gemessen werden. Kleiner = feinere Kurven, dafür mehr gespeicherte Daten.">?</span></label><input id="energy_sample_seconds" type="number"></div>
   </div>
 </div>
 
@@ -488,12 +551,6 @@
   </div>
 </div>
 
-<div class="card" id="report-admin">
-  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.">?</span></h2>
-  <div class="sub">Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.</div>
-  <a href="/report"><button type="button" class="ghost">📋 Betriebsbericht öffnen</button></a>
-</div>
-
 <div class="card" id="vrm-admin">
   <h2>Victron VRM – Zugang &amp; Solar-Prognose <span class="qhelp" role="button" tabindex="0" data-help="Der Zugang liefert die Solar-Prognose für heute und morgen (Dashboard und Ladeplanung) sowie die Daten zum Nachholen des Verlaufs.">?</span></h2>
   <div class="sub">Zugang zum VRM-Portal für die Solar-Prognose.</div>
@@ -749,58 +806,6 @@
       <button id="hm-events-refresh" class="ghost">Aktualisieren</button>
       <div id="hm-events" style="margin-top:8px;font-family:monospace;font-size:12px;line-height:1.7;max-height:260px;overflow-y:auto"></div>
     </details>
-</div>
-
-<div class="card" id="modules-card" data-tab="system" data-area="settings_system">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Module <span class="qhelp" role="button" tabindex="0" data-help="Ausgeschaltete Module verschwinden aus Menüs, Dashboard und Rechten. <b>Gespeicherte Daten bleiben erhalten</b> und sind beim Wiedereinschalten wieder da. Solange „Energie“ aus ist, wird nichts geregelt und nichts aufgezeichnet.">?</span></h2>
-  <div class="sub">Nicht genutzte Teile der App ausblenden.</div>
-  <div style="display:flex;flex-direction:column;gap:10px">
-    <label class="chk"><input type="checkbox" id="mod-energy"> <b>⚡ Energie</b> <span class="qhelp" role="button" tabindex="0" data-help="Victron, Tibber oder fester Tarif, VRM, Ladeplan, Überschuss-Automatik, Energie-Verlauf, Ersparnis.">?</span></label>
-    <label class="chk"><input type="checkbox" id="mod-smarthome"> <b>🏠 Smart Home</b> <span class="qhelp" role="button" tabindex="0" data-help="Geräte, Sensoren, Thermostate, Regeln, Wake-on-LAN, Soundmodule, Rollläden, Klimaanlagen.">?</span></label>
-    <label class="chk"><input type="checkbox" id="mod-verlauf"> <b>📈 Verläufe</b> <span class="qhelp" role="button" tabindex="0" data-help="Messwerte aufzeichnen und als Diagramme zeigen. Braucht Energie oder Smart Home.">?</span></label>
-    <label class="chk"><input type="checkbox" id="mod-cameras"> <b>📷 Kameras</b> <span class="qhelp" role="button" tabindex="0" data-help="Reolink- und RTSP-Kameras: Standbild, Live-Ansicht.">?</span></label>
-    <label class="chk"><input type="checkbox" id="mod-alexa"> <b>🗣️ Alexa</b> <span class="qhelp" role="button" tabindex="0" data-help="Sprachsteuerung für freigegebene Geräte und eigene Schalter – lokal, über Port 80. Braucht Smart Home.">?</span></label>
-  </div>
-  <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="mod-save" class="ghost">Speichern</button><span class="muted" id="mod-msg"></span></div>
-</div>
-
-<div class="card" id="backup-card" data-tab="system" data-area="user_management">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Sicherung &amp; Wiederherstellung <span class="qhelp" role="button" tabindex="0" data-help="Die Sicherung enthält Konten, Zugangsdaten, Geräte, Regeln, Kameras, Telegram, Fernzugriff und Dashboard. Bei einer neuen Installation spielst du sie auf der Startseite („Schon eine Sicherung?“) wieder ein – ohne Terminal und SSH.<br><br>Die Datei ist mit deinem Passwort verschlüsselt. <b>Ohne dieses Passwort ist sie wertlos</b> – bitte gut aufbewahren.">?</span></h2>
-  <div class="sub">Alle Einstellungen in einer verschlüsselten Datei sichern und zurückspielen.</div>
-  <h3 style="margin:0 0 6px;font-size:14px">Sicherung herunterladen</h3>
-  <div class="grid2">
-    <div><label>Passwort für die Sicherung <span class="qhelp" role="button" tabindex="0" data-help="Mindestens 8 Zeichen. Wird zum Öffnen der Sicherung benötigt – nicht vergessen.">?</span></label><div class="pw-wrap"><input id="bk-pw" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="bk-pw" aria-label="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-    <div style="display:flex;align-items:flex-end"><button id="bk-export" class="ghost" type="button">Sicherung herunterladen</button></div>
-  </div>
-  <label class="chk" style="margin-top:10px"><input type="checkbox" id="bk-data" checked> Verläufe und Historie mitnehmen <span class="qhelp" role="button" tabindex="0" data-help="Energie-Historie, Ladeprotokoll und Diagramm-Daten. Die Datei wird größer; ohne Haken enthält sie nur die Einstellungen.">?</span></label>
-  <h3 style="margin:18px 0 6px;font-size:14px">Sicherung einspielen</h3>
-  <div class="muted" style="margin-bottom:8px">Ersetzt alle aktuellen Einstellungen und Konten <span class="qhelp" role="button" tabindex="0" data-help="Der bisherige Stand wird vorher im Ordner app/backups abgelegt. Danach startet die App neu und du meldest dich mit den Konten der Sicherung an.">?</span></div>
-  <div class="grid2">
-    <div><label>Sicherungsdatei <span class="qhelp" role="button" tabindex="0" data-help="Datei mit der Endung .bnx aus einer früheren Sicherung.">?</span></label><input id="bk-file" type="file" accept=".bnx,.hnx,application/octet-stream"></div>
-    <div><label>Passwort der Sicherung <span class="qhelp" role="button" tabindex="0" data-help="Das Passwort, das beim Erstellen der Sicherung vergeben wurde.">?</span></label><div class="pw-wrap"><input id="bk-pw2" type="password" autocomplete="off"><button type="button" class="pw-toggle" data-for="bk-pw2" aria-label="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-  </div>
-  <div style="margin-top:10px"><button id="bk-import" class="ghost" type="button">Prüfen und einspielen …</button></div>
-  <div class="muted" id="bk-msg" style="margin-top:8px"></div>
-</div>
-
-<div class="card" id="tunnel-card" data-tab="system" data-area="settings_system">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 1 0 5 14.5"/><path d="M12 12v9M9 18l3 3 3-3"/></svg>Fernzugriff (Cloudflare Tunnel) <span class="qhelp" role="button" tabindex="0" data-help="Die App baut selbst eine gesicherte Verbindung zu Cloudflare auf. Voraussetzung: ein kostenloses Cloudflare-Konto und eine Domain bei Cloudflare.">?</span></h2>
-  <div class="sub">Zugriff von unterwegs – ohne Portfreigabe im Router.</div>
-  <div style="margin-bottom:12px"><button type="button" id="tn-warn" class="ghost" style="border-color:#f0a030;color:#f0a030">⚠ Sicherheitswarnung</button></div>
-  <div id="tn-setup" class="sub" style="margin:0 0 12px">Anleitung zur Einrichtung (einmalig, ca. 10 Minuten) <span class="qhelp" role="button" tabindex="0" data-help="<ol><li>Bei <a href=&quot;https://dash.cloudflare.com/sign-up&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>cloudflare.com</a> ein Konto anlegen und die Domain hinzufügen (Nameserver umstellen).</li><li><a href=&quot;https://one.dash.cloudflare.com&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>one.dash.cloudflare.com</a> (Zero-Trust-Dashboard) öffnen → <b>Networks → Connectors → Tunnel erstellen → Cloudflared</b>, Namen vergeben (z. B. „Steuerung“).</li><li>Den <b>Token</b> kopieren (langer Text, beginnt mit <code>eyJ</code>), hier einfügen und <b>Token speichern</b>. „Install connector“ überspringen – das übernimmt die App. <a href=&quot;https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Anleitung von Cloudflare</a></li><li>Im Tunnel unter <b>Public Hostname</b> eine Adresse anlegen, z. B. <code>steuerung.deine-domain.de</code>, Dienst <b>HTTP</b>, URL <code>localhost:<span id=&quot;tn-port&quot;>8080</span></code>.</li><li>Hier ggf. <b>cloudflared installieren</b> und <b>Fernzugriff einschalten</b>. Nach kurzer Zeit steht „Verbunden“.</li><li>Bei Cloudflare unter <b>Access</b> eine Anwendung für die Adresse anlegen (siehe Sicherheitswarnung). <a href=&quot;https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>Anleitung von Cloudflare</a></li></ol>">?</span></div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0">
-    <label class="switch" style="margin:0"><input type="checkbox" id="tn-enabled"><span class="slider"></span></label>
-    <div><b>Fernzugriff einschalten</b><div class="muted" id="tn-state">…</div></div>
-  </div>
-  <div id="tn-install-row" style="display:none;margin-bottom:10px"><button id="tn-install" class="ghost" type="button">cloudflared installieren</button>
-    <span class="muted" id="tn-install-hint"></span></div>
-  <div class="grid2">
-    <div><label>Tunnel-Token <span class="qhelp" role="button" tabindex="0" data-help="Token des Cloudflare-Tunnels (beginnt mit eyJ). Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="tn-token" type="password" autocomplete="new-password" placeholder="eyJ…"><button type="button" class="pw-toggle" data-for="tn-token" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-    <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap"><button id="tn-save" class="ghost" type="button">Token speichern</button>
-      <button id="tn-forget" class="ghost" type="button" style="color:#e5544a" title="Tunnel stoppen und den Token löschen">Token löschen</button></div>
-  </div>
-  <div class="muted" id="tn-msg" style="margin-top:8px"></div>
-  <details style="margin-top:8px"><summary>Protokoll von cloudflared</summary><pre id="tn-log" style="max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:8px 0 0"></pre></details>
 </div>
 
 <div class="card msg-host" id="alexa-card" data-tab="alexa">
@@ -3259,7 +3264,7 @@ if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
 const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'wol', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
 const IS_SH = window.PAGE_MODE === 'smarthome';
 const ADMIN_TABS = [
-  { id: 'anlage', label: 'Anlage', match: ['Victron Cerbo', 'Anlage', 'Batterie-Watchdog', 'Netz-Zähler', 'Periodische Vollladung'] },
+  { id: 'anlage', label: 'Anlage', match: ['Victron Cerbo', 'Ladesteuerung', 'Anlage', 'Batterie-Watchdog', 'Netz-Zähler', 'Periodische Vollladung'] },
   { id: 'tarif', label: 'Tarif & Laden', match: ['Tibber', 'Stromtarif', 'Vertragskosten', 'Intelligente Planung', 'Peak-Schutz', 'SOC-Strategie', 'PV-Prognose'] },
   { id: 'solar', label: 'Solar', match: ['PV-Wechselrichter'] },
   { id: 'vrm', label: 'VRM', match: ['Victron VRM'] },

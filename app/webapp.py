@@ -309,7 +309,9 @@ for _f in ("app_display_name", "show_live_values", "show_energy_chart", "show_fl
            "show_weather_card", "show_plansim_card", "show_savings_card", "show_verlauf_card", "tile_order",
            "chart_energy_hourly", "chart_flow_hourly"):
     FIELD_AREA[_f] = "settings_anzeige"
-for _f in ("dry_run", "poll_seconds", "energy_sample_seconds", "manual_override", "web_port"):
+for _f in ("dry_run", "poll_seconds", "energy_sample_seconds"):          # Karte "Ladesteuerung" im Reiter Anlage
+    FIELD_AREA[_f] = "settings_anlage"
+for _f in ("manual_override", "web_port"):
     FIELD_AREA[_f] = "settings_system"
 for _f in ("surplus_enabled", "surplus_dry_run", "surplus_min_soc"):
     FIELD_AREA[_f] = "automation"
