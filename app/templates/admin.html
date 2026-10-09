@@ -6,18 +6,7 @@
   .card h2 svg.h2i { width: 16px; height: 16px; flex: 0 0 auto;
     stroke: currentColor; stroke-width: 1.8; fill: none;
     stroke-linecap: round; stroke-linejoin: round; }
-  /* Farbe pro Karte (Reihenfolge = Kartenreihenfolge) */
-  .card:nth-of-type(1)  h2 svg.h2i { color: var(--blue); }   /* Update   */
-  .card:nth-of-type(2)  h2 svg.h2i { color: var(--green); }  /* Betrieb  */
-  .card:nth-of-type(3)  h2 svg.h2i { color: var(--accent-t); } /* Cerbo    */
-  .card:nth-of-type(4)  h2 svg.h2i { color: var(--timer); }  /* Tibber   */
-  .card:nth-of-type(5)  h2 svg.h2i { color: var(--red); }    /* Standort */
-  .card:nth-of-type(6)  h2 svg.h2i { color: var(--exp); }    /* Solarflächen */
-  .card:nth-of-type(7)  h2 svg.h2i { color: var(--timer); }  /* PV-Prognose  */
-  .card:nth-of-type(8)  h2 svg.h2i { color: var(--green); }  /* Anlage & Speicher */
-  .card:nth-of-type(9)  h2 svg.h2i { color: var(--plan); }   /* Peak-Schutz  */
-  .card:nth-of-type(10) h2 svg.h2i { color: var(--blue); }   /* SOC-Strategie */
-  .card:nth-of-type(11) h2 svg.h2i { color: var(--red); }    /* Netz-Zähler  */
+  /* Farbe der Kartensymbole: nach Ueberschrift (siehe colorH2Icons im Skript) */
   /* Reiter (Tabs) */
   .tabbar { position: sticky; top: var(--hdr-h, 56px); z-index: 9; display: flex; gap: 6px; overflow-x: auto;
     padding: 8px 10px; margin-bottom: 14px; border-radius: 18px; background: var(--navbg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
@@ -390,9 +379,6 @@
       </label>
       <div style="display:flex;gap:8px"><input id="ess_grid_sp" type="number" min="-1000" max="1000" step="10" placeholder="…"><button type="button" class="ghost" id="ess_grid_sp_btn" style="white-space:nowrap">Am Cerbo setzen</button></div>
       <small class="hint" id="ess_grid_sp_msg">Wird direkt am Cerbo gesetzt (nicht mit „Speichern“).</small></div>
-    <div><label>Immer laden unter (ct/kWh)
-        <span class="qhelp" role="button" tabindex="0" data-help="Gegenstück zum Ladelimit: Fällt der Preis auf oder unter diesen Wert, wird sofort geladen – unabhängig davon, ob eine Strategie gerade Bedarf sieht. Gedacht für Preise, die an diesem Tag mit hoher Wahrscheinlichkeit nicht mehr unterboten werden. Das Ladelimit oben gilt weiterhin. 0 = deaktiviert.">?</span>
-      </label><input id="absolute_cheap_price" type="number" step="0.5" min="0"></div>
   </div>
 </div>
 
@@ -421,6 +407,9 @@
   <div style="margin-top:14px"><label>Sicherheitspuffer beim Nachtladen (%-Punkte)
     <span class="qhelp" role="button" tabindex="0" data-help="Die Planung rechnet nachts mit einem um diesen Wert höheren Mindest-Akkustand und plant dadurch vorsichtiger: Sie lädt tendenziell früher und mehr, statt auf die Sonnenprognose zu setzen. Die Ladesperre am Cerbo (Minimaler Akkustand unter „Anlage & Speicher“) bleibt unverändert. 0 = kein Puffer. Beispiel: Minimaler Akkustand 15 %, Puffer 5 % → die Planung rechnet mit 20 %.">?</span></label>
     <input id="smart_planner_safety_buffer_pct" type="number" step="1" min="0" max="30" placeholder="z.B. 5" style="width:100px"></div>
+  <div style="margin-top:14px"><label>Immer laden unter (ct/kWh)
+        <span class="qhelp" role="button" tabindex="0" data-help="Gegenstück zum Ladelimit: Fällt der Preis auf oder unter diesen Wert, wird sofort geladen – unabhängig davon, ob eine Strategie gerade Bedarf sieht. Gedacht für Preise, die an diesem Tag mit hoher Wahrscheinlichkeit nicht mehr unterboten werden. Das Ladelimit oben gilt weiterhin. 0 = deaktiviert.">?</span>
+      </label><input id="absolute_cheap_price" type="number" step="0.5" min="0"></div>
 </div>
 
 <div id="legacy-strategy-cards">
@@ -3305,6 +3294,23 @@ const ADMIN_TABS = [
   { id: 'system', label: 'System', match: ['App-Version', 'Betrieb', 'Uhrzeit', 'Testmodus'] },
   { id: 'konto', label: 'Konto & Benutzer', match: ['Konto', 'Weitere Benutzer', 'Neuer Benutzer'] },
 ];
+// Farbe der Kartensymbole nach Ueberschrift (nicht nach Position: die Reihenfolge der Karten aendert sich). Symbole mit eigener Farbe bleiben.
+(function colorH2Icons() {
+  const MAP = [
+    ['App-Version', 'blue'], ['Uhrzeit', 'normal'], ['Betrieb', 'green'], ['Module', 'green'], ['Fernzugriff', 'accent-t'], ['Sicherung', 'blue'], ['Testmodus', 'plan'],
+    ['Diagramme', 'blue'], ['Darstellung', 'timer'], ['Meine Ansicht', 'plan'],
+    ['Victron Cerbo', 'accent-t'], ['Ladesteuerung', 'green'], ['Anlage', 'green'], ['Batterie-Watchdog', 'exp'], ['Periodische Vollladung', 'accent-t'], ['Netz-Z', 'normal'],
+    ['Stromtarif', 'timer'], ['Vertragskosten', 'exp'], ['PV-Prognose', 'timer'], ['Intelligente Planung', 'plan'], ['Peak-Schutz', 'red'], ['SOC-Strategie', 'blue'],
+    ['Victron VRM \u2013 Zugang', 'accent-t'], ['Victron VRM \u2013 Verlauf', 'green'], ['Wettervorhersage', 'blue'], ['Benachrichtigungen', 'exp'],
+    ['Konto', 'accent-t'], ['Weitere Benutzer', 'plan'], ['Neuer Benutzer', 'green'], ['Betriebsbericht', 'green'],
+  ];
+  document.querySelectorAll('.card h2').forEach(h => {
+    const svg = h.querySelector('svg.h2i'); if (!svg || svg.style.color) return;
+    const t = h.textContent.replace(/\s+/g, ' ').trim();
+    const m = MAP.find(x => t.startsWith(x[0]));
+    if (m) svg.style.color = 'var(--' + m[1] + ')';
+  });
+})();
 (function initAdminTabs() {
   const cards = [...document.querySelectorAll('.card')];
   cards.forEach(c => {

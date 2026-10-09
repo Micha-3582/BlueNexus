@@ -246,11 +246,12 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 | Ladelimit / max. SOC (%) | Harte Obergrenze für Netzladen – gilt immer. |
 | **Minimaler Akkustand am Cerbo (%)** | Wie „Minimaler SOC“ im VRM; darunter entlädt der Akku nicht. Wird **direkt am Cerbo** gesetzt. |
 | **Sollwert Netz am Cerbo (W)** | ESS-Netz-Sollwert (−1000 … 1000 W in 10er-Schritten). 0 = möglichst kein Bezug/Einspeisung. Wird **direkt am Cerbo** gesetzt. |
-| Immer laden unter (ct/kWh) | Fällt der Preis auf/unter diesen Wert, wird geladen (0 = aus). |
 
 **Periodische Vollladung:** Alle X Tage wird das Ladelimit auf ein Ziel (meist 100 %) angehoben, damit das BMS die Zellen balancieren kann. *Wann* geladen wird, entscheidet weiterhin die Planung – nur bei günstigem Preis bzw. genug Sonne. 0 = aus.
 
 ### 4.4 Stromtarif und Ladestrategie
+
+> **Immer laden unter (ct/kWh)** (die „Preisschwelle“) steht im Reiter **Tarif & Laden** in der Karte **Intelligente Planung**: Fällt der Preis auf oder unter diesen Wert, wird geladen, unabhängig von der Strategie (0 = aus). Im Preisdiagramm des Dashboards zeigt „Preisschwelle greift“ diese Stunden an.
 
 - **Dynamischer Tarif (Tibber):** Access-Token von developer.tibber.com eintragen. Die Steuerung lädt in den günstigsten Viertelstunden.
 - **Fester Preis:** Preis pro kWh (brutto) eintragen. Es gibt dann **keine Preisplanung**, die App lädt nie aktiv aus dem Netz. PV-Vorrang, Ladelimit und Sofort-Override wirken weiter.
