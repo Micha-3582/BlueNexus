@@ -272,7 +272,7 @@ ENDPOINT_AREA = {
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
     "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
-    "api_check_update": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
+    "api_check_update": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
@@ -2018,7 +2018,17 @@ ctrl = Controller()
 def index():
     if store.module_on("energy") and not store.is_configured():
         return redirect("/setup")
-    return render_template("index.html")
+    welcome = (not store.module_on("energy") and not store.load_config().get("welcome_done") and auth.is_full_admin(_perms()))      # Begruessung fuer Installationen ohne Energie (die haben keinen Einrichtungsassistenten)
+    return render_template("index.html", welcome=welcome)
+
+
+@app.route("/api/welcome/done", methods=["POST"])
+def api_welcome_done():
+    """Begruessung auf dem Dashboard als gesehen merken (erscheint nur einmal)."""
+    cfg = store.load_config()
+    cfg["welcome_done"] = True
+    store.save_config(cfg)
+    return jsonify(ok=True)
 
 
 # ---------------------------------------------------------------- Alexa (Hue-Emulation, siehe alexa.py)

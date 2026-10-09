@@ -257,6 +257,27 @@
 <script>
 const TH = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();          // Themenfarbe (dunkel/hell) fuer die Diagramme
 const MODULES = {{ modules | tojson }};              // Module der Installation (Energie / Smart Home / Kameras)
+{% if welcome %}
+(function () {            // Begruessung fuer Installationen ohne Energie: kurze Orientierung, erscheint nur einmal
+  const li = (t) => '<li style="margin:6px 0">' + t + '</li>';
+  let items = '';
+  if (MODULES.smarthome) items += li('<b>Smart Home:</b> Unter <a href="/smarthome#suchen">Smart Home → Geräte suchen</a> lernst du deine Geräte an. Danach schaltest du sie hier auf dem Dashboard, per Zeitplan oder mit <a href="/rules">Regeln</a> (z. B. „um 18 Uhr Licht an“).');
+  if (MODULES.cameras) items += li('<b>Kameras:</b> Unter <a href="/kameras">Kameras</a> siehst du deine Bilder; neue Kameras fügst du dort hinzu.');
+  if (MODULES.alexa) items += li('<b>Alexa:</b> Deine Geräte lassen sich per Sprache steuern, die Einrichtung steht unter Smart Home → Alexa.');
+  items += li('<b>Einstellungen</b> (Zahnrad oben): Konto, Benutzer und Rechte, Darstellung hell/dunkel, Updates und die Uhrzeit.');
+  items += li('<b>Energie nachrüsten:</b> Hast du eine Victron-Anlage oder einen dynamischen Stromtarif, aktivierst du das Modul jederzeit unter Einstellungen → System → Module. Dann führt dich ein Assistent durch die Einrichtung.');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+  ov.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">' +
+    '<h2 style="margin:0 0 8px">Willkommen bei BlueNexus 👋</h2>' +
+    '<div class="muted" style="margin-bottom:10px">Schön, dass du da bist! Hier ein kurzer Überblick, wo du was findest:</div>' +
+    '<ul style="padding-left:20px;margin:0">' + items + '</ul>' +
+    '<div class="muted" style="margin-top:12px">Viel Spaß mit BlueNexus!</div>' +
+    '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="welcome-ok">Los geht’s</button></div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('welcome-ok').onclick = () => { ov.remove(); fetch('/api/welcome/done', { method: 'POST' }).catch(() => {}); };
+})();
+{% endif %}
 const DASHBOARD_LEVEL = {{ (user_perms.dashboard or 'none') | tojson }};   // 'none' | 'read' | 'write' - siehe Einstellungen -> System -> Weitere Benutzer
 const LEVEL_COLORS = {
   VERY_CHEAP: '#35c07a', CHEAP: '#35c07a', NORMAL: '#5fa8d3',
