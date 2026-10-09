@@ -247,6 +247,17 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 | **Minimaler Akkustand am Cerbo (%)** | Wie „Minimaler SOC“ im VRM; darunter entlädt der Akku nicht. Wird **direkt am Cerbo** gesetzt. |
 | **Sollwert Netz am Cerbo (W)** | ESS-Netz-Sollwert (−1000 … 1000 W in 10er-Schritten). 0 = möglichst kein Bezug/Einspeisung. Wird **direkt am Cerbo** gesetzt. |
 
+**Bis wohin wird aus dem Netz geladen?** Zwei Grenzen wirken zusammen: die **PV-Reserve** (Ladestand, bis zu dem die „klugen“ Wege laden) und das **Ladelimit** (harte Obergrenze für alles). Beispiel mit PV-Reserve 80 % und Ladelimit 95 %:
+
+| Was lädt gerade | Stoppt bei |
+|---|---|
+| **Intelligente Planung** und **klassische Strategien** (Peak-Schutz, SOC-Strategie …) | **80 %** (PV-Reserve) – der Rest bleibt für die Mittagssonne frei |
+| **Preisschwelle** („Immer laden unter“, Anzeige „Supergünstig“) | **95 %** (Ladelimit) |
+| **Sofort-Override** (Knopf auf dem Dashboard) | **95 %** (Ladelimit) |
+| **Manueller Ladetermin** | **95 %** (Ladelimit) |
+
+Merksatz: Die PV-Reserve gilt nur für die automatische Planung. Alles, was du selbst auslöst (Override, Ladetermin) oder was als „immer laden“ eingestellt ist (Preisschwelle), geht bis zum Ladelimit. Das Ladelimit verhindert in allen Fällen, dass der Akku auf 100 % lädt. Liegt die PV-Reserve über dem Ladelimit, gilt das Ladelimit. Wer nachts bei sehr niedrigen Preisen nicht über die PV-Reserve hinaus laden will, senkt die Preisschwelle (dann entscheidet die Planung) oder setzt das Ladelimit niedriger.
+
 **Periodische Vollladung:** Alle X Tage wird das Ladelimit auf ein Ziel (meist 100 %) angehoben, damit das BMS die Zellen balancieren kann. *Wann* geladen wird, entscheidet weiterhin die Planung – nur bei günstigem Preis bzw. genug Sonne. 0 = aus.
 
 ### 4.4 Stromtarif und Ladestrategie
