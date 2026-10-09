@@ -77,7 +77,7 @@
     <label>Passwort</label>
     <div class="pw-wrap">
       <input type="password" id="pw" name="password" autocomplete="new-password" minlength="8" required>
-      <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Passwort anzeigen" title="Passwort anzeigen">
+      <button type="button" class="pw-toggle" id="pw-toggle" tabindex="-1" aria-label="Passwort anzeigen" title="Passwort anzeigen (beide Felder)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
           <circle cx="12" cy="12" r="3"/>
@@ -87,16 +87,16 @@
     <div class="hint">Mindestens 8 Zeichen.</div>
 
     <label>Passwort wiederholen</label>
-    <input type="password" name="password2" autocomplete="new-password" minlength="8" required>
+    <input type="password" id="pw2" name="password2" autocomplete="new-password" minlength="8" required>
 
     <button type="submit">Konto anlegen</button>
     <p class="hint" style="text-align:center;margin-top:14px">Schon eine Sicherung? <a href="{{ url_for('restore') }}" style="color:var(--accent-t)">Alles wiederherstellen</a></p>
   </form>
   <script>
     document.getElementById('pw-toggle').addEventListener('click', function () {
-      var pw = document.getElementById('pw');
+      var pw = document.getElementById('pw'), pw2 = document.getElementById('pw2');
       var showing = pw.type === 'text';
-      pw.type = showing ? 'password' : 'text';
+      pw.type = pw2.type = showing ? 'password' : 'text';                // das Auge zeigt beide Felder an, damit man die Wiederholung prüfen kann
       this.setAttribute('aria-label', showing ? 'Passwort anzeigen' : 'Passwort verbergen');
       this.title = showing ? 'Passwort anzeigen' : 'Passwort verbergen';
     });
