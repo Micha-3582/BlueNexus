@@ -15,6 +15,7 @@ import copy
 import logging
 import re
 import threading
+import subprocess
 import time
 from datetime import datetime, timedelta
 from functools import wraps
@@ -271,7 +272,7 @@ ENDPOINT_AREA = {
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
     "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
-    "api_check_update": "settings_system", "api_update": "settings_system",
+    "api_check_update": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
@@ -2817,6 +2818,60 @@ def api_check_update():
     return jsonify(updater.check_update())
 
 
+def _apply_timezone(name):
+    """Zeitzone der laufenden App setzen (ohne Root, wirkt fuer alle Uhrzeiten und Regeln). Unter Windows nicht moeglich."""
+    if not name or not hasattr(time, "tzset"):
+        return False
+    os.environ["TZ"] = name
+    time.tzset()
+    return True
+
+
+def _zone_names():
+    try:
+        import zoneinfo
+        names = sorted(zoneinfo.available_timezones())
+        if names:
+            return names
+    except Exception:                                    # noqa: BLE001
+        pass
+    return ["Europe/Berlin", "Europe/Vienna", "Europe/Zurich", "Europe/London", "UTC"]
+
+
+@app.route("/api/system/time")
+def api_system_time():
+    """Uhrzeit des Servers fuer die Systemeinstellungen: damit faellt eine falsche Zeitzone oder Uhr sofort auf."""
+    now = datetime.now().astimezone()
+    ntp = None
+    try:
+        r = subprocess.run(["timedatectl", "show", "-p", "NTPSynchronized", "--value"], capture_output=True, text=True, timeout=3)
+        if r.returncode == 0 and r.stdout.strip() in ("yes", "no"):
+            ntp = r.stdout.strip() == "yes"
+    except Exception:                                    # noqa: BLE001
+        pass
+    cfg = store.load_config()
+    return jsonify(epoch=time.time(), local=now.strftime("%d.%m.%Y %H:%M:%S"), offset=now.strftime("%z"),
+                   zone=cfg.get("timezone") or os.environ.get("TZ") or now.tzname(),
+                   can_set=hasattr(time, "tzset") and not sandbox.ACTIVE, ntp=ntp, zones=_zone_names())
+
+
+@app.route("/api/system/timezone", methods=["POST"])
+def api_system_timezone():
+    """Zeitzone der App einstellen (z. B. Europe/Berlin). Gilt sofort und bleibt nach einem Neustart erhalten."""
+    if sandbox.ACTIVE:
+        return jsonify(error="Im Testmodus gesperrt."), 403
+    name = str((request.get_json(silent=True) or {}).get("timezone") or "").strip()
+    if name not in _zone_names():
+        return jsonify(error="Unbekannte Zeitzone – Beispiel: Europe/Berlin"), 400
+    if not _apply_timezone(name):
+        return jsonify(error="Auf diesem System lässt sich die Zeitzone nicht in der App ändern."), 400
+    cfg = store.load_config()
+    cfg["timezone"] = name
+    store.save_config(cfg)
+    opslog.log("rules", f"Zeitzone auf {name} gestellt", dry=False)
+    return jsonify(ok=True, local=datetime.now().astimezone().strftime("%d.%m.%Y %H:%M:%S"))
+
+
 @app.route("/api/update", methods=["POST"])
 def api_update():
     if sandbox.ACTIVE:
@@ -5009,6 +5064,10 @@ def main():
         nfc.migrate_icons()                                  # NFC-Knoepfe mit dem alten Symbol bekommen das Etikett
     except Exception as e:                               # noqa: BLE001
         log.warning("NFC-Symbole: %s", e)
+    try:
+        _apply_timezone(store.load_config().get("timezone"))      # in den Systemeinstellungen gewaehlte Zeitzone
+    except Exception as e:                               # noqa: BLE001
+        log.warning("Zeitzone: %s", e)
     ctrl.start()
     cfg = store.load_config()
     try:

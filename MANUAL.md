@@ -699,6 +699,7 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 
 ## 15. Update, Sicherung, Datenhaltung
 
+- **Uhrzeit & Zeitzone:** *Einstellungen → System → Uhrzeit & Zeitzone* zeigt die Uhr des Servers neben der Uhr deines Geräts und warnt bei Abweichung. Regeln, Zeitpläne und Sonnenzeiten richten sich nach der Server-Uhr – geht sie falsch, schaltet eine Regel zur falschen Zeit. Die **Zeitzone** (z. B. `Europe/Berlin`) stellst du dort direkt ein, sie gilt sofort und bleibt erhalten. Geht die **Uhr selbst** falsch (Abweichung von Minuten), fehlt der Zeitabgleich: auf dem Pi `sudo timedatectl set-ntp true`.
 - **Update:** *Einstellungen → System → App-Version & Update* → „Nach Updates suchen“ → „Jetzt aktualisieren“. Alternativ per Terminal `git pull` im App-Ordner und Neustart des Dienstes (pm2 bzw. systemd). Persönliche Daten bleiben erhalten.
 - **Daten** liegen als JSON-Dateien im Ordner `app/` und sind **nicht in Git** (stehen in `.gitignore`). Dazu gehören u. a. die Konfiguration, die Geräteregister (Geräte, Sensoren, Thermostate, Türschlösser, eigene Schalter, WOL-Ziele, Zigbee-/Homematic-Zugang), Regeln, laufende Abläufe, Historie, Ladeprotokoll, Benutzer und Vertragszeiträume.
 - **Sicherung & Wiederherstellung (Umzug auf eine neue Installation):** *Einstellungen → System → Sicherung & Wiederherstellung* (nur Konten mit dem Recht „Benutzerverwaltung: Schreiben“).

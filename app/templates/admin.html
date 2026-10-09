@@ -101,6 +101,20 @@
 <div id="tab-settings">
 
 <div class="card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>Uhrzeit & Zeitzone <span class="qhelp" role="button" tabindex="0" data-help="Regeln, Zeitpläne und Sonnenzeiten richten sich nach der Uhr des Servers. Geht sie falsch (z. B. falsche Zeitzone, Unterschied von Stunden), schalten Regeln zur falschen Zeit. Hier siehst du die Serverzeit im Vergleich zu deinem Gerät.">?</span></h2>
+  <div class="muted">Uhr des Servers: <b id="tm-server">…</b> <span id="tm-zone" class="muted"></span></div>
+  <div class="muted">Dein Gerät: <b id="tm-client">…</b></div>
+  <div id="tm-status" style="margin-top:8px"></div>
+  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input id="tm-input" list="tm-zones" placeholder="Zeitzone, z. B. Europe/Berlin" style="max-width:280px">
+    <datalist id="tm-zones"></datalist>
+    <button class="ghost" id="tm-save">Zeitzone übernehmen</button>
+    <button class="ghost" id="tm-berlin">Europe/Berlin</button>
+  </div>
+  <div class="muted" id="tm-note" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>App-Version & Update <span class="qhelp" role="button" tabindex="0" data-help="Holt neue Versionen von GitHub. Einstellungen, Geräte und Verläufe bleiben erhalten – nur der Programmcode wird ersetzt.<ol><li><b>Nach Updates suchen</b> prüft, ob eine neuere Version vorliegt.</li><li><b>Jetzt aktualisieren</b> lädt sie und startet die App neu (als Dienst automatisch, sonst einmal von Hand).</li></ol>">?</span></h2>
   <div class="muted">Installierte Version: <b id="app-version">…</b></div>
   <div id="update-status" style="margin-top:8px"></div>
@@ -1145,6 +1159,48 @@ document.getElementById('btn-grid').addEventListener('click', async () => {
   setTimeout(() => msg.textContent = '', 3000);
 });
 
+// Uhrzeit & Zeitzone
+(function () {
+  const $ = id => document.getElementById(id);
+  const fmt = d => d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
+  let srv = null, t0 = 0;
+  function tick() {
+    $('tm-client').textContent = fmt(new Date());
+    if (!srv) return;
+    const diff = Math.round((srv.epoch * 1000 + (Date.now() - t0) - Date.now()) / 1000);      // Server-Uhr (UTC) gegen Geraet
+    const clientOff = -new Date().getTimezoneOffset();
+    const m = srv.offset.match(/([+-])(\d\d)(\d\d)/); const srvOff = m ? (m[1] === '-' ? -1 : 1) * (+m[2] * 60 + +m[3]) : clientOff;
+    const st = $('tm-status'); let html;
+    if (Math.abs(diff) > 120) html = `<span style="color:var(--vexp)">Die Uhr des Servers geht um ${Math.abs(Math.round(diff / 60))} Minuten ${diff > 0 ? 'vor' : 'nach'} – Regeln schalten zur falschen Zeit. Auf dem Server hilft: <code>sudo timedatectl set-ntp true</code></span>`;
+    else if (srvOff !== clientOff) html = `<span style="color:var(--exp)">Die Zeitzone des Servers (${srv.offset}) weicht von deinem Gerät ab – ist das richtig? Sonst unten die Zeitzone einstellen.</span>`;
+    else html = '<span style="color:var(--cheap)">Uhr und Zeitzone passen zu deinem Gerät ✓</span>';
+    if (srv.ntp === false) html += '<br><span style="color:var(--exp)">Die Uhr wird nicht automatisch über das Internet abgeglichen (NTP aus).</span>';
+    st.innerHTML = html;
+  }
+  async function load() {
+    try {
+      srv = await (await fetch('/api/system/time')).json(); t0 = Date.now();
+      $('tm-server').textContent = srv.local; $('tm-zone').textContent = '(' + srv.zone + ', UTC' + srv.offset + ')';
+      $('tm-input').value = srv.zone;
+      $('tm-zones').innerHTML = srv.zones.map(z => '<option value="' + z + '">').join('');
+      if (!srv.can_set) { $('tm-save').disabled = $('tm-berlin').disabled = $('tm-input').disabled = true; $('tm-note').textContent = 'Auf diesem System lässt sich die Zeitzone nicht in der App ändern.'; }
+      tick();
+    } catch (e) { $('tm-server').textContent = '–'; }
+  }
+  async function save(name) {
+    try {
+      const r = await fetch('/api/system/timezone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone: name }) });
+      const d = await r.json();
+      if (!r.ok) { $('tm-note').textContent = d.error || 'Fehler'; return; }
+      $('tm-note').textContent = 'Zeitzone gestellt ✓'; savedToast(); load();
+    } catch (e) { $('tm-note').textContent = 'Fehler beim Speichern.'; }
+  }
+  $('tm-save').addEventListener('click', () => save($('tm-input').value.trim()));
+  $('tm-berlin').addEventListener('click', () => save('Europe/Berlin'));
+  setInterval(() => { if (srv) { const mm = srv.offset.match(/([+-])(\d\d)(\d\d)/), o = mm ? (mm[1] === '-' ? -1 : 1) * (+mm[2] * 60 + +mm[3]) : 0, x = new Date(srv.epoch * 1000 + (Date.now() - t0) + o * 60000).toISOString();
+    $('tm-server').textContent = x.slice(8, 10) + '.' + x.slice(5, 7) + '.' + x.slice(0, 4) + ' ' + x.slice(11, 19); } tick(); }, 1000);
+  load();
+})();
 // App-Version & Update
 (async () => {
   try {
@@ -3184,7 +3240,7 @@ const ADMIN_TABS = [
   { id: 'wetter', label: 'Wetter', match: ['Wettervorhersage'] },
   { id: 'meldungen', label: 'Meldungen', match: ['Benachrichtigungen'] },
   { id: 'anzeige', label: 'Dashboard', match: ['Kacheln', 'Diagramme'] },
-  { id: 'system', label: 'System', match: ['App-Version', 'Betrieb'] },
+  { id: 'system', label: 'System', match: ['App-Version', 'Betrieb', 'Uhrzeit'] },
   { id: 'konto', label: 'Konto & Benutzer', match: ['Konto', 'Weitere Benutzer', 'Neuer Benutzer'] },
 ];
 (function initAdminTabs() {
