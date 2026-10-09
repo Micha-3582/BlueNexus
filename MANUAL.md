@@ -354,6 +354,7 @@ Sensoren sind in Regeln als Bedingung nutzbar („WENN Sensor wahr/falsch“ bzw
 
 - **Eingang:** Funk-Sendemodule wie das HM-MOD-EM-8 (z. B. mit Lichtschranke oder Kontakt) erscheinen als Ja/Nein-Sensor **„Eingang“** (TRUE = aktiv).
 - **Wandtaster / Fernbedienung:** Jede Taste liefert die Sensoren **„Taste kurz gedrückt“**, **„Taste lang gedrückt“** und – wenn der Taster es meldet – **„Taste lang losgelassen“**. Ein Tastendruck ist etwa **5 Sekunden lang TRUE** und löst so genau einen Ablauf aus. „Lang gedrückt“ gilt auch, wenn die CCU nur das Halten der Taste meldet (manche Taster senden kein eigenes „lang“).
+- **Klingelsignalsensor (z. B. HmIP-DSD-PCB) und ähnliche Eingangsmodule:** Stellst du den Kanal in der CCU auf **Taster**, kommen nur Tastendrücke (siehe unten, nur mit Push). Stellst du ihn auf **Schalter/Kontakt**, bietet die Suche zusätzlich den Sensor **„Eingang“** an: er zeigt dauerhaft WAHR/FALSCH, braucht **keinen** Push und lässt sich auch in der Anzeige ablesen. Für „Klingel gedrückt → Gong“ ist der Kontakt-Modus der einfachere Weg.
 - Tasten funktionieren **nur mit aktivem Homematic-Push**, denn ein Tastendruck ist ein Ereignis und lässt sich nicht abfragen. Ohne Push steht der Sensor auf „nicht lesbar“. Eine Umkehr-Option gibt es bei Tasten nicht.
 - **Fehlersuche:** Unter *Smart Home → Sonstiges → Homematic: Push von der CCU* zeigt „Letzte Meldungen der CCU (zur Fehlersuche)“, was die CCU zuletzt gemeldet hat (Kanaladresse, Meldung, Wert). Taste drücken, **Aktualisieren** – so sieht man, ob und wie der Druck ankommt.
 

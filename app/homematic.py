@@ -561,7 +561,7 @@ def discover_sensors(known_ids: set[str]) -> list[dict]:
                 if any(h in up for h in hints):
                     kinds.extend(k for k in ks if k not in kinds)
             if up in KEY_CHANNEL_TYPES:
-                kinds.extend(k for k in ("key_short", "key_long", "key_long_release") if k not in kinds)
+                kinds.extend(k for k in ("key_short", "key_long", "key_long_release", "input") if k not in kinds)         # "input" (STATE): nur wenn der Kanal als Schalter/Kontakt (statt Taster) eingestellt ist - dann ist STATE lesbar und braucht keinen Push
             for hints, ks in _SENSOR_DEVICE_HINTS:
                 if any(h in dtype.upper() for h in hints):
                     kinds.extend(k for k in ks if k not in kinds)
