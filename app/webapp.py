@@ -2245,7 +2245,7 @@ def setup_modules():
         _alexa_sync()
         if sel["energy"] and not store.is_configured(cfg):
             return redirect("/setup")
-        if sel["smarthome"] and not isinstance(cfg.get("device_families"), dict):      # Smart Home ohne Energie-Assistent: gleich dorthin, wo die Systeme gewaehlt werden
+        if sel["smarthome"] and not isinstance(cfg.get("device_families"), dict) and cfg.get("welcome_done"):      # Smart Home ohne Energie-Assistent: gleich dorthin, wo die Systeme gewaehlt werden
             return redirect("/smarthome#suchen")
         return redirect("/")
     return render_template("modules.html", mods=store.modules(), error=None)
