@@ -469,7 +469,7 @@ Mehrere Bedingungen lassen sich mit **alle (UND)** oder **eine davon (ODER)** ve
 | **Akkustand** | SOC über/unter einem Wert. |
 | **Sonne morgen (Prognose)** | PV-Prognose für morgen über/unter einem Wert. |
 | **Sensor** | Homematic-/Zigbee-Sensor wahr/falsch bzw. Messwert unter/über. |
-| **Anderes Gerät** | Ein anderes Gerät ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
+| **Meine Aktoren** | Einer deiner Aktoren (Geräte aus der Liste „Meine Aktoren“) ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
 | **Eigener Schalter / Knopf** | Schalter ist an/aus, oder Knopf wurde gedrückt. |
 
 Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die Regel schaltet nicht „ins Blaue“.
