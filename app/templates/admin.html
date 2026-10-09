@@ -2590,14 +2590,15 @@ if (window.IS_ADMIN && window.sortableList) {
     .forEach(([id, url]) => sortableList(id, { url, setActive: id === 'alexa-devs' ? (v => { window.ALEXA_SORTING = v; }) : undefined }));
 }
 /* --- Module (Einstellungen -> System) --- */
+let modsSaved = {};                                                // zuletzt gespeicherter Stand: gefragt wird nur, wenn ein eingeschaltetes Modul ausgeschaltet wird
 async function loadModules() {
   let r; try { r = await (await fetch('/api/modules')).json(); } catch (e) { return; }
-  const m = r.modules || {}; ['energy', 'smarthome', 'verlauf', 'cameras', 'alexa'].forEach(k => { const el = document.getElementById('mod-' + k); if (el) el.checked = !!m[k]; });
+  const m = r.modules || {}; modsSaved = m; ['energy', 'smarthome', 'verlauf', 'cameras', 'alexa'].forEach(k => { const el = document.getElementById('mod-' + k); if (el) el.checked = !!m[k]; });
 }
 document.getElementById('mod-save')?.addEventListener('click', async () => {
   const body = {}; ['energy', 'smarthome', 'verlauf', 'cameras', 'alexa'].forEach(k => { body[k] = document.getElementById('mod-' + k).checked; });
   const msg = document.getElementById('mod-msg');
-  if (!body.energy && !await uiDialog({ title: 'Energie ausschalten?', message: 'Die Ladesteuerung pausiert und es werden keine Energiewerte mehr aufgezeichnet. Alle bisherigen Daten bleiben gespeichert, beim Wiedereinschalten geht es weiter (die Zeit dazwischen fehlt im Verlauf).', okText: 'Ausschalten' })) { loadModules(); return; }
+  if (!body.energy && modsSaved.energy && !await uiDialog({ title: 'Energie ausschalten?', message: 'Die Ladesteuerung pausiert und es werden keine Energiewerte mehr aufgezeichnet. Alle bisherigen Daten bleiben gespeichert, beim Wiedereinschalten geht es weiter (die Zeit dazwischen fehlt im Verlauf).', okText: 'Ausschalten' })) { loadModules(); return; }
   try { await shellyApi('/api/modules', 'POST', body); msg.textContent = 'Gespeichert – Seite wird neu geladen …'; setTimeout(() => location.reload(), 800); }
   catch (e) { msg.textContent = e.message; msg.style.color = '#e5544a'; }
 });
