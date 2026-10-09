@@ -100,7 +100,7 @@
 
 <div id="tab-settings">
 
-<div class="card">
+<div class="card"{% if demo %} style="display:none"{% endif %}>
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>App-Version & Update <span class="qhelp" role="button" tabindex="0" data-help="Holt neue Versionen von GitHub. Einstellungen, Geräte und Verläufe bleiben erhalten – nur der Programmcode wird ersetzt.<ol><li><b>Nach Updates suchen</b> prüft, ob eine neuere Version vorliegt.</li><li><b>Jetzt aktualisieren</b> lädt sie und startet die App neu (als Dienst automatisch, sonst einmal von Hand).</li></ol>">?</span></h2>
   <div class="muted">Installierte Version: <b id="app-version">…</b></div>
   <div id="update-status" style="margin-top:8px"></div>
