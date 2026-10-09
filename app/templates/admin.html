@@ -1110,7 +1110,7 @@ function updateTariffFields() {
 function updateLegacyStrategyCards() {
   const smart = document.getElementById('smart_planner_enabled').checked;
   document.getElementById('legacy-strategy-note').style.display = smart ? '' : 'none';
-  document.querySelectorAll('#legacy-strategy-cards > .card:not(#legacy-strategy-note)').forEach(c => c.hidden = smart);
+  document.querySelectorAll('#legacy-strategy-cards > .card:not(#legacy-strategy-note)').forEach(c => { c.style.display = smart ? 'none' : ''; });      // nicht "hidden": die Reiterleiste setzt hidden bei jedem Reiterwechsel neu und wuerde die Karten wieder einblenden
 }
 document.getElementById('smart_planner_enabled').addEventListener('change', updateLegacyStrategyCards);
 document.querySelectorAll('input[name="tariff_mode"]').forEach(r => r.addEventListener('change', updateTariffFields));
