@@ -92,7 +92,8 @@ class FlowEngine:
             per = [rules.eval_condition(c, ctx) for c in r["when"]["conds"]]
             prev = self.last.get(rid)
             if res is not None:
-                if prev is not None and res != prev:
+                first = prev is None and bool(r.get("run_now"))                  # Option "gleich anwenden": beim Anlegen/Einschalten (noch kein bekannter Wert) sofort starten
+                if (prev is not None and res != prev) or first:
                     branch = "then" if res else "else"
                     steps = r.get(branch) or []
                     cool = int(r.get("cooldown_s") or 0)
@@ -114,7 +115,8 @@ class FlowEngine:
                                  and (ctx.get("virtual") or {}).get(c["id"], {}).get("kind") != "timer"] if (res and not r.get("keep_trigger")) else []        # ein Timer laeuft von selbst ab
                         self.runs.append({"id": uuid.uuid4().hex[:8], "rule_id": rid, "rule": r.get("name", ""), "branch": branch,
                                           "steps": steps, "idx": 0, "due": None, "start": time.time(), "reset": reset})
-                        events.append(("start", r, ("Auslöser: " if res else "Bedingung nicht mehr erfüllt: ") + txt + f" – {'DANN' if res else 'SONST'}-Ablauf startet"))
+                        events.append(("start", r, ("Regel eingeschaltet, Bedingung schon erfüllt: " if first and res else "Regel eingeschaltet, Bedingung nicht erfüllt: " if first
+                                                    else "Auslöser: " if res else "Bedingung nicht mehr erfüllt: ") + txt + f" – {'DANN' if res else 'SONST'}-Ablauf startet" + (" (sofort angewendet)" if first else "")))
                 if prev != res:
                     changed = True
                 self.last[rid] = res

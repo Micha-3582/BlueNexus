@@ -620,6 +620,7 @@ def normalize_rule(body: dict, rule_id: str | None = None) -> dict:
             r["abort_on_fall"] = bool(body.get("abort_on_fall"))
             r["cooldown_s"] = int(_num(body.get("cooldown_s") or 0, 0, 86400, "Sperrzeit (Sekunden)"))       # nach dem Ausloesen so lange keine neue Ausloesung (0 = keine)
             r["keep_trigger"] = bool(body.get("keep_trigger"))           # Standard: ausloesender Schalter geht am Ende des Ablaufs von selbst zurueck
+            r["run_now"] = bool(body.get("run_now"))                     # beim Anlegen/Einschalten gleich anwenden, wenn die Bedingung schon erfuellt (bzw. nicht erfuellt) ist
         compile_rule(r)                                  # prueft die Uebersetzbarkeit (RuleError)
         return r
     on = [normalize_condition(c) for c in (body.get("on") if body.get("on") is not None else body.get("conditions") or [])]
@@ -648,7 +649,7 @@ def update_rule(rule_id: str, body: dict) -> dict | None:
     d = load()
     for i, r in enumerate(d["rules"]):
         if r["id"] == rule_id:
-            merged = {**r, **{k: v for k, v in body.items() if k in ("name", "device_id", "enabled", "on", "off", "when", "then", "else", "mode", "abort_on_fall", "keep_trigger", "cooldown_s", "group")}}
+            merged = {**r, **{k: v for k, v in body.items() if k in ("name", "device_id", "enabled", "on", "off", "when", "then", "else", "mode", "abort_on_fall", "keep_trigger", "run_now", "cooldown_s", "group")}}
             d["rules"][i] = normalize_rule(merged, rule_id)
             _save(d)
             return d["rules"][i]

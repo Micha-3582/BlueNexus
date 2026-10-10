@@ -174,7 +174,7 @@ async function saveAll(auto) {
   const btn = $('btn-save'); btn.disabled = true; saving = true; const v0 = ver, manual = auto !== true;
   const cfg = { rules_enabled: CFG.enabled, rules_dry_run: CFG.dry };
   for (const [k, v] of Object.entries(CFG.settings)) cfg['rules_' + k] = v;
-  const body = { config: cfg, rules: R.map(r => ({ id: String(r.id).startsWith('new-') ? undefined : r.id, name: r.name || '', enabled: r.enabled !== false, keep_enabled: (r.enabled !== false) === r._en0, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, keep_trigger: !!r.keep_trigger, cooldown_s: r.cooldown_s || 0, when: r.when, then: r.then, else: r.else, group: r.group || '' })), groups: GR };
+  const body = { config: cfg, rules: R.map(r => ({ id: String(r.id).startsWith('new-') ? undefined : r.id, name: r.name || '', enabled: r.enabled !== false, keep_enabled: (r.enabled !== false) === r._en0, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, run_now: !!r.run_now, keep_trigger: !!r.keep_trigger, cooldown_s: r.cooldown_s || 0, when: r.when, then: r.then, else: r.else, group: r.group || '' })), groups: GR };
   try {
     await api('/api/automation', 'POST', body);
     if (manual) { savedToast('Gespeichert ✓'); await loadServer(); resetDraft(); EDIT = null; renderAll(); }
@@ -471,7 +471,7 @@ function collectRule(box) {
   const conds = [...box.querySelectorAll('.cond')].map(collectCond), then = acts('then'), other = acts('else');
   let kind = box.querySelector('.r-kind').value;
   if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => c.type === 'virtual' && c.is === 'pressed'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
-  return { name: box.querySelector('.r-name').value, enabled: box.querySelector('.r-en').checked, mode: kind, abort_on_fall: !!(box.querySelector('.r-abort') || {}).checked, keep_trigger: !!box.querySelector('.r-reset') && !box.querySelector('.r-reset').checked, cooldown_s: +((box.querySelector('.r-cool') || {}).value) || 0, when: { mode: mode ? mode.value : 'all', conds }, then, else: other };
+  return { name: box.querySelector('.r-name').value, enabled: box.querySelector('.r-en').checked, mode: kind, abort_on_fall: !!(box.querySelector('.r-abort') || {}).checked, run_now: !!(box.querySelector('.r-runnow') || {}).checked, keep_trigger: !!box.querySelector('.r-reset') && !box.querySelector('.r-reset').checked, cooldown_s: +((box.querySelector('.r-cool') || {}).value) || 0, when: { mode: mode ? mode.value : 'all', conds }, then, else: other };
 }
 const ruleBox = el => el.closest('[data-rule]');
 function syncRule(box) {                          // Entwurf der Regel aus den sichtbaren Feldern neu aufbauen
@@ -577,7 +577,7 @@ function renderWizard() {
     <button class="ghost" style="padding:2px 9px" title="Abbrechen" onclick="wizCancel()">✕</button></div>`;
 }
 const norm = v => Array.isArray(v) ? v.map(norm) : (v && typeof v === 'object') ? Object.fromEntries(Object.keys(v).sort().map(k => [k, norm(v[k])])) : (typeof v === 'string' && v.trim() !== '' && !isNaN(v) ? Number(v) : v);
-const sig = r => JSON.stringify(norm({ enabled: r.enabled !== false, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, when: r.when, then: r.then, else: r.else }));
+const sig = r => JSON.stringify(norm({ enabled: r.enabled !== false, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, run_now: !!r.run_now, when: r.when, then: r.then, else: r.else }));
 function statusHtml(r) {                          // Status gibt es nur fuer die gespeicherte, unveraenderte Regel - waehrend des Bearbeitens steht dort nichts
   if (String(r.id).startsWith('new-')) return '';
   const saved = (S.A.rules || []).find(x => x.id === r.id);
@@ -614,6 +614,7 @@ function ruleHtml(r) {
       <select class="r-group" style="width:auto" onchange="ruleGroupChanged(this)">${optHtml([['', 'Ohne Gruppe'], ...GR.map(g => [escH(g.id), escH(g.name)]), ['__new', '＋ Neue Gruppe …']], gOf(r))}</select></div>
     ${flow && conds.some(c => c.type === 'virtual' && c.is === 'on') ? `<div style="margin-top:8px"><label class="chk"><input type="checkbox" class="r-reset" ${r.keep_trigger ? '' : 'checked'} onchange="ruleEdited(this)"> Am Ende des Ablaufs den auslösenden Schalter ausschalten <span class="qhelp" role="button" tabindex="0" data-help="Ist der Ablauf durchgelaufen, wird der Schalter aus der WENN-Bedingung wieder ausgeschaltet – danach läuft das SONST. Bei vorzeitigem Abbruch ist er ohnehin schon aus.">?</span></label></div>` : ''}
     ${flow ? `<div style="margin-top:8px"><label class="chk"><input type="checkbox" class="r-abort" ${r.abort_on_fall ? 'checked' : ''} onchange="ruleEdited(this)"> Ablauf sofort beenden, wenn die Bedingung wegfällt <span class="qhelp" role="button" tabindex="0" data-help="Läuft der Ablauf noch (z. B. ein Timer) und die Bedingung fällt weg – etwa weil der Schalter wieder ausgeschaltet wird –, wird er sofort beendet. Bei Regeln mit SONST-Schritten passiert das immer.">?</span></label></div>` : ''}
+    ${flow ? `<div style="margin-top:8px"><label class="chk"><input type="checkbox" class="r-runnow" ${r.run_now ? 'checked' : ''} onchange="ruleEdited(this)"> Gleich anwenden, wenn die Regel angelegt oder eingeschaltet wird <span class="qhelp" role="button" tabindex="0" data-help="Normalerweise startet ein Ablauf erst, wenn sich die Bedingung <b>ändert</b>. Legst du die Regel mitten im Zeitfenster an (z. B. „01:30–05:00 Uhr“ um 02:00), passiert deshalb zunächst nichts. Mit dieser Option läuft das DANN (Bedingung erfüllt) bzw. das SONST (nicht erfüllt) sofort einmal, sobald die Regel angelegt oder eingeschaltet wird. Bei einem Neustart der App läuft es nicht noch einmal.">?</span></label></div>` : ''}
     ${flow ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="muted">Sperrzeit nach dem Auslösen <span class="qhelp" role="button" tabindex="0" data-help="Löst die Bedingung nach dem Start gleich noch einmal aus (z. B. eine mehrfach durchfahrene Lichtschranke), wird das innerhalb dieser Zeit ignoriert. 0 = keine Sperre.">?</span></span><input class="r-cool" type="number" min="0" max="86400" step="1" value="${r.cooldown_s || 0}" style="width:92px" oninput="ruleEdited(this)"><span class="muted">Sekunden</span></div>` : ''}
     ${blk('#4c97ff', ['WENN', modeSel], conds.map(c => condRow(c, onMode)).join('') + addCond)}
     ${blk('#35c07a', ['DANN', flow ? '<span class="muted">Schritte nacheinander</span>' : ''], then.map(a => actRow(a, 'then', flow)).join('') + addAct('then', '+ Aktion hinzufügen …'))}
