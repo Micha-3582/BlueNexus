@@ -206,3 +206,15 @@ def vrm_forecast():
     if cons["hours"]:
         data["cons"] = cons
     return data
+
+
+def view_perms(perms: dict) -> dict:
+    """Demo-Konto ohne Schreibrecht: Teilen und Benutzerverwaltung sind lesbar (sonst gaebe es dort in der Demo nichts zu sehen).
+    Gilt nur im Demo-Modus; Schreiben bleibt gesperrt (Server und Browser)."""
+    if not ACTIVE or any(v == "write" for v in (perms or {}).values()):
+        return perms
+    out = dict(perms)
+    for area in ("smarthome_teilen", "user_management"):
+        if out.get(area, "none") == "none":
+            out[area] = "read"
+    return out

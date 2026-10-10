@@ -340,6 +340,13 @@ def activate() -> None:
 
     shelly.status = _device_status
     shelly.set_state = _device_set
+    try:                                                    # Teilen: erfundene Freigaben/Quelle, Angebot der Quelle ohne Netzwerkzugriff
+        import share
+        seed_share()
+        share.source_items = lambda source_id: [dict(x) for x in DEMO_SOURCE_ITEMS]
+    except Exception:                                       # noqa: BLE001 - die Demo muss auch ohne Teilen-Daten starten
+        import logging
+        logging.getLogger("demo_sim").exception("Teilen-Daten konnten nicht angelegt werden")
     homematic._call = _hm_call
     homematic.push_active = lambda: False
 
@@ -415,3 +422,76 @@ def activate() -> None:
                                                        "support": {"md", "people", "vehicle", "dog_cat"}}
     camera.read_motion = lambda sen: False
     camera.device_info = lambda item: {"name": item.get("name", ""), "model": item.get("model", ""), "firmware": "demo"}
+
+
+# ---- Teilen und Benutzer (nur Anzeige in der Demo-Ansicht) -----------------------------------------------------------------
+def _find(items: list, *needles: str):
+    """Erster Eintrag, dessen Name einen der Suchtexte enthaelt (ohne Gross-/Kleinschreibung)."""
+    for n in needles:
+        for it in items:
+            if n.lower() in str(it.get("name") or "").lower():
+                return it
+    return None
+
+
+def seed_share() -> None:
+    """Legt erfundene Freigaben (Personen) und eine erfundene fremde Quelle an, solange es noch keine gibt. Die Schluessel sind Zufallswerte,
+    die nirgends gespeichert werden - /share/v1/* liefert in der Demo also nie etwas."""
+    import secrets
+    import share
+    import shelly
+    import homematic
+    import virtual
+    if share._load(share.SHARES_PATH) or share._load(share.SOURCES_PATH):
+        return
+    devs = [d for d in shelly.load_devices() if d.get("kind") != "remote"]
+    sens = [x for x in homematic.load_sensors() if x.get("source") != "remote"]
+    virt = list(virtual.load())
+
+    def ref(kind, it):
+        return (kind + ":" + it["id"]) if it else None
+
+    def items(*pairs):
+        return [{"ref": r, "mode": m} for r, m in pairs if r]
+
+    now = time.time()
+    k_licht = _find(devs, "Küchenlicht", "Kuechenlicht", "Flurbeleuchtung")
+    k_tuer = _find(devs, "Haustürbeleuchtung", "Haustuerbeleuchtung", "Aussenbeleuchtung")
+    k_huhn = _find(devs, "Hühnerstall", "Huehnerstall")
+    k_garage = _find(devs, "Garagenlampe", "Gartenpumpe")
+    s_fenster = _find(sens, "Küche", "Kueche", "Fenster", "Tür", "Tuer")
+    v_knopf = _find(virt, "Haustüröffner", "Haustueroeffner", "Warmwasser")
+    shares = [
+        {"id": "s-demo0001", "name": "Mama", "icon": "👩", "token_hash": secrets.token_hex(32), "created": now - 21 * 86400, "last_seen": now - 3600 * 5,
+         "items": items((ref("device", k_licht), "control"), (ref("device", k_tuer), "control"), (ref("sensor", s_fenster), "view"))},
+        {"id": "s-demo0002", "name": "Nachbar Tom", "icon": "🧑‍🔧", "token_hash": secrets.token_hex(32), "created": now - 9 * 86400, "last_seen": now - 86400 * 2,
+         "items": items((ref("device", k_huhn), "control"), (ref("device", k_garage), "view"))},
+        {"id": "s-demo0003", "name": "Ferienwohnung", "icon": "🏖️", "token_hash": secrets.token_hex(32), "created": now - 3 * 86400, "last_seen": 0,
+         "items": items((ref("virtual", v_knopf), "control"), (ref("device", k_licht), "view"))},
+    ]
+    share._save(share.SHARES_PATH, shares)
+    share._save(share.SOURCES_PATH, [{"id": "q-demo0001", "name": "Haus von Oma", "url": "https://oma.beispiel.de", "token": "bnx_demo_" + secrets.token_hex(12)}])
+
+
+DEMO_SOURCE_ITEMS = [
+    {"ref": "device:oma-heizung", "type": "device", "name": "Heizungspumpe", "icon": "♨️", "kind": "shelly", "control": True, "already": False},
+    {"ref": "device:oma-licht", "type": "device", "name": "Flurlicht", "icon": "💡", "kind": "shelly", "control": True, "already": False},
+    {"ref": "device:oma-klima", "type": "device", "name": "Klimaanlage Wohnzimmer", "icon": "❄️", "kind": "midea", "control": True, "already": False},
+    {"ref": "sensor:oma-fenster", "type": "sensor", "name": "Fenster Küche", "icon": "🪟", "kind": "contact", "control": False, "already": False},
+    {"ref": "sensor:oma-temp", "type": "sensor", "name": "Temperatur Wohnzimmer", "icon": "🌡️", "kind": "temperature", "control": False, "already": True},
+]
+
+
+def fake_users() -> list:
+    """Erfundene Konten fuer 'Konto & Benutzer' in der Demo-Ansicht (die echten Konten der Instanz bleiben unsichtbar)."""
+    import auth
+    now = time.time()
+    adm = dict(auth.PRESETS["admin"])
+    rows = [
+        ("mara", adm, now - 90 * 86400, now - 3600 * 2, None, True),
+        ("jonas", adm, now - 60 * 86400, now - 86400, None, False),
+        ("paul", auth.PRESETS["smarthome"], now - 40 * 86400, now - 86400 * 3, None, False),
+        ("oma", auth.PRESETS["user"], now - 20 * 86400, now - 86400 * 9, "2027-03-31", False),
+        ("demo", auth.PRESETS["demo"], now - 5 * 86400, now - 600, None, False),
+    ]
+    return [{"username": n, "permissions": dict(p), "created": c, "last_login": l, "expires": e, "owner": o} for n, p, c, l, e, o in rows]

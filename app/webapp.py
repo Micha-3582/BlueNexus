@@ -396,6 +396,7 @@ def _require_login():
     g.user = username
     g.user_display = user["username"]
     g.perms = auth.mask_permissions(auth.normalize_permissions(user.get("permissions")), store.modules())      # Bereiche ausgeschalteter Module: Kein Zugriff
+    g.perms = demo.view_perms(g.perms)                                    # Demo: Teilen und Benutzer lesbar
     g.dashboard_tiles = auth.normalize_tiles(user.get("dashboard_tiles"))     # Admin-Obergrenze
     g.my_tiles = auth.normalize_tiles(user.get("my_tiles"))                   # eigene Wahl ("Meine Ansicht")
     g.my_order = auth.normalize_tile_order(user.get("my_order"))              # eigene Reihenfolge ("Meine Ansicht")
@@ -489,7 +490,7 @@ def inject_role():
     # Schreibzugriffe (siehe base.html). Konto und Benutzerverwaltung bleiben wie sie sind (kein Passwort-/Konten-Aendern in der Demo).
     demo_view = demo.ACTIVE and not any(v == "write" for v in perms.values())
     if demo_view:
-        perms = {k: ("write" if v == "read" and k not in ("account", "user_management") else v) for k, v in perms.items()}
+        perms = {k: ("write" if v == "read" and k != "account" else v) for k, v in perms.items()}
     settings_areas = [a for a in auth.AREA_IDS if a.startswith("settings_")]
     can_save_settings = any(perms.get(a) == "write" for a in settings_areas)
     tabs = _smarthome_tabs(perms)
@@ -1041,7 +1042,7 @@ def api_users():
     Einschraenkung, welche Dashboard-Kacheln dieses Konto zusaetzlich zur globalen Einstellung sieht."""
     if request.method == "GET":
         mods = store.modules()
-        return jsonify(users=[_user_out(u) for u in users.list()], areas=auth.visible_areas(mods), presets={k: v for k, v in auth.PRESETS.items() if k != "admin"},
+        return jsonify(users=[_user_out(u) for u in (demo_sim.fake_users() if demo.ACTIVE else users.list())], areas=auth.visible_areas(mods), presets={k: v for k, v in auth.PRESETS.items() if k != "admin"},
                        groups=auth.visible_groups(mods), preset_labels={k: v for k, v in auth.PRESET_LABELS.items() if k != "admin"}, dashboard_tiles=auth.visible_tiles(mods),
                        global_order=auth.normalize_tile_order([k for k in (store.load_config().get("tile_order") or []) if isinstance(k, str)]) or auth.DASHBOARD_TILE_KEYS)
     body = request.json or {}
@@ -3169,7 +3170,7 @@ def _visible(item: dict) -> bool:
 
 def _admin_only():
     """None = ok (Administrator). Sonst 403: Geraete benennen, aendern, entfernen, anlegen duerfen nur Administratoren; Bedienen darf jeder mit Dashboard-Recht."""
-    if auth.is_full_admin(g.perms):
+    if auth.is_full_admin(g.perms) or (demo.ACTIVE and request.method == "GET"):      # Demo: nur Lesen der erfundenen Daten
         return None
     return jsonify(error="Das darf nur ein Administrator: Geräte anlegen, umbenennen, ändern oder entfernen. Bedienen (schalten/drücken) geht trotzdem."), 403
 
@@ -4777,7 +4778,7 @@ def api_source_delete(sid):
 
 @app.route("/api/sources/<sid>/items", methods=["GET"])
 def api_source_items(sid):
-    denied = _check_area("smarthome_teilen", "write")             # holt Daten von der anderen Anlage = Teil des Einrichtens
+    denied = None if demo.ACTIVE else _check_area("smarthome_teilen", "write")             # holt Daten von der anderen Anlage = Teil des Einrichtens (Demo: erfundenes Angebot)
     if denied:
         return denied
     try:
