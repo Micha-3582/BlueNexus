@@ -477,6 +477,10 @@ function askPin(title) {
   document.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && blocked(e)) { e.preventDefault(); e.stopPropagation(); toast(); }
   }, true);
+  /* Demo: Tags nie wirklich beschreiben (die Demo-Adresse ist oeffentlich) - auf dem Handy erscheint nur der Hinweis */
+  window.addEventListener('load', function () {
+    if (typeof window.nfcWrite === 'function' && !window.__nfcAllow) window.nfcWrite = function () { toast(); };
+  });
   /* Technische Absagemeldungen der Seiten durch den Demo-Hinweis ersetzen */
   new MutationObserver(function () {
     var t = document.getElementById('app-toast');
