@@ -630,6 +630,8 @@ Klimaanlagen, die du mit der App **NetHome Plus** bedienst (auch Comfee, Invento
 
 Die App meldet sich aufs Handy, wenn etwas nicht stimmt – und wenn es wieder in Ordnung ist. Gemeldet wird nur bei einem **Wechsel**, nicht bei jedem Durchlauf. Jede Meldung beginnt mit dem Namen der Anlage.
 
+*Einstellungen → Meldungen* hat drei getrennte Karten: **Telegram** (Bot und Empfänger), **Pushover** (zweiter Meldeweg) und **Meldungen – was soll gemeldet werden?** (welche Ereignisse über beide Wege kommen, Anlagenname, Akku-Schwelle, Tageszusammenfassung).
+
 **Einrichten (einmalig, ca. 2 Minuten):**
 
 1. In Telegram **@BotFather** öffnen → `/newbot` → Namen vergeben → **Token** kopieren und eintragen.

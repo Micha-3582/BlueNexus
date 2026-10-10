@@ -512,8 +512,8 @@
 </div>
 
 <div class="card" id="notify-admin">
-  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Benachrichtigungen (Telegram) <span class="qhelp" role="button" tabindex="0" data-help="Gemeldet wird nur bei einem <b>Wechsel</b>, nicht bei jedem Durchlauf. Jede Meldung beginnt auf Wunsch mit dem Anlagennamen.">?</span></h2>
-  <div class="sub">Meldungen aufs Handy bei Störungen und Entwarnung.</div>
+  <h2><svg class="h2i" style="color:#2AABEE" viewBox="0 0 24 24"><path d="M21.5 3.5 2.8 10.7c-.9.4-.9 1.2-.2 1.4l4.8 1.5 1.8 5.6c.2.6.9.7 1.3.3l2.7-2.5 4.9 3.6c.8.5 1.5.2 1.7-.8l3-14.2c.3-1.2-.4-1.8-1.3-1.5z"/><path d="m8 13.6 9.6-6.1"/></svg>Telegram <span class="qhelp" role="button" tabindex="0" data-help="Telegram-Bot einrichten und freigegebene Empfänger verwalten. Dieselben Empfänger können dem Bot auch Befehle (Triggerwörter) schreiben, die in Regeln Aktionen auslösen – siehe Handbuch, Kapitel 13 und 13a.">?</span></h2>
+  <div class="sub">Bot, Empfänger und Befehle per Telegram.</div>
   <div id="notify-setup" class="sub" style="margin:0 0 12px">Anleitung zur Einrichtung <span class="qhelp" role="button" tabindex="0" data-help="<ol><li>In Telegram <b>@BotFather</b> öffnen, <code>/newbot</code> senden, Namen vergeben und den <b>Token</b> kopieren.</li><li>Den neuen Bot öffnen und ihm eine beliebige Nachricht schreiben. Für eine Gruppe: Bot hinzufügen und dort schreiben.</li><li>Unten den Token einfügen, <b>Chat-ID ermitteln</b> anklicken und den Treffer wählen. Dann <b>Speichern</b> und <b>Test senden</b>.</li></ol>">?</span></div>
   <div class="grid2">
     <div><label>Bot-Token <span class="qhelp" role="button" tabindex="0" data-help="Token deines Telegram-Bots, den dir @BotFather bei /newbot nennt. Damit sendet die Steuerung die Meldungen. Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="nt-token" type="password" autocomplete="new-password" placeholder="123456:ABC…"><button type="button" class="pw-toggle" data-for="nt-token" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
@@ -535,8 +535,11 @@
     <div style="margin-top:10px"><button id="nt-add" class="ghost" type="button">+ Empfänger hinzufügen</button></div>
     <div id="nt-add-found" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></div>
   </div>
-  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px" id="pushover-admin">
-    <b>Pushover</b> <span class="qhelp" role="button" tabindex="0" data-help="Zusätzlicher Meldeweg neben Telegram – mit Priorität, Ton und Kamerabild. Jede Person braucht ein eigenes Pushover-Konto.">?</span>
+</div>
+
+<div class="card" id="pushover-admin">
+  <h2><svg class="h2i" style="color:#F5A623" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M9.5 17V7.5h3.2a2.9 2.9 0 0 1 0 5.8H9.5"/></svg>Pushover <span class="qhelp" role="button" tabindex="0" data-help="Zusätzlicher Meldeweg neben Telegram – mit Priorität, Ton und Kamerabild. Jede Person braucht ein eigenes Pushover-Konto.">?</span></h2>
+  <div class="sub">Zweiter Meldeweg mit Priorität, Ton und Kamerabild.</div>
     <div id="po-setup" class="sub" style="margin:6px 0 8px">Anleitung zur Einrichtung <span class="qhelp" role="button" tabindex="0" data-help="<ol><li>Konto auf <b>pushover.net</b> anlegen und die Pushover-App installieren (nach der Testzeit einmalig ca. 5 $ je Plattform).</li><li>Unter „Create an Application/API Token“ eine Anwendung anlegen (z. B. „BlueNexus“) und den <b>API-Token</b> kopieren.</li><li>Token hier einfügen und speichern. Dann je Person den <b>User Key</b> (oben auf pushover.net bzw. in der App) mit einem Namen eintragen.</li></ol>">?</span></div>
     <div class="grid2" style="margin-top:8px">
       <div><label>App-Token <span class="qhelp" role="button" tabindex="0" data-help="API-Token deiner Pushover-Anwendung (30 Zeichen). Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="po-token" type="password" autocomplete="new-password" placeholder="30 Zeichen"><button type="button" class="pw-toggle" data-for="po-token" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
@@ -553,7 +556,11 @@
     </div>
     <div style="margin-top:10px"><button id="po-add" class="ghost" type="button">+ Empfänger hinzufügen</button></div>
   </div>
-  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+</div>
+
+<div class="card" id="notify-events-card">
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Meldungen – was soll gemeldet werden? <span class="qhelp" role="button" tabindex="0" data-help="Gemeldet wird nur bei einem <b>Wechsel</b>, nicht bei jedem Durchlauf. Jede Meldung beginnt auf Wunsch mit dem Anlagennamen.">?</span></h2>
+  <div class="sub">Welche Ereignisse aufs Handy gemeldet werden – über Telegram und Pushover.</div>
     <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="nt-prefix"> Anlagenname vor jede Nachricht setzen <span class="qhelp" role="button" tabindex="0" data-help="Beispiel: „[Michaels BlueNexus] …“. Sinnvoll, wenn mehrere Anlagen im selben Chat schreiben.">?</span></label><br>
     <b>Was soll gemeldet werden?</b>
     <div id="nt-events" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
@@ -3554,7 +3561,7 @@ const ADMIN_TABS = [
   { id: 'vrm', label: 'VRM', match: ['Victron VRM'] },
   { id: 'automatik', label: 'Automatik', href: '/automation', area: 'automation', match: [] },
   { id: 'wetter', label: 'Wetter', match: ['Wettervorhersage'] },
-  { id: 'meldungen', label: 'Meldungen', match: ['Benachrichtigungen'] },
+  { id: 'meldungen', label: 'Meldungen', match: ['Benachrichtigungen', 'Telegram', 'Pushover', 'Meldungen'] },
   { id: 'anzeige', label: 'Dashboard', match: ['Kacheln', 'Diagramme'] },
   { id: 'system', label: 'System', match: ['App-Version', 'Betrieb', 'Uhrzeit', 'Testmodus'] },
   { id: 'konto', label: 'Konto & Benutzer', match: ['Konto', 'Weitere Benutzer', 'Neuer Benutzer'] },
@@ -3566,7 +3573,7 @@ const ADMIN_TABS = [
     ['Diagramme', 'blue'], ['Darstellung', 'timer'], ['Meine Ansicht', 'plan'],
     ['Victron Cerbo', 'accent-t'], ['Ladesteuerung', 'green'], ['Anlage', 'green'], ['Batterie-Watchdog', 'exp'], ['Periodische Vollladung', 'accent-t'], ['Netz-Z', 'normal'],
     ['Stromtarif', 'timer'], ['Laden aus dem Netz', 'green'], ['Vertragskosten', 'exp'], ['PV-Prognose', 'timer'], ['Intelligente Planung', 'plan'], ['Peak-Schutz', 'red'], ['SOC-Strategie', 'blue'],
-    ['Victron VRM \u2013 Zugang', 'accent-t'], ['Victron VRM \u2013 Verlauf', 'green'], ['Wettervorhersage', 'blue'], ['Benachrichtigungen', 'exp'],
+    ['Victron VRM \u2013 Zugang', 'accent-t'], ['Victron VRM \u2013 Verlauf', 'green'], ['Wettervorhersage', 'blue'], ['Benachrichtigungen', 'exp'], ['Meldungen –', 'exp'],
     ['Konto', 'accent-t'], ['Weitere Benutzer', 'plan'], ['Neuer Benutzer', 'green'], ['Betriebsbericht', 'green'],
   ];
   document.querySelectorAll('.card h2').forEach(h => {
