@@ -42,8 +42,8 @@ AREAS = [
      "Der Reiter Regeln (Wenn/Dann-Schaltungen und Abläufe). Achtung: Regeln schalten auch PIN-geschützte Geräte ohne PIN-Abfrage – „Schreiben“ nur an vertrauenswürdige Konten."),
     ("smarthome_einrichten", "Smart Home: Geräte suchen & einrichten",
      "Die Reiter Geräte suchen, Alexa (falls das Modul an ist) und Sonstiges: Systeme auswählen, Geräte suchen/hinzufügen, Zugangsdaten (CCU, Tuya, Zigbee), Homematic-Push und Alexa-Status; Freigaben für Alexa legt nur ein Administrator an. Zugangsdaten und Geräte-IP-Adressen sind nur bei „Schreiben“ im Klartext sichtbar."),
-    ("smarthome_teilen", "Smart Home: Teilen",
-     "Der Reiter Teilen: Personen/Anlagen, mit denen Geräte geteilt werden, und die Fremden Quellen ansehen. Schreiben = Personen anlegen, Einladungscodes erzeugen, Freigaben und Quellen ändern und löschen. Wer hier „Schreiben“ hat, kann Zugang zu den Geräten dieser Anlage vergeben – nur vertrauenswürdigen Konten geben. „Lesen“ zeigt nur die Liste, nichts davon lässt sich ändern. Die geteilten Geräte selbst bedienen (z. B. eine geholte Klimaanlage) darf, wer die Geräte bedienen darf (Aktoren/Dashboard)."),
+    ("smarthome_teilen", "Smart Home: Teilen (Fremde Quellen)",
+     "Der Reiter Teilen: die Fremden Quellen ansehen. Schreiben = Einladungscodes anderer Anlagen einfügen, Quellen verbinden/löschen und Geräte von dort holen. „Lesen“ zeigt nur die Liste. Das Vergeben von Zugang an andere (Personen anlegen, Einladungscodes erzeugen, Geräte freigeben) darf immer nur ein Administrator. Die geholten Geräte bedienen darf, wer Geräte bedienen darf (Aktoren/Dashboard)."),
     ("smarthome_nfc", "Smart Home: NFC-Tags",
      "Der Reiter NFC-Tags: Tags, registrierte Handys und Freigaben ansehen. Die Adressen der Tags (damit kann ein Tag beschrieben werden) und die Adresse der Zentrale sind nur bei „Schreiben“ sichtbar. Schreiben = Tags anlegen/umbenennen/löschen, Handys registrieren und Freigaben ändern."),
     # --- Menue "Einstellungen"

@@ -404,6 +404,35 @@ def add_source(name: str, url: str, token: str) -> dict:
     return _src_public(s)
 
 
+def migrate_imports() -> int:
+    """Frueher geholte Eintraege waren nur fuer Administratoren sichtbar (users=[]) und nicht auf dem Dashboard. Einmalig auf den neuen Standard
+    (alle Benutzer der Anlage, Dashboard) stellen; spaeter vom Administrator gesetzte Einschraenkungen bleiben (Kennzeichen vis2)."""
+    import homematic
+    import shelly
+    n = 0
+    devs = shelly.load_devices()
+    for d in devs:
+        if d.get("kind") == "remote" and not d.get("vis2"):
+            d["vis2"] = True
+            if d.get("users") == []:
+                d.pop("users", None)
+                d["show"] = True
+            n += 1
+    if n:
+        shelly._save(devs)
+    sens, m = homematic.load_sensors(), 0
+    for s in sens:
+        if s.get("source") == "remote" and not s.get("vis2"):
+            s["vis2"] = True
+            if s.get("users") == []:
+                s.pop("users", None)
+                s["show"] = True
+            m += 1
+    if m:
+        homematic._save_sensors(sens)
+    return n + m
+
+
 def imported_ids(source_id: str) -> tuple[list[str], list[str]]:
     import homematic
     import shelly
@@ -461,6 +490,7 @@ def source_items(source_id: str) -> list[dict]:
     items, err = fetch(source_id, force=True)
     if items is None:
         raise ShareError(err or "Quelle nicht erreichbar", 502)
+    migrate_imports()
     have_d, have_s = imported_ids(source_id)
     have = set(have_d) | set(have_s)
     return [{"ref": x["ref"], "type": x.get("type"), "name": x.get("name"), "icon": x.get("icon"), "kind": x.get("kind"), "control": bool(x.get("control")),
@@ -494,12 +524,12 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         if x.get("type") == "sensor":
             new_s.append({"id": lid, "kind": x.get("kind") or "", "source": "remote", "src": source_id, "rref": ref, "address": ref, "interface": "remote", "datapoint": "",
                           "unit": x.get("unit") or "", "binary": bool(x.get("binary")), "model": model, "room": x.get("room") or "", "name": x.get("name") or ref,
-                          "icon": x.get("icon") or "📟", "show": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
+                          "icon": x.get("icon") or "📟", "show": True, "vis2": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
         else:
             rkind = ("virtual-" + str(x.get("kind"))) if x.get("type") == "virtual" else (x.get("kind") or "shelly")
             new_d.append({"id": lid, "kind": "remote", "source": source_id, "rref": ref, "rkind": rkind, "gen": 0, "channel": 0, "model": model,
                           "name": x.get("name") or ref, "icon": x.get("icon") or "🔌", "room": "", "switchable": bool(x.get("control")),
-                          "show": True, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5})
+                          "show": True, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "vis2": True})
         have.add(lid)
     if new_d:
         shelly._save(devs + new_d)

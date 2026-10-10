@@ -4692,8 +4692,9 @@ def _share_err(e):
 
 @app.route("/api/shares", methods=["GET", "POST"])
 def api_shares():
-    if request.method == "GET" and not auth.has_level(_perms(), "smarthome_teilen", "write"):
-        return jsonify(shares=share.list_shares(), shareable=[])           # Lesen: nur die Liste, keine Auswahl zum Teilen
+    denied = _admin_only()                                    # Freigaben (Einladungscodes) vergeben darf nur ein Administrator
+    if denied:
+        return denied
     if request.method == "GET":
         return jsonify(shares=share.list_shares(), shareable=share.shareable())
     b = request.get_json(silent=True) or {}
@@ -4706,6 +4707,9 @@ def api_shares():
 
 @app.route("/api/shares/<sid>", methods=["PATCH", "DELETE"])
 def api_share_modify(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
     if request.method == "DELETE":
         return jsonify(ok=True) if share.remove(sid) else (jsonify(error="nicht gefunden"), 404)
     b = request.get_json(silent=True) or {}
@@ -4718,6 +4722,9 @@ def api_share_modify(sid):
 
 @app.route("/api/share-item", methods=["POST"])
 def api_share_item():
+    denied = _admin_only()
+    if denied:
+        return denied
     """Einen einzelnen Eintrag fuer bestimmte Freigaben teilen / nicht mehr teilen (Teilen-Knopf am Stift-Symbol)."""
     b = request.get_json(silent=True) or {}
     try:
@@ -4728,6 +4735,9 @@ def api_share_item():
 
 @app.route("/api/shares/<sid>/token", methods=["POST"])
 def api_share_token(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
     try:
         token = share.regenerate(sid)
     except share.ShareError as e:
@@ -4782,6 +4792,12 @@ def api_source_import(sid):
     except share.ShareError as e:
         return _share_err(e)
     return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]))
+
+
+try:
+    share.migrate_imports()                                   # frueher geholte Eintraege fuer alle Benutzer sichtbar machen (einmalig)
+except Exception as _e:                                        # noqa: BLE001
+    log.warning("Teilen: Altbestand nicht umgestellt: %s", _e)
 
 
 @app.route("/api/homematic/locks", methods=["GET"])

@@ -820,7 +820,7 @@
     </details>
 </div>
 
-<div class="card msg-host" id="share-give" data-tab="teilen" data-area="smarthome_teilen">
+<div class="card msg-host admin-only" id="share-give" data-tab="teilen" data-area="smarthome_teilen">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Teilen mit anderen (Personen) <span class="qhelp" role="button" tabindex="0" data-help="Lege hier eine Person bzw. Anlage an (z. B. deine Mutter im selben Haus). Sie bekommt einen Zugangsschlüssel und sieht danach nur, was du ihr freigibst. Freigeben tust du bei jedem Gerät, Sensor oder Schalter selbst: ✎ drücken und das Teilen-Symbol wählen. Befehle (z. B. Klimaanlage einschalten) führt dein System mit deinen Zugangsdaten aus – bei Cloud-Geräten wie der Klimaanlage muss sich also niemand ein zweites Mal anmelden. Das andere System muss deines erreichen können: über deine Tunnel-Adresse oder, wenn ihr im selben Netz seid, über die lokale Adresse.">?</span></h2>
   <div class="sub">Wer bekommt Zugang? Was geteilt wird, legst du pro Gerät über ✎ → Teilen-Symbol fest.</div>
   <div id="shares-list" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -1410,7 +1410,7 @@ const AREA_HINT = {          // kurze, sichtbare Zusatzzeile je Bereich (die Lan
   smarthome_sicherheit: ['Türschlösser ansehen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
   rules: ['⚠ Regeln schalten auch PIN-Geräte ohne PIN – nur vertrauten Konten „Schreiben“ geben', true],
   smarthome_einrichten: ['Geräte suchen, Zugangsdaten (CCU, Tuya, Zigbee), Push'],
-  smarthome_teilen: ['⚠ Schreiben = Zugang zu Geräten dieser Anlage vergeben (Einladungscodes) – nur vertrauten Konten. Lesen = nur ansehen'],
+  smarthome_teilen: ['Fremde Quellen: Schreiben = Einladungscode einfügen, Geräte holen. Zugang vergeben (Codes erzeugen) nur Admin'],
   smarthome_nfc: ['Ansehen ohne Adressen. Schreiben = Tags und Handys verwalten, Adressen sichtbar'],
   user_management: ['Mindestens ein Zugang muss „Schreiben“ behalten'],
 };
@@ -2500,7 +2500,7 @@ async function sourceItems(id, keep) {
 }
 async function sourceImport(id) {
   const p = document.getElementById('srcp-' + id), refs = [...p.querySelectorAll('.src-cb')].filter(c => c.checked && !c.disabled).map(c => c.dataset.ref);
-  if (!refs.length) return;
+  if (!refs.length) { savedToast('Nichts Neues ausgewählt'); return; }
   try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { alert(e.message); }
 }
 async function sourceDelete(id) {
