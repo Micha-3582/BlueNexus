@@ -1560,7 +1560,7 @@ async function loadUsers() {
     }));
     const saveTimers = {};                                  // Rechte und Dashboard-Kacheln: jede Aenderung wird nach kurzer Pause automatisch gespeichert
     body.querySelectorAll('.u-isadmin').forEach(el => el.addEventListener('change', async () => {          // Administrator an/aus: sofort speichern, Liste neu laden
-      if (el.checked && !confirm(`„${el.dataset.u}“ zum Administrator machen? Ein Administrator darf alles, auch Benutzer verwalten und Zugang teilen.`)) { el.checked = false; return; }
+      if (el.checked && !await uiDialog({ title: 'Zum Administrator machen?', message: `„${el.dataset.u}“ wird Administrator. Ein Administrator darf alles, auch Benutzer verwalten und Zugang teilen.`, okText: 'Administrator machen' })) { el.checked = false; return; }
       if (!await patchUser(el.dataset.u, { admin: el.checked })) return;
       const open = el.dataset.u; await loadUsers();
       const row = body.querySelector(`.u-editrow[data-u="${CSS.escape(open)}"]`); if (row) row.style.display = '';
@@ -1587,7 +1587,7 @@ async function loadUsers() {
       patchUser(el.dataset.u, { password: pw });
     }));
     body.querySelectorAll('.u-del').forEach(el => el.addEventListener('click', async () => {
-      if (!confirm(`Benutzer „${el.dataset.u}“ wirklich löschen?`)) return;
+      if (!await uiDialog({ title: 'Benutzer löschen?', message: `„${el.dataset.u}“ wird gelöscht und kann sich nicht mehr anmelden.`, okText: 'Löschen' })) return;
       try {
         const r2 = await fetch('/api/users/' + encodeURIComponent(el.dataset.u), { method: 'DELETE' });
         const d2 = await r2.json();
@@ -1671,6 +1671,7 @@ async function inUseBlock(kind, id, what) {
 }
 
 /* Eigener Dialog im App-Design (statt Browser-prompt/confirm) */
+const uiAlert = msg => uiDialog({ title: 'Hinweis', message: String(msg || 'Fehler'), info: true, okText: 'OK' });
 function uiDialog({ title, message, html, info, label, value = '', type = 'text', okText = 'OK' }) {      // html: feste, eigene Formatierung (nie Benutzereingaben); info: nur ein Knopf
   return new Promise(resolve => {
     const ov = document.createElement('div');
@@ -2421,18 +2422,18 @@ function shareIconPick(id) {
   box.style.display = 'flex';
 }
 async function shareSetIcon(id, icon) {
-  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'PATCH', { icon }); savedToast(); } catch (e) { alert(e.message); }
+  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'PATCH', { icon }); savedToast(); } catch (e) { uiAlert(e.message); }
   loadShares();
 }
 function shareToggle(id) { if (SHARE_OPEN.has(id)) SHARE_OPEN.delete(id); else SHARE_OPEN.add(id); loadShares(); }
 async function shareSetMode(sid, ref, mode) {
-  try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: mode } }); savedToast(); } catch (e) { alert(e.message); }
+  try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: mode } }); savedToast(); } catch (e) { uiAlert(e.message); }
   loadShares();
 }
 async function shareStop(sid, ref) {
   const c = SHARE_CAT.find(x => x.ref === ref), sh = SHARE_LIST.find(x => x.id === sid);
   if (!await uiDialog({ title: 'Teilen beenden?', message: `„${c ? c.name : ref}“ wird für ${sh ? sh.name : 'diese Person'} nicht mehr geteilt. Bei dir bleibt das Gerät unverändert.`, okText: 'Teilen beenden' })) return;
-  try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: null } }); savedToast('Nicht mehr geteilt ✓'); } catch (e) { alert(e.message); }
+  try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: null } }); savedToast('Nicht mehr geteilt ✓'); } catch (e) { uiAlert(e.message); }
   loadShares();
 }
 function sharePickDialog(shares, cur, viewOnly, title) {                       // -> undefined (abgebrochen) | {freigabe-id: 'view' | 'control' | null}
@@ -2467,7 +2468,7 @@ async function pickShare(kind, id) {
   const ref = shareRef(kind, id), cur = Object.fromEntries((SHARE_MAP[ref] || []).map(x => [x.id, x.mode]));
   const res = await sharePickDialog(SHARE_LIST, cur, kind === 'sensor', 'Teilen');
   if (res === undefined) return;
-  try { await shellyApi('/api/share-item', 'POST', { ref, shares: res }); savedToast(Object.values(res).some(Boolean) ? 'Geteilt ✓' : 'Nicht mehr geteilt ✓'); } catch (e) { shellyMsg(e.message, true); alert(e.message); }
+  try { await shellyApi('/api/share-item', 'POST', { ref, shares: res }); savedToast(Object.values(res).some(Boolean) ? 'Geteilt ✓' : 'Nicht mehr geteilt ✓'); } catch (e) { shellyMsg(e.message, true); uiAlert(e.message); }
   loadShares();
 }
 async function shareShowKey(name, j) {            // j: Antwort mit invite (Einladungscode) und token
@@ -2478,16 +2479,16 @@ async function shareShowKey(name, j) {            // j: Antwort mit invite (Einl
 async function shareToken(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
   if (!await uiDialog({ title: 'Neuen Schlüssel erzeugen?', message: `Der alte Schlüssel von „${s.name}“ gilt danach nicht mehr – ${s.name} muss den neuen eintragen.`, okText: 'Neu erzeugen' })) return;
-  try { const j = await shellyApi('/api/shares/' + encodeURIComponent(id) + '/token', 'POST', { origin: location.origin }); await shareShowKey(s.name, j); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/shares/' + encodeURIComponent(id) + '/token', 'POST', { origin: location.origin }); await shareShowKey(s.name, j); } catch (e) { uiAlert(e.message); }
 }
 async function shareDelete(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
   if (!await uiDialog({ title: 'Person löschen?', message: `„${s.name}“ sieht und bedient danach nichts mehr von dir.`, okText: 'Löschen' })) return;
-  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'DELETE'); savedToast('Gelöscht ✓'); loadShares(); } catch (e) { alert(e.message); }
+  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'DELETE'); savedToast('Gelöscht ✓'); loadShares(); } catch (e) { uiAlert(e.message); }
 }
 document.getElementById('share-add')?.addEventListener('click', async () => {
   const el = document.getElementById('share-name'), name = el.value.trim(); if (!name) { el.focus(); return; }
-  try { const j = await shellyApi('/api/shares', 'POST', { name, origin: location.origin }); el.value = ''; await loadShares(); await shareShowKey(j.share.name, j); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/shares', 'POST', { name, origin: location.origin }); el.value = ''; await loadShares(); await shareShowKey(j.share.name, j); } catch (e) { uiAlert(e.message); }
 });
 async function loadSources() {
   const box = document.getElementById('sources-list'); if (!box) return;
@@ -2517,11 +2518,11 @@ async function sourceItems(id, keep) {
 async function sourceImport(id) {
   const p = document.getElementById('srcp-' + id), refs = [...p.querySelectorAll('.src-cb')].filter(c => c.checked && !c.disabled).map(c => c.dataset.ref);
   if (!refs.length) { savedToast('Nichts Neues ausgewählt'); return; }
-  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { uiAlert(e.message); }
 }
 async function sourceDelete(id) {
   if (!await uiDialog({ title: 'Quelle entfernen?', message: 'Alle von dort geholten Geräte und Sensoren verschwinden aus deiner Anlage.', okText: 'Entfernen' })) return;
-  try { await shellyApi('/api/sources/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadSources(); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { alert(e.message); }
+  try { await shellyApi('/api/sources/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadSources(); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { uiAlert(e.message); }
 }
 document.getElementById('src-add')?.addEventListener('click', async () => {
   const v = id => document.getElementById(id);
@@ -2529,7 +2530,7 @@ document.getElementById('src-add')?.addEventListener('click', async () => {
     const code = v('src-invite').value.trim();
     await shellyApi('/api/sources', 'POST', code ? { invite: code, name: v('src-name').value } : { name: v('src-name').value, url: v('src-url').value, token: v('src-token').value });
     v('src-invite').value = v('src-name').value = v('src-url').value = v('src-token').value = ''; savedToast('Verbunden ✓'); loadSources();
-  } catch (e) { alert(e.message); }
+  } catch (e) { uiAlert(e.message); }
 });
 loadShares(); loadSources();
 loadWolAdmin(true).then(() => loadWolAdmin()); if (window.PAGE_MODE === 'smarthome') setInterval(() => { if (!openEdits('wedit-').length) loadWolAdmin(); }, 20000);
@@ -2966,7 +2967,7 @@ async function loadZigbeeInfo() {
   box.querySelectorAll('[data-zb-edit]').forEach(b => b.addEventListener('click', () => zbFillForm(gws.find(g => g.id === b.dataset.zbEdit))));
   box.querySelectorAll('[data-zb-del]').forEach(b => b.addEventListener('click', async () => {
     const g = gws.find(x => x.id === b.dataset.zbDel);
-    if (!confirm(`Gateway „${g.name || g.id}“ entfernen? Es werden keine Geräte gelöscht – das geht nur, wenn nichts mehr daran hängt.`)) return;
+    if (!await uiDialog({ title: 'Gateway entfernen?', message: `Gateway „${g.name || g.id}“ entfernen? Es werden keine Geräte gelöscht – das geht nur, wenn nichts mehr daran hängt.`, okText: 'Entfernen' })) return;
     try { await shellyApi('/api/zigbee/gateways/' + encodeURIComponent(g.id), 'DELETE'); shellyMsg('Gateway entfernt.'); if (zbEditId === g.id) zbFillForm(null); loadZigbeeInfo(); }
     catch (err) { shellyMsg(err.message, true); }
   }));
@@ -3380,7 +3381,7 @@ async function ntRecipientSystem(id, btn) {
   try { await shellyApi('/api/notify/recipient/' + encodeURIComponent(id), 'PATCH', { system: on }); savedToast(); ntLoad(); } catch (e) { ntMsg(e.message, true); ntLoad(); }
 }
 async function ntRecipientRemove(id) {
-  if (!confirm('Empfänger entfernen? Regeln, in denen nur er gewählt war, senden dann an die Standard-Empfänger.')) return;
+  if (!await uiDialog({ title: 'Empfänger entfernen?', message: 'Regeln, in denen nur er gewählt war, senden dann an die Standard-Empfänger.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/notify/recipient/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); ntLoad(); } catch (e) { ntMsg(e.message, true); }
 }
 document.getElementById('nt-add').addEventListener('click', async () => {
