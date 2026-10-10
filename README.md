@@ -139,7 +139,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 - **Türschlösser (HomematicIP und das klassische Keymatic):** öffnen, entriegeln, verriegeln – mit PIN und eigener Freigabe, ob Regeln öffnen dürfen.
 - **Homematic-Funk-Diagnose:** Duty Cycle der Funkmodule, gesprächigste Geräte, Befehle der App – plus ein Test „Homematic pausieren“, um den Verursacher von Funklast zu finden.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
-- **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel.
+- **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel. Tags lassen sich am Android-Handy (Chrome) direkt aus der App beschreiben; auf iPhone und PC weist die App auf die Einschränkung hin.
 - **Geräte teilen:** Person anlegen → ein Einladungscode (Adresse + Schlüssel in einem) wird verschickt und beim anderen BlueNexus in einem Feld eingefügt (Tunnel oder LAN), dann jedes Gerät einzeln über ✎ → Teilen-Symbol freigeben (nur sehen oder bedienen). Der Empfänger sieht und bedient die gewählten Geräte, Sensoren, Schalter und die Klimaanlage wie eigene und nutzt sie in Regeln; Cloud-Logins (z. B. Medea) bleiben beim Geber.
 - **Klingel:** Reolink-Türklingel als Auslöser („Klingel gedrückt“) – zum Beispiel für einen Gong im Haus.
 - **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen; als Regel-Schritt „Chime läuten“ löst er auch automatisch einen Gong aus.
