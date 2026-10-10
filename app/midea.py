@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
+import json
 import logging
+import os
 import threading
 import time
 
@@ -437,7 +440,114 @@ def _cloud_explain(e: Exception) -> str:
 
 
 LOGIN_BACKOFF_S = 300.0                                     # nach fehlgeschlagener Anmeldung so lange nicht erneut anmelden (zu viele Anmeldungen sperren das Konto)
-_login_fail: dict[str, tuple] = {}                          # Konto -> (Zeit, Meldung)
+LOGIN_BACKOFF_AUTH_S = 3600.0                               # bei "Passwort falsch" deutlich laenger: staendiges Wiederholen kann das Konto sperren
+LOGIN_STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "midea_login.json")
+
+
+def _load_login_fail() -> dict:
+    """Fehlgeschlagene Anmeldungen ueberleben einen Neustart der App (sonst meldet sich jeder Neustart sofort wieder an und haemmert auf das Konto)."""
+    try:
+        with open(LOGIN_STATE_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        return {k: (float(v[0]), str(v[1]), float(v[2])) for k, v in d.items() if isinstance(v, list) and len(v) == 3}
+    except (OSError, ValueError, TypeError, IndexError):
+        return {}
+
+
+def _save_login_fail():
+    try:
+        with open(LOGIN_STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump({k: list(v) for k, v in _login_fail.items()}, f)
+    except OSError:
+        pass
+
+
+_login_fail: dict[str, tuple] = _load_login_fail()          # Konto -> (Zeit, Meldung, Wartezeit in s)
+
+# Die Midea-Cloud begrenzt, wie oft und von wie vielen Orten man sich anmelden darf. Jeder Neustart der App (Update!) meldete sich bisher neu an -
+# nach ein paar Neustarts am Tag lehnt die Cloud die Anmeldung ab ("Passwort falsch (3101)"). Darum wird die laufende Sitzung auf der Platte gemerkt
+# und nach einem Neustart weiterverwendet; nur wenn sie abgelaufen ist, meldet die Bibliothek sich selbst neu an.
+SESSION_STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "midea_session.json")
+_SESSION_ATTRS = ("_session", "_login_id", "_country_code", "_id_adapt", "_mas_url", "_sse_url", "_api_url", "_uid", "_header_access_token", "_pushtoken", "_device_id")
+_session_saved: dict[str, str] = {}                         # Konto -> zuletzt gespeicherter Stand (nur Aenderungen schreiben)
+
+
+def _fp(account: str, password: str) -> str:
+    return hashlib.sha256((account + "\0" + password).encode("utf-8")).hexdigest()
+
+
+def _sessions_load() -> dict:
+    try:
+        with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _sessions_write(d: dict):
+    try:
+        with open(SESSION_STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump(d, f)
+        try:
+            os.chmod(SESSION_STATE_PATH, 0o600)
+        except OSError:
+            pass
+    except OSError:
+        pass
+
+
+def _session_save(account: str, password: str, cloud) -> None:
+    """Sitzung merken (nur wenn sich etwas geaendert hat)."""
+    try:
+        state = {a: getattr(cloud, a) for a in _SESSION_ATTRS if hasattr(cloud, a)}
+        if not state.get("_session"):
+            return
+        blob = json.dumps(state, sort_keys=True, default=str)
+        if _session_saved.get(account) == blob:
+            return
+        d = _sessions_load()
+        d[account] = {"fp": _fp(account, password), "ts": time.time(), "state": state}
+        _sessions_write(d)
+        _session_saved[account] = blob
+    except Exception:                                        # noqa: BLE001 - das Merken ist nur eine Erleichterung
+        pass
+
+
+def _session_forget(account: str) -> None:
+    _session_saved.pop(account, None)
+    d = _sessions_load()
+    if d.pop(account, None) is not None:
+        _sessions_write(d)
+
+
+def _session_restore(mb, account: str, password: str):
+    """Eine gemerkte Sitzung wiederherstellen (ohne Anmeldung). None, wenn es keine gibt oder sie nicht passt."""
+    try:
+        ent = _sessions_load().get(account)
+        if not ent or ent.get("fp") != _fp(account, password) or not ent.get("state", {}).get("_session"):
+            return None
+        from midea_beautiful.cloud import MideaCloud
+        from midea_beautiful.midea import DEFAULT_APP_ID, DEFAULT_APPKEY, DEFAULT_HMACKEY, DEFAULT_IOTKEY, DEFAULT_PROXIED, DEFAULT_SIGNKEY
+        st = ent["state"]
+        c = MideaCloud(appkey=DEFAULT_APPKEY, account=account, password=password, appid=DEFAULT_APP_ID, hmac_key=DEFAULT_HMACKEY, iot_key=DEFAULT_IOTKEY,
+                       api_url=st.get("_api_url") or None, proxied=DEFAULT_PROXIED, sign_key=DEFAULT_SIGNKEY, pushtoken=st.get("_pushtoken"), device_id=st.get("_device_id"))
+        for a in _SESSION_ATTRS:
+            if a in st and a not in ("_api_url",):
+                setattr(c, a, st[a])
+        if st.get("_api_url"):
+            c._api_url = st["_api_url"]
+        sess = c._session
+        if c._proxied:
+            c._security.set_access_token(str(sess.get("accessToken")), str(sess.get("randomData")))
+        else:
+            c._security.access_token = str(sess.get("accessToken"))
+        _session_saved[account] = json.dumps({a: getattr(c, a) for a in _SESSION_ATTRS if hasattr(c, a)}, sort_keys=True, default=str)
+        return c
+    except Exception as e:                                   # noqa: BLE001 - dann einfach normal anmelden
+        log.info("Gemerkte Midea-Sitzung nicht nutzbar (%s) – normale Anmeldung", e)
+        _session_forget(account)
+        return None
 
 
 def _cloud_conn(account: str, password: str, manual: bool = False):
@@ -446,17 +556,41 @@ def _cloud_conn(account: str, password: str, manual: bool = False):
         c = _clouds.get(account)
         if c is None:
             hit = _login_fail.get(account)
-            if hit and not manual and time.time() - hit[0] < LOGIN_BACKOFF_S:
-                raise MideaError(f"{hit[1]} (nächster Versuch in {int(LOGIN_BACKOFF_S - (time.time() - hit[0]))} s – nicht gleichzeitig mit der Handy-App oder einem zweiten Server dasselbe Konto benutzen)")
+            if hit and not manual and time.time() - hit[0] < hit[2]:
+                left = int(hit[2] - (time.time() - hit[0]))
+                raise MideaError(f"{hit[1]} (nächster Versuch in {left // 60 + 1} Min – nicht gleichzeitig mit der Handy-App oder einem zweiten Server dasselbe Konto benutzen; "
+                                 f"bei falschem Passwort: Klimaanlage ✎ → „Zugang erneuern“)")
+            c = None if manual else _session_restore(mb, account, password)          # nach einem Neustart die gemerkte Sitzung weiterverwenden
+            if c is not None:
+                c.max_retries = 2
+                _clouds[account] = c
+                return c
             try:
                 c = mb.connect_to_cloud(account=account, password=password)
             except Exception as e:                           # noqa: BLE001
-                _login_fail[account] = (time.time(), _cloud_explain(e))
+                msg = _cloud_explain(e)
+                _login_fail[account] = (time.time(), msg, LOGIN_BACKOFF_AUTH_S if ("authentication" in msg.lower() or "password" in msg.lower()) else LOGIN_BACKOFF_S)
+                _save_login_fail()
                 raise
-            _login_fail.pop(account, None)
+            if _login_fail.pop(account, None):
+                _save_login_fail()
             c.max_retries = 2
             _clouds[account] = c
+            _session_save(account, password, c)
         return c
+
+
+def cloud_forget(accounts, dev_ids=()):
+    """Gemerkte Anmeldungen/Verbindungen verwerfen (nach neuen Zugangsdaten)."""
+    with _clock:
+        for a in accounts:
+            _clouds.pop(a, None)
+            _session_forget(a)
+            if _login_fail.pop(a, None):
+                _save_login_fail()
+        for i in dev_ids:
+            _cdevs.pop(i, None)
+            _cache.pop(i, None)
 
 
 def _cloud_list(account: str, password: str) -> list[dict]:
@@ -524,6 +658,7 @@ def _cloud_drop(d: dict, e: Exception | None = None):
     if "login" in low or "session" in low or "authentication" in low:
         with _clock:
             _clouds.pop(d.get("cloud_account"), None)
+            _session_forget(d.get("cloud_account"))                  # sonst wuerde dieselbe unbrauchbare Sitzung wiederhergestellt
 
 
 def _cloud_read(d: dict) -> dict:
@@ -531,6 +666,7 @@ def _cloud_read(d: dict) -> dict:
         try:
             cloud, dev = _cloud_dev(d)
             dev.refresh(cloud)
+            _session_save(d["cloud_account"], d["cloud_password"], cloud)       # hat die Bibliothek sich zwischendurch neu angemeldet, den neuen Stand merken
             _cloud_sync_extras(dev)
             return _cloud_snapshot(dev)
         except MideaError:

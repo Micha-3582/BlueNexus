@@ -1830,6 +1830,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${d.kind === 'wled' && d.switchable !== false ? `<input type="range" min="0" max="100" step="1" value="${d.on ? (d.brightness || 100) : 0}" style="width:140px" title="Helligkeit in Prozent: ganz links 0 % = aus, ganz rechts 100 % – beim Loslassen übernommen" oninput="this.nextElementSibling.textContent = this.value + ' %'" onchange="wledBrightness('${id}', this.value)"><b class="rng-val" style="min-width:44px;text-align:right">${d.on ? (d.brightness || 100) : 0} %</b>
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
         ${isAc(d) && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
+        ${d.kind === 'midea' && d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaCloudRenew('${id}')" title="Neue E-Mail/Passwort des NetHome-Plus-Kontos eintragen (z. B. wenn die Anmeldung abgelehnt wird)">☁ Zugang</button>` : ''}
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
@@ -1879,6 +1880,13 @@ document.getElementById('midea-scan').addEventListener('click', async e => {
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });
+async function mideaCloudRenew(id) {
+  const account = await uiDialog({ title: 'NetHome-Plus-Zugang erneuern', message: 'E-Mail und Passwort des Midea-/NetHome-Plus-Kontos. Beides wird vor dem Speichern mit einer Anmeldung geprüft und gilt für alle Klimaanlagen dieses Kontos.', label: 'E-Mail', okText: 'Weiter' });
+  if (!account) return;
+  const password = await uiDialog({ title: 'NetHome-Plus-Zugang erneuern', message: `Passwort für ${account}`, label: 'Passwort', type: 'password', okText: 'Prüfen und speichern' });
+  if (!password) return;
+  try { const j = await shellyApi('/api/midea/cloud', 'POST', { id, account: account.trim(), password }); savedToast(`Verbunden ✓ (${j.devices} Klimaanlage${j.devices === 1 ? '' : 'n'})`); loadShellyAdmin(); } catch (e) { uiAlert(e.message); }
+}
 async function mideaPanel(id) {
   const box = document.getElementById('midea-' + id); if (!box) return;
   if (box.style.display !== 'none') { box.style.display = 'none'; return; }

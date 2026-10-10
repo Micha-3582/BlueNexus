@@ -69,3 +69,5 @@ demo-quelle/
 app/demo_data.json
 app/shares.json
 app/sources.json
+app/midea_login.json
+app/midea_session.json

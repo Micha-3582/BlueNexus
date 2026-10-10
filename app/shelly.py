@@ -310,6 +310,33 @@ def midea_scan(region=None, account=None, password=None, ip=None) -> list[dict]:
         raise ShellyError(str(e))
 
 
+def midea_cloud_renew(dev_id: str, account: str, password: str) -> int:
+    """Neue NetHome-Plus-Zugangsdaten (E-Mail/Passwort) fuer eine Cloud-Klimaanlage und alle anderen Cloud-Klimaanlagen desselben Kontos.
+    Die Zugangsdaten werden vorher mit einer echten Anmeldung geprueft (dabei wird die Anlage des Kontos gefunden). Gibt die Zahl der Geraete zurueck."""
+    d = _midea_dev(dev_id)
+    if d.get("kind") != "midea" or not d.get("cloud"):
+        raise ShellyError("Das gibt es nur bei Klimaanlagen, die über die Midea-Cloud laufen")
+    account, password = (account or "").strip(), password or ""
+    if not account or not password:
+        raise ShellyError("E-Mail und Passwort des NetHome-Plus-Kontos eingeben")
+    midea.cloud_forget({account})                                      # nicht eine alte, noch gemerkte Anmeldung mit anderem Passwort wiederverwenden
+    try:
+        found = midea._cloud_list(account, password)                 # echte Anmeldung (von Hand: ohne Wartezeit)
+    except midea.MideaError as e:
+        raise ShellyError(str(e))
+    if int(d.get("device_id", 0)) not in {int(x["device_id"]) for x in found}:
+        raise ShellyError("Diese Klimaanlage gehört nicht zu diesem Konto – anderes NetHome-Plus-Konto?")
+    old = d.get("cloud_account")
+    items, hit = load_devices(), []
+    for x in items:
+        if x.get("kind") == "midea" and x.get("cloud") and x.get("cloud_account") == old:
+            x["cloud_account"], x["cloud_password"] = account, password
+            hit.append(x["id"])
+    _save(items)
+    midea.cloud_forget({old, account}, hit)
+    return len(hit)
+
+
 def add_midea(ids: list[str]) -> list[dict]:
     """Legt die gewaehlten Klimaanlagen (aus der letzten Suche, samt Token/Schluessel) an."""
     try:

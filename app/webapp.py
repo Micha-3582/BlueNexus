@@ -220,7 +220,7 @@ ENDPOINT_AREA = {
     "api_battery_cycles": "dashboard", "api_status": "dashboard", "api_history": "dashboard",
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
-    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
+    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
     "report_page": "dashboard", "api_report": "dashboard", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
@@ -5394,6 +5394,17 @@ def api_midea_scan():
         return jsonify(shelly.midea_scan(b.get("region"), b.get("account"), b.get("password"), b.get("ip")))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
+
+
+@app.route("/api/midea/cloud", methods=["POST"])
+def api_midea_cloud():
+    """Neue NetHome-Plus-Zugangsdaten fuer eine Cloud-Klimaanlage (Passwort geaendert / abgelehnt). Wird vor dem Speichern mit einer Anmeldung geprueft."""
+    b = request.get_json(silent=True) or {}
+    try:
+        n = shelly.midea_cloud_renew(str(b.get("id") or ""), b.get("account"), b.get("password"))
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, devices=n)
 
 
 @app.route("/api/midea/add", methods=["POST"])
