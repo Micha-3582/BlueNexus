@@ -3252,49 +3252,85 @@ function nfcWriteState() {
   if (!window.isSecureContext) return { ok: false, kind: 'http', text: 'Das Beschreiben geht nur über eine sichere Adresse (https://, z. B. dein Fernzugriff). Öffne BlueNexus am Handy über diese Adresse.' };
   return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine NFC-Tags beschreiben. Öffne BlueNexus in Chrome (Android); Samsung Internet und Firefox unterstützen das nicht.' };
 }
-function nfcOverlay(title, text) {                     // kleines Fenster "Handy an den Tag halten" mit Abbrechen
+/* Fenster beim Beschreiben: Zustaende prepare (Erlaubnis), wait (Handy halten), retry, verify, ok, error */
+const NFC_ICON = '<svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="6" width="24" height="42" rx="5"/><path d="M28 42h8"/><path class="nfc-w1" d="M14 56a26 26 0 0 0 36 0"/><path class="nfc-w2" d="M20 62a18 18 0 0 0 24 0"/></svg>';
+function nfcSheet(title) {
+  if (!document.getElementById('nfc-sheet-css')) {
+    const st = document.createElement('style'); st.id = 'nfc-sheet-css';
+    st.textContent = '@keyframes nfcpulse{0%{opacity:.25}50%{opacity:1}100%{opacity:.25}}@keyframes nfcpop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}' +
+      '.nfc-sheet .nfc-w1{animation:nfcpulse 1.4s infinite}.nfc-sheet .nfc-w2{animation:nfcpulse 1.4s .35s infinite}.nfc-sheet.idle .nfc-w1,.nfc-sheet.idle .nfc-w2{animation:none;opacity:.3}' +
+      '.nfc-sheet .nfc-big{font-size:46px;line-height:1;animation:nfcpop .25s}.nfc-sheet.ok .nfc-ico{color:var(--green)}.nfc-sheet.error .nfc-ico{color:#e5544a}.nfc-sheet .nfc-ico{color:var(--accent-t)}';
+    document.head.appendChild(st);
+  }
   const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
-  ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
-    <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted nfc-ov-msg" style="white-space:pre-line"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="ghost nfc-ov-btn">Abbrechen</button></div></div>`;
-  ov.querySelector('h3').textContent = title; ov.querySelector('.nfc-ov-msg').textContent = text;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+  ov.innerHTML = `<div class="nfc-sheet" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 22px;width:100%;max-width:380px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+    <div class="nfc-ico" style="display:flex;justify-content:center;margin-bottom:10px;min-height:64px;align-items:center"></div>
+    <h3 class="nfc-h" style="margin:0 0 8px;font-size:18px"></h3><div class="muted nfc-t" style="white-space:pre-line;line-height:1.45"></div>
+    <div class="nfc-b" style="display:flex;gap:10px;justify-content:center;margin-top:18px"></div></div>`;
   document.body.appendChild(ov);
-  const o = { onCancel: null, set(t, btn) { ov.querySelector('.nfc-ov-msg').textContent = t; if (btn) ov.querySelector('.nfc-ov-btn').textContent = btn; }, close() { ov.remove(); } };
-  ov.querySelector('.nfc-ov-btn').onclick = () => { if (o.onCancel) o.onCancel(); o.close(); };
+  const box = ov.querySelector('.nfc-sheet'), o = { history: [], onCancel: null, onRetry: null, closed: false };
+  const btn = (label, fn, primary) => { const b = document.createElement('button'); if (!primary) b.className = 'ghost'; b.textContent = label; b.onclick = fn; ov.querySelector('.nfc-b').appendChild(b); };
+  o.close = () => { if (!o.closed) { o.closed = true; ov.remove(); } };
+  o.state = (st, head, text) => {
+    o.history.push(st); if (o.closed) return;
+    box.className = 'nfc-sheet ' + (st === 'prepare' || st === 'verify' ? 'idle ' : '') + (st === 'ok' || st === 'error' ? st : '');
+    ov.querySelector('.nfc-ico').innerHTML = st === 'ok' ? '<span class="nfc-big">✓</span>' : st === 'error' ? '<span class="nfc-big">✕</span>' : NFC_ICON;
+    ov.querySelector('.nfc-h').textContent = head || title; ov.querySelector('.nfc-t').textContent = text || '';
+    ov.querySelector('.nfc-b').innerHTML = '';
+    if (st === 'ok') { btn('OK', o.close, true); setTimeout(o.close, 4000); }
+    else if (st === 'error') { btn('Schließen', o.close); if (o.onRetry) btn('Nochmal versuchen', () => { o.close(); o.onRetry(); }, true); }
+    else btn('Abbrechen', () => { if (o.onCancel) o.onCancel(); o.close(); });
+  };
   return o;
 }
+const NFC_ERR = {
+  NotAllowedError: 'Die NFC-Berechtigung wurde nicht erteilt. Beim nächsten Versuch „Zulassen“ wählen (oder in den Chrome-Seiteneinstellungen NFC erlauben).',
+  NotSupportedError: 'NFC ist am Handy ausgeschaltet oder wird nicht unterstützt. In den Handy-Einstellungen NFC einschalten.',
+  NotReadableError: 'Der Tag lässt sich nicht beschreiben: Er ist vielleicht schreibgeschützt oder kein NDEF-fähiger Tag. Anderen Tag versuchen oder das Handy ruhiger halten.',
+  NetworkError: 'Der Kontakt zum Tag ist mehrmals abgebrochen. Handy ruhig und flach auf den Tag legen und noch einmal versuchen.',
+};
 function nfcWrite(tid) {                                // synchron aus dem Klick heraus starten (Chrome verlangt eine Nutzeraktion)
   const st = nfcWriteState();
   if (!st.ok) { uiAlert(st.text, st.kind === 'apple' ? 'Auf dem iPhone nicht möglich' : 'Beschreiben hier nicht möglich'); return; }
   const url = nfcBase() + '/nfc/' + tid, tag = (nfcData.tags.find(t => t.id === tid) || {}).name || 'Tag';
-  const ctl = new AbortController(), ov = nfcOverlay('Tag „' + tag + '“ beschreiben', 'Handy jetzt an den Tag halten (Rückseite des Handys, ruhig halten) …');
-  ov.onCancel = () => ctl.abort();
-  let ndef;
-  try { ndef = new NDEFReader(); } catch (e) { ov.close(); uiAlert('NFC ist an diesem Handy nicht verfügbar. In den Handy-Einstellungen NFC einschalten.'); return; }
-  ndef.write({ records: [{ recordType: 'url', data: url }] }, { overwrite: true, signal: ctl.signal }).then(async () => {
-    ov.set('Geschrieben ✓ – prüfe den Tag … (Handy noch kurz am Tag lassen)');
-    let ok = null;
-    try {                                               // zur Kontrolle gleich wieder lesen
-      const rd = new NDEFReader(), c2 = new AbortController(), t = setTimeout(() => c2.abort(), 6000);
-      ok = await new Promise(res => {
-        c2.signal.addEventListener('abort', () => res(null));
-        rd.onreading = ev => { const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { /* leer */ } res(v.replace(/^https?:\/\//i, '') === url.replace(/^https?:\/\//i, '')); c2.abort(); };
-        rd.scan({ signal: c2.signal }).catch(() => res(null));
-      });
-      clearTimeout(t);
-    } catch (e) { ok = null; }
-    ov.set(ok === true ? 'Fertig ✓ Der Tag ist beschrieben und geprüft.' : ok === false ? 'Der Tag wurde beschrieben, die Kontrolle hat aber eine andere Adresse gelesen. Bitte noch einmal beschreiben.' : 'Der Tag wurde beschrieben ✓. (Die Kontrolle war nicht möglich – scanne den Tag zum Test mit einem registrierten Handy.)', 'OK'); ov.onCancel = null;
-    nfcMsg(ok === false ? 'Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.' : 'Tag „' + tag + '“ beschrieben ✓', ok === false);
-  }).catch(e => {
-    ov.close();
-    if (e && e.name === 'AbortError') { nfcMsg('Beschreiben abgebrochen.'); return; }
-    const m = { NotAllowedError: 'Die NFC-Berechtigung wurde nicht erteilt. Beim nächsten Versuch „Zulassen“ wählen (oder in den Chrome-Seiteneinstellungen NFC erlauben).',
-                NotSupportedError: 'NFC ist am Handy ausgeschaltet oder wird nicht unterstützt. In den Handy-Einstellungen NFC einschalten.',
-                NotReadableError: 'Der Tag lässt sich nicht beschreiben (schreibgeschützt, kein NDEF-fähiger Tag oder zu kurz am Handy). Anderen Tag versuchen oder das Handy ruhiger halten.',
-                NetworkError: 'Der Tag lässt sich nicht beschreiben (zu kurz gehalten oder zu wenig Speicher). Noch einmal versuchen, das Handy ruhig am Tag halten.' }[e && e.name];
-    uiAlert(m || 'Beschreiben fehlgeschlagen: ' + (e && (e.message || e.name) || 'unbekannter Fehler'));
-  });
+  const ctl = new AbortController(), ui = nfcSheet('Tag „' + tag + '“ beschreiben');
+  ui.onCancel = () => ctl.abort(); ui.onRetry = () => nfcWrite(tid);
+  ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.');
+  let tries = 0;
+  const attempt = () => {
+    let ndef; try { ndef = new NDEFReader(); } catch (e) { ui.state('error', 'NFC nicht verfügbar', NFC_ERR.NotSupportedError); return; }
+    ndef.write({ records: [{ recordType: 'url', data: url }] }, { overwrite: true, signal: ctl.signal }).then(async () => {
+      ui.state('verify', 'Geschrieben – prüfe …', 'Handy noch einen Moment am Tag lassen.');
+      let ok = null;
+      try {                                             // zur Kontrolle gleich wieder lesen
+        const rd = new NDEFReader(), c2 = new AbortController(), t = setTimeout(() => c2.abort(), 6000);
+        ok = await new Promise(res => {
+          c2.signal.addEventListener('abort', () => res(null));
+          rd.onreading = ev => { const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { /* leer */ } res(v.replace(/^https?:\/\//i, '') === url.replace(/^https?:\/\//i, '')); c2.abort(); };
+          rd.scan({ signal: c2.signal }).catch(() => res(null));
+        });
+        clearTimeout(t);
+      } catch (e) { ok = null; }
+      if (ok === false) { ui.state('error', 'Kontrolle fehlgeschlagen', 'Der Tag wurde beschrieben, beim Lesen kam aber eine andere Adresse heraus. Bitte noch einmal beschreiben.'); nfcMsg('Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.', true); return; }
+      ui.state('ok', 'Fertig', ok === true ? 'Der Tag „' + tag + '“ ist beschrieben und geprüft.' : 'Der Tag „' + tag + '“ ist beschrieben. (Eine Kontrolle war nicht möglich – scanne ihn zum Test.)');
+      nfcMsg('Tag „' + tag + '“ beschrieben ✓');
+    }).catch(e => {
+      const name = e && e.name;
+      if (name === 'AbortError') { nfcMsg('Beschreiben abgebrochen.'); return; }
+      if ((name === 'NetworkError' || name === 'NotReadableError') && tries < 2 && !ui.closed) {            // Kontakt kurz verloren (z. B. Handy beim ersten Mal noch bewegt): selbst noch einmal versuchen
+        tries++; ui.state('retry', 'Kurz verloren – noch einmal …', 'Handy ruhig auf dem Tag lassen.'); setTimeout(attempt, 700); return;
+      }
+      ui.state('error', 'Beschreiben nicht geklappt', NFC_ERR[name] || ('Fehler: ' + ((e && (e.message || e.name)) || 'unbekannt')));
+    });
+  };
+  attempt();
+  try {                                                 // erste Nutzung: Chrome fragt nach der Erlaubnis - erst danach den Tag anlegen, sonst stoert das Android-Auswahlfenster
+    navigator.permissions.query({ name: 'nfc' }).then(ps => {
+      const upd = () => { if (ui.closed) return; const last = ui.history[ui.history.length - 1]; if (ps.state === 'prompt' && last === 'wait') ui.state('prepare', 'Erst erlauben', 'Chrome fragt gleich nach NFC. Bitte „Zulassen“ wählen – das Handy erst danach an den Tag halten.'); else if (ps.state === 'granted' && ui.history[ui.history.length - 1] === 'prepare') ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.'); };
+      ps.onchange = upd; upd();
+    }).catch(() => {});
+  } catch (e) { /* ohne Berechtigungsabfrage: Standardtext */ }
 }
 async function nfcCopy(tid) {
   const full = nfcBase() + '/nfc/' + tid;
