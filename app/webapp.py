@@ -1029,6 +1029,7 @@ def _user_out(u: dict) -> dict:
     return {"username": u["username"], "permissions": auth.normalize_permissions(u.get("permissions")),
             "created": u.get("created"), "last_login": u.get("last_login"),
             "expires": u.get("expires"), "is_me": u["username"].strip().lower() == g.user,
+            "admin": auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))), "owner": bool(u.get("owner")),
             "dashboard_tiles": auth.normalize_tiles(u.get("dashboard_tiles")),
             "dashboard_order": auth.normalize_tile_order(u.get("dashboard_order"))}
 
@@ -1040,15 +1041,16 @@ def api_users():
     Einschraenkung, welche Dashboard-Kacheln dieses Konto zusaetzlich zur globalen Einstellung sieht."""
     if request.method == "GET":
         mods = store.modules()
-        return jsonify(users=[_user_out(u) for u in users.list()], areas=auth.visible_areas(mods), presets=auth.PRESETS,
-                       groups=auth.visible_groups(mods), preset_labels=auth.PRESET_LABELS, dashboard_tiles=auth.visible_tiles(mods),
+        return jsonify(users=[_user_out(u) for u in users.list()], areas=auth.visible_areas(mods), presets={k: v for k, v in auth.PRESETS.items() if k != "admin"},
+                       groups=auth.visible_groups(mods), preset_labels={k: v for k, v in auth.PRESET_LABELS.items() if k != "admin"}, dashboard_tiles=auth.visible_tiles(mods),
                        global_order=auth.normalize_tile_order([k for k in (store.load_config().get("tile_order") or []) if isinstance(k, str)]) or auth.DASHBOARD_TILE_KEYS)
     body = request.json or {}
     permissions = auth.normalize_permissions(body.get("permissions") or auth.PRESETS["user"])
     expires = (body.get("expires") or "").strip() or None
     try:
         u = users.create(body.get("username") or "", body.get("password") or "", permissions=permissions,
-                          expires=expires, dashboard_tiles=body.get("dashboard_tiles"), dashboard_order=body.get("dashboard_order"))
+                          expires=expires, dashboard_tiles=body.get("dashboard_tiles"), dashboard_order=body.get("dashboard_order"),
+                          admin=bool(body.get("admin")))               # Administrator nur ueber das Kennzeichen, nie ueber die Rechte-Tabelle
     except UserError as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(ok=True, user=_user_out(u))
@@ -1059,6 +1061,9 @@ def api_users_item(username):
     """Rechte/Ablauf/Passwort/Dashboard-Kacheln eines Benutzers aendern oder den Benutzer
     loeschen (braucht Benutzerverwaltung=Schreiben). Mindestens ein Zugang muss die
     Benutzerverwaltung behalten - sonst sperrt man sich versehentlich selbst aus."""
+    owner_key = users.owner_key()
+    if owner_key and (username or "").strip().lower() == owner_key and owner_key != g.user:
+        return jsonify(error="Das Hauptkonto kann nur vom Hauptadmin selbst geändert werden (Passwort, Name, Rechte)."), 403
     if request.method == "DELETE":
         try:
             users.delete(username)
@@ -1072,6 +1077,8 @@ def api_users_item(username):
         # Das eigene Passwort nur ueber "Konto & Zugang" aendern: dort wird das aktuelle Passwort verlangt (hier ginge es ohne)
         return jsonify(error="Dein eigenes Passwort änderst du unter „Konto & Zugang“ – dort wird das aktuelle Passwort abgefragt."), 400
     try:
+        if "admin" in body:
+            users.set_admin(username, bool(body["admin"]))
         if "permissions" in body:
             users.set_permissions(username, body["permissions"])
         if "expires" in body:

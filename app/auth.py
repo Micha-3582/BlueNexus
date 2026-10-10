@@ -281,6 +281,29 @@ class UserStore:
         for u in self._users.values():
             self._migrate(u)
         self._stamp = stamp
+        if self._ensure_owner() and os.path.exists(self.path):
+            self._write()
+
+    def _ensure_owner(self) -> bool:
+        """Das erste angelegte Konto ist das Hauptkonto (owner): immer Administrator, nie loeschbar. Aeltere Datenbestaende ohne Kennzeichen:
+        der aelteste Administrator (sonst das aelteste Konto) wird Hauptkonto. True, wenn etwas geaendert wurde."""
+        if not self._users:
+            return False
+        changed = False
+        owners = [u for u in self._users.values() if u.get("owner")]
+        if not owners:
+            first = sorted(self._users.values(), key=lambda u: (not is_full_admin(u.get("permissions")), u.get("created") or 0))[0]
+            first["owner"] = True
+            owners, changed = [first], True
+        for o in owners[1:]:                                     # nur eines (z. B. nach dem Zusammenfuehren zweier Dateien)
+            o.pop("owner", None)
+            changed = True
+        o = owners[0]
+        if not is_full_admin(o.get("permissions")):
+            o["permissions"] = dict(PRESETS["admin"])
+            o["expires"] = None
+            changed = True
+        return changed
 
     @staticmethod
     def _migrate(user: dict) -> None:
@@ -365,7 +388,9 @@ class UserStore:
             return dict(user)
 
     def create(self, username: str, password: str, permissions: dict | None = None,
-               expires: str | None = None, dashboard_tiles=None, dashboard_order=None) -> dict:
+               expires: str | None = None, dashboard_tiles=None, dashboard_order=None, admin: bool | None = None) -> dict:
+        """admin=None: wie bisher aus den Rechten ableiten (Benutzerverwaltung = Schreiben). Sonst entscheidet allein das Kennzeichen:
+        True = Administrator (alle Rechte), False = normales Konto (Benutzerverwaltung nie 'Schreiben')."""
         key = _norm(username)
         if not key:
             raise UserError("Benutzername darf nicht leer sein.")
@@ -374,12 +399,15 @@ class UserStore:
         if len(password or "") < MIN_PASSWORD_LEN:
             raise UserError(f"Passwort muss mindestens {MIN_PASSWORD_LEN} Zeichen haben.")
         perms = normalize_permissions(permissions if permissions is not None else PRESETS["admin"])
-        if is_full_admin(perms):
-            expires = None                            # Volladmins laufen nie ab
         with self._lock:
             self._sync()
             if key in self._users:
                 raise UserError("Benutzername ist bereits vergeben.")
+            first = not self._users                  # das erste Konto ueberhaupt = Hauptkonto
+            is_admin = True if first else (is_full_admin(perms) if admin is None else bool(admin))
+            perms = dict(PRESETS["admin"]) if is_admin else self._clamp(perms)
+            if is_admin:
+                expires = None                        # Administratoren laufen nie ab
             user = {
                 "username": username.strip(),
                 "pw_hash": generate_password_hash(password),
@@ -390,6 +418,8 @@ class UserStore:
                 "dashboard_tiles": normalize_tiles(dashboard_tiles),
                 "dashboard_order": normalize_tile_order(dashboard_order),
             }
+            if first:
+                user["owner"] = True
             self._users[key] = user
             self._write()
             return dict(user)
@@ -471,15 +501,45 @@ class UserStore:
             user = self._users.get(key)
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
-            new_perms = normalize_permissions(permissions)
-            was_full_admin = is_full_admin(user.get("permissions"))
-            if was_full_admin and not is_full_admin(new_perms) and self._full_admin_count_locked() <= 1:
-                raise UserError("Mindestens ein Zugang muss die Benutzerverwaltung („Schreiben“) behalten.")
-            user["permissions"] = new_perms
-            if is_full_admin(new_perms):
-                user["expires"] = None                # Volladmins laufen nie ab
+            if is_full_admin(user.get("permissions")):                  # Administratoren haben immer alle Rechte; ob jemand Administrator ist, aendert nur set_admin
+                return dict(user)
+            user["permissions"] = self._clamp(normalize_permissions(permissions))
             self._write()
             return dict(user)
+
+    @staticmethod
+    def _clamp(perms: dict) -> dict:
+        """Normale Konten bekommen die Benutzerverwaltung nie auf 'Schreiben' (das ist allein Administratoren vorbehalten)."""
+        perms = dict(perms)
+        if perms.get("user_management") == "write":
+            perms["user_management"] = "read"
+        return perms
+
+    def set_admin(self, username: str, admin: bool) -> dict:
+        key = _norm(username)
+        with self._lock:
+            self._sync()
+            user = self._users.get(key)
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            if admin:
+                user["permissions"] = dict(PRESETS["admin"])
+                user["expires"] = None
+            else:
+                if user.get("owner"):
+                    raise UserError("Das Hauptkonto bleibt immer Administrator.")
+                if is_full_admin(user.get("permissions")):
+                    if self._full_admin_count_locked() <= 1:
+                        raise UserError("Mindestens ein Zugang muss Administrator bleiben.")
+                    user["permissions"] = self._clamp(user["permissions"])
+                    user["permissions"]["user_management"] = "none"
+            self._write()
+            return dict(user)
+
+    def owner_key(self):
+        with self._lock:
+            self._sync()
+            return next((k for k, u in self._users.items() if u.get("owner")), None)
 
     def set_expires(self, username: str, expires: str | None) -> dict:
         key = _norm(username)
@@ -489,7 +549,7 @@ class UserStore:
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
             if expires and is_full_admin(user.get("permissions")):
-                raise UserError("Ein Zugang mit Benutzerverwaltung („Schreiben“) kann nicht ablaufen.")
+                raise UserError("Ein Administrator-Zugang kann nicht ablaufen.")
             user["expires"] = expires or None
             self._write()
             return dict(user)
@@ -501,8 +561,10 @@ class UserStore:
             user = self._users.get(key)
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
+            if user.get("owner"):
+                raise UserError("Das Hauptkonto (der erste Administrator) kann nicht gelöscht werden.")
             if is_full_admin(user.get("permissions")) and self._full_admin_count_locked() <= 1:
-                raise UserError("Der letzte Zugang mit Benutzerverwaltung kann nicht gelöscht werden.")
+                raise UserError("Der letzte Administrator kann nicht gelöscht werden.")
             del self._users[key]
             self._write()
 

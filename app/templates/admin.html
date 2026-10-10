@@ -953,8 +953,9 @@
       <div><label>Passwort</label><div class="pw-wrap"><input id="nu-password" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="nu-password" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
       <div id="nu-expires-wrap"><label>Ablauf <span class="muted" style="font-weight:normal">(optional)</span> <span class="qhelp" role="button" tabindex="0" data-help="Ab diesem Tag funktioniert der Zugang nicht mehr - praktisch für einen befristeten Demo-Zugang. Leer lassen = unbegrenzt gültig. Nicht möglich, solange der Zugang Benutzerverwaltung=Schreiben hat.">?</span></label><input id="nu-expires" type="date"></div>
     </div>
-    <div style="margin-top:14px"><b>Rechte</b> <span class="qhelp" role="button" tabindex="0" data-help="Die Rechte folgen den Menüpunkten der App: Dashboard, Smart Home, Einstellungen, Konto. Pro Zeile: <b>Kein</b> (Bereich unsichtbar), <b>Lesen</b> (alle Werte sichtbar, Zugangsdaten verborgen) oder <b>Schreiben</b> (ändern). Mit „alle:“ stellst du eine ganze Gruppe ein; die Vorlagen füllen alles vor.">?</span></div>
-    <div id="nu-box" style="margin-top:10px"><div id="nu-presets"></div><div id="nu-matrix"></div></div>
+    <div style="margin-top:14px"><label class="chk"><input type="checkbox" id="nu-isadmin"> <b>Administrator</b></label> <span class="qhelp" role="button" tabindex="0" data-help="Ein Administrator darf alles: Benutzer verwalten, Geräte anlegen, ändern und löschen, alle Einstellungen, Regeln, Zugang an andere teilen. Die Rechte-Tabelle gilt für ihn nicht. „Schreiben“ in der Tabelle heißt bei normalen Konten nur: Geräte bedienen bzw. den Bereich ändern – es macht niemanden zum Administrator.">?</span> <span class="muted">Darf alles, auch Benutzer verwalten und Zugang teilen. Die Rechte darunter gelten dann nicht.</span></div>
+    <div id="nu-rights"><div style="margin-top:14px"><b>Rechte</b> <span class="qhelp" role="button" tabindex="0" data-help="Die Rechte folgen den Menüpunkten der App: Dashboard, Smart Home, Einstellungen, Konto. Pro Zeile: <b>Kein</b> (Bereich unsichtbar), <b>Lesen</b> (alle Werte sichtbar, Zugangsdaten verborgen) oder <b>Schreiben</b> (ändern). Mit „alle:“ stellst du eine ganze Gruppe ein; die Vorlagen füllen alles vor.">?</span></div>
+    <div id="nu-box" style="margin-top:10px"><div id="nu-presets"></div><div id="nu-matrix"></div></div></div>
     <div id="nu-tiles"></div>
     <div style="margin-top:12px"><button id="btn-nu-add">Benutzer anlegen</button></div>
   </div>
@@ -1423,7 +1424,7 @@ function matrixHtml(idPrefix, perms) {
       <div class="rg-head"><b>${escHUsers(glabel)}</b>
         <span class="rg-all">alle: ${LV.map(([v, l]) => `<button type="button" data-group-set="${v}" data-ids="${ids.join(',')}">${l}</button>`).join('')}</span></div>
       ${GROUP_NOTE[gid] ? `<span class="rg-hint" style="margin:0 0 4px">${escHUsers(GROUP_NOTE[gid])}</span>` : ''}
-      ${ids.map(id => { const [, label, desc] = byId[id]; const cur = perms[id] || 'none'; const hint = AREA_HINT[id];
+      ${ids.filter(id => id !== 'user_management').map(id => { const [, label, desc] = byId[id]; const cur = perms[id] || 'none'; const hint = AREA_HINT[id];
         return `<div class="rg-row"><div class="rg-lbl">${escHUsers(areaShort(label))} <span class="qhelp" role="button" tabindex="0" data-help="${escHUsers(desc)}">?</span>
           ${hint ? `<span class="rg-hint${hint[1] ? ' warn' : ''}">${escHUsers(hint[0])}</span>` : ''}</div>
           <div class="seg" data-area="${id}"><input type="hidden" id="${idPrefix}-${id}" value="${cur}">${LV.map(([v, l]) => `<button type="button" data-v="${v}" class="${cur === v ? 'on ' + v : ''}">${l}</button>`).join('')}</div></div>`; }).join('')}
@@ -1450,7 +1451,7 @@ function presetBarHtml(targetId) {
 }
 function readMatrix(idPrefix) {
   const perms = {};
-  AREAS_META.forEach(([id]) => { perms[id] = document.getElementById(`${idPrefix}-${id}`).value; });
+  AREAS_META.forEach(([id]) => { const el = document.getElementById(`${idPrefix}-${id}`); perms[id] = el ? el.value : 'none'; });          // Benutzerverwaltung gibt es hier nicht (nur ueber "Administrator")
   return perms;
 }
 let TILES_META = [], GLOBAL_ORDER = [];
@@ -1509,30 +1510,35 @@ async function loadUsers() {
     AREAS_META = d.areas; PRESETS_META = d.presets; TILES_META = d.dashboard_tiles; GLOBAL_ORDER = d.global_order || []; GROUPS_META = d.groups; PRESET_LABELS_META = d.preset_labels;
     const body = document.getElementById('users-body');
     body.innerHTML = '';
+    const iAmOwner = !!(d.users.find(x => x.is_me) || {}).owner;
     for (const u of d.users) {
       const perms = u.permissions;
-      const isFullAdmin = perms.user_management === 'write';
+      const isFullAdmin = !!u.admin, locked = u.owner && !u.is_me;          // Hauptkonto: andere Administratoren duerfen es nicht aendern
       const tr = document.createElement('tr');
       tr.style.borderTop = '1px solid var(--border)';
       tr.innerHTML = `
         <td style="padding:6px 4px">${escHUsers(u.username)}${u.is_me ? ' <span class="muted">(du)</span>' : ''}</td>
-        <td style="padding:6px 4px">${escHUsers(summarizePerms(perms))}</td>
+        <td style="padding:6px 4px">${isFullAdmin ? '<b>Administrator</b>' + (u.owner ? ' <span class="muted">· Hauptkonto</span>' : '') : escHUsers(summarizePerms(perms))}</td>
         <td style="padding:6px 4px">${isFullAdmin
           ? '<span class="muted" title="Ein Zugang mit Benutzerverwaltung läuft nie ab">– läuft nie ab –</span>'
           : `<input type="date" class="u-expires" data-u="${escHUsers(u.username)}" value="${u.expires || ''}" style="padding:4px 6px">`}</td>
         <td style="padding:6px 4px" class="muted">${fmtLogin(u.last_login)}</td>
-        <td style="padding:6px 4px;white-space:nowrap">
+        <td style="padding:6px 4px;white-space:nowrap">${locked ? '<span class="muted" title="Das Hauptkonto kann nur vom Hauptadmin selbst geändert werden">🔒 Hauptkonto</span>' : `
           <button type="button" class="ghost u-edit" data-u="${escHUsers(u.username)}" title="Rechte bearbeiten">🛠️</button>
-          ${u.permissions.user_management === 'write' ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
+          ${u.admin ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
           ${u.is_me && (window.USER_PERMS || {}).account !== 'write' ? '' : `<button type="button" class="ghost u-pw" data-u="${escHUsers(u.username)}" data-me="${u.is_me ? 1 : 0}" title="${u.is_me ? 'Eigenes Passwort ändern (unter Konto & Zugang, mit aktuellem Passwort)' : 'Neues Passwort setzen'}">🔑</button>`}
-          ${u.is_me ? '' : `<button type="button" class="danger u-del" data-u="${escHUsers(u.username)}" title="Löschen">✕</button>`}
+          ${u.is_me || u.owner ? '' : `<button type="button" class="danger u-del" data-u="${escHUsers(u.username)}" title="Löschen">✕</button>`}`}
         </td>`;
       body.appendChild(tr);
       const editRow = document.createElement('tr');
       const uid = userDomId(u.username);
       editRow.className = 'u-editrow'; editRow.dataset.u = u.username; editRow.style.display = 'none';
       editRow.innerHTML = `<td colspan="5" style="padding:8px 4px 16px;background:var(--card2);border-radius:8px">
-        <div id="${uid}-box">${presetBarHtml(uid + '-box')}${matrixHtml(uid, perms)}</div>
+        <div style="margin-bottom:12px"><label class="chk"><input type="checkbox" class="u-isadmin" data-u="${escHUsers(u.username)}" id="${uid}-isadmin" ${u.admin ? 'checked' : ''} ${u.owner ? 'disabled' : ''}> <b>Administrator</b></label>
+          <span class="qhelp" role="button" tabindex="0" data-help="Ein Administrator darf alles: Benutzer verwalten, Geräte anlegen, ändern und löschen, alle Einstellungen, Regeln, Zugang an andere teilen. Die Rechte-Tabelle gilt für ihn nicht. „Schreiben“ in der Tabelle heißt bei normalen Konten nur: Geräte bedienen bzw. den Bereich ändern – es macht niemanden zum Administrator.">?</span>
+          <span class="muted">${u.owner ? 'Hauptkonto – bleibt immer Administrator und kann nicht gelöscht werden (umbenennen und neues Passwort sind möglich).' : 'Darf alles, auch Benutzer verwalten und Zugang teilen.'}</span></div>
+        <div id="${uid}-box" style="${u.admin ? 'display:none' : ''}">${presetBarHtml(uid + '-box')}${matrixHtml(uid, perms)}</div>
+        ${u.admin ? '<div class="muted" style="margin:0 0 8px">Administratoren haben alle Rechte – die Rechte-Tabelle gilt für sie nicht.</div>' : ''}
         <div style="max-width:720px">${tilesHtml(uid, u.dashboard_tiles, u.dashboard_order)}</div>
         <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="muted">Änderungen werden automatisch gespeichert.</span>
         <button type="button" class="ghost u-edit-cancel" data-u="${escHUsers(u.username)}">Schließen</button></div></td>`;
@@ -1553,10 +1559,18 @@ async function loadUsers() {
       body.querySelector(`.u-editrow[data-u="${CSS.escape(el.dataset.u)}"]`).style.display = 'none';
     }));
     const saveTimers = {};                                  // Rechte und Dashboard-Kacheln: jede Aenderung wird nach kurzer Pause automatisch gespeichert
-    body.querySelectorAll('.u-editrow').forEach(row => row.addEventListener('change', () => {
+    body.querySelectorAll('.u-isadmin').forEach(el => el.addEventListener('change', async () => {          // Administrator an/aus: sofort speichern, Liste neu laden
+      if (el.checked && !confirm(`„${el.dataset.u}“ zum Administrator machen? Ein Administrator darf alles, auch Benutzer verwalten und Zugang teilen.`)) { el.checked = false; return; }
+      if (!await patchUser(el.dataset.u, { admin: el.checked })) return;
+      const open = el.dataset.u; await loadUsers();
+      const row = body.querySelector(`.u-editrow[data-u="${CSS.escape(open)}"]`); if (row) row.style.display = '';
+    }));
+    body.querySelectorAll('.u-editrow').forEach(row => row.addEventListener('change', e => {
+      if (e.target.classList && e.target.classList.contains('u-isadmin')) return;
       const name = row.dataset.u; clearTimeout(saveTimers[name]);
       saveTimers[name] = setTimeout(async () => {
         const perms = readMatrix(userDomId(name));
+        if (document.getElementById(userDomId(name) + '-isadmin')?.checked) return;                  // Administratoren: Rechte-Tabelle gilt nicht
         if (await patchUser(name, { permissions: perms, dashboard_tiles: readTiles(userDomId(name)), dashboard_order: readTileOrder(userDomId(name)) })) {
           const cell = row.previousElementSibling?.cells[1]; if (cell) cell.textContent = summarizePerms(perms);       // Zusammenfassung in der Liste nachziehen
         }
@@ -1604,10 +1618,11 @@ function renderNuMatrix(presetName) {
   syncNuExpires();
   syncTilesVisibility('nu');
   document.getElementById('nu-dashboard')?.addEventListener('change', () => syncTilesVisibility('nu'));
-  document.getElementById('nu-user_management')?.addEventListener('change', syncNuExpires);
+  document.getElementById('nu-isadmin').onchange = syncNuExpires;
 }
 function syncNuExpires() {
-  const isFullAdmin = document.getElementById('nu-user_management')?.value === 'write';
+  const isFullAdmin = !!document.getElementById('nu-isadmin')?.checked;
+  document.getElementById('nu-rights').style.display = isFullAdmin ? 'none' : '';
   const exp = document.getElementById('nu-expires');
   exp.disabled = isFullAdmin;
   if (isFullAdmin) exp.value = '';
@@ -1630,13 +1645,14 @@ document.getElementById('btn-nu-add').addEventListener('click', async () => {
   try {
     const r = await fetch('/api/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, permissions, expires, dashboard_tiles, dashboard_order }),
+      body: JSON.stringify({ username, password, permissions, expires, dashboard_tiles, dashboard_order, admin: document.getElementById('nu-isadmin').checked }),
     });
     const d = await r.json();
     if (!r.ok) { msg.textContent = d.error || 'Fehler'; return; }
     document.getElementById('nu-username').value = '';
     document.getElementById('nu-password').value = '';
     document.getElementById('nu-expires').value = '';
+    document.getElementById('nu-isadmin').checked = false;
     document.getElementById('nu-toggle').click();               // Karte nach dem Anlegen wieder einklappen
     msg.textContent = 'Angelegt ✓'; setTimeout(() => msg.textContent = '', 3000);
     loadUsers();

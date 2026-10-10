@@ -102,6 +102,8 @@ Beim ersten Start legt man einen Zugang an (`/create-account`) bzw. meldet sich 
 
 Nach jedem Zurücksetzen kommt eine Nachricht an Telegram und Pushover („Passwort wurde zurückgesetzt“), und das Logbuch hält es fest. Die Antworten der Seite verraten nie, ob ein Benutzername existiert. Bei anderen Konten (Familie, Gäste) vergibt der Administrator ein neues Passwort unter *Weitere Benutzer*. In der Demo ist die Funktion abgeschaltet.
 
+**Administrator und Hauptkonto.** *Administrator* ist ein eigener Haken pro Konto (beim Anlegen und beim Bearbeiten, Symbol 🛠️) – **nicht** eine Folge davon, dass irgendwo „Schreiben“ steht. Ein Administrator darf alles: Benutzer verwalten, Geräte anlegen, ändern und löschen, alle Einstellungen, Zugang an andere teilen. Für ihn gilt die Rechte-Tabelle nicht (sie wird ausgeblendet), und er läuft nie ab. Bei **normalen Konten** heißt „Schreiben“ nur: den jeweiligen Bereich bedienen bzw. ändern – es macht niemanden zum Administrator, und die Benutzerverwaltung gibt es für sie nicht. Das **erste angelegte Konto ist das Hauptkonto**: sein Haken ist gesetzt und gesperrt (immer Administrator), es lässt sich **nicht löschen** und von **anderen Administratoren nicht geändert** (weder Rechte noch Passwort, sie sehen dort nur „🔒 Hauptkonto“). Umbenennen und ein neues Passwort setzen kann das Hauptkonto selbst unter „Konto & Zugang“. So kann ein weiterer Administrator den Hauptadmin nie entmachten. Ältere Installationen bekommen das Hauptkonto beim Update automatisch (der älteste Administrator); bestehende Administratoren bleiben Administratoren. Mindestens ein Administrator bleibt immer.
+
 **Rechte pro Bereich.** Die Rechte sind nach den Menüpunkten der App geordnet. Pro Zeile stellst du mit drei Knöpfen **Kein**, **Lesen** oder **Schreiben** ein. Über „alle:“ in der Gruppenüberschrift setzt du eine ganze Gruppe auf einmal.
 
 | Gruppe | Bereich | Bedeutung |
@@ -117,7 +119,7 @@ Nach jedem Zurücksetzen kommt eine Nachricht an Telegram und Pushover („Passw
 | **Konto & Verwaltung** | Eigenes Konto | Eigenen Namen/Passwort ändern. |
 | | Teilen | Der Reiter Teilen (Geräte mit anderen BlueNexus-Anlagen teilen, Kapitel 13d) – hier die **Fremden Quellen**. **Lesen** zeigt nur die Liste der verbundenen Quellen. **Schreiben** = Einladungscode einer anderen Anlage einfügen, Quelle verbinden/löschen und Geräte von dort holen. Zugang **an andere vergeben** (Personen anlegen, Einladungscodes erzeugen, Geräte freigeben) darf immer nur ein **Administrator** – die Karte „Teilen mit anderen“ ist für andere Konten gar nicht sichtbar. Geholte Geräte **bedienen** darf jedes Konto, das Geräte bedienen darf. Standard für neue Konten: kein Zugriff. |
 | | NFC-Tags | Der Reiter NFC-Tags. **Lesen** zeigt Tags, Handys und Freigaben (gut für Demo-Konten), aber **keine Adressen** – weder die der Tags noch die der Zentrale. **Schreiben** = Tags anlegen/umbenennen/löschen, Handys registrieren, Freigaben ändern; nur dann sind die Adressen sichtbar. Bei „Kein“ fehlt der Reiter. |
-| | Benutzerverwaltung | Nur für Admins. Mindestens ein Zugang muss „Schreiben“ behalten. |
+| | Benutzerverwaltung | Nur für Administratoren (Haken „Administrator“, siehe oben) – in der Tabelle nicht einstellbar. |
 
 - **Vorlagen:** Über „Vorlage anwenden“ füllst du alles auf einmal vor – **Admin** (alles), **Benutzer** (nur Dashboard), **Smart-Home-Nutzer** (Dashboard + Geräte schreiben, Regeln/Automatik ansehen) und **Demo** (alles ansehen). Danach ist jede Zeile einzeln änderbar.
 - **Übersicht in der Benutzerliste:** Statt Zahlen steht pro Gruppe, was das Konto darf, z. B. „Dashboard: Schreiben · Smart Home: teils · Einstellungen: –“. Passt ein Konto genau zu einer Vorlage, steht deren Name da.
@@ -142,7 +144,7 @@ Zusätzlich zu den Bereichsrechten legt ein **Administrator** für jeden Aktor, 
 - **Neu angelegte Geräte, Sensoren, Schalter/Knöpfe und WOL-Ziele sind zunächst nur für Administratoren sichtbar.** Erst wenn du sie für Konten freigibst (siehe unten), sehen diese sie. Bereits vorhandene Einträge bleiben unverändert (für alle sichtbar).
 - Hinter dem **Stift ✎** des Eintrags gibt es das Symbol mit den **zwei Personen** (nur für Admins sichtbar). **Grau** = alle Benutzer sehen es, **blau** = eingeschränkt (der Hover-Text nennt die Namen).
 - Antippen öffnet **„Wer darf das sehen?“**: **Alle Benutzer** oder **Nur ausgewählte Benutzer** mit Häkchen je Konto.
-- **Administratoren** (Benutzerverwaltung = Schreiben) sehen immer alles.
+- **Administratoren** (Haken „Administrator“) sehen immer alles.
 - Wer ein Gerät nicht sehen darf, bekommt es **weder im Dashboard noch in den Listen** angezeigt und kann es auch nicht schalten (die Anfrage wird abgelehnt, als gäbe es das Gerät nicht). **Regeln und Abläufe** nutzen das Gerät trotzdem ganz normal.
 - Ändert ein Benutzer seinen Namen, wird er in den Listen mitgezogen; wird ein Konto gelöscht, wird es aus den Listen entfernt (das Gerät bleibt eingeschränkt).
 - Auf diesem Weg lässt sich auch **„niemand außer Admins“** einstellen: „Nur ausgewählte Benutzer“ ohne Häkchen.
@@ -426,7 +428,7 @@ Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entr
 
 Jedes schaltbare Ding kann mit einer **4-stelligen PIN** geschützt werden: Geräte (Shelly, Tasmota, Tuya, Homematic, Zigbee), eigene Schalter/Knöpfe und Wake-on-LAN-Ziele.
 
-- **Setzen/Ändern/Entfernen:** nur durch **Admins** (Recht „Benutzerverwaltung“ = Schreiben), in der Aktorenliste unter Smart Home (🔑). Das Auge-Symbol zeigt die Eingabe.
+- **Setzen/Ändern/Entfernen:** nur durch **Administratoren**, in der Aktorenliste unter Smart Home (🔑). Das Auge-Symbol zeigt die Eingabe.
 - **Benutzen:** Beim Tippen auf die Kachel erscheint ein Ziffernblock. Auch Admins geben die PIN ein.
 - **Schutz gegen Raten:** Nach 5 falschen PIN-Eingaben ist das Gerät 5 Minuten gesperrt. Bei der **Anmeldung** gilt: nach 10 falschen Versuchen von derselben Adresse innerhalb von 5 Minuten ist diese Adresse 5 Minuten gesperrt.
 - Die PIN wird nur als Hash gespeichert, nie im Klartext.
