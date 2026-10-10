@@ -3221,6 +3221,7 @@ async function nfcLoad() {
       <button class="tgl del" type="button" title="Handy löschen" onclick="nfcDelPhone('${escH(p.id)}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>`).join('')
     : '<div class="muted">Noch kein Handy registriert – ohne registriertes Handy löst kein Tag etwas aus.</div>';
   const tg = d.targets, byId = Object.fromEntries((d.known || tg).map(t => [t.id, t]));
+    const wst = nfcWriteState();                         // PC: kein Beschreiben-Knopf; Android mit NFC: kein Adresse-Knopf (die App schreibt selbst)
     document.getElementById('nfc-tags').innerHTML = d.tags.length ? d.tags.map(t => {
     const all = (t.phones || []).includes('*'), tgt = byId[t.target];
     const who = all ? 'alle registrierten Handys' : (t.phones.length ? t.phones.map(i => (d.phones.find(p => p.id === i) || { name: '?' }).name).join(', ') : 'niemand');
@@ -3228,8 +3229,8 @@ async function nfcLoad() {
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:20px">🏷️</span>
         <div style="flex:1;min-width:150px"><b>${escH(t.name)}</b><div class="muted">löst aus: ${tgt ? escH(tgt.name) : '<span style="color:#e5544a">(Ziel fehlt oder PIN-geschützt)</span>'} · erlaubt: ${escH(who)}<br>zuletzt: ${nfcWhen(t.last_used)}</div></div>
-        ${d.masked ? '' : `<button class="ghost" type="button" title="Den Tag mit diesem Handy beschreiben (Android/Chrome)" onclick="nfcWrite('${escH(t.id)}')">✍ Beschreiben</button>
-        <button class="ghost" type="button" title="Adresse des Tags kopieren (für eine NFC-App)" onclick="nfcCopy('${escH(t.id)}')">📋 Adresse</button>`}
+        ${d.masked ? '' : (wst.kind === 'desktop' ? '' : `<button class="ghost" type="button" title="Den Tag mit diesem Handy beschreiben (Android/Chrome)" onclick="nfcWrite('${escH(t.id)}')">✍ Beschreiben</button>`)}
+        ${d.masked || wst.kind === 'ok' ? '' : `<button class="ghost" type="button" title="Adresse des Tags kopieren (für eine NFC-App)" onclick="nfcCopy('${escH(t.id)}')">📋 Adresse</button>`}
         <button class="ghost" type="button" title="Welche Handys dürfen diesen Tag nutzen?" onclick="editToggle('nfcw-${escH(t.id)}')">✎</button>
         <button class="tgl del" type="button" title="Tag löschen" onclick="nfcDelTag('${escH(t.id)}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>
       <div class="edit-panel" id="nfcw-${escH(t.id)}" style="margin-top:8px">

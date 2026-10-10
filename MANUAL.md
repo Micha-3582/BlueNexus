@@ -747,7 +747,7 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 - **Am PC / Mac:** „Am PC gibt es keine NFC-Schnittstelle – öffne BlueNexus zum Beschreiben auf einem Android-Handy.“
 - **iPhone / iPad:** Apple erlaubt Webseiten das Beschreiben von NFC-Tags nicht (BlueNexus ist nicht kaputt). Dort Adresse mit „📋 Adresse“ kopieren und mit einer NFC-App wie „NFC Tools“ schreiben, oder den Tag mit einem Android-Handy beschreiben. **Scannen** funktioniert auf dem iPhone ganz normal.
 - **Android, aber anderer Browser** (Samsung Internet, Firefox): in Chrome öffnen.
-Die jeweils passende Erklärung steht auch als Hinweiszeile unter der Tag-Liste.
+Die jeweils passende Erklärung steht auch als Hinweiszeile unter der Tag-Liste. Die Knöpfe passen sich dem Gerät an: Am **PC** gibt es keinen „✍ Beschreiben“-Knopf (nur „📋 Adresse“), am **Android-Handy** mit NFC keinen „📋 Adresse“-Knopf (die App schreibt selbst); am iPhone und bei anderen Browsern bleiben beide, damit „Beschreiben“ die Erklärung zeigt und „Adresse“ den Weg über eine NFC-App ermöglicht.
 
 **Sicherheit**
 - Ausgelöst wird **nur von registrierten Handys**. Ein kopierter, fotografierter oder nachgebauter Tag nützt niemandem.
