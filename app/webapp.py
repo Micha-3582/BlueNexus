@@ -4678,6 +4678,14 @@ def share_ac():
     return jsonify(ok=True, state=res["state"])
 
 
+def _invite(origin, token: str):
+    """Einladungscode (Adresse + Schluessel) - die Adresse meldet der Browser (die, ueber die du gerade angemeldet bist: Tunnel oder lokal)."""
+    try:
+        return share.make_invite(str(origin or ""), token)
+    except share.ShareError:
+        return None
+
+
 def _share_err(e):
     return jsonify(error=str(e)), (e.code if 400 <= e.code < 600 else 400)
 
@@ -4689,11 +4697,12 @@ def api_shares():
         return denied
     if request.method == "GET":
         return jsonify(shares=share.list_shares(), shareable=share.shareable())
+    b = request.get_json(silent=True) or {}
     try:
-        s, token = share.create((request.get_json(silent=True) or {}).get("name"))
+        s, token = share.create(b.get("name"))
     except share.ShareError as e:
         return _share_err(e)
-    return jsonify(share=s, token=token)                 # Schluessel nur dieses eine Mal
+    return jsonify(share=s, token=token, invite=_invite(b.get("origin"), token))                 # Schluessel/Code nur dieses eine Mal
 
 
 @app.route("/api/shares/<sid>", methods=["PATCH", "DELETE"])
@@ -4729,9 +4738,10 @@ def api_share_token(sid):
     if denied:
         return denied
     try:
-        return jsonify(token=share.regenerate(sid))
+        token = share.regenerate(sid)
     except share.ShareError as e:
         return _share_err(e)
+    return jsonify(token=token, invite=_invite((request.get_json(silent=True) or {}).get("origin"), token))
 
 
 @app.route("/api/sources", methods=["GET", "POST"])
@@ -4743,6 +4753,9 @@ def api_sources():
         return jsonify(share.list_sources())
     b = request.get_json(silent=True) or {}
     try:
+        if b.get("invite"):                              # Einladungscode: Adresse + Schluessel (+ Name der anderen Anlage) in einem
+            url, token = share.parse_invite(b.get("invite"))
+            return jsonify(share.add_source(b.get("name"), url, token))
         return jsonify(share.add_source(b.get("name"), b.get("url"), b.get("token")))
     except share.ShareError as e:
         return _share_err(e)

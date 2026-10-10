@@ -834,10 +834,15 @@
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Fremde Quellen (Geräte von anderen holen) <span class="qhelp" role="button" tabindex="0" data-help="Hier trägst du Adresse und Zugangsschlüssel ein, die du von einem anderen BlueNexus-Betreiber bekommen hast. Danach holst du dir die freigegebenen Geräte, Sensoren, Schalter und Knöpfe in deine Anlage. Sie verhalten sich wie eigene: Dashboard, Regeln, Sichtbarkeit. Ob du sie nur sehen oder auch bedienen darfst, bestimmt der Geber. Entfernst du die Quelle, verschwinden auch alle von dort geholten Einträge.">?</span></h2>
   <div class="sub">Geräte, die dir jemand anderes freigegeben hat.</div>
   <div id="sources-list" style="display:flex;flex-direction:column;gap:8px"></div>
-  <div class="admin-only grid2" style="margin-top:12px">
-    <div><label>Name der Quelle</label><input id="src-name" placeholder="z. B. Wohnung Micha" autocomplete="off" maxlength="60"></div>
-    <div><label>Adresse <span class="qhelp" role="button" tabindex="0" data-help="Die Adresse des anderen BlueNexus, z. B. https://micha.beispiel.de oder (im selben Netz) http://192.168.2.40:5000. Steht beim Geber in der Meldung nach dem Anlegen der Freigabe.">?</span></label><input id="src-url" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
-    <div><label>Zugangsschlüssel</label><div class="pw-wrap"><input id="src-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="bnx_…"></div></div>
+  <div class="admin-only" style="margin-top:12px">
+    <label>Einladungscode <span class="qhelp" role="button" tabindex="0" data-help="Den Code hast du vom anderen BlueNexus-Betreiber bekommen (er beginnt mit bnxshare1_). Er enthält Adresse und Schlüssel – mehr brauchst du nicht. Der Name der Quelle wird automatisch vom anderen System übernommen.">?</span></label>
+    <input id="src-invite" placeholder="bnxshare1_…" autocomplete="off" spellcheck="false">
+    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Oder manuell eintragen (Name, Adresse, Schlüssel einzeln)</summary>
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Name der Quelle <span class="muted">(optional)</span></label><input id="src-name" placeholder="leer = Name der anderen Anlage" autocomplete="off" maxlength="60"></div>
+        <div><label>Adresse</label><input id="src-url" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
+        <div><label>Zugangsschlüssel</label><div class="pw-wrap"><input id="src-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="bnx_…"></div></div>
+      </div></details>
   </div>
   <div class="admin-only" style="margin-top:10px"><button id="src-add" class="ghost">Verbinden</button></div>
 </div>
@@ -2434,13 +2439,15 @@ async function pickShare(kind, id) {
   try { await shellyApi('/api/share-item', 'POST', { ref, shares: res }); savedToast(Object.values(res).some(Boolean) ? 'Geteilt ✓' : 'Nicht mehr geteilt ✓'); } catch (e) { shellyMsg(e.message, true); alert(e.message); }
   loadShares();
 }
-async function shareShowKey(name, token) {
-  await uiDialog({ title: 'Zugangsschlüssel für ' + name, message: `Adresse: ${location.origin}\n\nDer Schlüssel wird nur jetzt angezeigt. Adresse und Schlüssel trägt ${name} im eigenen BlueNexus unter Smart Home → Teilen → „Fremde Quellen“ ein. (Sind beide Systeme im selben Netz, geht auch die lokale Adresse mit Port.)\n\nWas ${name} sehen darf, legst du bei jedem Gerät, Sensor oder Schalter über ✎ und das Teilen-Symbol fest.`, label: 'Zugangsschlüssel', value: token, okText: 'Fertig' });
+async function shareShowKey(name, j) {            // j: Antwort mit invite (Einladungscode) und token
+  const code = j.invite || j.token;
+  try { await navigator.clipboard.writeText(code); } catch (e) { /* nicht schlimm: zum Kopieren markiert */ }
+  await uiDialog({ title: 'Einladung für ' + name, message: `${j.invite ? 'Dieser Code enthält Adresse und Schlüssel. Er ist schon in der Zwischenablage – schick ihn an ' + name + ' (am besten über einen privaten Chat).' : 'Schlüssel (die Adresse konnte nicht ermittelt werden – bitte auch die Adresse deines Systems weitergeben):'}\n\n${name} fügt ihn im eigenen BlueNexus unter Smart Home → Teilen → „Fremde Quellen“ ein und sieht dann sofort, was du freigibst.${j.invite ? '\n\nAdresse im Code: ' + location.origin + ' (für Besuche von außerhalb deine Tunnel-Adresse; öffne dazu BlueNexus über sie).' : ''}\n\nDer Code wird nur jetzt angezeigt. Was ${name} sehen darf, legst du bei jedem Gerät, Sensor oder Schalter über ✎ und das Teilen-Symbol fest.`, label: j.invite ? 'Einladungscode' : 'Zugangsschlüssel', value: code, okText: 'Fertig' });
 }
 async function shareToken(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
   if (!await uiDialog({ title: 'Neuen Schlüssel erzeugen?', message: `Der alte Schlüssel von „${s.name}“ gilt danach nicht mehr – ${s.name} muss den neuen eintragen.`, okText: 'Neu erzeugen' })) return;
-  try { const j = await shellyApi('/api/shares/' + encodeURIComponent(id) + '/token', 'POST'); await shareShowKey(s.name, j.token); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/shares/' + encodeURIComponent(id) + '/token', 'POST', { origin: location.origin }); await shareShowKey(s.name, j); } catch (e) { alert(e.message); }
 }
 async function shareDelete(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
@@ -2449,7 +2456,7 @@ async function shareDelete(id) {
 }
 document.getElementById('share-add')?.addEventListener('click', async () => {
   const el = document.getElementById('share-name'), name = el.value.trim(); if (!name) { el.focus(); return; }
-  try { const j = await shellyApi('/api/shares', 'POST', { name }); el.value = ''; await loadShares(); await shareShowKey(j.share.name, j.token); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/shares', 'POST', { name, origin: location.origin }); el.value = ''; await loadShares(); await shareShowKey(j.share.name, j); } catch (e) { alert(e.message); }
 });
 async function loadSources() {
   const box = document.getElementById('sources-list'); if (!box) return;
@@ -2488,8 +2495,9 @@ async function sourceDelete(id) {
 document.getElementById('src-add')?.addEventListener('click', async () => {
   const v = id => document.getElementById(id);
   try {
-    await shellyApi('/api/sources', 'POST', { name: v('src-name').value, url: v('src-url').value, token: v('src-token').value });
-    v('src-name').value = v('src-url').value = v('src-token').value = ''; savedToast('Verbunden ✓'); loadSources();
+    const code = v('src-invite').value.trim();
+    await shellyApi('/api/sources', 'POST', code ? { invite: code, name: v('src-name').value } : { name: v('src-name').value, url: v('src-url').value, token: v('src-token').value });
+    v('src-invite').value = v('src-name').value = v('src-url').value = v('src-token').value = ''; savedToast('Verbunden ✓'); loadSources();
   } catch (e) { alert(e.message); }
 });
 loadShares(); loadSources();

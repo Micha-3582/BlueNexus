@@ -15,7 +15,9 @@ Ein Empfaenger-Geraet ist ein normaler Geraete-Eintrag mit kind="remote" (rkind 
 """
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import hmac
 import os
 import secrets
@@ -352,15 +354,42 @@ def _http(s: dict, method: str, path: str, **kw):
     return j
 
 
+INVITE_PREFIX = "bnxshare1_"
+
+
+def make_invite(url: str, token: str) -> str:
+    """Einladungscode: Adresse + Schluessel in EINER Zeichenfolge (zum Verschicken und Einfuegen beim Empfaenger). Endet mit ~ (erkennt abgeschnittene Codes)."""
+    raw = json.dumps({"u": _norm_url(url), "k": token}, separators=(",", ":")).encode("utf-8")
+    return INVITE_PREFIX + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=") + "~"
+
+
+def parse_invite(code: str) -> tuple[str, str]:
+    code = code or ""
+    i = code.find(INVITE_PREFIX)                                # auch aus einer ganzen Nachricht herausfinden
+    if i < 0:
+        raise ShareError("Das ist kein Einladungscode (er beginnt mit „" + INVITE_PREFIX + "“)")
+    rest = code[i + len(INVITE_PREFIX):]
+    j = rest.find("~")
+    if j < 0:
+        raise ShareError("Der Einladungscode ist unvollständig (das Ende „~“ fehlt) – bitte noch einmal vollständig einfügen")
+    body = "".join(rest[:j].split())                            # Umbrueche/Leerzeichen beim Kopieren stoeren nicht
+    try:
+        d = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)).decode("utf-8"))
+        return _norm_url(d["u"]), str(d["k"]).strip()
+    except (ValueError, KeyError, TypeError, UnicodeDecodeError):
+        raise ShareError("Der Einladungscode ist beschädigt – bitte noch einmal vollständig einfügen")
+
+
 def add_source(name: str, url: str, token: str) -> dict:
+    """Quelle verbinden. Ohne Namen wird der Name der anderen Anlage uebernommen (aus ihrer Antwort)."""
     name = (name or "").strip()[:60]
     token = (token or "").strip()
-    if not name:
-        raise ShareError("Name eingeben (z. B. „Wohnung Micha“)")
     if not token:
         raise ShareError("Zugangsschlüssel eingeben")
-    s = {"id": "q-" + uuid.uuid4().hex[:8], "name": name, "url": _norm_url(url), "token": token}
+    s = {"id": "q-" + uuid.uuid4().hex[:8], "name": name or "Fremde Anlage", "url": _norm_url(url), "token": token}
     j = _http(s, "GET", "/share/v1/items")                       # Probe: Adresse + Schluessel pruefen
+    if not name:
+        s["name"] = str(j.get("name") or "").strip()[:60] or "Fremde Anlage"
     with _lock:
         items = _load(SOURCES_PATH)
         items.append(s)
