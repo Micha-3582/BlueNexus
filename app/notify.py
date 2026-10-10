@@ -280,6 +280,9 @@ def detect_chats(token: str | None = None) -> list[dict]:
     token = (token or load_credentials().get("token") or "").strip()
     if not token:
         raise NotifyError("Bitte zuerst den Bot-Token eintragen")
+    import notify_in
+    if notify_in.active():                                    # der Hintergrund-Abruf laeuft schon und merkt sich neue Chats als Anfragen
+        return [{"id": v["id"], "name": v.get("name") or str(v["id"]), "type": v.get("type", "")} for v in notify_in.requests_list()]
     j = _api(token, "getUpdates", {"limit": 50})
     seen: dict = {}
     for u in j.get("result", []):

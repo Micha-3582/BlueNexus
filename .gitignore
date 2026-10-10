@@ -71,3 +71,4 @@ app/shares.json
 app/sources.json
 app/midea_login.json
 app/midea_session.json
+app/telegram_requests.json

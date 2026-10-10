@@ -93,7 +93,8 @@ class FlowEngine:
             prev = self.last.get(rid)
             if res is not None:
                 first = prev is None and bool(r.get("run_now"))                  # Option "gleich anwenden": beim Anlegen/Einschalten (noch kein bekannter Wert) sofort starten
-                if (prev is not None and res != prev) or first:
+                pulse = prev is None and bool(res) and any(c.get("type") == "telegram" for c in r["when"]["conds"])       # ein Telegram-Wort darf nie verloren gehen, auch wenn es im allerersten Durchlauf eintrifft
+                if (prev is not None and res != prev) or first or pulse:
                     branch = "then" if res else "else"
                     steps = r.get(branch) or []
                     cool = int(r.get("cooldown_s") or 0)

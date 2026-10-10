@@ -50,7 +50,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(_DIR, "rules.json")
 STATE_PATH = os.path.join(_DIR, "rules_state.json")
 
-TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday", "rule")
+TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday", "rule", "telegram")
 ONCE = ("at", "sun")               # Ausloeser, die einmal pro Tag feuern
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 VERSION = 2
@@ -202,6 +202,20 @@ def normalize_condition(c: dict) -> dict:
     if t == "time":
         days = sorted({int(x) for x in (c.get("days") or []) if str(x).isdigit() and 0 <= int(x) <= 6})
         return {"type": t, "from": _hhmm(c.get("from", "00:00"), "Von"), "to": _hhmm(c.get("to", "24:00"), "Bis"), "days": days if len(days) < 7 else []}
+    if t == "telegram":                              # Triggerwort per Telegram (notify_in.py): nur Ablauf-Regeln, wie "Knopf gedrueckt"
+        import notify_in
+        word = notify_in.norm(c.get("word"))
+        if not word:
+            raise RuleError("Telegram: ein Triggerwort eingeben")
+        if len(word) > 40:
+            raise RuleError("Telegram-Wort: höchstens 40 Zeichen")
+        if word in notify_in.HELP or word in notify_in.YES or word in notify_in.NO:
+            raise RuleError(f"„{word}“ ist für den Bot reserviert (hilfe, ja, nein …) – bitte ein anderes Wort wählen")
+        who = c.get("who") or []
+        if not isinstance(who, list):
+            raise RuleError("Telegram: Empfänger ungültig")
+        return {"type": t, "word": word, "shown": str(c.get("shown") or c.get("word") or word).strip()[:40], "who": sorted({str(x) for x in who if str(x).strip()}),
+                "confirm": bool(c.get("confirm"))}
     if t == "virtual":                               # eigener Schalter/Knopf (virtual.py)
         vid = str(c.get("id") or "").strip()
         if not vid:
@@ -601,6 +615,8 @@ def normalize_rule(body: dict, rule_id: str | None = None) -> dict:
         else:
             if any(c["type"] == "virtual" and c.get("is") == "pressed" for c in conds):
                 raise RuleError("„wird gedrückt“ geht nur bei Regeln der Art „Ablauf“")
+            if any(c["type"] == "telegram" for c in conds):
+                raise RuleError("„Telegram-Wort“ geht nur bei Regeln der Art „Ablauf“")
             for key, lst in (("DANN", then), ("SONST", other)):
                 ids = [a["device_id"] for a in lst]
                 if len(ids) != len(set(ids)):
@@ -845,6 +861,11 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
         if not info:
             return None, f"Regel {c.get('id')} (nicht mehr vorhanden)"
         return bool(info.get("enabled")) == (c["is"] == "on"), f"Regel „{info.get('name') or c['id']}“ ist {'an' if c['is'] == 'on' else 'aus'}"
+    if t == "telegram":                                                  # ein passendes Wort wurde in diesem Durchlauf geschrieben (Impuls)
+        hit = next((e for e in (ctx.get("telegram") or []) if e.get("word") == c.get("word") and (not c.get("who") or e.get("rid") in c["who"])), None)
+        if hit:
+            return True, f"Telegram „{c.get('shown') or c['word']}“ von {hit.get('name') or '?'}"
+        return False, f"Telegram „{c.get('shown') or c['word']}“ (wartet)"
     if t == "virtual":
         info = (ctx.get("virtual") or {}).get(c.get("id"))
         if not info:

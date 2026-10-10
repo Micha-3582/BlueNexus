@@ -241,6 +241,7 @@ Sicherheit zuerst: Geräte mit PIN und Türschlösser sind für Alexa **nie** fr
 
 ## Benachrichtigungen
 
+- **Telegram-Befehle:** Triggerwörter, die jemand dem Bot schreibt, starten Regeln (z. B. „Tor“ öffnet das Schiebetor) – nur freigegebene Chat-IDs, wahlweise mit Rückfrage, alte Nachrichten verfallen, alles im Logbuch (nur Administratoren).
 - **Telegram:** Mehrere Empfänger an einem Bot, pro Meldung wählbar, wer sie bekommt. Mit Kamera-Standbild in
   Regeln – dasselbe Foto geht an alle gewählten Empfänger. Dazu Tagesbilanz, Monatsübersicht und Störungsmeldungen.
 - **Pushover:** Zweiter Meldeweg mit eigenem Regelbaustein, Auswahl einzelner Geräte als Ziel, Prioritäten

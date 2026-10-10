@@ -162,7 +162,7 @@
 <div class="card" id="report-admin">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.">?</span></h2>
   <div class="sub">Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.</div>
-  <a href="/report"><button type="button" class="ghost">📋 Betriebsbericht öffnen</button></a>
+  {% if user_role == 'admin' %}<a href="/report"><button type="button" class="ghost">📋 Betriebsbericht öffnen</button></a>{% endif %}
 </div>
 
 <div class="card" id="backup-card" data-tab="system" data-area="user_management">
@@ -327,7 +327,7 @@
     <div class="muted" id="pv-cal-msg" style="margin-top:4px"></div>
   </div>
   <div style="margin-top:12px">
-    <a href="/solar-log"><button type="button" class="ghost">☀︎ Solarlogbuch öffnen</button></a>
+    {% if user_role == 'admin' %}<a href="/solar-log"><button type="button" class="ghost">☀︎ Solarlogbuch öffnen</button></a>{% endif %}
     <span class="muted" style="margin-left:8px">Prognose gegen realen Ertrag.</span>
   </div>
 </div>
@@ -335,7 +335,7 @@
 <div class="card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>Batterie-Watchdog <span class="qhelp" role="button" tabindex="0" data-help="Erkennt und protokolliert, wenn die Batterie trotz Netzfluss länger als 15 Minuten nicht reagiert (Ladehänger des MultiPlus). Zeigt außerdem Vollzyklen und die Lebensdauer-Hochrechnung.">?</span></h2>
   <div style="margin-top:4px">
-    <a href="/watchdog"><button type="button" class="ghost">🔋 Watchdog öffnen</button></a>
+    {% if user_role == 'admin' %}<a href="/watchdog"><button type="button" class="ghost">🔋 Watchdog öffnen</button></a>{% endif %}
     <span class="muted" style="margin-left:8px">Meldet Ladehänger des MultiPlus.</span>
   </div>
 </div>
@@ -530,6 +530,7 @@
   <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
     <b>Empfänger</b> <span class="qhelp" role="button" tabindex="0" data-help="Mehrere Personen können denselben Bot nutzen: Jede öffnet den Bot in Telegram und schreibt ihm einmal „Hallo“, danach wird sie hier mit <b>Empfänger hinzufügen</b> eingetragen.<br><br>In Regeln wählst du je Schritt („Telegram-Nachricht“, „Kamera-Standbild“), wer die Nachricht erhält. Ein Foto wird nur einmal aufgenommen und an alle Gewählten gesendet. <b>Systemmeldungen</b> (Störungen, Tagesbilanz) und Schritte ohne Auswahl erhalten nur Empfänger mit dem Haken „Systemmeldungen“.">?</span>
     <div class="muted" style="margin:4px 0 10px">Mehrere Personen können denselben Bot nutzen.</div>
+    <div id="nt-requests" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
     <div id="nt-recipients" style="display:flex;flex-direction:column;gap:8px"></div>
     <div style="margin-top:10px"><button id="nt-add" class="ghost" type="button">+ Empfänger hinzufügen</button></div>
     <div id="nt-add-found" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></div>
@@ -890,7 +891,7 @@
   <ul class="muted" style="margin:0 0 0 18px;padding:0;line-height:1.8">
     <li><b>Dashboard-Kacheln</b> (ein-/ausblenden, sortieren): <a href="/admin#anzeige" style="color:var(--accent-t);font-weight:600">Einstellungen → Dashboard</a></li>
     <li><b>Telegram-Meldungen</b>: <a href="/admin#meldungen" style="color:var(--accent-t);font-weight:600">Einstellungen → Meldungen</a></li>
-    <li><b>Logbücher</b>: <a href="/automation-log" style="color:var(--accent-t);font-weight:600">Automatik</a> · <a href="/rules-log" style="color:var(--accent-t);font-weight:600">Regeln</a></li>
+{% if user_role == 'admin' %}    <li><b>Logbücher</b>: <a href="/automation-log" style="color:var(--accent-t);font-weight:600">Automatik</a> · <a href="/rules-log" style="color:var(--accent-t);font-weight:600">Regeln</a></li>{% endif %}
     <li><b>PIN-Schutz</b>: pro Gerät in der Aktoren-Liste (nur Admins).</li>
   </ul>
 </div>
@@ -3343,6 +3344,7 @@ async function ntLoad() {
   document.getElementById('nt-lowsoc').value = n.low_soc; document.getElementById('nt-hour').value = n.summary_hour;
   document.getElementById('nt-prefix').checked = n.prefix !== false;
   ntRecipients(n.recipients || []);
+  ntRequests();
   document.getElementById('nt-events').innerHTML = n.events.map(e => `<div style="display:flex;align-items:center;gap:14px">
     <label class="switch" style="margin:0"><input type="checkbox" data-ev="${e.key}" ${e.enabled ? 'checked' : ''}><span class="slider"></span></label>
     <div>${escH(e.label)}</div></div>`).join('');
@@ -3351,6 +3353,24 @@ async function ntLoad() {
     catch (e) { ntMsg(e.message, true); cb.checked = !cb.checked; }
   }));
 }
+async function ntRequests() {          // Chats, die dem Bot geschrieben haben und noch nicht freigegeben sind
+  const box = document.getElementById('nt-requests'); if (!box) return;
+  let list; try { const r = await fetch('/api/notify/requests', { cache: 'no-store' }); if (!r.ok) { box.innerHTML = ''; return; } list = await r.json(); } catch (e) { return; }
+  box.innerHTML = Array.isArray(list) && list.length ? `<div class="muted"><b>Anfragen</b> – diese Chats haben dem Bot geschrieben und sind noch nicht freigegeben:</div>` + list.map(q => `<div style="border:1px dashed var(--accent);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px"><b>${escH(q.name)}</b><div class="muted">Chat ${escH(String(q.id))} · schrieb „${escH(q.text || '')}“${q.last ? ' · ' + new Date(q.last * 1000).toLocaleString('de-DE') : ''}</div></div>
+      <button class="ghost" type="button" onclick="ntRequestApprove('${escH(String(q.id))}', this.dataset.name)" data-name="${escH(q.name)}">Freigeben</button>
+      <button class="ghost" type="button" onclick="ntRequestReject('${escH(String(q.id))}')" style="color:#e5544a">Ablehnen</button></div>`).join('') : '';
+}
+async function ntRequestApprove(cid, name) {
+  const nm = await uiDialog({ title: 'Chat freigeben', message: 'Dieser Chat darf danach dem Bot Befehle schreiben (Triggerwörter in Regeln) und bekommt Meldungen, wenn eine Regel ihn wählt.', label: 'Name (z. B. Anna)', value: name || '', okText: 'Freigeben' });
+  if (nm === null || !nm.trim()) return;
+  try { await shellyApi('/api/notify/recipient', 'POST', { name: nm.trim(), chat_id: cid, system: false }); savedToast('Freigegeben ✓'); ntLoad(); } catch (e) { ntMsg(e.message, true); }
+}
+async function ntRequestReject(cid) {
+  if (!await uiDialog({ title: 'Anfrage ablehnen?', message: 'Der Chat bleibt gesperrt. Schreibt er dem Bot noch einmal, erscheint er wieder in der Liste.', okText: 'Ablehnen' })) return;
+  try { await shellyApi('/api/notify/request/' + encodeURIComponent(cid), 'DELETE'); ntRequests(); } catch (e) { ntMsg(e.message, true); }
+}
+setInterval(() => { if (!document.hidden && document.getElementById('notify-admin') && !document.getElementById('notify-admin').closest('[hidden]')) ntRequests(); }, 20000);
 function ntRecipients(list) {
   const wasOpen = openEdits('ntedit-');
   document.getElementById('nt-recipients').innerHTML = list.length ? list.map(r => { const id = escH(r.id);

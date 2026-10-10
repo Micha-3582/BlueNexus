@@ -21,7 +21,7 @@
     <label class="switch" style="margin:0"><input type="checkbox" id="surplus_dry"><span class="slider"></span></label>
     <div><b>Trockenlauf</b> <span class="qhelp" role="button" tabindex="0" data-help="Es wird nur protokolliert (und gemeldet), was geschaltet würde – nichts wird wirklich geschaltet. Ideal zum Ausprobieren.">?</span><div class="muted">Nur protokollieren, nichts schalten.</div></div>
   </div>
-  <div style="margin-top:14px"><span data-log-badge="surplus" style="display:inline-block"><a href="/automation-log"><button type="button" class="ghost">📒 Logbuch</button></a></span></div>
+  {% if user_role == 'admin' %}<div style="margin-top:14px"><span data-log-badge="surplus" style="display:inline-block"><a href="/automation-log"><button type="button" class="ghost">📒 Logbuch</button></a></span></div>{% endif %}
 </div>
 
 <div class="card">

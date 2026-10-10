@@ -41,6 +41,7 @@ import zigbee
 import planner
 import autolog
 import notify
+import notify_in
 import pushover
 import pwreset
 import tunnel
@@ -211,6 +212,9 @@ def _deny(msg: str, code: int = 403):
 # die hier fehlen, sind nur mit Benutzerverwaltung=write erreichbar (sicherer Standard fuer
 # neue/vergessene Routen) - ausser sie stehen in ALWAYS_ALLOWED (eigenes Konto, Ab-/Anmelden).
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
+# Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
+LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
+                     "solar_log_page", "api_solar_log", "report_page", "api_report", "watchdog_page", "api_watchdog", "api_tunnel_log"}
 ENDPOINT_AREA = {
     "api_update_own_account": "account", "api_modules": "settings_system",
     "api_alexa": "smarthome_einrichten", "api_alexa_settings": "smarthome_einrichten", "api_alexa_add": "smarthome_einrichten", "api_alexa_modify": "smarthome_einrichten", "api_alexa_order": "smarthome_einrichten", "api_zigbee_gateways_order": "smarthome_einrichten",
@@ -242,7 +246,7 @@ ENDPOINT_AREA = {
     "api_notify_info": "settings_meldungen", "api_notify_credentials": "settings_meldungen",
     "api_notify_detect": "settings_meldungen", "api_notify_settings": "settings_meldungen",
     "api_notify_test": "settings_meldungen", "api_notify_recipient_add": "settings_meldungen", "api_notify_recipient_modify": "settings_meldungen",
-    "api_notify_recipients": "rules", "api_tibber_token_delete": "settings_tarif",
+    "api_notify_recipients": "rules", "api_notify_requests": "settings_meldungen", "api_notify_request": "settings_meldungen", "api_tibber_token_delete": "settings_tarif",
     "api_tunnel_info": "settings_system", "api_tunnel_log": "settings_system", "api_tunnel_token": "settings_system", "api_tunnel_enable": "settings_system",
     "api_tunnel_install": "settings_system",
     "api_pushover_info": "settings_meldungen", "api_pushover_credentials": "settings_meldungen", "api_pushover_recipient_add": "settings_meldungen",
@@ -409,6 +413,8 @@ def _require_login():
 
     if g.preview and request.method not in ("GET", "HEAD", "OPTIONS") and request.endpoint not in ("preview_start", "preview_stop"):
         return jsonify(error="Vorschau-Modus: Das Konto wird nur angesehen, hier wird nichts geändert. Oben „Vorschau beenden“ drücken."), 403
+    if request.endpoint in LOGBOOK_ENDPOINTS and not auth.is_full_admin(g.perms):
+        return _deny("Logbücher dürfen nur Administratoren ansehen.")
     if request.endpoint in ALWAYS_ALLOWED_ENDPOINTS or request.endpoint == "api_config":
         return None                                    # api_config prueft jedes Feld einzeln selbst (siehe dort)
     if request.endpoint == "admin":
@@ -1836,6 +1842,8 @@ class Controller:
                     ctx["virtual"] = virtual.snapshot()                              # eigene Schalter/Knoepfe
                     ctx["rules"] = {r["id"]: {"name": r.get("name", ""), "enabled": r.get("enabled", True)} for r in all_rules}          # Zustand anderer Regeln als Bedingung
                     pressed = virtual.pressed_ids()
+                    ctx["telegram"] = notify_in.snapshot()                           # Triggerworte, die jemand dem Bot geschrieben hat
+                    tg_seq = notify_in.max_seq()
                     for act in rule_engine.step(now, ctx, cfg, devs, rules.compile_all(all_rules)):
                         self._apply_rule(act, dry, cfg)
                     for ev in flow_engine.step(now, ctx, [r for r in all_rules if flows.is_flow(r)]):
@@ -1847,6 +1855,7 @@ class Controller:
                             log.warning("Ablauf-Schritt fehlgeschlagen: %s", e)         # ein kaputter Schritt darf die folgenden nicht verschlucken
                             autolog.log("rules", f"Regel „{act.get('rule', '')}“: Schritt fehlgeschlagen ({e})", dev=act.get("rule", ""), action="fail", dry=dry, rule=act.get("rule_id"))
                     virtual.consume(pressed)                                         # Knopfdruck war genau einen Durchlauf lang sichtbar
+                    notify_in.consume(tg_seq)                                        # ebenso ein Telegram-Wort
                     if time.time() - last_flush > 60:
                         rule_engine.flush()
                         last_flush = time.time()
@@ -1858,6 +1867,7 @@ class Controller:
                         self._log_flow_event(ev, False)
                     flow_engine.forget()
                     virtual.consume(virtual.pressed_ids())
+                    notify_in.consume(notify_in.max_seq())                           # Regeln aus: nichts bleibt liegen (ein altes Wort darf spaeter nichts ausloesen)
             except Exception as e:                       # noqa: BLE001
                 log.warning("Regel-Engine: %s", e)
             fast = any(c.get("type") in ("sensor", "device") for r in rules.list_rules() if r.get("enabled", True) for c in rules.all_conditions(r))
@@ -2159,9 +2169,21 @@ class Controller:
             store.repair_fixed_costs_once()
         threading.Thread(target=_fixed_price_housekeeping, daemon=True).start()
         homematic.add_listener(self._rules_wake.set)               # Meldung der CCU -> Regeln sofort pruefen
+        notify_in.start(_telegram_words, self._rules_wake.set, lambda: not (demo.ACTIVE or sandbox.ACTIVE))        # Telegram-Befehle (Triggerworte)
         homematic.push_start()
         tunnel.startup()                                           # Cloudflare-Tunnel (Fernzugriff) wieder verbinden, falls eingeschaltet
         _alexa_sync()                                              # Alexa-Anbindung (Hue-Emulation), nur wenn das Modul an ist
+
+
+def _telegram_words() -> list:
+    """Triggerwoerter aller eingeschalteten Ablauf-Regeln (fuer den Telegram-Bot)."""
+    out = []
+    for r in rules.list_rules():
+        if r.get("enabled", True) and flows.is_flow(r):
+            for c in rules.all_conditions(r):
+                if c.get("type") == "telegram":
+                    out.append({"word": c["word"], "shown": c.get("shown") or c["word"], "who": c.get("who") or [], "confirm": bool(c.get("confirm"))})
+    return out
 
 
 import demo_sim
@@ -3595,6 +3617,19 @@ def api_tibber_token_delete():
 def api_notify_recipients():
     """Empfaenger (nur Namen, keine Chat-IDs) fuer den Regel-Editor: wer soll eine Nachricht bzw. ein Foto bekommen."""
     return jsonify(notify.recipients_light())
+
+
+@app.route("/api/notify/requests", methods=["GET"])
+def api_notify_requests():
+    """Chats, die dem Bot geschrieben haben und noch nicht freigegeben sind (Freigeben = als Empfaenger eintragen)."""
+    return jsonify([{"id": v["id"], "name": v.get("name"), "type": v.get("type", ""), "text": v.get("text", ""), "last": v.get("last"), "count": v.get("count", 1)}
+                    for v in notify_in.requests_list()])
+
+
+@app.route("/api/notify/request/<cid>", methods=["DELETE"])
+def api_notify_request(cid):
+    """Anfrage ablehnen (der Chat wird nicht freigegeben und verschwindet aus der Liste; schreibt er wieder, erscheint er neu)."""
+    return (jsonify(ok=True), 200) if notify_in.reject_request(cid) else (jsonify(error="Anfrage nicht gefunden"), 404)
 
 
 @app.route("/api/notify/recipient", methods=["POST"])

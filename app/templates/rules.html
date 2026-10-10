@@ -33,7 +33,7 @@
     <label class="switch" style="margin:0"><input type="checkbox" id="rules_dry"><span class="slider"></span></label>
     <div><b>Trockenlauf</b> <span class="qhelp" role="button" tabindex="0" data-help="Es wird nur protokolliert (und gemeldet), was geschaltet würde – nichts wird wirklich geschaltet. Ideal zum Ausprobieren neuer Regeln.">?</span><div class="muted">Nur protokollieren, nichts schalten.</div></div>
   </div>
-  <div style="margin-top:14px"><span data-log-badge="rules" style="display:inline-block"><a href="/rules-log"><button type="button" class="ghost">📒 Logbuch</button></a></span></div>
+  {% if user_role == 'admin' %}<div style="margin-top:14px"><span data-log-badge="rules" style="display:inline-block"><a href="/rules-log"><button type="button" class="ghost">📒 Logbuch</button></a></span></div>{% endif %}
 </div>
 
 <div class="card">
@@ -210,9 +210,9 @@ function renderSettings() {
 const MODULES = {{ modules | tojson }};                         // Module der Installation: ausgeschaltete blenden ihre Bedingungen/Aktionen im Editor aus
 const FAMS = {{ families | tojson }};                                // gewaehlte Smart-Home-Systeme (Einstellungen -> Geraete): nicht vorhandene blenden ihre Schritte aus
 const ENERGY_CONDS = ['price', 'budget', 'soc', 'sun_tomorrow'];           // brauchen das Modul Energie (Strompreis, Akku, Prognose)
-const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf'], ['rule', 'Regel (an/aus)']];
+const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf'], ['telegram', 'Telegram-Wort (Befehl an den Bot)'], ['rule', 'Regel (an/aus)']];
 let CUR_FLOW = false;                           // gerade gezeichnete Regel ist ein Ablauf (kein 'Laufzeit pro Tag')
-const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
+const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'telegram' && !(S.recipients || []).length) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
 const switchable = () => S.devs.filter(d => d.switchable !== false && !d.auto);
 const COND_DEFAULT = {
   weekday: { type: 'weekday', days: [0, 1, 2, 3, 4] }, at: { type: 'at', time: '23:30', days: [] }, sun: { type: 'sun', event: 'sunset', offset: 0, days: [] }, sunwin: { type: 'sunwin', phase: 'night', start: 0, end: 0 }, time: { type: 'time', from: '09:00', to: '16:00', days: [] }, price: { type: 'price', op: 'below', ct: 25 },
@@ -230,7 +230,7 @@ const deviceDefault = () => ({ type: 'device', device_id: (S.devs[0] || {}).id |
 const virtualDefault = vid => { const v = (S.virtual || []).find(x => x.id === vid) || (S.virtual || [])[0]; return v ? { type: 'virtual', id: v.id, is: v.kind === 'button' ? 'pressed' : 'on' } : { type: 'virtual', id: '', is: 'on' }; };
 const savedRules = () => R.filter(x => !String(x.id).startsWith('new-'));                // nur gespeicherte Regeln lassen sich auswaehlen (neue haben noch keine feste ID)
 const ruleDefault = () => ({ type: 'rule', id: (savedRules()[0] || {}).id || '', is: 'off' });
-const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : t === 'rule' ? ruleDefault() : clone(COND_DEFAULT[t]);
+const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : t === 'rule' ? ruleDefault() : t === 'telegram' ? { type: 'telegram', word: '', shown: '', who: [], confirm: false } : clone(COND_DEFAULT[t]);
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 let FIXED = false;
 const optHtml = (list, val) => list.map(([v, t]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${t}</option>`).join('');
@@ -286,6 +286,11 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
     const opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!v) opts.unshift([escH(c.id), '(Schalter fehlt)']);
     const pick = sel('c-virt', c.id, opts).replace('onchange="ruleEdited(this)"', 'onchange="virtChanged(this)"');
     body = (c.is === 'pressed' || (v && v.kind === 'button')) ? `${pick} wird gedrückt` : `${pick} ${v && v.kind === 'timer' ? sel('c-vis', c.is, [['on', 'läuft'], ['off', 'läuft nicht']]) : 'ist ' + sel('c-vis', c.is, [['on', 'an'], ['off', 'aus']])}`;
+  } else if (c.type === 'telegram') {
+    const rs = S.recipients || [], who = c.who || [];
+    body = `Wort <input class="c-tgw" value="${escH(c.shown || c.word || '')}" maxlength="40" placeholder="z. B. Tor" style="width:130px" oninput="ruleEdited(this)"> wird dem Bot geschrieben`
+      + (rs.length > 1 ? ` von ${rs.map(r => `<label class="chk" style="font-weight:normal"><input type="checkbox" class="c-tgwho" value="${escH(r.id)}" ${who.includes(r.id) ? 'checked' : ''} onchange="ruleEdited(this)"> ${escH(r.name)}</label>`).join(' ')} <span class="muted">(nichts angehakt = alle freigegebenen)</span>` : '')
+      + ` <label class="chk" style="font-weight:normal"><input type="checkbox" class="c-tgc" ${c.confirm ? 'checked' : ''} onchange="ruleEdited(this)"> mit Rückfrage („ja“) <span class="qhelp" role="button" tabindex="0" data-help="Der Bot fragt nach: „Wirklich auslösen? Antworte mit ja“. Erst die Antwort „ja“ (innerhalb einer Minute) löst aus. Sinnvoll bei Tor, Tür oder Schloss.">?</span></label>`;
   } else if (c.type === 'rule') {
     const list = savedRules(), opts = list.map(x => [escH(x.id), escH(x.name || '(ohne Namen)')]); if (!list.some(x => x.id === c.id)) opts.unshift([escH(c.id), '(Regel fehlt)']);
     body = `${sel('c-rule', c.id, opts)} ist ${sel('c-rst', c.is, [['on', 'an'], ['off', 'aus']])}`;
@@ -318,6 +323,7 @@ function collectCond(row) {
   if (t === 'sensor') return row.querySelector('.c-is') ? { type: t, sensor_id: v('c-sensor'), is: v('c-is') === '1' }
                                                           : { type: t, sensor_id: v('c-sensor'), op: v('c-op'), value: v('c-val') };
   if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed' };
+  if (t === 'telegram') return { type: t, word: v('c-tgw'), shown: v('c-tgw'), who: [...row.querySelectorAll('.c-tgwho:checked')].map(x => x.value), confirm: !!row.querySelector('.c-tgc:checked') };
   if (t === 'rule') return { type: t, id: v('c-rule'), is: v('c-rst') };
   if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
   return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
@@ -470,7 +476,7 @@ function collectRule(box) {
   const mode = box.querySelector('.r-mode'), acts = b => [...box.querySelectorAll(`.act[data-branch="${b}"]`)].map(collectAct);
   const conds = [...box.querySelectorAll('.cond')].map(collectCond), then = acts('then'), other = acts('else');
   let kind = box.querySelector('.r-kind').value;
-  if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => c.type === 'virtual' && c.is === 'pressed'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
+  if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
   return { name: box.querySelector('.r-name').value, enabled: box.querySelector('.r-en').checked, mode: kind, abort_on_fall: !!(box.querySelector('.r-abort') || {}).checked, run_now: !!(box.querySelector('.r-runnow') || {}).checked, keep_trigger: !!box.querySelector('.r-reset') && !box.querySelector('.r-reset').checked, cooldown_s: +((box.querySelector('.r-cool') || {}).value) || 0, when: { mode: mode ? mode.value : 'all', conds }, then, else: other };
 }
 const ruleBox = el => el.closest('[data-rule]');
@@ -513,11 +519,11 @@ function actMove(btn, dir) {
 }
 // Standard fuer neue Ablaeufe: bei Wegfall der Bedingung sofort beenden - ausser bei Impuls-Ausloesern (Knopf, 'Um HH:MM'), die gleich wieder wegfallen
 const isKeySensor = c => c.type === 'sensor' && /^key_/.test(((S.sensors || []).find(x => x.id === c.sensor_id) || {}).kind || '');
-const flowAbortDefault = r => !r.when.conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'at' || c.type === 'sun' || isKeySensor(c));
+const flowAbortDefault = r => !r.when.conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram' || c.type === 'at' || c.type === 'sun' || isKeySensor(c));
 function kindChanged(sel) {
   const box = ruleBox(sel), r = R.find(x => x.id === box.dataset.rule), c = collectRule(box);
-  if (sel.value === 'state' && (c.then.concat(c.else).some(a => a.type && a.type !== 'switch') || c.when.conds.some(x => x.type === 'virtual' && x.is === 'pressed'))) {
-    sel.value = 'flow'; savedToast('Erst Warten, Nachricht, Sollwert, eigenen Schalter und „wird gedrückt“ entfernen'); return;
+  if (sel.value === 'state' && (c.then.concat(c.else).some(a => a.type && a.type !== 'switch') || c.when.conds.some(x => (x.type === 'virtual' && x.is === 'pressed') || x.type === 'telegram'))) {
+    sel.value = 'flow'; savedToast('Erst Warten, Nachricht, Sollwert, eigenen Schalter, „wird gedrückt“ und Telegram-Wort entfernen'); return;
   }
   const wasFlow = r.mode === 'flow'; Object.assign(r, c, { mode: sel.value }); if (sel.value === 'flow' && !wasFlow) r.abort_on_fall = flowAbortDefault(r); touch(); renderRules();
 }
@@ -641,6 +647,7 @@ function condSummary(c) {
     return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
   }
   if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
+  if (c.type === 'telegram') return `Telegram „${c.shown || c.word}“${(c.who || []).length ? ' von ' + c.who.map(i => ((S.recipients || []).find(r => r.id === i) || {}).name || '?').join(', ') : ''}${c.confirm ? ' (mit Rückfrage)' : ''}`;
   if (c.type === 'rule') { const k = R.find(x => x.id === c.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
   if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
   return c.type;

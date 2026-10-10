@@ -24,6 +24,7 @@ Die technische Beschreibung der Lade-Strategie, Installation und Architektur ste
 11b. [Klimaanlage (Midea / NetHome Plus)](#11b-klimaanlage-midea--nethome-plus)
 12. [Logbuch, Betriebsbericht, Solarlogbuch, Watchdog](#12-logbuch-betriebsbericht-solarlogbuch-watchdog)
 13. [Benachrichtigungen (Telegram)](#13-benachrichtigungen-telegram)
+13a. [Telegram-Befehle (Triggerwörter an den Bot)](#13a-telegram-befehle-triggerwörter-an-den-bot)
 13b. [Fernzugriff von unterwegs (Cloudflare Tunnel)](#13b-fernzugriff-von-unterwegs-cloudflare-tunnel)
 13c. [NFC-Tags (Handy scannen, Knopf auslösen)](#13c-nfc-tags-handy-scannen-knopf-auslösen)
 13d. [Geräte teilen (zwischen BlueNexus-Anlagen)](#13d-geräte-teilen-zwischen-bluenexus-anlagen)
@@ -496,6 +497,7 @@ Mehrere Bedingungen lassen sich mit **alle (UND)** oder **eine davon (ODER)** ve
 | **Sensor** | Homematic-/Zigbee-Sensor wahr/falsch bzw. Messwert unter/über. |
 | **Meine Aktoren** | Einer deiner Aktoren (Geräte aus der Liste „Meine Aktoren“) ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
 | **Eigener Schalter / Knopf** | Schalter ist an/aus, oder Knopf wurde gedrückt. |
+| **Telegram-Wort** | Jemand schreibt dem Telegram-Bot ein bestimmtes Wort (z. B. „Tor“). Nur bei Regeln der Art **Ablauf**, es ist ein Impuls wie „Knopf wird gedrückt“. Wahlweise nur von bestimmten Empfängern und wahlweise **mit Rückfrage** („ja“). Siehe Kapitel 13a. |
 | **Regel (an/aus)** | Eine andere Regel ist ein- oder ausgeschaltet. Damit kann eine Regel auf den Zustand einer anderen reagieren, z. B. „Regel ‚Nachtruhe‘ ist aus → …“. Nur gespeicherte Regeln lassen sich wählen. |
 
 Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die Regel schaltet nicht „ins Blaue“.
@@ -613,6 +615,8 @@ Klimaanlagen, die du mit der App **NetHome Plus** bedienst (auch Comfee, Invento
 
 ## 12. Logbuch, Betriebsbericht, Solarlogbuch, Watchdog
 
+**Alle Logbücher sehen nur Administratoren** (Logbuch von Regeln und Automatik, Betriebsbericht, Solarlogbuch, Batterie-Watchdog, Tunnel-Protokoll) – unabhängig von den Bereichsrechten eines Kontos. Für andere Konten fehlen die Knöpfe, und ein direkter Aufruf führt zum Dashboard zurück.
+
 | Seite | Wo | Inhalt |
 |---|---|---|
 | **Logbuch** (Automatik/Regeln) | Buttons „📒 Logbuch“ auf Automatik und Regeln | Was wann und warum geschaltet wurde, auch Trockenlauf-Einträge und Fehler. Ungelesene Einträge zeigen ein Abzeichen. |
@@ -675,6 +679,23 @@ Jeder gespeicherte Zugang lässt sich mit einem roten Knopf **löschen** – imm
 **Wichtig:** Das **Abwählen eines Systems** („Welche Smart-Home-Systeme hast du?“) blendet nur Bereiche aus. Gespeicherte Zugänge und angelegte Geräte bleiben bestehen und arbeiten weiter. Wer ein System wirklich nicht mehr nutzen will, löscht seinen Zugang wie oben.
 
 ---
+
+## 13a. Telegram-Befehle (Triggerwörter an den Bot)
+
+Mit einem Wort, das jemand dem Bot schreibt, lässt sich eine Regel starten – z. B. öffnet „Tor“ das Schiebetor am Bauhof. Das Wort schützt vor versehentlichem Auslösen (ein Knopfdruck allein reicht nicht), und die Kollegen brauchen **kein BlueNexus-Konto**, nur Telegram. Voraussetzung: Der Telegram-Bot ist eingerichtet (Kapitel 13).
+
+**Wer darf? – Freigabe per Chat-ID.** Es werden **nur freigegebene Chats** bedient, das sind die **Empfänger** unter *Einstellungen → Meldungen*:
+1. Die Person öffnet den Bot in Telegram und schreibt ihm **einmal irgendetwas** („Hallo“). Sie bekommt zur Antwort, dass sie noch nicht freigegeben ist.
+2. Unter *Meldungen → Empfänger* erscheint eine **Anfrage** mit Namen und Chat-ID. **Freigeben** (Name vergeben) macht sie zum Empfänger, **Ablehnen** sperrt sie. Fremde, die dem Bot schreiben, lösen nie etwas aus und bekommen nur einmal diese Antwort.
+
+**Wörter festlegen – in den Regeln.** Im Regel-Editor (Art **Ablauf**) gibt es die Bedingung **„Telegram-Wort (Befehl an den Bot)“**: das Wort frei wählen (Groß-/Kleinschreibung, `/` davor und ein `@Botname` sind egal), danach beliebige Aktionen wie bei jeder Regel (Knopf drücken, Schalter, Tor, Licht, Nachricht, Warten …). Zusätzlich:
+- **von …:** Mit mehreren Empfängern lässt sich ein Wort auf bestimmte Personen beschränken (nichts angehakt = alle freigegebenen).
+- **mit Rückfrage („ja“):** Der Bot fragt „Wirklich auslösen? Antworte mit ja“. Erst „ja“ innerhalb einer Minute löst aus, „nein“ bricht ab. Empfohlen bei Tor, Tür und Schloss.
+- Der Bot bestätigt jede Auslösung („✓ Tor wird ausgelöst“). **hilfe** (oder `/start`) zeigt der Person die Wörter, die sie nutzen darf. Reserviert sind hilfe, ja, nein usw.
+
+**Sicherheit.** Die App fragt bei Telegram selbst nach (es muss nichts von außen erreichbar sein). **Nachrichten, die älter als 90 Sekunden sind, werden verworfen** – ein liegengebliebenes „Tor“ nach einem Neustart oder Netzausfall öffnet nie später das Tor. Ausgeschaltete Regeln reagieren nicht. Jede Auslösung, Rückfrage und jede Anfrage steht im **Logbuch** (nur für Administratoren sichtbar). Bei einer Gruppe als Empfänger gilt jedes Gruppenmitglied als dieser Empfänger; nur für Telegram-Gruppen mit vertrauten Personen verwenden. Ein Bot kann nur von **einem** System abgefragt werden: Wird derselbe Bot-Token von einem zweiten Server verwendet, pausieren die Befehle.
+
+**Beispiel Schiebetor:** Eigener Knopf „Tor öffnen“ (mit Web-Aufruf oder Schaltbefehl) anlegen. Regel „Tor per Telegram“, Art Ablauf: WENN Telegram-Wort „Tor“ (mit Rückfrage) → DANN Knopf „Tor öffnen“ drücken → Nachricht „Tor wurde geöffnet“ an den Admin.
 
 ## 13b. Fernzugriff von unterwegs (Cloudflare Tunnel)
 
