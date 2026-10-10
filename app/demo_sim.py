@@ -504,6 +504,7 @@ def fake_users() -> list:
 
 
 _PRIVATE = {"Jonas": "Ben", "Paul": "Finn", "Alex": "Anna", "Oma": "Gast"}
+_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor-Tag"), ("Test NFC", "Garagentor-Tag"))      # Testnamen aus den Rohdaten
 
 
 def neutral_names() -> None:
@@ -518,6 +519,8 @@ def neutral_names() -> None:
             with open(p, "r", encoding="utf-8") as f:
                 txt = f.read()
             new = rx.sub(lambda m: _PRIVATE[m.group(1)], txt)
+            for old, repl in _RENAMES:
+                new = new.replace(old, repl)
             if new != txt:
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(new)
