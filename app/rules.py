@@ -215,7 +215,7 @@ def normalize_condition(c: dict) -> dict:
         if not isinstance(who, list):
             raise RuleError("Telegram: Empfänger ungültig")
         return {"type": t, "word": word, "shown": str(c.get("shown") or c.get("word") or word).strip()[:40], "who": sorted({str(x) for x in who if str(x).strip()}),
-                "confirm": bool(c.get("confirm"))}
+                "confirm": bool(c.get("confirm")), "reply": str(c.get("reply") or "").strip()[:200]}
     if t == "virtual":                               # eigener Schalter/Knopf (virtual.py)
         vid = str(c.get("id") or "").strip()
         if not vid:

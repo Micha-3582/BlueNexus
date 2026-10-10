@@ -2182,7 +2182,7 @@ def _telegram_words() -> list:
         if r.get("enabled", True) and flows.is_flow(r):
             for c in rules.all_conditions(r):
                 if c.get("type") == "telegram":
-                    out.append({"word": c["word"], "shown": c.get("shown") or c["word"], "who": c.get("who") or [], "confirm": bool(c.get("confirm"))})
+                    out.append({"word": c["word"], "shown": c.get("shown") or c["word"], "who": c.get("who") or [], "confirm": bool(c.get("confirm")), "reply": c.get("reply") or ""})
     return out
 
 

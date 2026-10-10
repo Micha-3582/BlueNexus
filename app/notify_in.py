@@ -137,6 +137,20 @@ def _reply(token: str, chat_id, text: str) -> None:
         log.warning("Antwort an %s nicht gesendet: %s", chat_id, e)
 
 
+DEFAULT_REPLY = "✓ „{wort}“ wird ausgelöst."
+NO_REPLY = "-"                                  # als Antworttext eingetragen: der Bot antwortet nicht
+
+
+def _answer(token: str, chat_id, entries: list, word: str, rec: dict) -> None:
+    """Antwort nach dem Ausloesen: der in der Regel eingestellte Text ({wort}, {name} werden ersetzt), sonst der Standardtext; "-" = keine Antwort."""
+    e = next((x for x in entries if x["word"] == word and (x.get("reply") or "").strip()), None)
+    text = (e or {}).get("reply") or DEFAULT_REPLY
+    if text.strip() == NO_REPLY:
+        return
+    shown = next((x["shown"] for x in entries if x["word"] == word), word)
+    _reply(token, chat_id, text.replace("{wort}", shown).replace("{name}", rec["name"]))
+
+
 def _sender(msg: dict) -> str:
     chat = msg.get("chat") or {}
     fr = msg.get("from") or {}
@@ -175,7 +189,7 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
             _pending.pop(cid, None)
             _fire(rec, p[0])
             _log(f"Telegram: „{p[0]}“ von {rec['name']} bestätigt und ausgelöst")
-            _reply(token, cid, f"✓ „{p[0]}“ wird ausgelöst.")
+            _answer(token, cid, entries, p[0], rec)
             return
         _pending.pop(cid, None)
         if word in NO:
@@ -193,7 +207,7 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
         return
     _fire(rec, word)
     _log(f"Telegram: „{word}“ von {rec['name']} ausgelöst")
-    _reply(token, cid, f"✓ „{word}“ wird ausgelöst.")
+    _answer(token, cid, entries, word, rec)
 
 
 # ---------------------------------------------------------------- Long-Poll-Schleife
