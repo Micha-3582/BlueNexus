@@ -494,12 +494,12 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         if x.get("type") == "sensor":
             new_s.append({"id": lid, "kind": x.get("kind") or "", "source": "remote", "src": source_id, "rref": ref, "address": ref, "interface": "remote", "datapoint": "",
                           "unit": x.get("unit") or "", "binary": bool(x.get("binary")), "model": model, "room": x.get("room") or "", "name": x.get("name") or ref,
-                          "icon": x.get("icon") or "📟", "users": [], "show": False})
+                          "icon": x.get("icon") or "📟", "show": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
         else:
             rkind = ("virtual-" + str(x.get("kind"))) if x.get("type") == "virtual" else (x.get("kind") or "shelly")
             new_d.append({"id": lid, "kind": "remote", "source": source_id, "rref": ref, "rkind": rkind, "gen": 0, "channel": 0, "model": model,
                           "name": x.get("name") or ref, "icon": x.get("icon") or "🔌", "room": "", "switchable": bool(x.get("control")),
-                          "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "users": []})
+                          "show": True, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5})
         have.add(lid)
     if new_d:
         shelly._save(devs + new_d)

@@ -820,21 +820,21 @@
     </details>
 </div>
 
-<div class="card msg-host" id="share-give" data-tab="teilen">
+<div class="card msg-host" id="share-give" data-tab="teilen" data-area="smarthome_teilen">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Teilen mit anderen (Personen) <span class="qhelp" role="button" tabindex="0" data-help="Lege hier eine Person bzw. Anlage an (z. B. deine Mutter im selben Haus). Sie bekommt einen Zugangsschlüssel und sieht danach nur, was du ihr freigibst. Freigeben tust du bei jedem Gerät, Sensor oder Schalter selbst: ✎ drücken und das Teilen-Symbol wählen. Befehle (z. B. Klimaanlage einschalten) führt dein System mit deinen Zugangsdaten aus – bei Cloud-Geräten wie der Klimaanlage muss sich also niemand ein zweites Mal anmelden. Das andere System muss deines erreichen können: über deine Tunnel-Adresse oder, wenn ihr im selben Netz seid, über die lokale Adresse.">?</span></h2>
   <div class="sub">Wer bekommt Zugang? Was geteilt wird, legst du pro Gerät über ✎ → Teilen-Symbol fest.</div>
   <div id="shares-list" style="display:flex;flex-direction:column;gap:8px"></div>
-  <div class="admin-only" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input id="share-name" placeholder="Name der Person, z. B. Marion" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
     <button id="share-add" class="ghost">Person anlegen</button>
   </div>
 </div>
 
-<div class="card msg-host" id="share-get" data-tab="teilen">
+<div class="card msg-host" id="share-get" data-tab="teilen" data-area="smarthome_teilen">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Fremde Quellen (Geräte von anderen holen) <span class="qhelp" role="button" tabindex="0" data-help="Hier trägst du Adresse und Zugangsschlüssel ein, die du von einem anderen BlueNexus-Betreiber bekommen hast. Danach holst du dir die freigegebenen Geräte, Sensoren, Schalter und Knöpfe in deine Anlage. Sie verhalten sich wie eigene: Dashboard, Regeln, Sichtbarkeit. Ob du sie nur sehen oder auch bedienen darfst, bestimmt der Geber. Entfernst du die Quelle, verschwinden auch alle von dort geholten Einträge.">?</span></h2>
   <div class="sub">Geräte, die dir jemand anderes freigegeben hat.</div>
   <div id="sources-list" style="display:flex;flex-direction:column;gap:8px"></div>
-  <div class="admin-only" style="margin-top:12px">
+  <div style="margin-top:12px">
     <label>Einladungscode <span class="qhelp" role="button" tabindex="0" data-help="Den Code hast du vom anderen BlueNexus-Betreiber bekommen (er beginnt mit bnxshare1_). Er enthält Adresse und Schlüssel – mehr brauchst du nicht. Der Name der Quelle wird automatisch vom anderen System übernommen.">?</span></label>
     <input id="src-invite" placeholder="bnxshare1_…" autocomplete="off" spellcheck="false">
     <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Oder manuell eintragen (Name, Adresse, Schlüssel einzeln)</summary>
@@ -844,7 +844,7 @@
         <div><label>Zugangsschlüssel</label><div class="pw-wrap"><input id="src-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="bnx_…"></div></div>
       </div></details>
   </div>
-  <div class="admin-only" style="margin-top:10px"><button id="src-add" class="ghost">Verbinden</button></div>
+  <div style="margin-top:10px"><button id="src-add" class="ghost">Verbinden</button></div>
 </div>
 
 <div class="card msg-host" id="alexa-card" data-tab="alexa">
@@ -1410,6 +1410,7 @@ const AREA_HINT = {          // kurze, sichtbare Zusatzzeile je Bereich (die Lan
   smarthome_sicherheit: ['Türschlösser ansehen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
   rules: ['⚠ Regeln schalten auch PIN-Geräte ohne PIN – nur vertrauten Konten „Schreiben“ geben', true],
   smarthome_einrichten: ['Geräte suchen, Zugangsdaten (CCU, Tuya, Zigbee), Push'],
+  smarthome_teilen: ['⚠ Schreiben = Zugang zu Geräten dieser Anlage vergeben (Einladungscodes) – nur vertrauten Konten. Lesen = nur ansehen'],
   smarthome_nfc: ['Ansehen ohne Adressen. Schreiben = Tags und Handys verwalten, Adressen sichtbar'],
   user_management: ['Mindestens ein Zugang muss „Schreiben“ behalten'],
 };
@@ -1753,7 +1754,8 @@ let SHARE_MAP = {}, SHARE_LIST = [], SHARE_CAT = [], SHARE_SIG = '';
 const SHARE_OPEN = new Set();                                                   // aufgeklappte Personen im Reiter Teilen           // SHARE_MAP: Referenz -> [{id, name, mode}]
 const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:' }[kind] || '?:') + id;
 const shareWho = ref => (SHARE_MAP[ref] || []).map(x => `${x.name} (${x.mode === 'control' ? 'bedienen' : 'nur sehen'})`).join(', ');
-const shareBtn = (kind, id, skip) => (!window.IS_ADMIN || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
+const shareWrite = () => !!window.IS_ADMIN && ((window.USER_PERMS || {}).smarthome_teilen === 'write');
+const shareBtn = (kind, id, skip) => (!shareWrite() || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
 const shareMark = (kind, id, skip) => (!window.IS_ADMIN || skip || !(SHARE_MAP[shareRef(kind, id)] || []).length) ? '' : `<span class="share-mark" title="${escH('Geteilt mit: ' + shareWho(shareRef(kind, id)))}">${I_SHARE}</span>`;
 const VIS_URL = { shelly: '/api/shelly/', sensor: '/api/sensors/', virtual: '/api/virtual/', wol: '/api/wol/', sound: '/api/homematic/sounds/', blind: '/api/homematic/blinds/' };
 const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); } };
@@ -2378,11 +2380,11 @@ async function loadShares() {
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button type="button" class="ghost" style="width:44px;height:44px;padding:0;font-size:20px;line-height:1;flex:0 0 auto" title="${open ? 'Zuklappen' : 'Aufklappen: geteilte Einträge anzeigen'}" aria-expanded="${open}" onclick="shareToggle('${id}')">${open ? '▾' : '▸'}</button>
-        <button type="button" class="ghost icon-pick admin-only" style="width:44px;height:44px;padding:0;font-size:22px;line-height:1;flex:0 0 auto" title="Symbol wählen" aria-label="Symbol wählen" onclick="shareIconPick('${id}')">${escH(sh.icon || '👤')}</button>
+        <button type="button" class="ghost icon-pick" style="width:44px;height:44px;padding:0;font-size:22px;line-height:1;flex:0 0 auto" title="Symbol wählen" aria-label="Symbol wählen" onclick="shareIconPick('${id}')">${escH(sh.icon || '👤')}</button>
         <div style="flex:1;min-width:150px;cursor:pointer" onclick="shareToggle('${id}')"><b>${escH(sh.name)}</b><div class="muted">${its.length ? its.length + (its.length === 1 ? ' Eintrag geteilt' : ' Einträge geteilt') : 'noch nichts geteilt'} · ${sh.last_seen ? 'zuletzt abgefragt ' + new Date(sh.last_seen * 1000).toLocaleString('de-DE') : 'noch nie abgefragt'}</div></div>
         <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
-          <button class="ghost admin-only" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
-          <button type="button" class="tgl del admin-only" title="Person und alle Freigaben löschen" aria-label="Person löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
+          <button class="ghost" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
+          <button type="button" class="tgl del" title="Person und alle Freigaben löschen" aria-label="Person löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
         </div></div>
       <div id="shicons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:230px;overflow-y:auto"></div>
       <div id="shbody-${id}" style="display:${open ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:10px">${its.length ? its.map(i => { const c = nameOf[i.ref], ref = escH(i.ref);
@@ -2390,8 +2392,8 @@ async function loadShares() {
           <span style="font-size:22px;padding:4px 10px">${escH(c.icon)}</span>
           <div style="flex:1;min-width:150px"><b>${escH(c.name)}</b><div class="muted">${escH(c.detail)} · ${i.mode === 'control' ? 'sehen & bedienen' : 'nur sehen'}</div></div>
           <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
-            ${c.type === 'sensor' ? '' : `<select class="admin-only" style="width:auto" title="Darf die Person es nur sehen oder auch bedienen?" onchange="shareSetMode('${id}','${ref}',this.value)"><option value="view"${i.mode === 'view' ? ' selected' : ''}>nur sehen</option><option value="control"${i.mode === 'control' ? ' selected' : ''}>sehen &amp; bedienen</option></select>`}
-            <button type="button" class="tgl del admin-only" title="Teilen beenden – ${escH(sh.name)} sieht das danach nicht mehr" aria-label="Teilen beenden" onclick="shareStop('${id}','${ref}')">${I_TRASH}</button>
+            ${c.type === 'sensor' ? '' : `<select style="width:auto" title="Darf die Person es nur sehen oder auch bedienen?" onchange="shareSetMode('${id}','${ref}',this.value)"><option value="view"${i.mode === 'view' ? ' selected' : ''}>nur sehen</option><option value="control"${i.mode === 'control' ? ' selected' : ''}>sehen &amp; bedienen</option></select>`}
+            <button type="button" class="tgl del" title="Teilen beenden – ${escH(sh.name)} sieht das danach nicht mehr" aria-label="Teilen beenden" onclick="shareStop('${id}','${ref}')">${I_TRASH}</button>
           </div></div></div>`; }).join('') : '<div class="muted">Noch nichts geteilt. Geteilt wird pro Gerät über ✎ und das Teilen-Symbol.</div>'}</div></div>`; }).join('')
     : '<div class="muted">Noch niemand angelegt.</div>';
 }
@@ -2480,8 +2482,8 @@ async function loadSources() {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">📥</span>
         <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b><div class="muted">${escH(s.url)}</div></div>
         <div style="display:flex;gap:8px;margin-left:auto">
-          <button class="ghost admin-only" onclick="sourceItems('${id}')">Geräte holen</button>
-          <button type="button" class="tgl del admin-only" title="Quelle entfernen (auch alle von dort geholten Einträge)" aria-label="Quelle entfernen" onclick="sourceDelete('${id}')">${I_TRASH}</button>
+          <button class="ghost" onclick="sourceItems('${id}')">Geräte holen</button>
+          <button type="button" class="tgl del" title="Quelle entfernen (auch alle von dort geholten Einträge)" aria-label="Quelle entfernen" onclick="sourceDelete('${id}')">${I_TRASH}</button>
         </div></div><div id="srcp-${id}" class="src-panel" style="display:none;margin-top:10px"></div></div>`; }).join('')
     : '<div class="muted">Noch keine Quelle verbunden.</div>';
   open.forEach(pid => { const sid = pid.slice(5); if (list.some(s => s.id === sid)) sourceItems(sid, true); });
@@ -3549,7 +3551,7 @@ const ADMIN_TABS = [
   const TAB_AREA = { anlage: 'settings_anlage', tarif: 'settings_tarif',
     vrm: 'settings_vrm', wetter: 'settings_wetter', meldungen: 'settings_meldungen',
     aktoren: 'settings_geraete', sensoren: 'settings_geraete', thermostate: 'settings_geraete', sicherheit: 'smarthome_sicherheit',
-    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_einrichten', alexa: 'smarthome_einrichten', wol: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
+    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();

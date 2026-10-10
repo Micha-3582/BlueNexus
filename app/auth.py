@@ -42,6 +42,8 @@ AREAS = [
      "Der Reiter Regeln (Wenn/Dann-Schaltungen und Abläufe). Achtung: Regeln schalten auch PIN-geschützte Geräte ohne PIN-Abfrage – „Schreiben“ nur an vertrauenswürdige Konten."),
     ("smarthome_einrichten", "Smart Home: Geräte suchen & einrichten",
      "Die Reiter Geräte suchen, Alexa (falls das Modul an ist) und Sonstiges: Systeme auswählen, Geräte suchen/hinzufügen, Zugangsdaten (CCU, Tuya, Zigbee), Homematic-Push und Alexa-Status; Freigaben für Alexa legt nur ein Administrator an. Zugangsdaten und Geräte-IP-Adressen sind nur bei „Schreiben“ im Klartext sichtbar."),
+    ("smarthome_teilen", "Smart Home: Teilen",
+     "Der Reiter Teilen: Personen/Anlagen, mit denen Geräte geteilt werden, und die Fremden Quellen ansehen. Schreiben = Personen anlegen, Einladungscodes erzeugen, Freigaben und Quellen ändern und löschen. Wer hier „Schreiben“ hat, kann Zugang zu den Geräten dieser Anlage vergeben – nur vertrauenswürdigen Konten geben. „Lesen“ zeigt nur die Liste, nichts davon lässt sich ändern. Die geteilten Geräte selbst bedienen (z. B. eine geholte Klimaanlage) darf, wer die Geräte bedienen darf (Aktoren/Dashboard)."),
     ("smarthome_nfc", "Smart Home: NFC-Tags",
      "Der Reiter NFC-Tags: Tags, registrierte Handys und Freigaben ansehen. Die Adressen der Tags (damit kann ein Tag beschrieben werden) und die Adresse der Zentrale sind nur bei „Schreiben“ sichtbar. Schreiben = Tags anlegen/umbenennen/löschen, Handys registrieren und Freigaben ändern."),
     # --- Menue "Einstellungen"
@@ -64,7 +66,7 @@ AREA_GROUPS = [
     ("dashboard", "Dashboard", ["dashboard"]),
     ("kameras", "Kameras", ["kameras"]),
     ("verlauf", "Verläufe", ["verlauf"]),
-    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_nfc"]),
+    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc"]),
     ("einstellungen", "Einstellungen", ["settings_anlage", "settings_tarif", "settings_vrm", "automation", "settings_wetter",
                                           "settings_meldungen", "settings_anzeige", "settings_system"]),
     ("konto", "Konto & Verwaltung", ["account", "user_management"]),
@@ -72,7 +74,7 @@ AREA_GROUPS = [
 
 # Neue Bereiche, die es frueher nicht gab: Fehlt der Eintrag in gespeicherten Rechten, gilt der Wert des alten Bereichs,
 # damit bestehende Konten nach dem Update unveraendert weiterarbeiten koennen.
-_INHERIT = {"smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "verlauf": "user_management"}
+_INHERIT = {"smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "smarthome_teilen": "user_management", "verlauf": "user_management"}
 
 PRESETS = {
     "admin": {a: "write" for a in AREA_IDS},
@@ -128,7 +130,7 @@ DASHBOARD_TILE_KEYS = [k for k, _, _ in DASHBOARD_TILES]
 # Bereiche fuer alle Konten als "Kein Zugriff" (gespeicherte Rechte bleiben unveraendert und wirken wieder, sobald das Modul an ist).
 MODULE_AREAS = {
     "energy": ("settings_anlage", "settings_tarif", "settings_vrm", "automation"),
-    "smarthome": ("settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
+    "smarthome": ("settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
     "cameras": ("kameras",),
     "verlauf": ("verlauf",),
 }

@@ -277,8 +277,8 @@ ENDPOINT_AREA = {
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
-    "api_shares": "smarthome_einrichten", "api_share_modify": "smarthome_einrichten", "api_share_token": "smarthome_einrichten", "api_share_item": "smarthome_einrichten",
-    "api_sources": "smarthome_einrichten", "api_source_delete": "smarthome_einrichten", "api_source_items": "smarthome_einrichten", "api_source_import": "smarthome_einrichten",
+    "api_shares": "smarthome_teilen", "api_share_modify": "smarthome_teilen", "api_share_token": "smarthome_teilen", "api_share_item": "smarthome_teilen",
+    "api_sources": "smarthome_teilen", "api_source_delete": "smarthome_teilen", "api_source_items": "smarthome_teilen", "api_source_import": "smarthome_teilen",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
     "setup": "settings_anlage",
@@ -292,7 +292,7 @@ ENDPOINT_AREA = {
 # hier wird nicht der Endpunkt, sondern jedes einzelne Config-Feld einem Bereich zugeordnet
 # (siehe api_config: GET blendet fremde Felder nicht aus, PATCH prueft nur veraenderte Felder).
 # Seiten/Lese-Endpunkte, die fuer JEDES Konto mit mindestens einem Smart-Home-Bereich offen sind (Schreiben nutzt ENDPOINT_AREA)
-SMARTHOME_AREAS = ("settings_geraete", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_nfc")
+SMARTHOME_AREAS = ("settings_geraete", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc")
 ANY_READ = {"smarthome_page": SMARTHOME_AREAS, "api_device_families": SMARTHOME_AREAS, "api_automation_unread": ("automation", "rules")}
 FIELD_AREA = {}
 for _f in ("cerbo_host", "cerbo_port", "has_pv_inverter", "has_mppt", "battery_usable_kwh",
@@ -449,7 +449,7 @@ SMARTHOME_TABS = [
     ("regeln", "Regeln", "/rules", "rules", 2),
     ("suchen", "Geräte suchen", "/smarthome#suchen", "smarthome_einrichten", 3),
     ("nfc", "NFC-Tags", "/smarthome#nfc", "smarthome_nfc", 3),
-    ("teilen", "Teilen", "/smarthome#teilen", "smarthome_einrichten", 3),
+    ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
@@ -4692,9 +4692,8 @@ def _share_err(e):
 
 @app.route("/api/shares", methods=["GET", "POST"])
 def api_shares():
-    denied = _admin_only()
-    if denied:
-        return denied
+    if request.method == "GET" and not auth.has_level(_perms(), "smarthome_teilen", "write"):
+        return jsonify(shares=share.list_shares(), shareable=[])           # Lesen: nur die Liste, keine Auswahl zum Teilen
     if request.method == "GET":
         return jsonify(shares=share.list_shares(), shareable=share.shareable())
     b = request.get_json(silent=True) or {}
@@ -4707,9 +4706,6 @@ def api_shares():
 
 @app.route("/api/shares/<sid>", methods=["PATCH", "DELETE"])
 def api_share_modify(sid):
-    denied = _admin_only()
-    if denied:
-        return denied
     if request.method == "DELETE":
         return jsonify(ok=True) if share.remove(sid) else (jsonify(error="nicht gefunden"), 404)
     b = request.get_json(silent=True) or {}
@@ -4723,9 +4719,6 @@ def api_share_modify(sid):
 @app.route("/api/share-item", methods=["POST"])
 def api_share_item():
     """Einen einzelnen Eintrag fuer bestimmte Freigaben teilen / nicht mehr teilen (Teilen-Knopf am Stift-Symbol)."""
-    denied = _admin_only()
-    if denied:
-        return denied
     b = request.get_json(silent=True) or {}
     try:
         return jsonify(shares=share.set_item(str(b.get("ref") or ""), b.get("shares")))
@@ -4735,9 +4728,6 @@ def api_share_item():
 
 @app.route("/api/shares/<sid>/token", methods=["POST"])
 def api_share_token(sid):
-    denied = _admin_only()
-    if denied:
-        return denied
     try:
         token = share.regenerate(sid)
     except share.ShareError as e:
@@ -4747,9 +4737,6 @@ def api_share_token(sid):
 
 @app.route("/api/sources", methods=["GET", "POST"])
 def api_sources():
-    denied = _admin_only()
-    if denied:
-        return denied
     if request.method == "GET":
         return jsonify(share.list_sources())
     b = request.get_json(silent=True) or {}
@@ -4764,9 +4751,6 @@ def api_sources():
 
 @app.route("/api/sources/<sid>", methods=["DELETE"])
 def api_source_delete(sid):
-    denied = _admin_only()
-    if denied:
-        return denied
     dev_ids, sen_ids = share.imported_ids(sid)
     for kind, ids in (("device", dev_ids), ("sensor", sen_ids)):
         for i in ids:
@@ -4778,7 +4762,7 @@ def api_source_delete(sid):
 
 @app.route("/api/sources/<sid>/items", methods=["GET"])
 def api_source_items(sid):
-    denied = _admin_only()
+    denied = _check_area("smarthome_teilen", "write")             # holt Daten von der anderen Anlage = Teil des Einrichtens
     if denied:
         return denied
     try:
@@ -4789,9 +4773,6 @@ def api_source_items(sid):
 
 @app.route("/api/sources/<sid>/import", methods=["POST"])
 def api_source_import(sid):
-    denied = _admin_only()
-    if denied:
-        return denied
     b = request.get_json(silent=True) or {}
     refs = b.get("refs")
     if not isinstance(refs, list) or not all(isinstance(r, str) for r in refs):
