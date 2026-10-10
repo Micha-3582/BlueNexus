@@ -49,14 +49,14 @@ _polling = False                              # True, solange der Poller laeuft 
 
 
 def norm(text) -> str:
-    """Vergleichsform eines Befehlswortes: klein, ohne /, ohne @Botname, Leerzeichen vereinheitlicht."""
-    t = str(text or "").strip().lower()
+    """Vergleichsform eines Befehlswortes: ohne fuehrendes /, ohne @Botname, Leerzeichen vereinheitlicht. Gross-/Kleinschreibung bleibt: "Bing" ist nicht "bing"."""
+    t = str(text or "").strip()
     if t.startswith("/"):
         t = t[1:]
-    if "@" in t.split(" ")[0]:
-        first, _, rest = t.partition(" ")
-        t = (first.split("@")[0] + " " + rest).strip()
-    return " ".join(t.split())
+    first, _, rest = t.partition(" ")
+    if "@" in first:
+        first = first.split("@")[0]
+    return " ".join((first + " " + rest).split())
 
 
 # ---------------------------------------------------------------- Anfragen (noch nicht freigegebene Chats)
@@ -180,19 +180,20 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
         return
     entries = [e for e in _hooks["words"]() if not e["who"] or rec["id"] in e["who"]]
     shown = sorted({e["shown"] for e in entries})
-    if word in HELP:
+    lw = word.lower()                                                  # nur die festen Bot-Befehle (hilfe, ja, nein) sind unabhaengig von der Schreibweise
+    if lw in HELP:
         _reply(token, cid, ("Du kannst mir schreiben: " + ", ".join(f"„{w}“" for w in shown)) if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
         return
     p = _pending.get(cid)
     if p and now - p[1] < CONFIRM_S:
-        if word in YES:
+        if lw in YES:
             _pending.pop(cid, None)
             _fire(rec, p[0])
             _log(f"Telegram: „{p[0]}“ von {rec['name']} bestätigt und ausgelöst")
             _answer(token, cid, entries, p[0], rec)
             return
         _pending.pop(cid, None)
-        if word in NO:
+        if lw in NO:
             _reply(token, cid, "Abgebrochen.")
             return
     match = [e for e in entries if e["word"] == word]

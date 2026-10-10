@@ -204,12 +204,12 @@ def normalize_condition(c: dict) -> dict:
         return {"type": t, "from": _hhmm(c.get("from", "00:00"), "Von"), "to": _hhmm(c.get("to", "24:00"), "Bis"), "days": days if len(days) < 7 else []}
     if t == "telegram":                              # Triggerwort per Telegram (notify_in.py): nur Ablauf-Regeln, wie "Knopf gedrueckt"
         import notify_in
-        word = notify_in.norm(c.get("word"))
+        word = notify_in.norm(c.get("shown") or c.get("word"))                # so geschrieben, wie eingegeben (Gross-/Kleinschreibung zaehlt)
         if not word:
             raise RuleError("Telegram: ein Triggerwort eingeben")
         if len(word) > 40:
             raise RuleError("Telegram-Wort: höchstens 40 Zeichen")
-        if word in notify_in.HELP or word in notify_in.YES or word in notify_in.NO:
+        if word.lower() in notify_in.HELP or word.lower() in notify_in.YES or word.lower() in notify_in.NO:
             raise RuleError(f"„{word}“ ist für den Bot reserviert (hilfe, ja, nein …) – bitte ein anderes Wort wählen")
         who = c.get("who") or []
         if not isinstance(who, list):
@@ -565,6 +565,12 @@ def devices_of(r: dict) -> list[str]:
     return seen
 
 
+def tg_word(c: dict) -> str:
+    """Triggerwort einer Telegram-Bedingung, exakt wie eingegeben. (Aeltere Regeln speicherten es klein geschrieben; massgeblich ist die eingegebene Schreibweise.)"""
+    import notify_in
+    return notify_in.norm(c.get("shown") or c.get("word"))
+
+
 def all_conditions(r: dict) -> list[dict]:
     return list(r["when"]["conds"]) if "when" in r else (r.get("on") or []) + (r.get("off") or [])
 
@@ -862,7 +868,7 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
             return None, f"Regel {c.get('id')} (nicht mehr vorhanden)"
         return bool(info.get("enabled")) == (c["is"] == "on"), f"Regel „{info.get('name') or c['id']}“ ist {'an' if c['is'] == 'on' else 'aus'}"
     if t == "telegram":                                                  # ein passendes Wort wurde in diesem Durchlauf geschrieben (Impuls)
-        hit = next((e for e in (ctx.get("telegram") or []) if e.get("word") == c.get("word") and (not c.get("who") or e.get("rid") in c["who"])), None)
+        hit = next((e for e in (ctx.get("telegram") or []) if e.get("word") == tg_word(c) and (not c.get("who") or e.get("rid") in c["who"])), None)
         if hit:
             return True, f"Telegram „{c.get('shown') or c['word']}“ von {hit.get('name') or '?'}"
         return False, f"Telegram „{c.get('shown') or c['word']}“ (wartet)"
