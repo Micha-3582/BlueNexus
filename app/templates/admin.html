@@ -3294,42 +3294,54 @@ function nfcWrite(tid) {                                // synchron aus dem Klic
   const st = nfcWriteState();
   if (!st.ok) { uiAlert(st.text, st.kind === 'apple' ? 'Auf dem iPhone nicht möglich' : 'Beschreiben hier nicht möglich'); return; }
   const url = nfcBase() + '/nfc/' + tid, tag = (nfcData.tags.find(t => t.id === tid) || {}).name || 'Tag';
+  const strip = u => String(u || '').replace(/^https?:\/\//i, '');
   const ctl = new AbortController(), ui = nfcSheet('Tag „' + tag + '“ beschreiben');
   ui.onCancel = () => ctl.abort(); ui.onRetry = () => nfcWrite(tid);
   ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.');
-  let tries = 0, hold = null;
-  const stopHold = () => { if (hold) { try { hold.abort(); } catch (e) { /* schon beendet */ } hold = null; } };
-  ui.onClose = stopHold;
+  let tries = 0, guard = null, hold = null, wrote = false;
+  const stop = c => { if (c) { try { c.abort(); } catch (e) { /* schon beendet */ } } };
+  ui.onClose = () => { stop(guard); stop(hold); guard = hold = null; };
   const attempt = () => {
     let ndef; try { ndef = new NDEFReader(); } catch (e) { ui.state('error', 'NFC nicht verfügbar', NFC_ERR.NotSupportedError); return; }
     ndef.write({ records: [{ recordType: 'url', data: url }] }, { overwrite: true, signal: ctl.signal }).then(async () => {
+      wrote = true;
       ui.state('verify', 'Geschrieben ✓ – Kontrolle läuft …', 'Handy noch am Tag lassen, gleich geht es weiter.');
       let ok = null;
-      try {          // zur Kontrolle gleich wieder lesen. Die Lese-Sitzung bleibt danach OFFEN, bis du das Handy vom Tag genommen hast: solange sie laeuft, oeffnet Android den frisch beschriebenen Tag nicht von selbst (das wuerde den Knopf des Tags ausloesen)
+      try {          // zur Kontrolle neu lesen. Diese Lese-Sitzung bleibt danach OFFEN, bis du das Handy vom Tag genommen hast: solange sie laeuft, oeffnet Android den frisch beschriebenen Tag nicht von selbst (das wuerde den Knopf des Tags ausloesen)
         const rd = new NDEFReader();
         hold = new AbortController();
         ok = await new Promise(res => {
           const t = setTimeout(() => res(null), 6000);
-          rd.onreading = ev => { if (ok !== null) return; const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { /* leer */ } clearTimeout(t); res(v.replace(/^https?:\/\//i, '') === url.replace(/^https?:\/\//i, '')); };
+          rd.onreading = ev => {                         // leere Lesungen (fabrikneuer Tag, Kontakt-Meldung) zaehlen nicht; nur eine gelesene Adresse entscheidet
+            const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); if (!r) return;
+            let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { return; }
+            clearTimeout(t); res(strip(v) === strip(url) || v.endsWith('/nfc/' + tid));
+          };
           rd.scan({ signal: hold.signal }).catch(() => { clearTimeout(t); res(null); });
         });
       } catch (e) { ok = null; }
-      if (ok === false) { stopHold(); ui.state('error', 'Kontrolle fehlgeschlagen', 'Der Tag wurde beschrieben, beim Lesen kam aber eine andere Adresse heraus. Bitte noch einmal beschreiben.'); nfcMsg('Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.', true); return; }
+      stop(guard); guard = null;                         // die Schutz-Sitzung wird erst jetzt abgeloest (die neue laeuft schon)
+      if (ok === false) { ui.state('error', 'Kontrolle fehlgeschlagen', 'Der Tag wurde beschrieben, beim Lesen kam aber eine andere Adresse heraus. Bitte noch einmal beschreiben.\n\n(Technisch: gelesene Adresse weicht ab)'); nfcMsg('Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.', true); return; }
       ui.state('ok', 'Fertig ✓', 'Der Tag „' + tag + '“ ist ' + (ok === true ? 'beschrieben und geprüft.' : 'beschrieben (eine Kontrolle war nicht möglich – scanne ihn zum Test).') + '\n\nJetzt das Handy vom Tag nehmen und dann auf „Handy ist weg“ tippen.');
       nfcMsg('Tag „' + tag + '“ beschrieben ✓');
     }).catch(e => {
       const name = e && e.name;
       if (name === 'AbortError') { nfcMsg('Beschreiben abgebrochen.'); return; }
-      if ((name === 'NetworkError' || name === 'NotReadableError') && tries < 2 && !ui.closed) {            // Kontakt kurz verloren (z. B. Handy beim ersten Mal noch bewegt): selbst noch einmal versuchen
-        tries++; ui.state('retry', 'Kurz verloren – noch einmal …', 'Handy ruhig auf dem Tag lassen.'); setTimeout(attempt, 700); return;
+      if ((name === 'NetworkError' || name === 'NotReadableError') && tries < 3 && !ui.closed) {            // Kontakt kurz verloren (z. B. fabrikneuer Tag wird erst formatiert): selbst noch einmal versuchen
+        tries++; ui.state('retry', 'Kurz verloren – noch einmal …', 'Handy ruhig auf dem Tag lassen.'); setTimeout(attempt, 800); return;
       }
-      ui.state('error', 'Beschreiben nicht geklappt', NFC_ERR[name] || ('Fehler: ' + ((e && (e.message || e.name)) || 'unbekannt')));
+      ui.state('error', 'Beschreiben nicht geklappt', (NFC_ERR[name] || ('Fehler: ' + ((e && (e.message || e.name)) || 'unbekannt'))) + '\n\n(Technisch: ' + (name || 'unbekannt') + ')');
     });
   };
   attempt();
-  try {                                                 // erste Nutzung: Chrome fragt nach der Erlaubnis - erst danach den Tag anlegen, sonst stoert das Android-Auswahlfenster
+  try {                                                 // Schutz-Sitzung: waehrend des ganzen Vorgangs lauscht die Seite auf Tags, damit Android sie (auch zwischen zwei Versuchen oder bei einem fabrikneuen Tag) nicht selbst oeffnet und das Auswahlfenster zeigt
+    guard = new AbortController();
+    const g = new NDEFReader(); g.onreading = () => { /* nur zum Festhalten des Tags; ausgewertet wird erst nach dem Schreiben */ };
+    g.scan({ signal: guard.signal }).catch(() => {});
+  } catch (e) { guard = null; }
+  try {                                                 // erste Nutzung: Chrome fragt nach der Erlaubnis - erst danach den Tag anlegen
     navigator.permissions.query({ name: 'nfc' }).then(ps => {
-      const upd = () => { if (ui.closed) return; const last = ui.history[ui.history.length - 1]; if (ps.state === 'prompt' && last === 'wait') ui.state('prepare', 'Erst erlauben', 'Chrome fragt gleich nach NFC. Bitte „Zulassen“ wählen – das Handy erst danach an den Tag halten.'); else if (ps.state === 'granted' && ui.history[ui.history.length - 1] === 'prepare') ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.'); };
+      const upd = () => { if (ui.closed) return; const last = ui.history[ui.history.length - 1]; if (ps.state === 'prompt' && last === 'wait') ui.state('prepare', 'Erst erlauben', 'Chrome fragt gleich nach NFC. Bitte „Zulassen“ wählen – das Handy erst danach an den Tag halten.'); else if (ps.state === 'granted' && last === 'prepare') ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.'); };
       ps.onchange = upd; upd();
     }).catch(() => {});
   } catch (e) { /* ohne Berechtigungsabfrage: Standardtext */ }
