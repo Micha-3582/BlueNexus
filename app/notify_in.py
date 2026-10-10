@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 
@@ -137,7 +138,27 @@ def _reply(token: str, chat_id, text: str) -> None:
         log.warning("Antwort an %s nicht gesendet: %s", chat_id, e)
 
 
-DEFAULT_REPLY = "✓ „{wort}“ wird ausgelöst."
+# Platzhalter in allen Antworttexten: [NAME] (auch [USERNAME], [BENUTZER], {name}) = Name des Absenders, [WORT] (auch {wort}) = das geschriebene Wort
+DEFAULT_REPLY = "✓ „[WORT]“ wird ausgelöst."
+DEFAULT_TEXT = {"unknown": "Hallo [NAME], das Wort ist mir nicht bekannt!",
+                "stranger": "Du bist noch nicht im System registriert, melde dich beim Admin!",
+                "nocommand": "Hallo [NAME], für dich ist hier noch kein Befehl eingerichtet."}
+_NAME_TOK = re.compile(r"\[(?:name|username|benutzer|user)\]|\{name\}", re.I)
+_WORD_TOK = re.compile(r"\[wort\]|\{wort\}", re.I)
+
+
+def fill(text: str, name: str = "", word: str = "") -> str:
+    """Platzhalter ersetzen (Gross-/Kleinschreibung der Platzhalter egal)."""
+    return _WORD_TOK.sub(lambda m: word, _NAME_TOK.sub(lambda m: name, text))
+
+
+def _text(kind: str) -> str:
+    """Eingestellter Text (Einstellungen -> Meldungen -> Telegram) oder Standard."""
+    try:
+        t = str(store.load_config().get(notify.BOT_TEXTS[kind]) or "").strip()
+    except Exception:                                                  # noqa: BLE001
+        t = ""
+    return t or DEFAULT_TEXT[kind]
 NO_REPLY = "-"                                  # als Antworttext eingetragen: der Bot antwortet nicht
 
 
@@ -148,7 +169,7 @@ def _answer(token: str, chat_id, entries: list, word: str, rec: dict) -> None:
     if text.strip() == NO_REPLY:
         return
     shown = next((x["shown"] for x in entries if x["word"] == word), word)
-    _reply(token, chat_id, text.replace("{wort}", shown).replace("{name}", rec["name"]))
+    _reply(token, chat_id, fill(text, rec["name"], shown))
 
 
 def _opt(kind: str) -> bool:
@@ -184,13 +205,13 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
         _log(f"Telegram: Anfrage von noch nicht freigegebenem Chat „{name}“ (ID {cid}) – unter Einstellungen → Meldungen freigeben oder ablehnen")
         if _opt("stranger") and now - _replied.get(cid, 0) > UNKNOWN_REPLY_S:
             _replied[cid] = now
-            _reply(token, cid, "Hallo! Dein Chat ist noch nicht freigegeben. Der Administrator sieht deine Anfrage in BlueNexus und kann dich freischalten.")
+            _reply(token, cid, fill(_text("stranger"), name, ""))
         return
     entries = [e for e in _hooks["words"]() if not e["who"] or rec["id"] in e["who"]]
     shown = sorted({e["shown"] for e in entries})
     lw = word.lower()                                                  # nur die festen Bot-Befehle (hilfe, ja, nein) sind unabhaengig von der Schreibweise
     if lw in HELP and _opt("help"):
-        _reply(token, cid, ("Du kannst mir schreiben: " + ", ".join(f"„{w}“" for w in shown)) if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
+        _reply(token, cid, ("Du kannst mir schreiben: " + ", ".join(f"„{w}“" for w in shown)) if shown else fill(DEFAULT_TEXT["nocommand"], rec["name"], ""))
         return
     p = _pending.get(cid)
     if p and now - p[1] < CONFIRM_S:
@@ -208,8 +229,7 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
     if not match:
         _log(f"Telegram: unbekanntes Wort „{str(text)[:40]}“ von {rec['name']}")
         if _opt("unknown"):
-            hint = " Schreib „hilfe“, dann nenne ich dir die möglichen Wörter." if _opt("help") else ""
-            _reply(token, cid, ("Das kenne ich nicht." + hint) if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
+            _reply(token, cid, fill(_text("unknown") if shown else DEFAULT_TEXT["nocommand"], rec["name"], str(text)[:40]))
         return
     if any(e["confirm"] for e in match):
         _pending[cid] = (word, now)

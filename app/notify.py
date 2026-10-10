@@ -314,6 +314,7 @@ ENERGY_EVENTS = ("tick_error", "tibber", "vrm", "watchdog", "alarms", "low_soc",
 
 # Von sich aus gesprochene Antworten des Telegram-Bots (siehe notify_in.py) - jede einzeln abschaltbar; die Bestaetigung nach dem Ausloesen stellt die Regel selbst ein
 BOT_REPLIES = {"help": "tg_reply_help", "unknown": "tg_reply_unknown", "stranger": "tg_reply_stranger"}
+BOT_TEXTS = {"unknown": "tg_text_unknown", "stranger": "tg_text_stranger"}          # frei einstellbare Texte (leer = Standardtext, siehe notify_in.DEFAULT_TEXT)
 
 
 def settings_public(cfg: dict) -> dict:
@@ -323,7 +324,8 @@ def settings_public(cfg: dict) -> dict:
             "prefix": bool(cfg.get("notify_prefix", True)),
             "low_soc": int(cfg.get("notify_low_soc", DEFAULT_LOW_SOC)),
             "summary_hour": int(cfg.get("notify_summary_hour", DEFAULT_SUMMARY_HOUR)),
-            "bot": {k: bool(cfg.get(ck, True)) for k, ck in BOT_REPLIES.items()}}
+            "bot": {k: bool(cfg.get(ck, True)) for k, ck in BOT_REPLIES.items()},
+            "bot_text": {k: str(cfg.get(ck) or "") for k, ck in BOT_TEXTS.items()}}
 
 
 def validate_settings(body: dict) -> dict:
@@ -334,6 +336,12 @@ def validate_settings(body: dict) -> dict:
         out["notify_events"] = {k: bool(v) for k, v in body["events"].items() if k in EVENTS}
     if "prefix" in body:
         out["notify_prefix"] = bool(body["prefix"])
+    if "bot_text" in body:
+        if not isinstance(body["bot_text"], dict):
+            raise NotifyError("Ungültiger Antworttext")
+        for k, v in body["bot_text"].items():
+            if k in BOT_TEXTS:
+                out[BOT_TEXTS[k]] = str(v or "").strip()[:200]
     if "bot" in body:
         if not isinstance(body["bot"], dict):
             raise NotifyError("Ungültige Bot-Einstellung")
