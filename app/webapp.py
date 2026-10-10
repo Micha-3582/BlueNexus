@@ -4714,7 +4714,8 @@ def api_share_modify(sid):
         return jsonify(ok=True) if share.remove(sid) else (jsonify(error="nicht gefunden"), 404)
     b = request.get_json(silent=True) or {}
     try:
-        return jsonify(share=share.update(sid, name=b.get("name") if isinstance(b.get("name"), str) else None, items=b.get("items") if "items" in b else None))
+        return jsonify(share=share.update(sid, name=b.get("name") if isinstance(b.get("name"), str) else None, items=b.get("items") if "items" in b else None,
+                                            icon=b.get("icon") if isinstance(b.get("icon"), str) else None))
     except share.ShareError as e:
         return _share_err(e)
 

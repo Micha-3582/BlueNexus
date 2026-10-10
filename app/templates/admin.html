@@ -2377,12 +2377,14 @@ async function loadShares() {
     const id = escH(sh.id), its = (sh.items || []).filter(i => nameOf[i.ref]), open = SHARE_OPEN.has(sh.id);
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button type="button" class="ghost" style="padding:4px 10px;font-size:22px;line-height:1" title="${open ? 'Zuklappen' : 'Aufklappen: geteilte Einträge anzeigen'}" aria-expanded="${open}" onclick="shareToggle('${id}')">${open ? '▾' : '▸'}</button>
+        <button type="button" class="ghost" style="width:44px;height:44px;padding:0;font-size:20px;line-height:1;flex:0 0 auto" title="${open ? 'Zuklappen' : 'Aufklappen: geteilte Einträge anzeigen'}" aria-expanded="${open}" onclick="shareToggle('${id}')">${open ? '▾' : '▸'}</button>
+        <button type="button" class="ghost icon-pick admin-only" style="width:44px;height:44px;padding:0;font-size:22px;line-height:1;flex:0 0 auto" title="Symbol wählen" aria-label="Symbol wählen" onclick="shareIconPick('${id}')">${escH(sh.icon || '👤')}</button>
         <div style="flex:1;min-width:150px;cursor:pointer" onclick="shareToggle('${id}')"><b>${escH(sh.name)}</b><div class="muted">${its.length ? its.length + (its.length === 1 ? ' Eintrag geteilt' : ' Einträge geteilt') : 'noch nichts geteilt'} · ${sh.last_seen ? 'zuletzt abgefragt ' + new Date(sh.last_seen * 1000).toLocaleString('de-DE') : 'noch nie abgefragt'}</div></div>
         <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
           <button class="ghost admin-only" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
           <button type="button" class="tgl del admin-only" title="Person und alle Freigaben löschen" aria-label="Person löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
         </div></div>
+      <div id="shicons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:230px;overflow-y:auto"></div>
       <div id="shbody-${id}" style="display:${open ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:10px">${its.length ? its.map(i => { const c = nameOf[i.ref], ref = escH(i.ref);
         return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:22px;padding:4px 10px">${escH(c.icon)}</span>
@@ -2392,6 +2394,17 @@ async function loadShares() {
             <button type="button" class="tgl del admin-only" title="Teilen beenden – ${escH(sh.name)} sieht das danach nicht mehr" aria-label="Teilen beenden" onclick="shareStop('${id}','${ref}')">${I_TRASH}</button>
           </div></div></div>`; }).join('') : '<div class="muted">Noch nichts geteilt. Geteilt wird pro Gerät über ✎ und das Teilen-Symbol.</div>'}</div></div>`; }).join('')
     : '<div class="muted">Noch niemand angelegt.</div>';
+}
+function shareIconPick(id) {
+  const box = document.getElementById('shicons-' + id); if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const list = [...new Set(['👤', '👥', '👨', '👩', '🧑', '👴', '👵', '👧', '👦', '🏠', '🏡', '🏢', '🔑', ...shellyIcons])];
+  box.innerHTML = list.map(ic => `<button class="ghost" style="font-size:22px;padding:4px 8px" onclick="shareSetIcon('${id}', this.textContent)">${escH(ic)}</button>`).join('');
+  box.style.display = 'flex';
+}
+async function shareSetIcon(id, icon) {
+  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'PATCH', { icon }); savedToast(); } catch (e) { alert(e.message); }
+  loadShares();
 }
 function shareToggle(id) { if (SHARE_OPEN.has(id)) SHARE_OPEN.delete(id); else SHARE_OPEN.add(id); loadShares(); }
 async function shareSetMode(sid, ref, mode) {

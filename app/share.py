@@ -36,6 +36,7 @@ API_VERSION = 1
 REF_TYPES = ("device", "sensor", "virtual")
 MODES = ("view", "control")
 MAX_ITEMS = 300
+DEFAULT_ICON = "👤"
 CACHE_TTL_S = 2.0                                          # eine Abfrage pro Quelle genuegt fuer alle Geraete/Sensoren dieser Quelle
 FAIL_TTL_S = 8.0                                           # nach einem Fehler nicht jede Runde neu warten
 TIMEOUT = (3.0, 8.0)
@@ -70,7 +71,7 @@ def _hash(token: str) -> str:
 
 
 def _public(s: dict) -> dict:
-    return {"id": s["id"], "name": s["name"], "items": list(s.get("items") or []), "created": s.get("created", 0), "last_seen": s.get("last_seen", 0)}
+    return {"id": s["id"], "name": s["name"], "icon": s.get("icon") or DEFAULT_ICON, "items": list(s.get("items") or []), "created": s.get("created", 0), "last_seen": s.get("last_seen", 0)}
 
 
 def list_shares() -> list[dict]:
@@ -134,7 +135,7 @@ def shareable() -> list[dict]:
     return out
 
 
-def update(share_id: str, name: str | None = None, items=None) -> dict:
+def update(share_id: str, name: str | None = None, items=None, icon: str | None = None) -> dict:
     with _lock:
         shares = _load(SHARES_PATH)
         s = next((x for x in shares if x["id"] == share_id), None)
@@ -145,6 +146,11 @@ def update(share_id: str, name: str | None = None, items=None) -> dict:
             if not n:
                 raise ShareError("Name darf nicht leer sein")
             s["name"] = n
+        if icon is not None:
+            ic = icon.strip()
+            if not 0 < len(ic) <= 12:
+                raise ShareError("Symbol ungültig")
+            s["icon"] = ic
         if items is not None:
             if not isinstance(items, list) or len(items) > MAX_ITEMS:
                 raise ShareError("Einträge ungültig")
