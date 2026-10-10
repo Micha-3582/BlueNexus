@@ -535,6 +535,15 @@
     <div style="margin-top:10px"><button id="nt-add" class="ghost" type="button">+ Empfänger hinzufügen</button></div>
     <div id="nt-add-found" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></div>
   </div>
+  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+    <b>Antworten des Bots</b> <span class="qhelp" role="button" tabindex="0" data-help="Was der Bot <b>von sich aus</b> zurückschreibt, wenn jemand ihm etwas schreibt. Die Bestätigung nach dem Auslösen („✓ … wird ausgelöst“) stellst du je Regel ein (Feld „Antwort des Bots“, ein Bindestrich = keine Antwort). Aus = der Bot bleibt in diesem Fall stumm; ausgelöst wird in keinem Fall etwas.">?</span>
+    <div class="muted" style="margin:4px 0 8px">Jede Antwort lässt sich abschalten.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label class="chk"><input type="checkbox" class="nt-bot" data-bot="help"> Auf „hilfe“ die möglichen Wörter nennen (nur freigegebenen Chats)</label>
+      <label class="chk"><input type="checkbox" class="nt-bot" data-bot="unknown"> Bei einem unbekannten Wort antworten („Das kenne ich nicht“, nur freigegebenen Chats)</label>
+      <label class="chk"><input type="checkbox" class="nt-bot" data-bot="stranger"> Unbekannten Chats einmal antworten („noch nicht freigegeben“)</label>
+    </div>
+  </div>
 </div>
 
 <div class="card" id="pushover-admin">
@@ -3352,6 +3361,7 @@ async function ntLoad() {
   document.getElementById('nt-prefix').checked = n.prefix !== false;
   ntRecipients(n.recipients || []);
   ntRequests();
+  document.querySelectorAll('.nt-bot').forEach(cb => { cb.checked = !n.bot || n.bot[cb.dataset.bot] !== false; });
   document.getElementById('nt-events').innerHTML = n.events.map(e => `<div style="display:flex;align-items:center;gap:14px">
     <label class="switch" style="margin:0"><input type="checkbox" data-ev="${e.key}" ${e.enabled ? 'checked' : ''}><span class="slider"></span></label>
     <div>${escH(e.label)}</div></div>`).join('');
@@ -3360,6 +3370,11 @@ async function ntLoad() {
     catch (e) { ntMsg(e.message, true); cb.checked = !cb.checked; }
   }));
 }
+document.addEventListener('change', async e => {
+  const cb = e.target.closest && e.target.closest('.nt-bot'); if (!cb) return;
+  try { await shellyApi('/api/notify/settings', 'POST', { bot: { [cb.dataset.bot]: cb.checked } }); savedToast(); }
+  catch (err) { ntMsg(err.message, true); cb.checked = !cb.checked; }
+});
 async function ntRequests() {          // Chats, die dem Bot geschrieben haben und noch nicht freigegeben sind
   const box = document.getElementById('nt-requests'); if (!box) return;
   let list; try { const r = await fetch('/api/notify/requests', { cache: 'no-store' }); if (!r.ok) { box.innerHTML = ''; return; } list = await r.json(); } catch (e) { return; }

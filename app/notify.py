@@ -312,13 +312,18 @@ def enabled(key: str, cfg: dict | None = None) -> bool:
 ENERGY_EVENTS = ("tick_error", "tibber", "vrm", "watchdog", "alarms", "low_soc", "surplus", "summary")      # nur mit Modul Energie sinnvoll
 
 
+# Von sich aus gesprochene Antworten des Telegram-Bots (siehe notify_in.py) - jede einzeln abschaltbar; die Bestaetigung nach dem Ausloesen stellt die Regel selbst ein
+BOT_REPLIES = {"help": "tg_reply_help", "unknown": "tg_reply_unknown", "stranger": "tg_reply_stranger"}
+
+
 def settings_public(cfg: dict) -> dict:
     energy, smart = store.module_on("energy", cfg), store.module_on("smarthome", cfg)
     shown = lambda k: (energy or k not in ENERGY_EVENTS) and (smart or k not in ("rules", "surplus"))        # Regeln/Ueberschuss schalten Geraete (Smart Home)  # noqa: E731
     return {"events": [{"key": k, "label": lab, "enabled": enabled(k, cfg), "default": dflt} for k, (lab, dflt) in EVENTS.items() if shown(k)],
             "prefix": bool(cfg.get("notify_prefix", True)),
             "low_soc": int(cfg.get("notify_low_soc", DEFAULT_LOW_SOC)),
-            "summary_hour": int(cfg.get("notify_summary_hour", DEFAULT_SUMMARY_HOUR))}
+            "summary_hour": int(cfg.get("notify_summary_hour", DEFAULT_SUMMARY_HOUR)),
+            "bot": {k: bool(cfg.get(ck, True)) for k, ck in BOT_REPLIES.items()}}
 
 
 def validate_settings(body: dict) -> dict:
@@ -329,6 +334,12 @@ def validate_settings(body: dict) -> dict:
         out["notify_events"] = {k: bool(v) for k, v in body["events"].items() if k in EVENTS}
     if "prefix" in body:
         out["notify_prefix"] = bool(body["prefix"])
+    if "bot" in body:
+        if not isinstance(body["bot"], dict):
+            raise NotifyError("Ungültige Bot-Einstellung")
+        for k, v in body["bot"].items():
+            if k in BOT_REPLIES:
+                out[BOT_REPLIES[k]] = bool(v)
     for key, cfgkey, lo, hi in (("low_soc", "notify_low_soc", 3, 60), ("summary_hour", "notify_summary_hour", 0, 23)):
         if key in body:
             try:

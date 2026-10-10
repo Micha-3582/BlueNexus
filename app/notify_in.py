@@ -151,6 +151,14 @@ def _answer(token: str, chat_id, entries: list, word: str, rec: dict) -> None:
     _reply(token, chat_id, text.replace("{wort}", shown).replace("{name}", rec["name"]))
 
 
+def _opt(kind: str) -> bool:
+    """Darf der Bot von sich aus antworten? kind: help | unknown | stranger (Einstellungen -> Meldungen -> Telegram, Standard: ja)."""
+    try:
+        return bool(store.load_config().get(notify.BOT_REPLIES[kind], True))
+    except Exception:                                                  # noqa: BLE001
+        return True
+
+
 def _sender(msg: dict) -> str:
     chat = msg.get("chat") or {}
     fr = msg.get("from") or {}
@@ -174,14 +182,14 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
         name = _sender(msg)
         _note_request(chat, name, text)
         _log(f"Telegram: Anfrage von noch nicht freigegebenem Chat „{name}“ (ID {cid}) – unter Einstellungen → Meldungen freigeben oder ablehnen")
-        if now - _replied.get(cid, 0) > UNKNOWN_REPLY_S:
+        if _opt("stranger") and now - _replied.get(cid, 0) > UNKNOWN_REPLY_S:
             _replied[cid] = now
             _reply(token, cid, "Hallo! Dein Chat ist noch nicht freigegeben. Der Administrator sieht deine Anfrage in BlueNexus und kann dich freischalten.")
         return
     entries = [e for e in _hooks["words"]() if not e["who"] or rec["id"] in e["who"]]
     shown = sorted({e["shown"] for e in entries})
     lw = word.lower()                                                  # nur die festen Bot-Befehle (hilfe, ja, nein) sind unabhaengig von der Schreibweise
-    if lw in HELP:
+    if lw in HELP and _opt("help"):
         _reply(token, cid, ("Du kannst mir schreiben: " + ", ".join(f"„{w}“" for w in shown)) if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
         return
     p = _pending.get(cid)
@@ -199,7 +207,9 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
     match = [e for e in entries if e["word"] == word]
     if not match:
         _log(f"Telegram: unbekanntes Wort „{str(text)[:40]}“ von {rec['name']}")
-        _reply(token, cid, "Das kenne ich nicht. Schreib „hilfe“, dann nenne ich dir die möglichen Wörter." if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
+        if _opt("unknown"):
+            hint = " Schreib „hilfe“, dann nenne ich dir die möglichen Wörter." if _opt("help") else ""
+            _reply(token, cid, ("Das kenne ich nicht." + hint) if shown else "Für dich ist hier noch kein Befehl eingerichtet.")
         return
     if any(e["confirm"] for e in match):
         _pending[cid] = (word, now)
