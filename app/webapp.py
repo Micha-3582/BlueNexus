@@ -4758,10 +4758,8 @@ def api_sources():
         return jsonify(share.list_sources())
     b = request.get_json(silent=True) or {}
     try:
-        if b.get("invite"):                              # Einladungscode: Adresse + Schluessel (+ Name der anderen Anlage) in einem
-            url, token = share.parse_invite(b.get("invite"))
-            return jsonify(share.add_source(b.get("name"), url, token))
-        return jsonify(share.add_source(b.get("name"), b.get("url"), b.get("token")))
+        url, token = share.parse_invite(b.get("invite"))      # nur Einladungscode: Adresse + Schluessel in einem; der Name kommt von der anderen Anlage
+        return jsonify(share.add_source("", url, token))
     except share.ShareError as e:
         return _share_err(e)
 

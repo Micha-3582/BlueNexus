@@ -837,12 +837,6 @@
   <div style="margin-top:12px">
     <label>Einladungscode <span class="qhelp" role="button" tabindex="0" data-help="Den Code hast du vom anderen BlueNexus-Betreiber bekommen (er beginnt mit bnxshare1_). Er enthält Adresse und Schlüssel – mehr brauchst du nicht. Der Name der Quelle wird automatisch vom anderen System übernommen.">?</span></label>
     <input id="src-invite" placeholder="bnxshare1_…" autocomplete="off" spellcheck="false">
-    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Oder manuell eintragen (Name, Adresse, Schlüssel einzeln)</summary>
-      <div class="grid2" style="margin-top:8px">
-        <div><label>Name der Quelle <span class="muted">(optional)</span></label><input id="src-name" placeholder="leer = Name der anderen Anlage" autocomplete="off" maxlength="60"></div>
-        <div><label>Adresse</label><input id="src-url" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
-        <div><label>Zugangsschlüssel</label><div class="pw-wrap"><input id="src-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="bnx_…"></div></div>
-      </div></details>
   </div>
   <div style="margin-top:10px"><button id="src-add" class="ghost">Verbinden</button></div>
 </div>
@@ -2528,8 +2522,9 @@ document.getElementById('src-add')?.addEventListener('click', async () => {
   const v = id => document.getElementById(id);
   try {
     const code = v('src-invite').value.trim();
-    await shellyApi('/api/sources', 'POST', code ? { invite: code, name: v('src-name').value } : { name: v('src-name').value, url: v('src-url').value, token: v('src-token').value });
-    v('src-invite').value = v('src-name').value = v('src-url').value = v('src-token').value = ''; savedToast('Verbunden ✓'); loadSources();
+    if (!code) { v('src-invite').focus(); return; }
+    await shellyApi('/api/sources', 'POST', { invite: code });
+    v('src-invite').value = ''; savedToast('Verbunden ✓'); loadSources();
   } catch (e) { uiAlert(e.message); }
 });
 loadShares(); loadSources();
