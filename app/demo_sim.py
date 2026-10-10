@@ -338,6 +338,9 @@ def activate() -> None:
     import wol
     import zigbee
 
+    import store as _store
+    _store.list_charge_sessions = _demo_charge_sessions        # Ladevorgaenge heute: erfundene Nachtfenster statt leerer Liste
+    _store.energy_grid_charge_buckets = _demo_grid_buckets_factory(_store.energy_grid_charge_buckets)
     shelly.status = _device_status
     shelly.set_state = _device_set
     neutral_names()                                         # private Vornamen in den Demo-Daten neutral benennen
@@ -559,3 +562,37 @@ def seed_notify() -> None:
                     json.dump(data, f, ensure_ascii=False)
     except (OSError, ValueError):
         pass
+
+
+_CHARGE_TEMPLATE = [
+    ("02:00", "02:45", "🧠 Intelligente Planung – lädt jetzt (26.1 ct, geplant: 02:00-02:45, 03:15-03:45, 04:30-04:45, 05:30-05:45, 06:00-06:15)"),
+    ("03:15", "03:45", "🧠 Intelligente Planung – lädt jetzt (26.2 ct, geplant: 03:15-03:45, 04:30-04:45, 05:00-05:15, 05:30-05:45)"),
+    ("04:00", "06:15", "🧠 Intelligente Planung – lädt jetzt (26.3 ct, geplant: 04:00-05:45, 06:00-06:15)"),
+]
+
+
+def _demo_charge_sessions(now=None):
+    """Ladevorgaenge 'heute' fuer die Demo: die naechtlichen Ladefenster des Tages (immer mit dem heutigen Datum, nur schon vergangene)."""
+    from datetime import datetime as _dt
+    n = now or _dt.now()
+    day = n.date().isoformat()
+    out = [{"start": day + "T" + a, "end": day + "T" + b, "strategy": t} for a, b, t in _CHARGE_TEMPLATE if (day + "T" + b) <= n.strftime("%Y-%m-%dT%H:%M")]
+    return {"sessions": out, "open": None}
+
+
+def _demo_grid_buckets_factory(orig):
+    """Netz->Batterie-Energie je 15 Minuten: fuer die erfundenen Ladefenster von heute ca. 0,85 kWh pro Viertelstunde (3,4 kW)."""
+    from datetime import datetime as _dt, timedelta as _td
+
+    def f(day):
+        res = dict(orig(day) or {})
+        if str(day) != _dt.now().date().isoformat():
+            return res
+        for a, b, _t in _CHARGE_TEMPLATE:
+            t = _dt.fromisoformat(day + "T" + a)
+            end = _dt.fromisoformat(day + "T" + b)
+            while t < end:
+                res[t.strftime("%Y-%m-%dT%H:%M")] = round(0.82 + 0.06 * ((t.minute // 15) % 2), 2)
+                t += _td(minutes=15)
+        return res
+    return f
