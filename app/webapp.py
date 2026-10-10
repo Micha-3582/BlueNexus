@@ -413,7 +413,7 @@ def _require_login():
 
     if g.preview and request.method not in ("GET", "HEAD", "OPTIONS") and request.endpoint not in ("preview_start", "preview_stop"):
         return jsonify(error="Vorschau-Modus: Das Konto wird nur angesehen, hier wird nichts geändert. Oben „Vorschau beenden“ drücken."), 403
-    if request.endpoint in LOGBOOK_ENDPOINTS and not auth.is_full_admin(g.perms):
+    if request.endpoint in LOGBOOK_ENDPOINTS and not (auth.is_full_admin(g.perms) or (demo.ACTIVE and request.method == "GET")):      # Demo: Logbuecher nur lesen
         return _deny("Logbücher dürfen nur Administratoren ansehen.")
     if request.endpoint in ALWAYS_ALLOWED_ENDPOINTS or request.endpoint == "api_config":
         return None                                    # api_config prueft jedes Feld einzeln selbst (siehe dort)

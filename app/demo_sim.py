@@ -340,6 +340,11 @@ def activate() -> None:
 
     shelly.status = _device_status
     shelly.set_state = _device_set
+    neutral_names()                                         # private Vornamen in den Demo-Daten neutral benennen
+    try:
+        seed_notify()                                       # Telegram/Pushover/Regel mit Telegram-Wort (erfunden)
+    except Exception:                                       # noqa: BLE001
+        pass
     try:                                                    # Teilen: erfundene Freigaben/Quelle, Angebot der Quelle ohne Netzwerkzugriff
         import share
         seed_share()
@@ -442,8 +447,6 @@ def seed_share() -> None:
     import shelly
     import homematic
     import virtual
-    if share._load(share.SHARES_PATH) or share._load(share.SOURCES_PATH):
-        return
     devs = [d for d in shelly.load_devices() if d.get("kind") != "remote"]
     sens = [x for x in homematic.load_sensors() if x.get("source") != "remote"]
     virt = list(virtual.load())
@@ -462,15 +465,15 @@ def seed_share() -> None:
     s_fenster = _find(sens, "Küche", "Kueche", "Fenster", "Tür", "Tuer")
     v_knopf = _find(virt, "Haustüröffner", "Haustueroeffner", "Warmwasser")
     shares = [
-        {"id": "s-demo0001", "name": "Mama", "icon": "👩", "token_hash": secrets.token_hex(32), "created": now - 21 * 86400, "last_seen": now - 3600 * 5,
+        {"id": "s-demo0001", "name": "Anna", "icon": "👩", "token_hash": secrets.token_hex(32), "created": now - 21 * 86400, "last_seen": now - 3600 * 5,
          "items": items((ref("device", k_licht), "control"), (ref("device", k_tuer), "control"), (ref("sensor", s_fenster), "view"))},
-        {"id": "s-demo0002", "name": "Nachbar Tom", "icon": "🧑‍🔧", "token_hash": secrets.token_hex(32), "created": now - 9 * 86400, "last_seen": now - 86400 * 2,
+        {"id": "s-demo0002", "name": "Ben", "icon": "🧑‍🔧", "token_hash": secrets.token_hex(32), "created": now - 9 * 86400, "last_seen": now - 86400 * 2,
          "items": items((ref("device", k_huhn), "control"), (ref("device", k_garage), "view"))},
         {"id": "s-demo0003", "name": "Ferienwohnung", "icon": "🏖️", "token_hash": secrets.token_hex(32), "created": now - 3 * 86400, "last_seen": 0,
          "items": items((ref("virtual", v_knopf), "control"), (ref("device", k_licht), "view"))},
     ]
     share._save(share.SHARES_PATH, shares)
-    share._save(share.SOURCES_PATH, [{"id": "q-demo0001", "name": "Haus von Oma", "url": "https://oma.beispiel.de", "token": "bnx_demo_" + secrets.token_hex(12)}])
+    share._save(share.SOURCES_PATH, [{"id": "q-demo0001", "name": "Haus Nord", "url": "https://nord.beispiel.de", "token": "bnx_demo_" + secrets.token_hex(12)}])
 
 
 DEMO_SOURCE_ITEMS = [
@@ -488,10 +491,71 @@ def fake_users() -> list:
     now = time.time()
     adm = dict(auth.PRESETS["admin"])
     rows = [
-        ("mara", adm, now - 90 * 86400, now - 3600 * 2, None, True),
-        ("jonas", adm, now - 60 * 86400, now - 86400, None, False),
-        ("paul", auth.PRESETS["smarthome"], now - 40 * 86400, now - 86400 * 3, None, False),
-        ("oma", auth.PRESETS["user"], now - 20 * 86400, now - 86400 * 9, "2027-03-31", False),
+        ("anna", adm, now - 90 * 86400, now - 3600 * 2, None, True),
+        ("ben", adm, now - 60 * 86400, now - 86400, None, False),
+        ("finn", auth.PRESETS["smarthome"], now - 40 * 86400, now - 86400 * 3, None, False),
+        ("gast", auth.PRESETS["user"], now - 20 * 86400, now - 86400 * 9, "2027-03-31", False),
         ("demo", auth.PRESETS["demo"], now - 5 * 86400, now - 600, None, False),
     ]
     return [{"username": n, "permissions": dict(p), "created": c, "last_login": l, "expires": e, "owner": o} for n, p, c, l, e, o in rows]
+
+
+_PRIVATE = {"Jonas": "Ben", "Paul": "Finn", "Alex": "Anna", "Oma": "Gast"}
+
+
+def neutral_names() -> None:
+    """Ersetzt in den Demo-Daten private Vornamen durch neutrale (idempotent, nur Namen mit grossem Anfangsbuchstaben als ganzes Wort)."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    rx = re.compile(r"\b(" + "|".join(_PRIVATE) + r")\b")
+    for fn in ("shelly_devices.json", "virtual.json", "nfc.json", "rules.json", "homematic_sensors.json", "homematic_locks.json",
+               "homematic_setpoints.json", "homematic_sounds.json", "homematic_blinds.json", "homematic.json", "wol.json", "cameras.json",
+               "verlauf_charts.json", "verlauf_series.json", "config.json", "flows_state.json"):
+        p = os.path.join(d, fn)
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                txt = f.read()
+            new = rx.sub(lambda m: _PRIVATE[m.group(1)], txt)
+            if new != txt:
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(new)
+        except OSError:
+            pass
+
+
+def seed_notify() -> None:
+    """Erfundene Telegram-/Pushover-Empfaenger, eine offene Chat-Anfrage und eine Regel mit Telegram-Wort - nur zur Ansicht.
+    Die Schluessel sind ungueltig; in der Demo ist der Telegram-Abruf aus und nach aussen geht nichts (Testmodus)."""
+    import json
+    d = os.path.dirname(os.path.abspath(__file__))
+    now = time.time()
+
+    def dump(fn, obj):
+        with open(os.path.join(d, fn), "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False)
+
+    dump("telegram.json", {"token": "1234567890:DEMO-ungueltig-0000000000000000000", "chat_id": "100000001", "primary_name": "Anna",
+                           "extra": [{"id": "r1", "name": "Ben", "chat_id": "100000002", "system": False}]})
+    dump("pushover.json", {"token": "aDEMOungueltig000000000000000000", "recipients": [
+        {"id": "p1", "name": "Anna (Handy)", "user_key": "uDEMOungueltig000000000000000000", "system": True}]})
+    dump("telegram_requests.json", {"100000003": {"id": 100000003, "first": now - 7200, "name": "Carla", "type": "private",
+                                                   "last": now - 1800, "text": "Hof", "count": 2}})
+    try:                                                    # Beispielregel: Telegram-Wort "Hof" schaltet die Aussenbeleuchtung
+        p = os.path.join(d, "rules.json")
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        rules = data.get("rules") or []
+        if not any(r.get("name") == "Telegram: Hofbeleuchtung" for r in rules):
+            devs = json.load(open(os.path.join(d, "shelly_devices.json"), encoding="utf-8"))
+            dev = next((x for x in devs if "Aussenbeleuchtung" in str(x.get("name"))), None)
+            grp = next((g["id"] for g in data.get("groups") or [] if "Beleuchtung" in str(g.get("name"))), "")
+            if dev:
+                rules.append({"id": "demotg01", "name": "Telegram: Hofbeleuchtung", "device_id": "", "enabled": True,
+                              "when": {"mode": "all", "conds": [{"type": "telegram", "word": "Hof", "shown": "Hof", "who": [], "confirm": False,
+                                                                 "reply": "[NAME]: Die Hofbeleuchtung ist an."}]},
+                              "then": [{"type": "switch", "device_id": dev["id"], "state": "on"}], "else": [], "group": grp,
+                              "mode": "flow", "abort_on_fall": False, "cooldown_s": 3, "keep_trigger": False})
+                data["rules"] = rules
+                with open(p, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+    except (OSError, ValueError):
+        pass
