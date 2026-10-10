@@ -504,7 +504,7 @@ def fake_users() -> list:
 
 
 _PRIVATE = {"Jonas": "Ben", "Paul": "Finn", "Alex": "Anna", "Oma": "Gast"}
-_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor-Tag"), ("Test NFC", "Garagentor-Tag"), ("Ben Zimmerlicht", "Garagentor"))      # Testnamen aus den Rohdaten
+_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor"), ("Test NFC", "Garagentor-Tag"), ("Ben Zimmerlicht", "Garagentor"))      # Testnamen aus den Rohdaten
 
 
 def neutral_names() -> None:
@@ -526,6 +526,16 @@ def neutral_names() -> None:
                     f.write(new)
         except OSError:
             pass
+    try:                                                    # der Knopf hinter dem Garagentor-Tag heisst "Garagentor" (der Tag selbst "Garagentor-Tag")
+        p = os.path.join(d, "virtual.json")
+        with open(p, "r", encoding="utf-8") as f:
+            txt = f.read()
+        new = txt.replace('"name": "Garagentor-Tag"', '"name": "Garagentor"')
+        if new != txt:
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(new)
+    except OSError:
+        pass
 
 
 def seed_notify() -> None:
