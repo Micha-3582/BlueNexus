@@ -492,6 +492,7 @@ Mehrere Bedingungen lassen sich mit **alle (UND)** oder **eine davon (ODER)** ve
 | **Sensor** | Homematic-/Zigbee-Sensor wahr/falsch bzw. Messwert unter/über. |
 | **Meine Aktoren** | Einer deiner Aktoren (Geräte aus der Liste „Meine Aktoren“) ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
 | **Eigener Schalter / Knopf** | Schalter ist an/aus, oder Knopf wurde gedrückt. |
+| **Regel (an/aus)** | Eine andere Regel ist ein- oder ausgeschaltet. Damit kann eine Regel auf den Zustand einer anderen reagieren, z. B. „Regel ‚Nachtruhe‘ ist aus → …“. Nur gespeicherte Regeln lassen sich wählen. |
 
 Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die Regel schaltet nicht „ins Blaue“.
 
@@ -510,6 +511,7 @@ Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die
 | **Türschloss: öffnen / entriegeln / verriegeln** | Siehe Sicherheit in [Kapitel 7](#türschlösser-homematic-ip). | ja |
 | **Adresse aufrufen (GET / POST)** | Ruft eine Internet-Adresse auf, z. B. einen **Webhook** (IFTTT, Home Assistant, ioBroker) oder ein Gerät mit HTTP-Schnittstelle (etwa einen Shelly-Befehl). Im Schritt Art (GET/POST), **Adresse** und eine **Bezeichnung** fürs Logbuch eintragen. Läuft im Hintergrund; das Ergebnis steht im Logbuch (ohne Adresse). **Trockenlauf:** ruft nie auf. Konten ohne Schreibrecht für Regeln sehen die Adresse nicht. | ja |
 | **Chime läuten (Türklingel-Gong)** | Lässt alle verbundenen Chimes einer Reolink-Video-Türklingel mit dem gewählten Klingelton läuten (10 Töne), z. B. als Gong bei einem Ereignis. Die Lautstärke stellst du unter Kameras → ✎ → Chime ein. Nur Reolink-Türklingeln. | ja |
+| **Regel ein-/ausschalten** | Schaltet eine **andere Regel** ein, aus oder um – als würdest du den Schalter in der Regelliste bedienen. Beispiel: Die Regel „Nachtruhe“ schaltet um 22 Uhr die Regel „Bewegungslicht“ aus und um 6 Uhr wieder ein. Der Zustand bleibt nach einem Neustart erhalten; in der Liste steht an der Regel „von Regel ‚Nachtruhe‘ ausgeschaltet“, bis du sie selbst umschaltest. Eine ausgeschaltete Ablauf-Regel startet erst wieder, wenn ihr Auslöser neu eintritt. Schaltet ein Schritt die eigene Regel aus, warnt der Editor. Trockenlauf: schaltet nie. | ja |
 | **Sound abspielen (Homematic Gong)** | Spielt auf einem Homematic-Soundmodul (z. B. HM-OU-CM-PCB, HM-OU-CFM-TW) einen **Titel** ab: Titelnummer (1–255), Lautstärke in Prozent, Wiederholungen. Das Modul wird vorher unter *Smart Home → Geräte suchen → Homematic-Soundmodule suchen* angelegt und erscheint dann unter *Aktoren*, dort mit ▶ zum Ausprobieren. Im Trockenlauf wird nichts abgespielt. | ja |
 | **Rollladen fahren / anhalten (Homematic)** | Fährt einen Rollladen auf eine Position (0 % zu … 100 % auf) oder hält ihn an. Siehe Kapitel 7 (Rollläden). | ja |
 | **Rechner aufwecken (Wake-on-LAN)** | Sendet das Magic Packet. | ja |

@@ -1822,6 +1822,7 @@ class Controller:
                     ctx = self._rules_ctx(cfg, system, now)
                     ctx["devices"] = {d["id"]: d for d in devs}                      # Zustand/Leistung anderer Geraete als Bedingung
                     ctx["virtual"] = virtual.snapshot()                              # eigene Schalter/Knoepfe
+                    ctx["rules"] = {r["id"]: {"name": r.get("name", ""), "enabled": r.get("enabled", True)} for r in all_rules}          # Zustand anderer Regeln als Bedingung
                     pressed = virtual.pressed_ids()
                     for act in rule_engine.step(now, ctx, cfg, devs, rules.compile_all(all_rules)):
                         self._apply_rule(act, dry, cfg)
@@ -2022,6 +2023,19 @@ class Controller:
                 sent = notify.photo(lambda cam=cam: camera.snapshot(cam, max_age=0.0), cap, cfg, st.get("to"))
                 who = (" an " + notify.names(st.get("to"))) if st.get("to") else ""
                 jobs.append(("notify", cam["name"], f"Standbild von {cam['name']} {'wird per Telegram' + who + ' gesendet' if sent else 'NICHT gesendet (Telegram nicht eingerichtet)'}", None if sent else "Telegram nicht eingerichtet"))
+        elif t == "rule":
+            tgt = next((x for x in rules.list_rules() if x["id"] == st["id"]), None)
+            word = {"on": "eingeschaltet", "off": "ausgeschaltet", "toggle": "umgeschaltet"}[st["state"]]
+            if tgt is None:
+                jobs.append(("fail", st["id"], "Regel existiert nicht mehr", "weg"))
+            elif dry:
+                jobs.append(("rule", tgt.get("name", ""), f"Regel „{tgt.get('name', '')}“ würde {word}", None))
+            else:
+                try:
+                    changed, now_on = rules.set_enabled(tgt["id"], st["state"], by=rule)
+                    jobs.append(("rule", tgt.get("name", ""), f"Regel „{tgt.get('name', '')}“ " + (f"{word} (jetzt {'an' if now_on else 'aus'})" if changed else f"ist schon {'an' if now_on else 'aus'} – nichts geändert"), None))
+                except rules.RuleError as e:
+                    jobs.append(("fail", st["id"], str(e), str(e)))
         elif t == "chime":
             cam = camera.get(st["id"])
             tname = camera.CHIME_TONES.get(st.get("tone"), str(st.get("tone")))
@@ -3244,7 +3258,7 @@ def api_rules_get():
     return jsonify({"enabled": rules.enabled(cfg), "dry_run": rules.dry_run(cfg),
                     "settings": rules.settings(cfg), "defaults": rules.DEFAULTS, "bounds": rules.BOUNDS,
                     "tariff_mode": cfg.get("tariff_mode", "tibber"),
-                    "groups": rules.load().get("groups", []), "rules": rl, "status": {**rules.rollup_status(dict(rule_engine.status)), **dict(flow_engine.status)}, "owner": dict(rule_engine.owner),
+                    "groups": rules.load().get("groups", []), "marks": rules.marks(), "rules": rl, "status": {**rules.rollup_status(dict(rule_engine.status)), **dict(flow_engine.status)}, "owner": dict(rule_engine.owner),
                     "sun": _sun_info(cfg), "events": autolog.recent("rules", 8)})
 
 

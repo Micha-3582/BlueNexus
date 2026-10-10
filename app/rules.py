@@ -50,7 +50,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(_DIR, "rules.json")
 STATE_PATH = os.path.join(_DIR, "rules_state.json")
 
-TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday")
+TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday", "rule")
 ONCE = ("at", "sun")               # Ausloeser, die einmal pro Tag feuern
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 VERSION = 2
@@ -175,6 +175,11 @@ def normalize_condition(c: dict) -> dict:
         raise RuleError("Unbekannte Bedingung")
     if t == "cheapest":                              # entfallen: "N guenstigste Stunden" = "Laufzeit pro Tag" ueber den ganzen Tag
         return {"type": "budget", "minutes": int(_num(c.get("hours"), 1, 23, "Stunden")) * 60, "from": "00:00", "to": "24:00"}
+    if t == "rule":                                  # Zustand einer anderen Regel: an oder aus
+        rid = str(c.get("id") or "").strip()
+        if not rid:
+            raise RuleError("Regel wählen")
+        return {"type": t, "id": rid, "is": "off" if str(c.get("is", "on")).strip().lower() == "off" else "on"}
     if t == "weekday":                               # nur an bestimmten Wochentagen (ganzer Kalendertag, 0 = Montag)
         days = sorted({int(x) for x in (c.get("days") or []) if str(x).isdigit() and 0 <= int(x) <= 6})
         if not days:
@@ -243,7 +248,7 @@ def normalize_condition(c: dict) -> dict:
 AC_MODES = ("auto", "cool", "dry", "heat", "fan_only", "smart_dry")
 AC_FANS = ("auto", "silent", "low", "medium", "high", "max")
 VIDEO_FILTERS = ("animal", "person", "vehicle", "motion")                      # Ereignisarten fuer "Video zum Ereignis" (leer = jede Aufnahme)
-STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime")
+STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime", "rule")
 MAX_WAIT_S = 7 * 86400
 SETPOINT_MIN, SETPOINT_MAX = 5.0, 30.0              # Solltemperatur der Thermostate (°C), gilt fuer Regeln und beim Setzen
 
@@ -326,6 +331,14 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
         except webhook.WebhookError as e:
             raise RuleError(f"Adresse aufrufen: {e}")
         return {"type": t, "url": url, "method": method, "label": str(a.get("label") or "").strip()[:60]}
+    if t == "rule":                                  # eine andere Regel ein-/ausschalten/umschalten (set_enabled)
+        rid = str(a.get("id") or "").strip()
+        if not rid:
+            raise RuleError("Regel wählen, die ein-/ausgeschaltet werden soll")
+        st = str(a.get("state", "off")).strip().lower()
+        if st not in ("on", "off", "toggle"):
+            raise RuleError("Regel: einschalten, ausschalten oder umschalten")
+        return {"type": t, "id": rid, "state": st}
     if t == "chime":                                 # Chime (Tuergong) der Reolink-Video-Tuerklingel laeuten lassen (camera.py)
         cid = str(a.get("id") or "").strip()
         if not cid:
@@ -663,13 +676,56 @@ def normalize_groups(groups: list, known: set) -> tuple:
     return out, idmap
 
 
+_rule_lock = threading.RLock()                 # Regel-Datei lesen/aendern/schreiben: die Liste (Seite) und Regeln, die Regeln schalten, kommen sich nicht ins Gehege
+
+
+def set_enabled(rule_id: str, state: str, by: str = "") -> tuple:
+    """Schaltet eine Regel ein/aus/um (state: on|off|toggle) - fuer den Schritt "Regel ein-/ausschalten". Rueckgabe: (geaendert?, neuer Zustand).
+    Merkt sich, WER geschaltet hat (marks), damit die Liste "geschaltet von Regel X" anzeigen kann."""
+    with _rule_lock:
+        d = load()
+        for r in d["rules"]:
+            if r["id"] == rule_id:
+                old = bool(r.get("enabled", True))
+                new = (not old) if state == "toggle" else (state == "on")
+                if new == old:
+                    return False, old
+                r["enabled"] = new
+                d.setdefault("marks", {})[rule_id] = {"by": str(by)[:60], "at": datetime.now().isoformat(timespec="seconds"), "state": "on" if new else "off"}
+                _save(d)
+                return True, new
+    raise RuleError("Regel nicht gefunden")
+
+
+def marks() -> dict:
+    return dict(load().get("marks") or {})
+
+
 def replace_all(items: list, groups=None) -> list[dict]:
     """Ersetzt die komplette Regelliste (Speichern-Knopf der Automatik-Seite). Alle Regeln werden vorab geprueft (RuleError -> nichts
     geschrieben); Regeln mit bekannter ID behalten sie, neue bekommen eine. `groups` (optional): die Gruppen in Reihenfolge; Regeln mit
     unbekannter Gruppe landen bei „Ohne Gruppe“."""
+    with _rule_lock:
+        return _replace_all(items, groups)
+
+
+def _replace_all(items: list, groups=None) -> list[dict]:
     d = load()
     known = {r["id"] for r in d["rules"]}
-    out = [normalize_rule(b, b.get("id") if b.get("id") in known else None) for b in items]
+    old_by_id = {r["id"]: r for r in d["rules"]}
+    out = []
+    for b in items:
+        r = normalize_rule(b, b.get("id") if b.get("id") in known else None)
+        old = old_by_id.get(r["id"])
+        if old is not None:
+            if b.get("keep_enabled"):                                    # in der Liste nicht angefasst: der aktuelle Stand gilt (eine andere Regel kann sie inzwischen geschaltet haben)
+                r["enabled"] = bool(old.get("enabled", True))
+            elif bool(old.get("enabled", True)) != bool(r.get("enabled", True)):
+                (d.get("marks") or {}).pop(r["id"], None)                # von Hand umgeschaltet: der Vermerk "geschaltet von Regel ..." entfaellt
+        out.append(r)
+    if d.get("marks"):
+        ids = {r["id"] for r in out}
+        d["marks"] = {k: v for k, v in d["marks"].items() if k in ids}
     if groups is not None:
         d["groups"], idmap = normalize_groups(groups, {g["id"] for g in d.get("groups", [])})
     else:
@@ -686,13 +742,15 @@ def replace_all(items: list, groups=None) -> list[dict]:
 
 
 def delete_rule(rule_id: str) -> bool:
-    d = load()
-    n = len(d["rules"])
-    d["rules"] = [r for r in d["rules"] if r["id"] != rule_id]
-    if len(d["rules"]) != n:
-        _save(d)
-        return True
-    return False
+    with _rule_lock:
+        d = load()
+        n = len(d["rules"])
+        d["rules"] = [r for r in d["rules"] if r["id"] != rule_id]
+        (d.get("marks") or {}).pop(rule_id, None)
+        if len(d["rules"]) != n:
+            _save(d)
+            return True
+        return False
 
 
 def remove_device(dev_id: str):
@@ -781,6 +839,11 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
             v = not v
         txt = (" UND " if c["mode"] == "all" else " ODER ").join(r[1] for r in res)
         return v, ("nicht (" + txt + ")") if c.get("not") else txt
+    if t == "rule":
+        info = (ctx.get("rules") or {}).get(c.get("id"))
+        if not info:
+            return None, f"Regel {c.get('id')} (nicht mehr vorhanden)"
+        return bool(info.get("enabled")) == (c["is"] == "on"), f"Regel „{info.get('name') or c['id']}“ ist {'an' if c['is'] == 'on' else 'aus'}"
     if t == "virtual":
         info = (ctx.get("virtual") or {}).get(c.get("id"))
         if not info:

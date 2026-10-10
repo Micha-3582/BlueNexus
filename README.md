@@ -176,6 +176,7 @@ Kamera-Standbild** · **Telegram mit Video zum Ereignis** (aus der SD-Karten-Auf
 - **Trockenlauf:** Regeln werden nur protokolliert, nichts wird geschaltet – ideal zum Ausprobieren.
 - **Logbuch** zeigt, was wann und warum geschaltet wurde.
 - **Gruppen:** Regeln lassen sich in frei benennbare Gruppen sortieren (auf- und zuklappbar, per Ziehen sortierbar).
+- **Regeln steuern Regeln:** Ein Schritt „Regel ein-/ausschalten“ und die Bedingung „Regel (an/aus)“ – z. B. schaltet eine Zeit-Regel das Bewegungslicht zu bestimmten Zeiten ab.
   Änderungen in der Regelliste (Gruppen, Reihenfolge, Ein/Aus, Löschen) gelten **sofort**; eine Regel im Regel-Editor
   speicherst du bewusst mit „Speichern“.
 - **Adresse aufrufen:** Ein Regel-Schritt (GET/POST) für Webhooks und andere Systeme – dazu passend der **Knopf mit

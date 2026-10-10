@@ -142,7 +142,7 @@ async function wledLoadInfo(id) {
   try { const r = await fetch('/api/shelly/' + encodeURIComponent(id) + '/wled', { cache: 'no-store' }); WLED_INFO[id] = r.ok ? await r.json() : null; } catch (e) { WLED_INFO[id] = null; }
   if (typeof renderRules === 'function') renderRules();
 }
-function resetDraft() { GR = clone(S.A.groups || []); R = clone(S.A.rules || []); R.forEach(r => { if (!(r.name || '').trim()) r.name = 'Regel: ' + ((S.devs.find(d => d.id === r.device_id) || {}).name || 'Gerät'); }); CFG = { enabled: !!S.A.enabled, dry: !!S.A.dry_run, settings: { ...S.A.settings } }; setDirty(false); }
+function resetDraft() { GR = clone(S.A.groups || []); R = clone(S.A.rules || []); R.forEach(r => { r._en0 = r.enabled !== false; }); R.forEach(r => { if (!(r.name || '').trim()) r.name = 'Regel: ' + ((S.devs.find(d => d.id === r.device_id) || {}).name || 'Gerät'); }); CFG = { enabled: !!S.A.enabled, dry: !!S.A.dry_run, settings: { ...S.A.settings } }; setDirty(false); }
 /* Automatisch speichern: nur Aenderungen in der Regelliste (Gruppen, Sortierung, Ein/Aus, Loeschen). Wer eine Regel im Regel-Editor
    bearbeitet oder neu anlegt, schliesst das bewusst mit "Speichern" ab; bis dahin bleibt die Leiste stehen. */
 const MSG_PENDING = '● Ungespeicherte Änderungen – die Steuerung nutzt noch die bisherigen Regeln';
@@ -174,7 +174,7 @@ async function saveAll(auto) {
   const btn = $('btn-save'); btn.disabled = true; saving = true; const v0 = ver, manual = auto !== true;
   const cfg = { rules_enabled: CFG.enabled, rules_dry_run: CFG.dry };
   for (const [k, v] of Object.entries(CFG.settings)) cfg['rules_' + k] = v;
-  const body = { config: cfg, rules: R.map(r => ({ id: String(r.id).startsWith('new-') ? undefined : r.id, name: r.name || '', enabled: r.enabled !== false, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, keep_trigger: !!r.keep_trigger, cooldown_s: r.cooldown_s || 0, when: r.when, then: r.then, else: r.else, group: r.group || '' })), groups: GR };
+  const body = { config: cfg, rules: R.map(r => ({ id: String(r.id).startsWith('new-') ? undefined : r.id, name: r.name || '', enabled: r.enabled !== false, keep_enabled: (r.enabled !== false) === r._en0, mode: r.mode || 'state', abort_on_fall: !!r.abort_on_fall, keep_trigger: !!r.keep_trigger, cooldown_s: r.cooldown_s || 0, when: r.when, then: r.then, else: r.else, group: r.group || '' })), groups: GR };
   try {
     await api('/api/automation', 'POST', body);
     if (manual) { savedToast('Gespeichert ✓'); await loadServer(); resetDraft(); EDIT = null; renderAll(); }
@@ -210,7 +210,7 @@ function renderSettings() {
 const MODULES = {{ modules | tojson }};                         // Module der Installation: ausgeschaltete blenden ihre Bedingungen/Aktionen im Editor aus
 const FAMS = {{ families | tojson }};                                // gewaehlte Smart-Home-Systeme (Einstellungen -> Geraete): nicht vorhandene blenden ihre Schritte aus
 const ENERGY_CONDS = ['price', 'budget', 'soc', 'sun_tomorrow'];           // brauchen das Modul Energie (Strompreis, Akku, Prognose)
-const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf']];
+const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf'], ['rule', 'Regel (an/aus)']];
 let CUR_FLOW = false;                           // gerade gezeichnete Regel ist ein Ablauf (kein 'Laufzeit pro Tag')
 const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
 const switchable = () => S.devs.filter(d => d.switchable !== false && !d.auto);
@@ -228,7 +228,9 @@ function sensorDefault(sid) {                      // neue Sensor-Bedingung: Ja/
 }
 const deviceDefault = () => ({ type: 'device', device_id: (S.devs[0] || {}).id || '', is: 'on' });
 const virtualDefault = vid => { const v = (S.virtual || []).find(x => x.id === vid) || (S.virtual || [])[0]; return v ? { type: 'virtual', id: v.id, is: v.kind === 'button' ? 'pressed' : 'on' } : { type: 'virtual', id: '', is: 'on' }; };
-const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : clone(COND_DEFAULT[t]);
+const savedRules = () => R.filter(x => !String(x.id).startsWith('new-'));                // nur gespeicherte Regeln lassen sich auswaehlen (neue haben noch keine feste ID)
+const ruleDefault = () => ({ type: 'rule', id: (savedRules()[0] || {}).id || '', is: 'off' });
+const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : t === 'rule' ? ruleDefault() : clone(COND_DEFAULT[t]);
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 let FIXED = false;
 const optHtml = (list, val) => list.map(([v, t]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${t}</option>`).join('');
@@ -284,6 +286,9 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
     const opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!v) opts.unshift([escH(c.id), '(Schalter fehlt)']);
     const pick = sel('c-virt', c.id, opts).replace('onchange="ruleEdited(this)"', 'onchange="virtChanged(this)"');
     body = (c.is === 'pressed' || (v && v.kind === 'button')) ? `${pick} wird gedrückt` : `${pick} ${v && v.kind === 'timer' ? sel('c-vis', c.is, [['on', 'läuft'], ['off', 'läuft nicht']]) : 'ist ' + sel('c-vis', c.is, [['on', 'an'], ['off', 'aus']])}`;
+  } else if (c.type === 'rule') {
+    const list = savedRules(), opts = list.map(x => [escH(x.id), escH(x.name || '(ohne Namen)')]); if (!list.some(x => x.id === c.id)) opts.unshift([escH(c.id), '(Regel fehlt)']);
+    body = `${sel('c-rule', c.id, opts)} ist ${sel('c-rst', c.is, [['on', 'an'], ['off', 'aus']])}`;
   } else if (c.type === 'device') {
     const opts = S.devs.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!dev(c.device_id)) opts.unshift([escH(c.device_id), '(Gerät fehlt)']);
     const kind = 'is' in c ? c.is : 'power';
@@ -313,10 +318,11 @@ function collectCond(row) {
   if (t === 'sensor') return row.querySelector('.c-is') ? { type: t, sensor_id: v('c-sensor'), is: v('c-is') === '1' }
                                                           : { type: t, sensor_id: v('c-sensor'), op: v('c-op'), value: v('c-val') };
   if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed' };
+  if (t === 'rule') return { type: t, id: v('c-rule'), is: v('c-rst') };
   if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
   return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
 }
-const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)'], ['chime', 'Chime läuten (Türklingel-Gong, Reolink)']];
+const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)'], ['chime', 'Chime läuten (Türklingel-Gong, Reolink)'], ['rule', 'Regel ein-/ausschalten']];
 const CHIME_TONES = ['Vogelgezwitscher', 'Originalmelodie', 'Klaviertöne', 'Schleife', 'Attraktion', 'Hüpfer', 'Guten Tag', 'Operette', 'Mondlicht', 'Heimweg'];
 const videoCams = () => (S.cameras || []).filter(x => (x.kind || 'reolink') === 'reolink');
 function toRow(a, rs) {                              // "Senden an": nur wenn es mehr als einen Empfaenger gibt (Telegram: S.recipients, Pushover: S.prec)
@@ -331,6 +337,7 @@ function stepAvailable(t) {
   const has = k => (S.devs || []).some(d => d.kind === k);
   if (t === 'photo') return !!MODULES.cameras;
   if (t === 'video') return !!MODULES.cameras && videoCams().length > 0;                 // nur Reolink-Kameras (SD-Karte, Aufnahmen per Kamera-Schnittstelle)
+  if (t === 'rule') return savedRules().length > 0;
   if (t === 'chime') return !!MODULES.cameras && videoCams().length > 0;                 // nur Reolink-Kameras
   if (t === 'pushover') return (S.prec || []).length > 0;                 // nur mit eingerichtetem Pushover
   if (t === 'ac') return !!FAMS.midea || has('midea');
@@ -403,6 +410,10 @@ function actRow(a, branch, flow) {
     const kinds = [['animal', 'Tier'], ['person', 'Person'], ['vehicle', 'Fahrzeug'], ['motion', 'Bewegung']];
     body = `<b>🎥 Video per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Video (optional)" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">
       <span class="a-vf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;width:100%"><span class="muted">Nur senden bei ${helpQ('Das Video wird nur gesendet, wenn die Aufnahme der Kamera eine dieser Ereignisarten enthält. Nichts angehakt = bei jeder Aufnahme. Gesendet werden 10 Sekunden in 720p, ab 3 Sekunden vor dem Auslösen; das Video kommt erst, wenn die Aufnahme fertig ist (meist 1 bis 2 Minuten). Nur für Reolink-Kameras mit SD-Karte.')}:</span>${kinds.map(([k, l]) => `<label class="chk" style="margin:0"><input type="checkbox" value="${k}" ${flt.includes(k) ? 'checked' : ''} onchange="ruleEdited(this)"> ${l}</label>`).join('')}</span>${list.length ? '' : '<span class="muted">Keine Reolink-Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
+  } else if (t === 'rule') {
+    const list = savedRules(), opts = list.map(x => [escH(x.id), escH(x.name || '(ohne Namen)')]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Regel fehlt)']);
+    const selfHit = a.id && a.id === EDIT;
+    body = `<b>⚙ Regel</b> ${sel('a-rid', a.id, opts)} ${sel('a-rst', a.state || 'off', [['off', 'ausschalten'], ['on', 'einschalten'], ['toggle', 'umschalten']])} ${helpQ('Schaltet eine andere Regel ein oder aus, als würdest du den Schalter in der Regelliste bedienen. Der Zustand bleibt auch nach einem Neustart erhalten, in der Liste steht „geschaltet von Regel …“. Eine ausgeschaltete Ablauf-Regel startet erst wieder, wenn ihr Auslöser neu eintritt.')}${selfHit ? ' <span style="color:var(--exp)">⚠ schaltet diese Regel selbst</span>' : ''}${list.length ? '' : '<span class="muted">Noch keine gespeicherte Regel.</span>'}`;
   } else if (t === 'chime') {
     const list = videoCams(), opts = list.map(x => [escH(x.id), '🔔 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Türklingel fehlt)']);
     body = `<b>🔔 Chime läuten</b> ${sel('a-cid', a.id, opts)} ${sel('a-tone', String(a.tone ?? 1), CHIME_TONES.map((n, i) => [String(i), n]))} ${helpQ('Lässt alle mit der Türklingel verbundenen Chimes mit dem gewählten Klingelton läuten (z. B. als Gong bei einem Ereignis). Die Lautstärke stellst du unter Kameras → Stift → Chime ein.')}${list.length ? '' : '<span class="muted">Noch keine Reolink-Türklingel angelegt – Kameras → Kamera hinzufügen.</span>'}`;
@@ -441,6 +452,7 @@ function collectAct(x) {
   if (t === 'setpoint') return { type: t, device_ids: q('a-spall').checked ? ['*'] : [...x.querySelectorAll('.a-sp:checked')].map(c => c.value), value: Math.min(30, Math.max(5, +q('a-spv').value || 21)) };
   if (t === 'notify') return { type: t, text: q('a-text').value, ...toVal(q) };
   if (t === 'chime') return { type: t, id: q('a-cid').value, tone: +q('a-tone').value };
+  if (t === 'rule') return { type: t, id: q('a-rid').value, state: q('a-rst').value };
   if (t === 'photo') return { type: t, id: q('a-cid').value, text: q('a-text').value, ...toVal(q) };
   if (t === 'video') return { type: t, id: q('a-cid').value, text: q('a-text').value, filter: [...x.querySelectorAll('.a-vf input:checked')].map(i => i.value), ...toVal(q) };
   if (t === 'pushover') { const o = { type: t, text: q('a-text').value, title: q('a-title').value, priority: +q('a-prio').value, sound: q('a-snd').value, ...toVal(q) }; const c = q('a-pcam'); if (c && c.value) o.camera = c.value; return o; }
@@ -526,6 +538,7 @@ function actAddSel(sel, branch) {
     http: () => ({ type: 'http', method: 'GET', url: '', label: '' }),
     sound: () => ({ type: 'sound', id: ((S.sounds || [])[0] || {}).id || '', track: 1, volume: 100, repeats: 1 }),
     chime: () => ({ type: 'chime', id: (videoCams()[0] || {}).id || '', tone: 1 }),
+    rule: () => ({ type: 'rule', id: ((savedRules().find(x => x.id !== EDIT) || savedRules()[0]) || {}).id || '', state: 'off' }),
     photo: () => ({ type: 'photo', id: ((S.cameras || [])[0] || {}).id || '', text: '' }),
     video: () => ({ type: 'video', id: (videoCams()[0] || {}).id || '', text: '', filter: ['animal'] }),
     pushover: () => ({ type: 'pushover', text: '', priority: 0 }),
@@ -627,6 +640,7 @@ function condSummary(c) {
     return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
   }
   if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
+  if (c.type === 'rule') { const k = R.find(x => x.id === c.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
   if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
   return c.type;
 }
@@ -644,6 +658,7 @@ const actSummary = a => {
   if (t === 'wled') { const k = dev(a.id); return `WLED ${k ? k.name : '?'} ${a.mode === 'color' ? 'Farbe ' + a.color + (a.brightness ? ', ' + a.brightness + ' %' : '') : 'Voreinstellung ' + a.preset}`; }
   if (t === 'blind') { const k = (S.blinds || []).find(x => x.id === a.id); return `Rollladen ${k ? k.name : '?'} ${a.action === 'stop' ? 'anhalten' : 'auf ' + a.level + ' %'}`; }
   if (t === 'sound') { const k = (S.sounds || []).find(x => x.id === a.id); return `Sound ${k ? k.name : '?'} (Titel ${a.track})`; }
+  if (t === 'rule') { const k = R.find(x => x.id === a.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ${({ on: 'einschalten', off: 'ausschalten', toggle: 'umschalten' })[a.state] || a.state}`; }
   if (t === 'chime') { const k = (S.cameras || []).find(x => x.id === a.id); return `Chime ${k ? k.name : '?'} läuten (${CHIME_TONES[a.tone] || a.tone})`; }
   if (t === 'photo') { const k = (S.cameras || []).find(x => x.id === a.id); return `Standbild ${k ? k.name : '?'} per Telegram${toNames(a)}`; }
   if (t === 'video') { const k = (S.cameras || []).find(x => x.id === a.id); const L = { animal: 'Tier', person: 'Person', vehicle: 'Fahrzeug', motion: 'Bewegung' }; return `Video ${k ? k.name : '?'} per Telegram${(a.filter || []).length ? ' bei ' + a.filter.map(f => L[f]).join('/') : ''}${toNames(a)}`; }
@@ -652,13 +667,17 @@ const actSummary = a => {
   if (t === 'virtual') { const v = (S.virtual || []).find(x => x.id === a.id); return `Schalter ${v ? v.name : '?'} ${VSTATE_WORD[a.state]}`; }
   return `${a.state === 'on' ? 'ein' : 'aus'}: ${devName(a.device_id)}`;
 };
+function markHtml(r) {                            // "geschaltet von Regel X": wenn eine andere Regel diese Regel zuletzt ein-/ausgeschaltet hat
+  const m = ((S.A || {}).marks || {})[r.id]; if (!m || (m.state === 'on') !== (r.enabled !== false)) return '';
+  return ` <span class="muted" style="font-size:12px" title="${escH(m.at || '')}">· von Regel „${escH(m.by || '?')}“ ${m.state === 'on' ? 'eingeschaltet' : 'ausgeschaltet'}</span>`;
+}
 function ruleRow(r) {
   const id = escH(r.id), conds = r.when.conds.map(condSummary).join(r.when.mode === 'any' ? ' ODER ' : ' UND ');
   const sum = (r.mode === 'flow' ? '⚙ Ablauf · ' : '') + `WENN ${conds} → DANN ${(r.then || []).map(actSummary).join(', ')}` + ((r.else || []).length ? ` · SONST ${r.else.map(actSummary).join(', ')}` : '');
   const st = statusHtml(r);
   return `<div data-sort-id="${id}" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <label class="switch" style="margin:0" title="Regel an/aus"><input type="checkbox" ${r.enabled !== false ? 'checked' : ''} onchange="listToggle('${id}', this.checked)"><span class="slider"></span></label>
-    <div style="flex:1;min-width:200px;cursor:grab" title="Lange drücken und ziehen = Reihenfolge ändern · Bearbeiten mit ✎"><b>${escH(r.name || '(ohne Namen)')}</b>${st ? ' <span style="margin-left:6px">' + st + '</span>' : ''}
+    <div style="flex:1;min-width:200px;cursor:grab" title="Lange drücken und ziehen = Reihenfolge ändern · Bearbeiten mit ✎"><b>${escH(r.name || '(ohne Namen)')}</b>${st ? ' <span style="margin-left:6px">' + st + '</span>' : ''}${markHtml(r)}
       <div class="muted" style="margin-top:2px">${escH(sum)}</div></div>
     <button class="ghost" onclick="ruleMove('${id}')" title="In eine Gruppe verschieben">📁</button>
     <button class="ghost" onclick="editOpen('${id}')" title="Regel bearbeiten">✎</button>
