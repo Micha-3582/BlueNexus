@@ -504,7 +504,7 @@ def fake_users() -> list:
 
 
 _PRIVATE = {"Jonas": "Ben", "Paul": "Finn", "Alex": "Anna", "Oma": "Gast"}
-_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor-Tag"), ("Test NFC", "Garagentor-Tag"))      # Testnamen aus den Rohdaten
+_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor-Tag"), ("Test NFC", "Garagentor-Tag"), ("Ben Zimmerlicht", "Garagentor"))      # Testnamen aus den Rohdaten
 
 
 def neutral_names() -> None:
