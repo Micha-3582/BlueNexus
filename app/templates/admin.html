@@ -3271,14 +3271,14 @@ function nfcSheet(title) {
   document.body.appendChild(ov);
   const box = ov.querySelector('.nfc-sheet'), o = { history: [], onCancel: null, onRetry: null, closed: false };
   const btn = (label, fn, primary) => { const b = document.createElement('button'); if (!primary) b.className = 'ghost'; b.textContent = label; b.onclick = fn; ov.querySelector('.nfc-b').appendChild(b); };
-  o.close = () => { if (!o.closed) { o.closed = true; ov.remove(); } };
+  o.close = () => { if (!o.closed) { o.closed = true; ov.remove(); if (o.onClose) o.onClose(); } };
   o.state = (st, head, text) => {
     o.history.push(st); if (o.closed) return;
     box.className = 'nfc-sheet ' + (st === 'prepare' || st === 'verify' ? 'idle ' : '') + (st === 'ok' || st === 'error' ? st : '');
     ov.querySelector('.nfc-ico').innerHTML = st === 'ok' ? '<span class="nfc-big">✓</span>' : st === 'error' ? '<span class="nfc-big">✕</span>' : NFC_ICON;
     ov.querySelector('.nfc-h').textContent = head || title; ov.querySelector('.nfc-t').textContent = text || '';
     ov.querySelector('.nfc-b').innerHTML = '';
-    if (st === 'ok') { btn('OK', o.close, true); setTimeout(o.close, 4000); }
+    if (st === 'ok') { btn('Handy ist weg', o.close, true); setTimeout(o.close, 30000); }
     else if (st === 'error') { btn('Schließen', o.close); if (o.onRetry) btn('Nochmal versuchen', () => { o.close(); o.onRetry(); }, true); }
     else btn('Abbrechen', () => { if (o.onCancel) o.onCancel(); o.close(); });
   };
@@ -3297,23 +3297,25 @@ function nfcWrite(tid) {                                // synchron aus dem Klic
   const ctl = new AbortController(), ui = nfcSheet('Tag „' + tag + '“ beschreiben');
   ui.onCancel = () => ctl.abort(); ui.onRetry = () => nfcWrite(tid);
   ui.state('wait', 'Handy an den Tag halten', 'Rückseite des Handys flach auf den Tag legen und ruhig halten, bis es fertig ist.');
-  let tries = 0;
+  let tries = 0, hold = null;
+  const stopHold = () => { if (hold) { try { hold.abort(); } catch (e) { /* schon beendet */ } hold = null; } };
+  ui.onClose = stopHold;
   const attempt = () => {
     let ndef; try { ndef = new NDEFReader(); } catch (e) { ui.state('error', 'NFC nicht verfügbar', NFC_ERR.NotSupportedError); return; }
     ndef.write({ records: [{ recordType: 'url', data: url }] }, { overwrite: true, signal: ctl.signal }).then(async () => {
-      ui.state('verify', 'Geschrieben – prüfe …', 'Handy noch einen Moment am Tag lassen.');
+      ui.state('verify', 'Geschrieben ✓ – Kontrolle läuft …', 'Handy noch am Tag lassen, gleich geht es weiter.');
       let ok = null;
-      try {                                             // zur Kontrolle gleich wieder lesen
-        const rd = new NDEFReader(), c2 = new AbortController(), t = setTimeout(() => c2.abort(), 6000);
+      try {          // zur Kontrolle gleich wieder lesen. Die Lese-Sitzung bleibt danach OFFEN, bis du das Handy vom Tag genommen hast: solange sie laeuft, oeffnet Android den frisch beschriebenen Tag nicht von selbst (das wuerde den Knopf des Tags ausloesen)
+        const rd = new NDEFReader();
+        hold = new AbortController();
         ok = await new Promise(res => {
-          c2.signal.addEventListener('abort', () => res(null));
-          rd.onreading = ev => { const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { /* leer */ } res(v.replace(/^https?:\/\//i, '') === url.replace(/^https?:\/\//i, '')); c2.abort(); };
-          rd.scan({ signal: c2.signal }).catch(() => res(null));
+          const t = setTimeout(() => res(null), 6000);
+          rd.onreading = ev => { if (ok !== null) return; const r = (ev.message.records || []).find(x => x.recordType === 'url' || x.recordType === 'text'); let v = ''; try { v = new TextDecoder().decode(r.data); } catch (e) { /* leer */ } clearTimeout(t); res(v.replace(/^https?:\/\//i, '') === url.replace(/^https?:\/\//i, '')); };
+          rd.scan({ signal: hold.signal }).catch(() => { clearTimeout(t); res(null); });
         });
-        clearTimeout(t);
       } catch (e) { ok = null; }
-      if (ok === false) { ui.state('error', 'Kontrolle fehlgeschlagen', 'Der Tag wurde beschrieben, beim Lesen kam aber eine andere Adresse heraus. Bitte noch einmal beschreiben.'); nfcMsg('Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.', true); return; }
-      ui.state('ok', 'Fertig', ok === true ? 'Der Tag „' + tag + '“ ist beschrieben und geprüft.' : 'Der Tag „' + tag + '“ ist beschrieben. (Eine Kontrolle war nicht möglich – scanne ihn zum Test.)');
+      if (ok === false) { stopHold(); ui.state('error', 'Kontrolle fehlgeschlagen', 'Der Tag wurde beschrieben, beim Lesen kam aber eine andere Adresse heraus. Bitte noch einmal beschreiben.'); nfcMsg('Kontrolle fehlgeschlagen – bitte noch einmal beschreiben.', true); return; }
+      ui.state('ok', 'Fertig ✓', 'Der Tag „' + tag + '“ ist ' + (ok === true ? 'beschrieben und geprüft.' : 'beschrieben (eine Kontrolle war nicht möglich – scanne ihn zum Test).') + '\n\nJetzt das Handy vom Tag nehmen und dann auf „Handy ist weg“ tippen.');
       nfcMsg('Tag „' + tag + '“ beschrieben ✓');
     }).catch(e => {
       const name = e && e.name;
