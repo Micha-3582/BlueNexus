@@ -490,7 +490,7 @@
   <div class="sub">Standort für die Wetterkachel auf dem Dashboard.</div>
   <label>Ort suchen <span class="qhelp" role="button" tabindex="0" data-help="Ortsname eintippen und auf Suchen klicken, dann den passenden Treffer anklicken. Er legt den Standort für die Wetterkachel fest.">?</span></label>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <input id="wx-q" placeholder="z. B. Alpen" autocomplete="off" style="flex:1;min-width:160px">
+    <input id="wx-q" placeholder="z. B. Hamburg" autocomplete="off" style="flex:1;min-width:160px">
     <button id="wx-search" class="ghost" type="button">Suchen</button>
     <button id="wx-gps" class="ghost" type="button">📍 Meinen Standort verwenden</button>
   </div>
@@ -563,7 +563,7 @@
     <div id="po-recipients" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
     <div class="muted" style="margin-top:12px"><b>Neuer Empfänger</b></div>
     <div class="grid2" style="margin-top:10px">
-      <div><label>Name <span class="qhelp" role="button" tabindex="0" data-help="Frei wählbarer Anzeigename des Empfängers, z. B. „Ina (S22)“.">?</span></label><input id="po-name" maxlength="40" placeholder="z. B. Ina (S22)" autocomplete="off"></div>
+      <div><label>Name <span class="qhelp" role="button" tabindex="0" data-help="Frei wählbarer Anzeigename des Empfängers, z. B. „Anna (Handy)“.">?</span></label><input id="po-name" maxlength="40" placeholder="z. B. Anna (Handy)" autocomplete="off"></div>
       <div><label>Gerät (optional) <span class="qhelp" role="button" tabindex="0" data-help="Leer = Nachricht an alle Geräte dieses Kontos. Mit Gerätename (z. B. GalaxyS22, wie in Pushover unter „Your Devices“) geht sie nur an dieses Handy. Für zwei Handys im selben Konto: zwei Empfänger mit gleichem Schlüssel und unterschiedlichem Gerät anlegen.">?</span></label><input id="po-dev" maxlength="25" placeholder="z. B. GalaxyS22" autocomplete="off"></div>
       <div><label>Benutzer-Schlüssel <span class="qhelp" role="button" tabindex="0" data-help="User Key des Empfängers – steht oben auf pushover.net bzw. in der Pushover-App.">?</span></label><div class="pw-wrap"><input id="po-key" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="po-key" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     </div>
@@ -574,7 +574,7 @@
 <div class="card" id="notify-events-card">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Meldungen – was soll gemeldet werden? <span class="qhelp" role="button" tabindex="0" data-help="Gemeldet wird nur bei einem <b>Wechsel</b>, nicht bei jedem Durchlauf. Jede Meldung beginnt auf Wunsch mit dem Anlagennamen.">?</span></h2>
   <div class="sub">Welche Ereignisse aufs Handy gemeldet werden – über Telegram und Pushover.</div>
-    <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="nt-prefix"> Anlagenname vor jede Nachricht setzen <span class="qhelp" role="button" tabindex="0" data-help="Beispiel: „[Michaels BlueNexus] …“. Sinnvoll, wenn mehrere Anlagen im selben Chat schreiben.">?</span></label><br>
+    <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="nt-prefix"> Anlagenname vor jede Nachricht setzen <span class="qhelp" role="button" tabindex="0" data-help="Beispiel: „[Annas BlueNexus] …“. Sinnvoll, wenn mehrere Anlagen im selben Chat schreiben.">?</span></label><br>
     <b>Was soll gemeldet werden?</b>
     <div id="nt-events" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
     <div class="grid2" style="margin-top:14px">
@@ -846,7 +846,7 @@
   <div class="sub">Wer bekommt Zugang? Was geteilt wird, legst du pro Gerät über ✎ → Teilen-Symbol fest.</div>
   <div id="shares-list" style="display:flex;flex-direction:column;gap:8px"></div>
   <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input id="share-name" placeholder="Name der Person, z. B. Marion" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
+    <input id="share-name" placeholder="Name der Person, z. B. Anna" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
     <button id="share-add" class="ghost">Person anlegen</button>
   </div>
 </div>
@@ -964,7 +964,7 @@
   </button>
   <div id="nu-form" style="display:none;margin-top:14px">
     <div class="grid2">
-      <div><label>Benutzername</label><input id="nu-username" autocomplete="off" placeholder="z.B. marion oder demo"></div>
+      <div><label>Benutzername</label><input id="nu-username" autocomplete="off" placeholder="z.B. anna oder gast"></div>
       <div><label>Passwort</label><div class="pw-wrap"><input id="nu-password" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="nu-password" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
       <div id="nu-expires-wrap"><label>Ablauf <span class="muted" style="font-weight:normal">(optional)</span> <span class="qhelp" role="button" tabindex="0" data-help="Ab diesem Tag funktioniert der Zugang nicht mehr - praktisch für einen befristeten Demo-Zugang. Leer lassen = unbegrenzt gültig. Nicht möglich, solange der Zugang Benutzerverwaltung=Schreiben hat.">?</span></label><input id="nu-expires" type="date"></div>
     </div>
@@ -2487,7 +2487,7 @@ function sharePickDialog(shares, cur, viewOnly, title) {                       /
 }
 async function pickShare(kind, id) {
   await loadShares();
-  if (!SHARE_LIST.length) { await uiDialog({ title: 'Noch niemand angelegt', message: 'Lege zuerst unter Smart Home → Teilen eine Person an (z. B. „Marion“). Danach kannst du hier einzelne Geräte mit ihr teilen.', info: true, okText: 'OK' }); return; }
+  if (!SHARE_LIST.length) { await uiDialog({ title: 'Noch niemand angelegt', message: 'Lege zuerst unter Smart Home → Teilen eine Person an (z. B. „Anna“). Danach kannst du hier einzelne Geräte mit ihr teilen.', info: true, okText: 'OK' }); return; }
   const ref = shareRef(kind, id), cur = Object.fromEntries((SHARE_MAP[ref] || []).map(x => [x.id, x.mode]));
   const res = await sharePickDialog(SHARE_LIST, cur, kind === 'sensor', 'Teilen');
   if (res === undefined) return;
@@ -3275,7 +3275,7 @@ if (document.getElementById('nfc-card')) {
     nfcLoad();
   });
   document.getElementById('nfc-reg-here').addEventListener('click', async () => {
-    const name = await uiDialog({ title: 'Dieses Gerät registrieren', label: 'Name des Handys (z. B. Michaels S25)', okText: 'Registrieren' });
+    const name = await uiDialog({ title: 'Dieses Gerät registrieren', label: 'Name des Handys (z. B. Annas Handy)', okText: 'Registrieren' });
     if (!name) return;
     try {
       if (nfcBase() !== location.origin) {                              // Tags zeigen auf eine andere Adresse (z. B. Tunnel): das Kennzeichen muss dort gesetzt werden -> ueber den Link auf dieser Adresse registrieren

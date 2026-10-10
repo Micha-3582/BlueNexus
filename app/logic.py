@@ -68,14 +68,14 @@ class Params:
     soc_floor_pct: float = 0.0     # 'Minimaler SOC' am Cerbo (wird je Durchlauf gelesen): darunter liefert der Akku nichts mehr
     smart_planner_safety_buffer_pct: float = 5.0   # Intelligente Planung rechnet mit soc_floor_pct + diesem Puffer als
     # Untergrenze (siehe webapp._smart_decision), OHNE den echten Cerbo-Minimalwert zu aendern - reine Sicherheitsmarge
-    # gegen eine zu optimistische Sonnenprognose (Michael, 29.09.: "min soc 15% eingestellt, Software soll trotzdem mit
+    # gegen eine zu optimistische Sonnenprognose (Nutzerwunsch, 29.09.: "min soc 15% eingestellt, Software soll trotzdem mit
     # 20% rechnen" - Ladelimit/harte Cerbo-Sperre bleiben unveraendert bei den echten 15%, nur die Planung selbst wird
     # vorsichtiger und laedt nachts etwas frueher/mehr, statt bis auf den letzten Prozentpunkt auf die Sonne zu wetten).
     periodic_full_charge_days: float = 0.0     # periodische Vollladung fuer Batteriegesundheit/BMS-Balancing (0 = aus,
     # siehe webapp._apply_periodic_full_charge): alle X Tage wird die Ladeobergrenze (max_charge_soc) auf
     # periodic_full_charge_target_soc angehoben, damit die Batterie hin und wieder wirklich voll wird - WANN das
     # geschieht, entscheidet weiterhin ganz normal die preis-/sonnenbewusste Planung (nie blindes Sofortladen,
-    # Michael 30.09.: "niemals blind laden und die preise ausser acht lassen"). Angeregt durch Victrons "GX
+    # Nutzerwunsch 30.09.: "niemals blind laden und die preise ausser acht lassen"). Angeregt durch Victrons "GX
     # Opportunity Loads"-Folien (Venus OS v3.80), die genau das empfehlen.
     periodic_full_charge_target_soc: float = 100.0
     dynamic_pricing: bool = True   # False = fester Tarif: keine preisbasierten Strategien
@@ -114,7 +114,7 @@ class PersistentState:
     charge_limit_hit: bool = False
     smart_commit_slot: str = ""    # wie commit_slot, aber fuer die Intelligente Planung (siehe webapp._smart_decision):
                                     # verhindert, dass eine einmal begonnene Ladung innerhalb derselben Viertelstunde
-                                    # durch eine neu berechnete Entscheidung wieder abgebrochen wird (Michael, 28.09.:
+                                    # durch eine neu berechnete Entscheidung wieder abgebrochen wird (Nutzerwunsch, 28.09.:
                                     # "wenn es zu einer ladeentscheidung kommt das dann die 15 min auch durchgezogen
                                     # werden" - vorher flatterte das bei knappen Faellen minuetlich an/aus)
     last_full_charge_date: str = ""    # periodische Vollladung (siehe webapp._apply_periodic_full_charge): Tag,
@@ -304,7 +304,7 @@ def decide(soc: float, price_entries: list, solar_today_raw: float,
     # mitgeben koennen, statt stillschweigend auf den Decision-Dataclass-Default
     # 0.0 zurueckzufallen - sonst zeigt das Dashboard "Sonne heute/morgen 0 kWh",
     # sobald ein manueller Ladetermin oder Sofort-Override aktiv ist, obwohl die
-    # Prognose intern laengst da ist (gefunden 20.09., Michael meldete faelschlich
+    # Prognose intern laengst da ist (gefunden 20.09., ein Nutzer meldete faelschlich
     # vermutete PV-Prognose-Ausfaelle).
     solar_today = round(solar_today_raw * p.pv_korrektur_faktor, 2)
     solar_tom = round(solar_tom_raw * p.pv_korrektur_faktor, 2)

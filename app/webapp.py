@@ -995,7 +995,7 @@ def manifest():
     name = store.default_app_name()
     m["name"] = name
     # Voller Name auch als Kurzname - eigenmaechtiges Abschneiden (z.B. auf
-    # 12 Zeichen) reisst bei "Mamas BlueNexus" nur "Mamas" heraus.
+    # 12 Zeichen) reisst bei "Annas BlueNexus" nur "Annas" heraus.
     # Das Betriebssystem bricht/kuerzt lange Homescreen-Labels selbst sinnvoll.
     m["short_name"] = name
     resp = jsonify(m)
@@ -1357,7 +1357,7 @@ class Controller:
         Loads'-Folien, Venus OS v3.80, 29.09.2026 - siehe Params.periodic_full_charge_days). Hebt NUR die
         Ladeobergrenze (params.max_charge_soc) an, wenn eine Vollladung faellig ist - WANN tatsaechlich geladen
         wird, entscheidet weiterhin die ganz normale preis-/sonnenbewusste Logik danach (Intelligente Planung
-        bzw. Standard-Strategien). Es wird nie blind/sofort geladen (Michael, 30.09.: "niemals blind laden und
+        bzw. Standard-Strategien). Es wird nie blind/sofort geladen (Nutzerwunsch, 30.09.: "niemals blind laden und
         die preise ausser acht lassen") - ist gerade kein guenstiger Moment oder scheint keine Sonne, wartet die
         angehobene Grenze einfach weiter, auch ueber mehrere Tage hinweg. pv_reserve_kwh bleibt dabei unangetastet,
         d.h. per Netz wird trotzdem nur bis zur gewohnten Reserve-Grenze zugekauft - die letzten Prozent bis zum
@@ -1414,7 +1414,7 @@ class Controller:
         """Untergrenze fuer den Planer (planner.py): der echte Cerbo-Minimalwert (params.soc_floor_pct) plus
         Sicherheitspuffer (params.smart_planner_safety_buffer_pct) - siehe _smart_decision(). Von der Ladeplan-
         Simulation (_run_plansim) genauso benutzt, damit deren 'Bisherige Steuerung' wirklich das zeigt, was live
-        passiert, statt mit dem ungenutzten alten night_safety_soc-Default (30%) zu rechnen (Michael, 29.09.:
+        passiert, statt mit dem ungenutzten alten night_safety_soc-Default (30%) zu rechnen (Nutzerwunsch, 29.09.:
         Simulation zeigte eine bei 30% schnurgerade SOC-Linie, obwohl der echte Minimalwert+Puffer nur 20% sind)."""
         return min(params.soc_floor_pct + max(0.0, params.smart_planner_safety_buffer_pct),
                    params.max_charge_soc - 1)
@@ -1439,7 +1439,7 @@ class Controller:
         Commitment (state.smart_commit_slot): hat ein Tick innerhalb einer Viertelstunde einmal "jetzt laden"
         beschlossen, bleibt es dabei bis zum Ende dieser Viertelstunde, auch wenn ein spaeterer Tick (z.B. weil
         der reale SOC inzwischen minimal hoeher ist als die Prognose) knapp auf "reicht schon" umschwenken wuerde -
-        sonst flattert die Ladung in Grenzfaellen minuetlich an/aus, statt die 15 Minuten durchzuziehen (Michael,
+        sonst flattert die Ladung in Grenzfaellen minuetlich an/aus, statt die 15 Minuten durchzuziehen (Nutzerwunsch,
         28.09.2026). Gleiches Prinzip wie state.commit_slot in logic.decide() fuer die Standard-Logik, nur ein
         eigenes Feld, weil beide Planer unabhaengig voneinander laufen.
         Rueckgabe: (jetzt_laden, geplante_Slots, Text) oder None, wenn die Datenlage nicht reicht (Aufrufer
@@ -2497,7 +2497,7 @@ def api_watchdog():
 @app.route("/api/alarms")
 def api_alarms():
     """Diagnose: Alarmregister von Multiplus (VE.Bus) und Batterie (BMS) roh auslesen (siehe victron.ALARM_REGS).
-    Noch nicht am echten Cerbo verifiziert - dient erstmal dazu, das gemeinsam mit Michael zu pruefen, bevor
+    Noch nicht am echten Cerbo verifiziert - dient erstmal dazu, das gemeinsam mit dem Nutzer zu pruefen, bevor
     daraus eine feste Anzeige/Meldung wird."""
     cfg = store.load_config()
     if not store.is_configured(cfg):
@@ -2882,7 +2882,7 @@ def api_ess_grid_setpoint():
 
 
 # Felder, deren echter Wert nur bei Schreibrecht auf ihren Bereich rausgeht - fuer
-# Zugangs-Token (nie im Klartext an einen reinen Leser) und interne IP-Adressen (Michael:
+# Zugangs-Token (nie im Klartext an einen reinen Leser) und interne IP-Adressen (Nutzerwunsch:
 # "man soll sehen dass da eine IP reinkommt, aber nicht meine internen IPs gelistet").
 SECRET_FIELDS = {"tibber_token", "cerbo_host"}
 

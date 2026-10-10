@@ -1,9 +1,9 @@
 """
 Geraete teilen zwischen BlueNexus-Instanzen (z. B. Wohnung und Mutter im selben Haus).
 
-GEBER (Micha): legt unter "Teilen" eine Freigabe an, waehlt Geraete / Sensoren / Schalter und Knoepfe aus und gibt pro Eintrag "nur sehen" oder
+GEBER: legt unter "Teilen" eine Freigabe an, waehlt Geraete / Sensoren / Schalter und Knoepfe aus und gibt pro Eintrag "nur sehen" oder
 "sehen und bedienen" frei. Dazu gibt es eine Adresse (Tunnel oder LAN) und einen Zugangsschluessel (nur ein Mal sichtbar, gespeichert wird nur sein Hash).
-EMPFAENGER (Mama): traegt Adresse + Schluessel unter "Fremde Quellen" ein und holt sich die freigegebenen Eintraege in die eigene Anlage. Sie erscheinen dort
+EMPFAENGER: traegt Adresse + Schluessel unter "Fremde Quellen" ein und holt sich die freigegebenen Eintraege in die eigene Anlage. Sie erscheinen dort
 wie eigene Geraete bzw. Sensoren (mit Vermerk "von ..."), lassen sich in Regeln nutzen, und Befehle gehen zum Geber, der sie mit SEINEN Zugangsdaten ausfuehrt
 (z. B. Klimaanlage: der Medea-Login bleibt nur beim Geber).
 
@@ -81,7 +81,7 @@ def list_shares() -> list[dict]:
 def create(name: str) -> tuple[dict, str]:
     name = (name or "").strip()[:60]
     if not name:
-        raise ShareError("Name eingeben (z. B. „Mama“)")
+        raise ShareError("Name eingeben (z. B. „Anna“)")
     token = "bnx_" + secrets.token_urlsafe(24)
     s = {"id": "s-" + uuid.uuid4().hex[:8], "name": name, "token_hash": _hash(token), "items": [], "created": time.time(), "last_seen": 0}
     with _lock:
@@ -325,7 +325,7 @@ def provider_ac(share: dict, ref: str, body: dict | None) -> dict:
 def _norm_url(url: str) -> str:
     u = urlparse((url or "").strip())
     if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password:
-        raise ShareError("Adresse: http:// oder https:// und der Name des anderen Systems, z. B. https://mama.beispiel.de")
+        raise ShareError("Adresse: http:// oder https:// und der Name des anderen Systems, z. B. https://anlage.beispiel.de")
     return f"{u.scheme}://{u.netloc}"
 
 

@@ -753,7 +753,7 @@ $('e-next').addEventListener('click', () => shiftEnergyDay(1));
 $('f-prev').addEventListener('click', () => shiftEnergyDay(-1));
 $('f-next').addEventListener('click', () => shiftEnergyDay(1));
 /* --- Eigenes Kalender-Popup (statt nativem <input type=date>) fuer e-pick/f-pick/p-pick: passend zum
-   dunklen Design und direkt neben dem Icon positioniert, statt am Browser-Standardort (Michael, 28.09.). */
+   dunklen Design und direkt neben dem Icon positioniert, statt am Browser-Standardort (Nutzerwunsch, 28.09.). */
 function openEnergyDatePick(anchor) {
   openCalendarPicker(anchor, { value: energyDay || todayStr(), min: energyMinDay || todayStr(),
     max: fcForDay(tomorrowStr()) ? tomorrowStr() : todayStr() }, day => loadEnergyDay(day));
@@ -1373,7 +1373,7 @@ async function loadHistPrices(day) {
   prices = (rec ? rec.p : Array(96).fill(null)).map((ct, i) => {
     const h = Math.floor(i / 4), m = (i % 4) * 15;
     // Seit 28.09.2026 speichert store.record_prices() Tibbers eigene Einstufung (lvl) mit - damit sieht der
-    // Rueckblick exakt dieselben Farben wie am Tag selbst (Michael, Screenshot). Nur bei aelteren Tagen, die das
+    // Rueckblick exakt dieselben Farben wie am Tag selbst (Nutzerwunsch, Screenshot). Nur bei aelteren Tagen, die das
     // Feld noch nicht haben, faellt es auf eine grobe Schaetzung relativ zum Tagesdurchschnitt zurueck.
     const realLvl = rec && rec.lvl && rec.lvl[i];
     const level = realLvl || (ct == null ? 'NORMAL' : ct < avg * 0.6 ? 'VERY_CHEAP' : ct < avg * 0.9 ? 'CHEAP'

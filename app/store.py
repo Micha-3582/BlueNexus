@@ -144,7 +144,7 @@ PRODUCT_NAME = "BlueNexus"
 
 
 def possessive_name(first: str) -> str:
-    """Michael -> "Michaels", Hans -> "Hans'" (deutsche Besitzform: nach s, ß, x, z nur ein Apostroph)."""
+    """Anna -> "Annas", Hans -> "Hans'" (deutsche Besitzform: nach s, ß, x, z nur ein Apostroph)."""
     first = (first or "").strip()
     if not first:
         return ""
@@ -952,7 +952,7 @@ def contract_fixed_cost_eur(cfg: dict, days: float) -> float:
     Vertragskosten. Fuer eine punktuelle Ja/Nein-Frage ("gibt es ueberhaupt Vertragskosten?", z.B.
     webapp.has_contract_fees) unproblematisch, aber NICHT fuer echte vergangene Zeitraeume verwenden - dafuer
     gibt es contract_fixed_cost_for_range(), das die zum jeweiligen Tag gueltige Periode nimmt (siehe
-    record_contract_period_if_changed() weiter unten: Michael, 28.09. - bei einem Anbieterwechsel duerfen sich
+    record_contract_period_if_changed() weiter unten: Nutzerwunsch 28.09. - bei einem Anbieterwechsel duerfen sich
     vergangene Monate nicht rueckwirkend mit den neuen Konditionen aendern)."""
     return _fee_per_day(_period_values(cfg)) * days
 
@@ -1409,7 +1409,7 @@ def recent_solar_average(days: int = 7, now: datetime | None = None) -> float | 
 #   'VERY_CHEAP'/'CHEAP'/'NORMAL'/'EXPENSIVE'/'VERY_EXPENSIVE' oder null], "src": "tibber" | "derived"}}}
 # "tibber" = Originalpreise (inkl. Tibbers eigener Einstufung), "derived" = aus Bezugskosten/-menge im Verlauf
 # zurueckgerechnet (nur Slots mit Netzbezug, lueckenhaft, kein "lvl" - der Preis allein war ja bekannt, nicht die
-# Einstufung). "lvl" existiert erst seit 28.09.2026 (Michael: Rueckblick soll dieselben Farben zeigen wie am Tag
+# Einstufung). "lvl" existiert erst seit 28.09.2026 (Nutzerwunsch: Rueckblick soll dieselben Farben zeigen wie am Tag
 # selbst bei Tibber) - aeltere Tage haben das Feld schlicht nicht bzw. es steht auf null; der Rueckblick im
 # Frontend (index.html loadHistPrices) faellt dafuer auf eine grobe Schaetzung relativ zum Tagesdurchschnitt zurueck.
 PRICE_HISTORY_PATH = os.path.join(_DIR, "price_history.json")

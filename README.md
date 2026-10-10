@@ -16,7 +16,7 @@ vollwertiges **Energiemanagement für Victron-ESS-Anlagen mit dynamischem Stromp
 > nutzt BlueNexus als reine Smart-Home-Zentrale.
 
 Jede Installation trägt den Namen ihres Besitzers: Beim ersten Start fragt die App nach dem Vornamen und heißt
-dann z. B. **„Michaels BlueNexus“** – in Kopfzeile, Browser-Tab, Handy-App und Nachrichten (später frei änderbar).
+dann z. B. **„Annas BlueNexus“** – in Kopfzeile, Browser-Tab, Handy-App und Nachrichten (später frei änderbar).
 
 Sie läuft auf einem Raspberry Pi (oder jedem Linux-Rechner im Netz), wird im Browser oder als App auf dem
 Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet oder filmt:
@@ -478,7 +478,7 @@ Läuft mit Python 3.9+. Alternativ per **pm2** oder **systemd** als Dienst.
 
 ## Einrichtung
 
-1. **Konto anlegen** – Vorname angeben (daraus entsteht der Name der App, z. B. „Michaels BlueNexus“); das erste Konto wird zum Administrator.
+1. **Konto anlegen** – Vorname angeben (daraus entsteht der Name der App, z. B. „Annas BlueNexus“); das erste Konto wird zum Administrator.
 2. **Module wählen** – Energie, Smart Home, Kameras, Alexa. Ohne PV-Anlage „Energie“ einfach abwählen.
    Wer eine Sicherung hat, stellt sie gleich auf der Seite „Konto anlegen“ wieder her (Dateien `.bnx`, auch ältere `.hnx`).
 3. **Einrichtungsassistent** (nur mit Energie): Victron-GX-Gerät (Cerbo GX oder MultiPlus-II GX), Tibber-Token oder Festpreis, VRM-Zugang. Ein

@@ -3,7 +3,7 @@
 Aufruf (im App-Ordner, mit der Python-Umgebung der App):
     ./venv/bin/python camera_diag.py [Stunden] [Kamera-Name-Teil]
 Beispiele:  ./venv/bin/python camera_diag.py          (alle Kameras, letzte 12 Stunden)
-            ./venv/bin/python camera_diag.py 48 Tor   (nur Kameras mit „Tor“ im Namen, letzte 48 Stunden)
+            ./venv/bin/python camera_diag.py 48 Garage   (nur Kameras mit „Garage“ im Namen, letzte 48 Stunden)
 
 Es wird nichts verändert, gelöscht oder gespeichert: nur lesen. Für den Download-Test werden höchstens ca. 3 MB einer Aufnahme geladen.
 """

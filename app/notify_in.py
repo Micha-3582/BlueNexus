@@ -1,5 +1,5 @@
 """
-Telegram-Befehle: Triggerworte, die jemand dem Bot schreibt, loesen Regeln aus (z. B. "Tor" oeffnet das Schiebetor).
+Telegram-Befehle: Triggerworte, die jemand dem Bot schreibt, loesen Regeln aus (z. B. ein Wort wie "Garage" oeffnet ein Garagentor).
 
 - Der Bot fragt bei Telegram per Long-Poll nach neuen Nachrichten (getUpdates) - es muss nichts von aussen erreichbar sein.
 - Nur FREIGEGEBENE Chats werden bedient: das sind die Empfaenger unter Einstellungen -> Meldungen (Chat-ID einmalig eintragen). Wer dem Bot
@@ -8,7 +8,7 @@ Telegram-Befehle: Triggerworte, die jemand dem Bot schreibt, loesen Regeln aus (
 - Welche Woerter es gibt, bestimmen die Regeln: Bedingung "Telegram-Wort" (nur bei Regeln der Art Ablauf), wahlweise nur fuer bestimmte Empfaenger
   und wahlweise mit Rueckfrage ("wirklich? Antworte mit ja"). Die Aktionen sind dieselben wie bei jeder Regel.
 - Sicherheit: Nachrichten, die aelter als MAX_AGE_S sind (z. B. nach einem Neustart oder Netzausfall liegengeblieben), werden verworfen - ein altes
-  "Tor" darf nie spaeter ein Tor oeffnen. Jede Auslösung, jede Rueckfrage und jede Anfrage steht im Logbuch (nur fuer Administratoren sichtbar).
+  Ein altes Wort darf nie spaeter ein Tor oeffnen. Jede Auslösung, jede Rueckfrage und jede Anfrage steht im Logbuch (nur fuer Administratoren sichtbar).
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ _polling = False                              # True, solange der Poller laeuft 
 
 
 def norm(text) -> str:
-    """Vergleichsform eines Befehlswortes: ohne fuehrendes /, ohne @Botname, Leerzeichen vereinheitlicht. Gross-/Kleinschreibung bleibt: "Bing" ist nicht "bing"."""
+    """Vergleichsform eines Befehlswortes: ohne fuehrendes /, ohne @Botname, Leerzeichen vereinheitlicht. Gross-/Kleinschreibung bleibt erhalten (z. B. "Wort" ist nicht "wort")."""
     t = str(text or "").strip()
     if t.startswith("/"):
         t = t[1:]
