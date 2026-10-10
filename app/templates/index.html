@@ -255,6 +255,36 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='verlauf-chart.js') }}"></script>
 <script>
+/* App-Fenster statt Browser-Popup (confirm/alert) */
+function uiConfirm(title, message, okText) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg" style="white-space:pre-line"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok"></button></div></div>`;
+    ov.querySelector('h3').textContent = title; ov.querySelector('.dlg-msg').textContent = message; ov.querySelector('.dlg-ok').textContent = okText || 'OK';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+    ov.querySelector('.dlg-ok').onclick = () => close(true); ov.querySelector('.dlg-no').onclick = () => close(false);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-ok').focus();
+  });
+}
+function uiAlert(message, title) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg" style="white-space:pre-line"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="dlg-ok">OK</button></div></div>`;
+    ov.querySelector('h3').textContent = title || 'Hinweis'; ov.querySelector('.dlg-msg').textContent = String(message || '');
+    const close = () => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(); };
+    const onKey = e => { if (e.key === 'Escape' || e.key === 'Enter') close(); };
+    ov.querySelector('.dlg-ok').onclick = close; ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-ok').focus();
+  });
+}
 const TH = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();          // Themenfarbe (dunkel/hell) fuer die Diagramme
 const MODULES = {{ modules | tojson }};              // Module der Installation (Energie / Smart Home / Kameras)
 {% if welcome %}
@@ -788,7 +818,7 @@ document.getElementById('ev-confirm').addEventListener('click', async () => {
   if (!pendingSel) return;
   const r = await fetch('/api/ev', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ start: pendingSel.start, end: pendingSel.end, note: $('ev-note').value }) });
-  if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.error || 'Termin konnte nicht angelegt werden'); return; }
+  if (!r.ok) { const e = await r.json().catch(() => ({})); await uiAlert(e.error || 'Termin konnte nicht angelegt werden'); return; }
   clearSelection();
   load();
 });
@@ -1249,7 +1279,7 @@ function renderEv() {
 }
 async function delEv(id) { await fetch('/api/ev/' + id, { method: 'DELETE' }); load(); }
 async function stopEv(id) {
-  if (!confirm('Ladetermin jetzt beenden? Das bereits Geladene bleibt in der Liste der Ladevorgänge.')) return;
+  if (!await uiConfirm('Ladetermin beenden?', 'Das bereits Geladene bleibt in der Liste der Ladevorgänge.', 'Jetzt beenden')) return;
   await fetch('/api/ev/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'stop' }) });
   load();

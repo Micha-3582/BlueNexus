@@ -83,6 +83,36 @@
 {% endblock %}
 {% block scripts %}
 <script>
+/* App-Fenster statt Browser-Popup (confirm/alert) */
+function uiConfirm(title, message, okText) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg" style="white-space:pre-line"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok"></button></div></div>`;
+    ov.querySelector('h3').textContent = title; ov.querySelector('.dlg-msg').textContent = message; ov.querySelector('.dlg-ok').textContent = okText || 'OK';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+    ov.querySelector('.dlg-ok').onclick = () => close(true); ov.querySelector('.dlg-no').onclick = () => close(false);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-ok').focus();
+  });
+}
+function uiAlert(message, title) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3><div class="muted dlg-msg" style="white-space:pre-line"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="dlg-ok">OK</button></div></div>`;
+    ov.querySelector('h3').textContent = title || 'Hinweis'; ov.querySelector('.dlg-msg').textContent = String(message || '');
+    const close = () => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(); };
+    const onKey = e => { if (e.key === 'Escape' || e.key === 'Enter') close(); };
+    ov.querySelector('.dlg-ok').onclick = close; ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov); ov.querySelector('.dlg-ok').focus();
+  });
+}
 const IS_ADMIN = {{ (((user_perms.user_management or 'none') == 'write') or demo_view) | tojson }};
 document.documentElement.classList.toggle('is-admin', IS_ADMIN);
 const $ = id => document.getElementById(id);
@@ -349,9 +379,9 @@ $('camgrid').addEventListener('click', async e => {
     else if (act === 'del') {
       try {
         const u = await api('/api/rule-usage?kind=camera&id=' + encodeURIComponent(id));
-        if ((u.rules || []).length) { alert('Die Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wird in ' + (u.rules.length > 1 ? 'den Regeln ' : 'der Regel ') + u.rules.map(n => '„' + n + '“').join(', ') + ' verwendet.\n\nErst ' + (u.rules.length > 1 ? 'diese Regeln' : 'diese Regel') + ' löschen oder ausschalten, dann lässt sich die Kamera entfernen.'); return; }
+        if ((u.rules || []).length) { await uiAlert('Die Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wird in ' + (u.rules.length > 1 ? 'den Regeln ' : 'der Regel ') + u.rules.map(n => '„' + n + '“').join(', ') + ' verwendet.\n\nErst ' + (u.rules.length > 1 ? 'diese Regeln' : 'diese Regel') + ' löschen oder ausschalten, dann lässt sich die Kamera entfernen.'); return; }
       } catch (e) { /* Pruefung nicht moeglich: der Server prueft beim Loeschen noch einmal */ }
-      if (!confirm('Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wirklich entfernen? (An der Kamera selbst ändert sich nichts.)')) return;
+      if (!await uiConfirm('Kamera entfernen?', 'Kamera „' + (CAMS.find(c => c.id === id)?.name || '') + '“ wirklich entfernen? (An der Kamera selbst ändert sich nichts.)', 'Entfernen')) return;
       stopLive(id, card, true); await api('/api/cameras/' + encodeURIComponent(id), 'DELETE'); toast('Entfernt ✓'); await load();
     }
   } catch (err) { toast(err.message, true); }
