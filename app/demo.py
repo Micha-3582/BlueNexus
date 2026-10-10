@@ -81,6 +81,19 @@ def _simulate(now: datetime):
         t = nxt
 
 
+# Nur fuer Werbebilder: BLUENEXUS_DEMO_SNAPSHOT=1 zeigt einen festen, sonnigen Moment statt der Tageszeit (sonst viele Nullen am Abend).
+# Wird auf der oeffentlichen Demo nicht gesetzt.
+SNAPSHOT = os.environ.get("BLUENEXUS_DEMO_SNAPSHOT") == "1"
+_SNAP_SYSTEM = {
+    "grid": {"l1": 2047, "l2": -1100, "l3": -967, "total": -20},
+    "loads": {"l1": 155, "l2": 938, "l3": 359, "total": 1452},
+    "pv_inverter": {"l1": 0, "l2": 2038, "l3": 1326, "total": 3364},
+    "pv_charger": 1378, "pv_charger_current": 26.9, "solar_total": 4742,
+    "grid_energy_total": {"import": 4530.4, "export": 5610.2},
+    "battery": {"voltage": 50.9, "current": 61.7, "power": 3141, "soc": 90, "state": 1},
+}
+
+
 class _Mode:
     value = 10
 
@@ -90,9 +103,14 @@ def _make_cerbo():
 
     class DemoCerbo(_Real):
         def read_soc(self):
+            if SNAPSHOT:
+                return 90.0
             return round(_simulate(datetime.now())[0], 1)
 
         def read_system(self, has_pv_inverter=True, has_mppt=True):
+            if SNAPSHOT:
+                import copy
+                return copy.deepcopy(_SNAP_SYSTEM)
             now = datetime.now()
             soc, pv, load, batt = _simulate(now)
             pv_ac = pv * 0.8 if has_pv_inverter else 0.0
