@@ -164,6 +164,35 @@ def update(share_id: str, name: str | None = None, items=None) -> dict:
         return _public(s)
 
 
+def set_item(ref: str, assignments: dict) -> list[dict]:
+    """Einen Eintrag (Geraet/Sensor/Schalter) fuer bestimmte Freigaben setzen: {freigabe-id: "view" | "control" | None (nicht teilen)}.
+    Freigaben, die nicht genannt werden, bleiben unveraendert. Gibt die Freigaben zurueck, die den Eintrag jetzt haben."""
+    if not isinstance(assignments, dict):
+        raise ShareError("Angaben ungültig")
+    with _lock:
+        valid = {x["ref"]: x for x in shareable()}
+        if ref not in valid:
+            raise ShareError("Dieser Eintrag lässt sich nicht teilen", 400)
+        shares = _load(SHARES_PATH)
+        ids = {s["id"] for s in shares}
+        for sid, mode in assignments.items():
+            if sid not in ids:
+                raise ShareError("Freigabe nicht gefunden", 404)
+            if mode is not None and mode not in MODES:
+                raise ShareError("Art der Freigabe: nur sehen oder bedienen")
+            if mode == "control" and valid[ref]["type"] == "sensor":
+                raise ShareError("Sensoren lassen sich nur ansehen")
+        for s in shares:
+            if s["id"] not in assignments:
+                continue
+            mode = assignments[s["id"]]
+            s["items"] = [x for x in s.get("items") or [] if x["ref"] != ref and x["ref"] in valid]
+            if mode is not None:
+                s["items"].append({"ref": ref, "mode": mode})
+        _save(SHARES_PATH, shares)
+        return [_public(s) for s in shares if any(x["ref"] == ref for x in s.get("items") or [])]
+
+
 def by_token(token: str) -> dict | None:
     """Freigabe zum Schluessel (zeitkonstanter Vergleich). Vermerkt nebenbei, wann sie zuletzt benutzt wurde."""
     token = (token or "").strip()

@@ -730,12 +730,12 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 **Was sich teilen lässt:** Geräte (Steckdosen, Lampen, Klimaanlagen …), Sensoren, eigene Schalter und Knöpfe. Pro Eintrag legst du fest: **nur sehen** oder **sehen & bedienen** (Sensoren sind immer nur zum Sehen). Was selbst aus einer fremden Quelle stammt, lässt sich nicht weitergeben.
 
 **Beim Geber (du)**
-1. *Teilen → Meine Freigaben:* Name der Freigabe eintragen (z. B. „Mama“) → **Freigabe anlegen**.
-2. Es erscheint der **Zugangsschlüssel** (`bnx_…`) und die **Adresse** deines Systems. Der Schlüssel wird **nur dieses eine Mal** gezeigt, gespeichert ist nur sein Hash. Beides gibst du dem Empfänger.
-3. **Einträge wählen:** Haken setzen und je Eintrag „nur sehen“ bzw. „sehen & bedienen“ wählen → **Speichern**. Der Empfänger sieht nur genau das.
-4. **Neuer Schlüssel** macht den alten sofort ungültig (z. B. wenn er in falsche Hände kam). Der Papierkorb löscht die Freigabe komplett. In der Liste steht, wann der Empfänger zuletzt abgefragt hat.
+1. *Teilen → Teilen mit anderen:* Name der Person eintragen (z. B. „Marion“) → **Person anlegen**.
+2. Es erscheint der **Zugangsschlüssel** (`bnx_…`) und die **Adresse** deines Systems. Der Schlüssel wird **nur dieses eine Mal** gezeigt, gespeichert ist nur sein Hash. Beides gibst du der Person.
+3. **Geräte teilst du dort, wo sie stehen:** In *Aktoren*, *Sensoren* oder *Eigene Schalter & Knöpfe* auf das **✎** des Eintrags drücken und das **Teilen-Symbol** (drei verbundene Punkte) wählen. Ein Fenster fragt, **mit wem** (die angelegten Personen) und ob **nur sehen** oder **sehen & bedienen** (Sensoren nur sehen). Die Person sieht danach genau diesen Eintrag – keine lange Liste mit allem anderen. Am Namen erscheint zur Erinnerung das kleine **Teilen-Zeichen** (mit dem Mauszeiger darüber steht, mit wem). Zum Zurücknehmen Haken wieder entfernen.
+4. Im Reiter *Teilen* siehst du pro Person, was geteilt ist, und wann sie zuletzt abgefragt hat. **Neuer Schlüssel** macht den alten sofort ungültig (z. B. wenn er in falsche Hände kam). Der Papierkorb löscht die Person samt aller Freigaben.
 
-**Beim Empfänger (Mama)**
+**Beim Empfänger (z. B. Marion oder Mama)**
 1. *Teilen → Fremde Quellen:* Name (z. B. „Wohnung Micha“), **Adresse** und **Zugangsschlüssel** eintragen → **Verbinden**. Die App prüft dabei, ob die Verbindung klappt.
 2. **Geräte holen:** angebotene Einträge ankreuzen → **Ausgewählte holen**. Sie erscheinen als normale Geräte bzw. Sensoren in der eigenen Anlage (Vermerk „von Wohnung Micha“), die Klimaanlage in der Rubrik Klimaanlagen mit dem vollen Bedienfeld (Modus, Temperatur, Lüfter). Danach lassen sie sich wie eigene umbenennen, aufs Dashboard legen, pro Benutzer sichtbar machen und in **Regeln** verwenden (WENN Sensor/Gerät …, DANN Gerät/Klimaanlage …).
 3. **Quelle entfernen** löscht auch alle von dort geholten Einträge (nicht, solange eine Regel sie noch verwendet).

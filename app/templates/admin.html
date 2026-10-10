@@ -64,6 +64,9 @@
   .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; }
   .tgl.vis.on { background: var(--card2); border-color: var(--accent); color: var(--accent-t); opacity: 1; }
   .tgl.pin.on { background: var(--card2); border-color: #f0b429; color: #f0b429; }
+  .tgl.share.on { background: var(--card2); border-color: var(--accent); color: var(--accent-t); opacity: 1; }
+  .share-mark { display: inline-flex; vertical-align: -2px; margin-left: 7px; color: var(--accent-t); }
+  .share-mark svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .edit-panel { display: none; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
   .edit-panel.open { display: block; }
   .edit-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -818,12 +821,12 @@
 </div>
 
 <div class="card msg-host" id="share-give" data-tab="teilen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Meine Freigaben (Geräte teilen) <span class="qhelp" role="button" tabindex="0" data-help="Gib Geräte, Sensoren, Schalter und Knöpfe an ein anderes BlueNexus weiter, z. B. an deine Mutter im selben Haus. Sie bekommt einen Zugangsschlüssel und sieht danach nur, was du ausgewählt hast. Befehle (z. B. Klimaanlage einschalten) führt dein System mit deinen Zugangsdaten aus – bei Cloud-Geräten wie der Klimaanlage muss sich also niemand ein zweites Mal anmelden. Das andere System muss deines erreichen können: über deine Tunnel-Adresse oder, wenn ihr im selben Netz seid, über die lokale Adresse.">?</span></h2>
-  <div class="sub">Wer darf was von dir sehen oder bedienen?</div>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Teilen mit anderen (Personen) <span class="qhelp" role="button" tabindex="0" data-help="Lege hier eine Person bzw. Anlage an (z. B. deine Mutter im selben Haus). Sie bekommt einen Zugangsschlüssel und sieht danach nur, was du ihr freigibst. Freigeben tust du bei jedem Gerät, Sensor oder Schalter selbst: ✎ drücken und das Teilen-Symbol wählen. Befehle (z. B. Klimaanlage einschalten) führt dein System mit deinen Zugangsdaten aus – bei Cloud-Geräten wie der Klimaanlage muss sich also niemand ein zweites Mal anmelden. Das andere System muss deines erreichen können: über deine Tunnel-Adresse oder, wenn ihr im selben Netz seid, über die lokale Adresse.">?</span></h2>
+  <div class="sub">Wer bekommt Zugang? Was geteilt wird, legst du pro Gerät über ✎ → Teilen-Symbol fest.</div>
   <div id="shares-list" style="display:flex;flex-direction:column;gap:8px"></div>
   <div class="admin-only" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input id="share-name" placeholder="Wer bekommt die Freigabe? z. B. Mama" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
-    <button id="share-add" class="ghost">Freigabe anlegen</button>
+    <input id="share-name" placeholder="Name der Person, z. B. Marion" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
+    <button id="share-add" class="ghost">Person anlegen</button>
   </div>
 </div>
 
@@ -1739,6 +1742,13 @@ const I_USERS = svgi('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circ
 /* Sichtbarkeit pro Benutzer (nur Administratoren): blau = eingeschraenkt, grau = alle sehen es */
 const visBtn = (kind, id, users) => !window.IS_ADMIN ? '' :
   `<button type="button" class="tgl vis${Array.isArray(users) ? ' on' : ''}" data-users="${escH(Array.isArray(users) ? JSON.stringify(users) : '')}" onclick="pickVisibility('${kind}','${id}',this)" aria-label="Sichtbarkeit pro Benutzer" title="${escH(Array.isArray(users) ? (users.length ? 'Sichtbar nur für: ' + users.join(', ') : 'Sichtbar nur für Administratoren – antippen, um Benutzer freizugeben') : 'Sichtbar für: alle Benutzer')}">${I_USERS}</button>`;
+const I_SHARE = svgi('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>');
+/* Teilen mit anderen BlueNexus-Anlagen (share.py): Knopf im Stift-Menue jedes Geraets/Sensors/Schalters + kleines Zeichen am Namen */
+let SHARE_MAP = {}, SHARE_LIST = [], SHARE_CAT = [], SHARE_SIG = '';           // SHARE_MAP: Referenz -> [{id, name, mode}]
+const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:' }[kind] || '?:') + id;
+const shareWho = ref => (SHARE_MAP[ref] || []).map(x => `${x.name} (${x.mode === 'control' ? 'bedienen' : 'nur sehen'})`).join(', ');
+const shareBtn = (kind, id, skip) => (!window.IS_ADMIN || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
+const shareMark = (kind, id, skip) => (!window.IS_ADMIN || skip || !(SHARE_MAP[shareRef(kind, id)] || []).length) ? '' : `<span class="share-mark" title="${escH('Geteilt mit: ' + shareWho(shareRef(kind, id)))}">${I_SHARE}</span>`;
 const VIS_URL = { shelly: '/api/shelly/', sensor: '/api/sensors/', virtual: '/api/virtual/', wol: '/api/wol/', sound: '/api/homematic/sounds/', blind: '/api/homematic/blinds/' };
 const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); } };
 function userPickDialog(names, current) {                       // -> undefined (abgebrochen) | null (alle) | Liste
@@ -1796,7 +1806,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
     return `<div data-dev="${id}" data-sort-id="${id}" style="border:1px solid var(--border);border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="shellyPickIcon('${id}')">${escH(d.icon)}</button>
-        <div style="flex:1;min-width:150px"><b>${escH(d.name)}</b>
+        <div style="flex:1;min-width:150px"><b>${escH(d.name)}</b>${shareMark('shelly', id, d.kind === 'remote')}
           <div class="muted">${escH([d.model, d.ip].filter(Boolean).join(' · '))} · <span class="dev-stat">${escH(shellyStatText(d))}</span></div></div>
         ${d.kind === 'wled' && d.switchable !== false ? `<input type="range" min="0" max="100" step="1" value="${d.on ? (d.brightness || 100) : 0}" style="width:140px" title="Helligkeit in Prozent: ganz links 0 % = aus, ganz rechts 100 % – beim Loslassen übernommen" oninput="this.nextElementSibling.textContent = this.value + ' %'" onchange="wledBrightness('${id}', this.value)"><b class="rng-val" style="min-width:44px;text-align:right">${d.on ? (d.brightness || 100) : 0} %</b>
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
@@ -1816,6 +1826,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
           ${visBtn('shelly', id, d.users)}
+          ${shareBtn('shelly', id, d.kind === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="shellyRemove('${id}')">${I_TRASH}</button>
         </div>
       </div>
@@ -2234,7 +2245,7 @@ async function loadSensorsAdmin(light) {
   box.innerHTML = list.length ? list.map(s => { const sid = escH(s.id); return `<div data-sensor="${sid}" data-sort-id="${sid}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="sensorPickIcon('${sid}')">${escH(s.icon || SENSOR_ICON[s.kind] || '📡')}</button>
-      <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b><div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : s.source === 'camera' ? ' · Kamera' : ''}${s.room ? ' · ' + escH(s.room) : ''} · <b>${escH(sensorValueText(s))}</b></div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b>${shareMark('sensor', sid, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : s.source === 'camera' ? ' · Kamera' : ''}${s.room ? ' · ' + escH(s.room) : ''} · <b>${escH(sensorValueText(s))}</b></div></div>
       <button class="ghost admin-only" onclick="editToggle('sedit-${sid}')" title="Bearbeiten: Name, Dashboard, Umkehren, Entfernen">✎</button></div>
       <div class="edit-panel" id="sedit-${sid}">
         <div class="edit-row"><input id="sname-${sid}" value="${escH(s.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')sensorRenameSave('${sid}')">
@@ -2242,6 +2253,7 @@ async function loadSensorsAdmin(light) {
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(s.show !== false, I_EYE, 'Auf dem Dashboard in der Kachel „Sensoren“ zeigen', `tglField(this,'sensor','${sid}','show','Dashboard')`)}
           ${visBtn('sensor', sid, s.users)}
+          ${shareBtn('sensor', sid, s.source === 'remote')}
           ${s.binary && !/^key_/.test(s.kind) ? tglBtn(!!s.invert, I_SWAP, `${INV_LABEL[s.kind] || 'Umkehren'} – Legt fest, was TRUE bedeutet. An: ${INV_ON[s.kind] || 'TRUE und FALSE vertauscht'}. Aus: ${INV_OFF[s.kind] || 'wie vom Sensor gemeldet'}.`, `tglField(this,'sensor','${sid}','invert','${escH(INV_LABEL[s.kind] || 'Umkehren')}')`) : ''}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="sensorRemove('${sid}')">${I_TRASH}</button>
         </div>
@@ -2342,48 +2354,65 @@ document.getElementById('wol-add').addEventListener('click', async () => {
   } catch (e) { shellyMsg(e.message, true); }
   loadWolAdmin();
 });
-/* --- Teilen: Freigaben (Geber) und Fremde Quellen (Empfaenger), siehe share.py --- */
+/* --- Teilen: Personen/Anlagen (Geber) und Fremde Quellen (Empfaenger), siehe share.py --- */
 const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', virtual: 'Schalter & Knöpfe' };
-let SHARE_CAT = [], SHARE_LIST = [];
 async function loadShares() {
-  const box = document.getElementById('shares-list'); if (!box) return;
   let j; try { j = await (await fetch('/api/shares', { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(j.shares)) return;
   SHARE_CAT = j.shareable || []; SHARE_LIST = j.shares;
-  const open = [...box.querySelectorAll('.share-panel')].filter(p => p.style.display !== 'none').map(p => p.id);
-  box.innerHTML = j.shares.length ? j.shares.map(s => { const id = escH(s.id); return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">🔗</span>
-        <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b><div class="muted">${s.items.length} ${s.items.length === 1 ? 'Eintrag' : 'Einträge'} freigegeben · ${s.last_seen ? 'zuletzt abgefragt ' + new Date(s.last_seen * 1000).toLocaleString('de-DE') : 'noch nie abgefragt'}</div></div>
+  SHARE_MAP = {};
+  j.shares.forEach(sh => (sh.items || []).forEach(it => { (SHARE_MAP[it.ref] = SHARE_MAP[it.ref] || []).push({ id: sh.id, name: sh.name, mode: it.mode }); }));
+  const sig = JSON.stringify(SHARE_MAP);
+  if (sig !== SHARE_SIG) { const first = SHARE_SIG === ''; SHARE_SIG = sig; if (!first || sig !== '{}') { ['shelly', 'sensor', 'virtual'].forEach(k => { try { VIS_RELOAD[k](); } catch (e) { /* Liste noch nicht da */ } }); } }
+  const box = document.getElementById('shares-list'); if (!box) return;
+  const nameOf = Object.fromEntries(SHARE_CAT.map(c => [c.ref, c]));
+  box.innerHTML = j.shares.length ? j.shares.map(sh => { const id = escH(sh.id), its = (sh.items || []).filter(i => nameOf[i.ref]); return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">👤</span>
+        <div style="flex:1;min-width:150px"><b>${escH(sh.name)}</b><div class="muted">${its.length ? its.length + (its.length === 1 ? ' Eintrag geteilt' : ' Einträge geteilt') : 'noch nichts geteilt'} · ${sh.last_seen ? 'zuletzt abgefragt ' + new Date(sh.last_seen * 1000).toLocaleString('de-DE') : 'noch nie abgefragt'}</div></div>
         <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
-          <button class="ghost admin-only" onclick="shareEdit('${id}')">Einträge wählen</button>
           <button class="ghost admin-only" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
-          <button type="button" class="tgl del admin-only" title="Freigabe löschen" aria-label="Freigabe löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
-        </div></div><div id="sharep-${id}" class="share-panel" style="display:none;margin-top:10px"></div></div>`; }).join('')
-    : '<div class="muted">Noch nichts freigegeben.</div>';
-  open.forEach(pid => { const sid = pid.slice(7); if (j.shares.some(s => s.id === sid)) shareEdit(sid, true); });
+          <button type="button" class="tgl del admin-only" title="Person und Freigaben löschen" aria-label="Löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
+        </div></div>
+      ${its.length ? `<div class="muted" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${its.map(i => `<span style="border:1px solid var(--border);border-radius:999px;padding:2px 10px">${escH(nameOf[i.ref].icon)} ${escH(nameOf[i.ref].name)} · ${i.mode === 'control' ? 'bedienen' : 'nur sehen'}</span>`).join('')}</div>` : ''}</div>`; }).join('')
+    : '<div class="muted">Noch niemand angelegt.</div>';
 }
-function shareEdit(id, keep) {
-  const p = document.getElementById('sharep-' + id); if (!p) return;
-  if (!keep && p.style.display !== 'none') { p.style.display = 'none'; return; }
-  const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
-  const cur = Object.fromEntries(s.items.map(i => [i.ref, i.mode]));
-  const groups = Object.keys(SHARE_TYPE).map(t => {
-    const rows = SHARE_CAT.filter(c => c.type === t);
-    if (!rows.length) return '';
-    return `<div style="margin-top:8px"><b>${SHARE_TYPE[t]}</b>` + rows.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
-        <label class="chk" style="flex:1;min-width:200px"><input type="checkbox" class="sh-cb" data-ref="${escH(c.ref)}" ${cur[c.ref] ? 'checked' : ''}> ${escH(c.icon)} ${escH(c.name)} <span class="muted">· ${escH(c.detail)}</span></label>
-        <select class="sh-mode" data-ref="${escH(c.ref)}" style="width:auto" ${c.type === 'sensor' ? 'disabled title="Sensoren lassen sich nur ansehen"' : ''}><option value="view">nur sehen</option>${c.type === 'sensor' ? '' : `<option value="control" ${cur[c.ref] === 'control' ? 'selected' : ''}>sehen &amp; bedienen</option>`}</select></div>`).join('') + '</div>';
-  }).join('');
-  p.innerHTML = (groups || '<div class="muted">Es gibt noch nichts zum Teilen.</div>') + `<div style="margin-top:12px"><button class="ghost" onclick="shareSave('${id}')">Speichern</button></div>`;
-  p.style.display = '';
+function sharePickDialog(shares, cur, viewOnly, title) {                       // -> undefined (abgebrochen) | {freigabe-id: 'view' | 'control' | null}
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:90vh;overflow:auto">
+      <h3 style="margin:0 0 6px;font-size:17px"></h3>
+      <div class="muted" style="margin-bottom:12px">Mit wem soll das geteilt werden? Die Person sieht es danach in ihrer Anlage${viewOnly ? ' (Sensoren nur zum Ansehen).' : ' – zum Ansehen oder auch zum Bedienen.'}</div>
+      <div class="sp-rows"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost sp-no">Abbrechen</button><button class="sp-ok">Speichern</button></div></div>`;
+    ov.querySelector('h3').textContent = title || 'Teilen';
+    const rows = ov.querySelector('.sp-rows');
+    shares.forEach(sh => {
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap';
+      row.innerHTML = `<label class="chk" style="flex:1;min-width:140px"><input type="checkbox" class="sp-cb"> <span class="sp-n"></span></label><select class="sp-mode" style="width:auto"><option value="view">nur sehen</option>${viewOnly ? '' : '<option value="control">sehen &amp; bedienen</option>'}</select>`;
+      row.querySelector('.sp-n').textContent = '👤 ' + sh.name;
+      row.querySelector('.sp-cb').checked = !!cur[sh.id]; row.querySelector('.sp-mode').value = cur[sh.id] === 'control' && !viewOnly ? 'control' : 'view';
+      row.dataset.id = sh.id; rows.appendChild(row);
+    });
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const ok = () => { const out = {}; rows.querySelectorAll('[data-id]').forEach(r => { out[r.dataset.id] = r.querySelector('.sp-cb').checked ? r.querySelector('.sp-mode').value : null; }); close(out); };
+    const onKey = e => { if (e.key === 'Escape') close(undefined); };
+    ov.querySelector('.sp-ok').onclick = ok; ov.querySelector('.sp-no').onclick = () => close(undefined);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(undefined); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov);
+  });
 }
-async function shareSave(id) {
-  const p = document.getElementById('sharep-' + id);
-  const items = [...p.querySelectorAll('.sh-cb')].filter(c => c.checked).map(c => ({ ref: c.dataset.ref, mode: p.querySelector(`.sh-mode[data-ref="${CSS.escape(c.dataset.ref)}"]`).value }));
-  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'PATCH', { items }); savedToast(); loadShares(); } catch (e) { shellyMsg(e.message, true, 'shelly-msg'); alert(e.message); }
+async function pickShare(kind, id) {
+  await loadShares();
+  if (!SHARE_LIST.length) { await uiDialog({ title: 'Noch niemand angelegt', message: 'Lege zuerst unter Smart Home → Teilen eine Person an (z. B. „Marion“). Danach kannst du hier einzelne Geräte mit ihr teilen.', info: true, okText: 'OK' }); return; }
+  const ref = shareRef(kind, id), cur = Object.fromEntries((SHARE_MAP[ref] || []).map(x => [x.id, x.mode]));
+  const res = await sharePickDialog(SHARE_LIST, cur, kind === 'sensor', 'Teilen');
+  if (res === undefined) return;
+  try { await shellyApi('/api/share-item', 'POST', { ref, shares: res }); savedToast(Object.values(res).some(Boolean) ? 'Geteilt ✓' : 'Nicht mehr geteilt ✓'); } catch (e) { shellyMsg(e.message, true); alert(e.message); }
+  loadShares();
 }
 async function shareShowKey(name, token) {
-  await uiDialog({ title: 'Zugangsschlüssel für ' + name, message: `Adresse: ${location.origin}\n\nDer Schlüssel wird nur jetzt angezeigt. Adresse und Schlüssel trägt ${name} im eigenen BlueNexus unter Smart Home → Teilen → „Fremde Quellen“ ein. (Sind beide Systeme im selben Netz, geht auch die lokale Adresse mit Port.)`, label: 'Zugangsschlüssel', value: token, okText: 'Fertig' });
+  await uiDialog({ title: 'Zugangsschlüssel für ' + name, message: `Adresse: ${location.origin}\n\nDer Schlüssel wird nur jetzt angezeigt. Adresse und Schlüssel trägt ${name} im eigenen BlueNexus unter Smart Home → Teilen → „Fremde Quellen“ ein. (Sind beide Systeme im selben Netz, geht auch die lokale Adresse mit Port.)\n\nWas ${name} sehen darf, legst du bei jedem Gerät, Sensor oder Schalter über ✎ und das Teilen-Symbol fest.`, label: 'Zugangsschlüssel', value: token, okText: 'Fertig' });
 }
 async function shareToken(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
@@ -2392,12 +2421,12 @@ async function shareToken(id) {
 }
 async function shareDelete(id) {
   const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
-  if (!await uiDialog({ title: 'Freigabe löschen?', message: `„${s.name}“ sieht und bedient danach nichts mehr von dir.`, okText: 'Löschen' })) return;
+  if (!await uiDialog({ title: 'Person löschen?', message: `„${s.name}“ sieht und bedient danach nichts mehr von dir.`, okText: 'Löschen' })) return;
   try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'DELETE'); savedToast('Gelöscht ✓'); loadShares(); } catch (e) { alert(e.message); }
 }
 document.getElementById('share-add')?.addEventListener('click', async () => {
   const el = document.getElementById('share-name'), name = el.value.trim(); if (!name) { el.focus(); return; }
-  try { const j = await shellyApi('/api/shares', 'POST', { name }); el.value = ''; await loadShares(); shareEdit(j.share.id); await shareShowKey(j.share.name, j.token); } catch (e) { alert(e.message); }
+  try { const j = await shellyApi('/api/shares', 'POST', { name }); el.value = ''; await loadShares(); await shareShowKey(j.share.name, j.token); } catch (e) { alert(e.message); }
 });
 async function loadSources() {
   const box = document.getElementById('sources-list'); if (!box) return;
@@ -2455,7 +2484,7 @@ async function loadVirtualAdmin() {
   document.getElementById('virtual-list').innerHTML = list.length ? list.map(v => { const vid = escH(v.id), isSw = v.kind === 'switch' || v.kind === 'timer'; return `<div data-sort-id="${vid}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${v.nfc ? `<button type="button" class="ghost icon-pick fixed" style="font-size:22px;padding:4px 10px" title="NFC-Tag – das Symbol ist fest" aria-disabled="true" tabindex="-1">${escH(v.icon)}</button>` : `<button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="virtPickIcon('${vid}')">${escH(v.icon)}</button>`}
-      <div style="flex:1;min-width:150px"><b>${escH(v.name)}</b><div class="muted">${VIRT_KIND[v.kind]}${v.kind === 'timer' ? ` · ${v.minutes} Min Nachlauf · ${v.on ? 'läuft noch ' + fmtMin(v.remaining_s || 0) : 'aus'}` : (isSw ? ' · ' + (v.on ? 'an' : 'aus') : '')}${v.has_url ? ' · 🔗 Web-Aufruf' : ''}${v.pin_set ? ' · 🔒 PIN geschützt' : ''}</div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(v.name)}</b>${shareMark('virtual', vid, false)}<div class="muted">${VIRT_KIND[v.kind]}${v.kind === 'timer' ? ` · ${v.minutes} Min Nachlauf · ${v.on ? 'läuft noch ' + fmtMin(v.remaining_s || 0) : 'aus'}` : (isSw ? ' · ' + (v.on ? 'an' : 'aus') : '')}${v.has_url ? ' · 🔗 Web-Aufruf' : ''}${v.pin_set ? ' · 🔒 PIN geschützt' : ''}</div></div>
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`virtPin('${vid}', ${v.pin_set ? 'true' : 'false'})`, !!v.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('vedit-${vid}')" title="Bearbeiten: Name, Dashboard, Entfernen">✎</button>
@@ -2472,6 +2501,7 @@ async function loadVirtualAdmin() {
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(v.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'virtual','${vid}','show','Dashboard')`)}
           ${visBtn('virtual', vid, v.users)}
+          ${shareBtn('virtual', vid, false)}
           ${v.nfc ? '' : `<button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="virtRemove('${vid}')">${I_TRASH}</button>`}
         </div>
       </div>

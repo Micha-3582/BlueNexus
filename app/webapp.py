@@ -277,7 +277,7 @@ ENDPOINT_AREA = {
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
-    "api_shares": "smarthome_einrichten", "api_share_modify": "smarthome_einrichten", "api_share_token": "smarthome_einrichten",
+    "api_shares": "smarthome_einrichten", "api_share_modify": "smarthome_einrichten", "api_share_token": "smarthome_einrichten", "api_share_item": "smarthome_einrichten",
     "api_sources": "smarthome_einrichten", "api_source_delete": "smarthome_einrichten", "api_source_items": "smarthome_einrichten", "api_source_import": "smarthome_einrichten",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
@@ -4706,6 +4706,19 @@ def api_share_modify(sid):
     b = request.get_json(silent=True) or {}
     try:
         return jsonify(share=share.update(sid, name=b.get("name") if isinstance(b.get("name"), str) else None, items=b.get("items") if "items" in b else None))
+    except share.ShareError as e:
+        return _share_err(e)
+
+
+@app.route("/api/share-item", methods=["POST"])
+def api_share_item():
+    """Einen einzelnen Eintrag fuer bestimmte Freigaben teilen / nicht mehr teilen (Teilen-Knopf am Stift-Symbol)."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    b = request.get_json(silent=True) or {}
+    try:
+        return jsonify(shares=share.set_item(str(b.get("ref") or ""), b.get("shares")))
     except share.ShareError as e:
         return _share_err(e)
 
