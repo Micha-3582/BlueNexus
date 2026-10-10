@@ -67,3 +67,5 @@ app/nfc.json
 # Demo-Daten (echte Verlaufsdaten, nie ins oeffentliche Repo)
 demo-quelle/
 app/demo_data.json
+app/shares.json
+app/sources.json

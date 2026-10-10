@@ -609,7 +609,7 @@ def read_sensor(sen: dict, latch: bool = False):
     latch=True (nur fuer die Regeln): Ein sehr kurzer Impuls (Lichtschranke: TRUE und gleich wieder FALSE) wird den Regeln trotzdem EINMAL als TRUE gemeldet,
     auch wenn er schon wieder vorbei ist, bevor die Regelschleife nachschaut. Die Anzeige (latch=False) bleibt unberuehrt."""
     val = _read_sensor_now(sen)
-    if latch and sen.get("binary") and sen.get("source") not in ("zigbee", "camera") and not str(sen.get("kind", "")).startswith("key_") \
+    if latch and sen.get("binary") and sen.get("source") not in ("zigbee", "camera", "remote") and not str(sen.get("kind", "")).startswith("key_") \
             and sen.get("datapoint") != "LOCK_STATE":
         now, sid = time.time(), sen["id"]
         if val is True or sid not in _latch_used:
@@ -625,6 +625,9 @@ def read_sensor(sen: dict, latch: bool = False):
 
 def _read_sensor_now(sen: dict):
     now = time.time()
+    if sen.get("source") == "remote":                                  # Sensor einer fremden BlueNexus-Instanz (share.py)
+        import share
+        return share.read_sensor(sen)
     if str(sen.get("kind", "")).startswith("key_"):                    # Taste: TRUE, wenn die CCU in den letzten KEY_HOLD_S Sekunden einen Druck gemeldet hat (ohne Push: unbekannt)
         if not push_active():
             return None

@@ -29,6 +29,7 @@ from flask import (Flask, g, jsonify, make_response, redirect, render_template, 
 import json
 import os
 
+import share
 import shelly
 import store
 import surplus
@@ -159,7 +160,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -276,6 +277,8 @@ ENDPOINT_AREA = {
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
+    "api_shares": "smarthome_einrichten", "api_share_modify": "smarthome_einrichten", "api_share_token": "smarthome_einrichten",
+    "api_sources": "smarthome_einrichten", "api_source_delete": "smarthome_einrichten", "api_source_items": "smarthome_einrichten", "api_source_import": "smarthome_einrichten",
     "api_nfc": "smarthome_nfc", "api_nfc_phones": "smarthome_nfc", "api_nfc_phone": "smarthome_nfc", "api_nfc_pair": "smarthome_nfc",
     "api_nfc_tags": "smarthome_nfc", "api_nfc_tag": "smarthome_nfc", "api_nfc_base": "smarthome_nfc",
     "setup": "settings_anlage",
@@ -446,6 +449,7 @@ SMARTHOME_TABS = [
     ("regeln", "Regeln", "/rules", "rules", 2),
     ("suchen", "Geräte suchen", "/smarthome#suchen", "smarthome_einrichten", 3),
     ("nfc", "NFC-Tags", "/smarthome#nfc", "smarthome_nfc", 3),
+    ("teilen", "Teilen", "/smarthome#teilen", "smarthome_einrichten", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
@@ -1983,7 +1987,7 @@ class Controller:
                 except homematic.HomematicError as e:
                     jobs.append(("fail", bl["name"], f"{bl['name']}: {e}", str(e)))
         elif t == "ac":
-            ad = next((x for x in shelly.load_devices() if x["id"] == st["id"] and x.get("kind") == "midea"), None)
+            ad = next((x for x in shelly.load_devices() if x["id"] == st["id"] and (x.get("kind") == "midea" or x.get("rkind") == "midea")), None)
             parts = [{"on": "einschalten", "off": "ausschalten"}.get(st.get("power"), "")] + ([f"Modus {midea.MODE_LABELS.get(st['mode'], st['mode'])}"] if st.get("mode") else []) \
                 + ([f"{st['target']:g} °C"] if st.get("target") is not None else []) + ([f"Lüfter {midea.FAN_LABELS.get(st['fan'], st['fan'])}"] if st.get("fan") else [])
             what = ", ".join(p for p in parts if p)
@@ -3334,7 +3338,7 @@ def api_automation_save():
             sound_ids = {s_["id"] for s_ in homematic.load_sounds()}
             blind_ids = {b_["id"] for b_ in homematic.load_blinds()}
             wled_ids = {w_["id"] for w_ in shelly.load_devices() if w_.get("kind") == "wled"}
-            ac_ids = {w_["id"] for w_ in shelly.load_devices() if w_.get("kind") == "midea"}
+            ac_ids = {w_["id"] for w_ in shelly.load_devices() if w_.get("kind") == "midea" or w_.get("rkind") == "midea"}
             for x in norm_items:
                 for a in x.get("then", []) + x.get("else", []):
                     if a.get("type") == "ac" and a["id"] not in ac_ids:
@@ -4608,6 +4612,168 @@ def api_virtual_set(vid):
         return jsonify(error="Schalter nicht gefunden"), 404
     ctrl._rules_wake.set()
     return jsonify(ok=True)
+
+
+# ================================================================ Teilen zwischen BlueNexus-Instanzen (share.py)
+def _share_auth():
+    """Zugangsschluessel (Authorization: Bearer ...) pruefen. Gibt (Freigabe, None) oder (None, Antwort) zurueck. Falsche Schluessel werden gebremst."""
+    key = "share:" + client_ip()
+    if too_many_attempts(key):
+        return None, (jsonify(error="Zu viele Versuche – bitte später erneut."), 429)
+    h = request.headers.get("Authorization", "")
+    s = share.by_token(h[7:].strip() if h[:7].lower() == "bearer " else "")
+    if not s:
+        note_failed_attempt(key)
+        return None, (jsonify(error="Zugangsschlüssel ungültig"), 401)
+    return s, None
+
+
+@app.route("/share/v1/items", methods=["GET"])
+def share_items():
+    s, bad = _share_auth()
+    if bad:
+        return bad
+    try:
+        return jsonify(v=share.API_VERSION, name=store.load_config().get("app_display_name") or store.default_app_name(), items=share.provider_items(s))
+    except Exception as e:                               # noqa: BLE001
+        log.warning("Freigabe %s: %s", s.get("name"), e)
+        return jsonify(error="Zustand nicht lesbar"), 500
+
+
+@app.route("/share/v1/act", methods=["POST"])
+def share_act():
+    s, bad = _share_auth()
+    if bad:
+        return bad
+    b = request.get_json(silent=True) or {}
+    try:
+        res = share.provider_act(s, str(b.get("ref") or ""), b)
+    except share.ShareError as e:
+        return jsonify(error=str(e)), e.code
+    opslog.log("rules", f"Freigabe „{s['name']}“: {res['name']} {'eingeschaltet' if res['on'] else 'ausgeschaltet'}", dry=False)
+    if str(b.get("ref") or "").startswith("device:"):
+        cfg_ = store.load_config()
+        did = str(b["ref"]).split(":", 1)[1]
+        surplus_ctrl.note_manual(did, hold_min=surplus.settings(cfg_)["manual_hold_min"])
+        rule_engine.note_manual(did, hold_min=rules.settings(cfg_)["manual_hold_min"])
+    ctrl._rules_wake.set()
+    return jsonify(ok=True, state=res["state"])
+
+
+@app.route("/share/v1/ac", methods=["GET", "POST"])
+def share_ac():
+    s, bad = _share_auth()
+    if bad:
+        return bad
+    try:
+        if request.method == "GET":
+            return jsonify(share.provider_ac(s, request.args.get("ref", ""), None))
+        b = request.get_json(silent=True) or {}
+        res = share.provider_ac(s, str(b.get("ref") or ""), b)
+    except share.ShareError as e:
+        return jsonify(error=str(e)), e.code
+    opslog.log("rules", f"Freigabe „{s['name']}“: Klimaanlage {res['name']} gestellt", dry=False)
+    did = str(b.get("ref") or "").split(":", 1)[1]
+    rule_engine.note_manual(did, hold_min=rules.settings(store.load_config())["manual_hold_min"])
+    return jsonify(ok=True, state=res["state"])
+
+
+def _share_err(e):
+    return jsonify(error=str(e)), (e.code if 400 <= e.code < 600 else 400)
+
+
+@app.route("/api/shares", methods=["GET", "POST"])
+def api_shares():
+    denied = _admin_only()
+    if denied:
+        return denied
+    if request.method == "GET":
+        return jsonify(shares=share.list_shares(), shareable=share.shareable())
+    try:
+        s, token = share.create((request.get_json(silent=True) or {}).get("name"))
+    except share.ShareError as e:
+        return _share_err(e)
+    return jsonify(share=s, token=token)                 # Schluessel nur dieses eine Mal
+
+
+@app.route("/api/shares/<sid>", methods=["PATCH", "DELETE"])
+def api_share_modify(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
+    if request.method == "DELETE":
+        return jsonify(ok=True) if share.remove(sid) else (jsonify(error="nicht gefunden"), 404)
+    b = request.get_json(silent=True) or {}
+    try:
+        return jsonify(share=share.update(sid, name=b.get("name") if isinstance(b.get("name"), str) else None, items=b.get("items") if "items" in b else None))
+    except share.ShareError as e:
+        return _share_err(e)
+
+
+@app.route("/api/shares/<sid>/token", methods=["POST"])
+def api_share_token(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
+    try:
+        return jsonify(token=share.regenerate(sid))
+    except share.ShareError as e:
+        return _share_err(e)
+
+
+@app.route("/api/sources", methods=["GET", "POST"])
+def api_sources():
+    denied = _admin_only()
+    if denied:
+        return denied
+    if request.method == "GET":
+        return jsonify(share.list_sources())
+    b = request.get_json(silent=True) or {}
+    try:
+        return jsonify(share.add_source(b.get("name"), b.get("url"), b.get("token")))
+    except share.ShareError as e:
+        return _share_err(e)
+
+
+@app.route("/api/sources/<sid>", methods=["DELETE"])
+def api_source_delete(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
+    dev_ids, sen_ids = share.imported_ids(sid)
+    for kind, ids in (("device", dev_ids), ("sensor", sen_ids)):
+        for i in ids:
+            busy = _in_use(kind, i)
+            if busy:
+                return busy
+    return jsonify(ok=True, removed=len(dev_ids) + len(sen_ids)) if share.remove_source(sid) else (jsonify(error="nicht gefunden"), 404)
+
+
+@app.route("/api/sources/<sid>/items", methods=["GET"])
+def api_source_items(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
+    try:
+        return jsonify(share.source_items(sid))
+    except share.ShareError as e:
+        return _share_err(e)
+
+
+@app.route("/api/sources/<sid>/import", methods=["POST"])
+def api_source_import(sid):
+    denied = _admin_only()
+    if denied:
+        return denied
+    b = request.get_json(silent=True) or {}
+    refs = b.get("refs")
+    if not isinstance(refs, list) or not all(isinstance(r, str) for r in refs):
+        return jsonify(error="refs fehlt"), 400
+    try:
+        res = share.import_items(sid, refs)
+    except share.ShareError as e:
+        return _share_err(e)
+    return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]))
 
 
 @app.route("/api/homematic/locks", methods=["GET"])

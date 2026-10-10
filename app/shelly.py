@@ -334,16 +334,24 @@ def _midea_dev(dev_id: str) -> dict:
     d = _find(dev_id)
     if not d:
         raise ShellyError("Gerät nicht gefunden")
-    if d.get("kind") != "midea":
+    if d.get("kind") != "midea" and not (d.get("kind") == "remote" and d.get("rkind") == "midea"):
         raise ShellyError("Das gibt es nur bei Klimaanlagen (Midea)")
     return d
 
 
 def midea_details(dev_id: str) -> dict:
+    d = _midea_dev(dev_id)
     try:
-        return midea.details(_midea_dev(dev_id))
-    except midea.MideaError as e:
+        if d.get("kind") == "remote":                      # Klimaanlage einer fremden Instanz: der Geber fuehrt es mit seinem Zugang aus
+            import share
+            return share.ac_details(d)
+        return midea.details(d)
+    except (midea.MideaError, ValueError) as e:
         raise ShellyError(str(e))
+    except Exception as e:                                 # noqa: BLE001
+        if e.__class__.__name__ == "ShareError":
+            raise ShellyError(str(e))
+        raise
 
 
 def midea_set(dev_id: str, **kw) -> dict:
@@ -352,9 +360,16 @@ def midea_set(dev_id: str, **kw) -> dict:
     if d.get("switchable") is False:
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
     try:
+        if d.get("kind") == "remote":
+            import share
+            return share.ac_set(d, **kw)
         return midea.set_params(d, **kw)
     except midea.MideaError as e:
         raise ShellyError(str(e))
+    except Exception as e:                                 # noqa: BLE001
+        if e.__class__.__name__ == "ShareError":
+            raise ShellyError(str(e))
+        raise
 
 
 # ---------------------------------------------------------------- Homematic / HomematicIP (ueber die OpenCCU)
@@ -563,6 +578,9 @@ def _auth(d: dict):
 
 def status(d: dict) -> dict:
     """{'online': bool, 'on': bool|None, 'power': W|None}"""
+    if d.get("kind") == "remote":                          # geteiltes Geraet einer fremden BlueNexus-Instanz (share.py)
+        import share
+        return share.status(d)
     if d.get("kind") == "tuya":
         return tuya.status(d)
     if d.get("kind") == "tasmota":
@@ -599,6 +617,13 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
         raise ShellyError("Gerät nicht gefunden")
     if d.get("switchable") is False:
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
+    if d.get("kind") == "remote":
+        import share
+        try:
+            share.set_state(d, on, timer_s)
+        except share.ShareError as e:
+            raise ShellyError(str(e))
+        return status(d)
     if d.get("kind") == "tuya":
         try:
             return tuya.set_state(d, on)

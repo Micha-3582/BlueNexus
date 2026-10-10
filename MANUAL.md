@@ -26,6 +26,7 @@ Die technische Beschreibung der Lade-Strategie, Installation und Architektur ste
 13. [Benachrichtigungen (Telegram)](#13-benachrichtigungen-telegram)
 13b. [Fernzugriff von unterwegs (Cloudflare Tunnel)](#13b-fernzugriff-von-unterwegs-cloudflare-tunnel)
 13c. [NFC-Tags (Handy scannen, Knopf auslösen)](#13c-nfc-tags-handy-scannen-knopf-auslösen)
+13d. [Geräte teilen (zwischen BlueNexus-Anlagen)](#13d-geräte-teilen-zwischen-bluenexus-anlagen)
 14. [Kosten, Tarife und Tarifwechsel](#14-kosten-tarife-und-tarifwechsel)
 15. [Update, Sicherung, Datenhaltung](#15-update-sicherung-datenhaltung)
 16. [Beispiele](#16-beispiele)
@@ -721,6 +722,34 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 - **Fenster schließen:** Nach dem Scannen zeigt das Handy kurz „✓ ausgelöst“ und versucht, das Browserfenster selbst zu schließen. Ob das klappt, entscheidet der Browser: Öffnet er den Tag in einem **neuen Tab**, schließt er sich; nutzt er einen schon offenen Tab, bleibt die Seite stehen – dann erscheint nach kurzer Zeit ein Knopf **Schließen**. **Empfohlen und erprobt:** die App auf dem Startbildschirm installieren (am einfachsten über die öffentliche Einrichtungsseite `https://<deine-Tunnel-Adresse>/nfc`: dort steht ein Knopf **App installieren**, und die Seite zeigt, ob das Handy schon registriert ist; eine Anmeldung ist nicht nötig). Dann öffnet sich beim Scannen die App, zeigt kurz die Bestätigung und schließt sich von selbst wieder.
 - **Cloudflare Access:** Ist vor die App eine Anmeldung gesetzt (Access), muss der Pfad `/nfc/*` davon ausgenommen sein, sonst erscheint beim Scannen die Cloudflare-Anmeldung. Die Handy-Registrierung ersetzt dort die Anmeldung.
 - Die Registrierungen gehören zur Sicherung (Kapitel 15) und werden mit wiederhergestellt.
+
+## 13d. Geräte teilen (zwischen BlueNexus-Anlagen)
+
+*Smart Home → Teilen* (Recht „Smart Home: Geräte einrichten“, nur Administratoren). Zwei BlueNexus-Anlagen – z. B. deine und die deiner Mutter im selben Haus – können Geräte, Sensoren, Schalter und Knöpfe untereinander teilen. Der Geber behält alle Zugangsdaten und führt Befehle selbst aus. Das ist vor allem für **Cloud-Geräte mit Anmeldegrenze** wichtig, etwa die Klimaanlage: Der Medea-/NetHome-Login bleibt nur beim Geber, der Empfänger meldet sich dort nirgends zusätzlich an.
+
+**Was sich teilen lässt:** Geräte (Steckdosen, Lampen, Klimaanlagen …), Sensoren, eigene Schalter und Knöpfe. Pro Eintrag legst du fest: **nur sehen** oder **sehen & bedienen** (Sensoren sind immer nur zum Sehen). Was selbst aus einer fremden Quelle stammt, lässt sich nicht weitergeben.
+
+**Beim Geber (du)**
+1. *Teilen → Meine Freigaben:* Name der Freigabe eintragen (z. B. „Mama“) → **Freigabe anlegen**.
+2. Es erscheint der **Zugangsschlüssel** (`bnx_…`) und die **Adresse** deines Systems. Der Schlüssel wird **nur dieses eine Mal** gezeigt, gespeichert ist nur sein Hash. Beides gibst du dem Empfänger.
+3. **Einträge wählen:** Haken setzen und je Eintrag „nur sehen“ bzw. „sehen & bedienen“ wählen → **Speichern**. Der Empfänger sieht nur genau das.
+4. **Neuer Schlüssel** macht den alten sofort ungültig (z. B. wenn er in falsche Hände kam). Der Papierkorb löscht die Freigabe komplett. In der Liste steht, wann der Empfänger zuletzt abgefragt hat.
+
+**Beim Empfänger (Mama)**
+1. *Teilen → Fremde Quellen:* Name (z. B. „Wohnung Micha“), **Adresse** und **Zugangsschlüssel** eintragen → **Verbinden**. Die App prüft dabei, ob die Verbindung klappt.
+2. **Geräte holen:** angebotene Einträge ankreuzen → **Ausgewählte holen**. Sie erscheinen als normale Geräte bzw. Sensoren in der eigenen Anlage (Vermerk „von Wohnung Micha“), die Klimaanlage in der Rubrik Klimaanlagen mit dem vollen Bedienfeld (Modus, Temperatur, Lüfter). Danach lassen sie sich wie eigene umbenennen, aufs Dashboard legen, pro Benutzer sichtbar machen und in **Regeln** verwenden (WENN Sensor/Gerät …, DANN Gerät/Klimaanlage …).
+3. **Quelle entfernen** löscht auch alle von dort geholten Einträge (nicht, solange eine Regel sie noch verwendet).
+
+**Adresse: Tunnel oder lokal:** Die Anlage des Gebers muss vom Empfänger erreichbar sein. Der einheitliche Weg ist die **Tunnel-Adresse** (Kapitel 13b, `https://…`); sind beide Anlagen im selben Netz, geht auch die lokale Adresse mit Port (z. B. `http://192.168.2.40:5000`) – schneller und ohne Internet. Ist vor den Tunnel eine Cloudflare-Anmeldung (Access) gesetzt, muss der Pfad `/share/*` davon ausgenommen sein.
+
+**Sicherheit**
+- Ohne gültigen Schlüssel (Kopfzeile `Authorization: Bearer …`) antwortet die Schnittstelle `/share/v1/…` nur mit „ungültig“; falsche Versuche werden pro Adresse gebremst.
+- Der Schlüssel gibt **nur die ausgewählten Einträge** frei, nur im erlaubten Umfang. Dashboard, Einstellungen, Konten und alle anderen Geräte bleiben unerreichbar. „Nur sehen“ wird **beim Geber** durchgesetzt, nicht nur im Bildschirm des Empfängers.
+- Zugangsdaten (Medea-Konto, Gerätepasswörter, Tokens) verlassen den Geber nie.
+- Befehle von außen stehen im Logbuch des Gebers („Freigabe ‚Mama‘: Klimaanlage … gestellt“). Sie zählen wie ein Handgriff: Regeln und Automatik des Gebers halten sich für dieses Gerät kurz zurück (Pause nach Handschaltung, Kapitel 10.5).
+- Freigaben und Quellen gehören zur Sicherung (Kapitel 15). Beim Zurückspielen auf einem anderen System bleibt der Schlüssel gültig.
+
+**Grenzen:** Ist der Geber oder seine Verbindung weg, zeigen die geholten Geräte „nicht erreichbar“, und der Empfänger kann sie nicht bedienen. Zustände werden etwa alle paar Sekunden abgefragt, Klingel-/Tür-Ereignisse kommen also mit kleiner Verzögerung. Kamerabilder, Thermostate, Schlösser und Rollläden lassen sich noch nicht teilen (folgt später).
 
 ## 14. Kosten, Tarife und Tarifwechsel
 

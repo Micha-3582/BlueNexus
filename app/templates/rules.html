@@ -380,7 +380,7 @@ function actRow(a, branch, flow) {
     const nin = (cls, v, min, max, w) => `<input class="${cls}" type="number" min="${min}" max="${max}" step="1" value="${escH(v)}" style="width:${w}px" oninput="ruleEdited(this)">`;
     body = `<b>🔔 Sound</b> ${sel('a-sid', a.id, opts)} <span class="muted">Titel</span> ${nin('a-str', a.track ?? 1, 1, 255, 78)} <span class="muted">Lautstärke</span> ${nin('a-svol', a.volume ?? 100, 0, 100, 78)} <span class="muted">%  ·  Wiederholungen</span> ${nin('a-srep', a.repeats ?? 1, 1, 20, 70)}${list.length ? '' : '<span class="muted">Noch kein Soundmodul angelegt – Smart Home → Geräte suchen → Homematic-Soundmodule suchen.</span>'}`;
   } else if (t === 'ac') {
-    const list = S.devs.filter(d => d.kind === 'midea'), opts = list.map(x => [escH(x.id), escH(x.icon || '❄️') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Klimaanlage fehlt)']);
+    const list = S.devs.filter(d => d.kind === 'midea' || d.rkind === 'midea'), opts = list.map(x => [escH(x.id), escH(x.icon || '❄️') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Klimaanlage fehlt)']);
     body = `<b>❄ Klimaanlage</b> ${sel('a-acid', a.id, opts)} ${sel('a-acp', a.power || '', [['', 'Ein/Aus unverändert'], ['on', 'einschalten'], ['off', 'ausschalten']])}
       ${sel('a-acm', a.mode || '', [['', 'Modus unverändert'], ['auto', 'Automatik'], ['cool', 'Kühlen'], ['dry', 'Entfeuchten'], ['heat', 'Heizen'], ['fan_only', 'Lüften'], ['smart_dry', 'Intelligent entfeuchten']])}
       <span class="muted">Soll</span> <input class="a-act" type="number" min="10" max="35" step="0.5" value="${escH(a.target ?? '')}" placeholder="–" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">°C</span>
@@ -542,7 +542,7 @@ function actAddSel(sel, branch) {
     photo: () => ({ type: 'photo', id: ((S.cameras || [])[0] || {}).id || '', text: '' }),
     video: () => ({ type: 'video', id: (videoCams()[0] || {}).id || '', text: '', filter: ['animal'] }),
     pushover: () => ({ type: 'pushover', text: '', priority: 0 }),
-    ac: () => ({ type: 'ac', id: (S.devs.find(d => d.kind === 'midea') || {}).id || '', power: 'on', mode: 'cool', target: 24 }),
+    ac: () => ({ type: 'ac', id: (S.devs.find(d => d.kind === 'midea' || d.rkind === 'midea') || {}).id || '', power: 'on', mode: 'cool', target: 24 }),
     wled: () => ({ type: 'wled', id: (S.devs.find(d => d.kind === 'wled') || {}).id || '', mode: 'preset', preset: 1 }),
     blind: () => ({ type: 'blind', id: ((S.blinds || [])[0] || {}).id || '', action: 'set', level: 0 }),
   };

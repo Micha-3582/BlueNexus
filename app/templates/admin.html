@@ -817,6 +817,28 @@
     </details>
 </div>
 
+<div class="card msg-host" id="share-give" data-tab="teilen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Meine Freigaben (Geräte teilen) <span class="qhelp" role="button" tabindex="0" data-help="Gib Geräte, Sensoren, Schalter und Knöpfe an ein anderes BlueNexus weiter, z. B. an deine Mutter im selben Haus. Sie bekommt einen Zugangsschlüssel und sieht danach nur, was du ausgewählt hast. Befehle (z. B. Klimaanlage einschalten) führt dein System mit deinen Zugangsdaten aus – bei Cloud-Geräten wie der Klimaanlage muss sich also niemand ein zweites Mal anmelden. Das andere System muss deines erreichen können: über deine Tunnel-Adresse oder, wenn ihr im selben Netz seid, über die lokale Adresse.">?</span></h2>
+  <div class="sub">Wer darf was von dir sehen oder bedienen?</div>
+  <div id="shares-list" style="display:flex;flex-direction:column;gap:8px"></div>
+  <div class="admin-only" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input id="share-name" placeholder="Wer bekommt die Freigabe? z. B. Mama" style="flex:1;min-width:200px" autocomplete="off" maxlength="60">
+    <button id="share-add" class="ghost">Freigabe anlegen</button>
+  </div>
+</div>
+
+<div class="card msg-host" id="share-get" data-tab="teilen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Fremde Quellen (Geräte von anderen holen) <span class="qhelp" role="button" tabindex="0" data-help="Hier trägst du Adresse und Zugangsschlüssel ein, die du von einem anderen BlueNexus-Betreiber bekommen hast. Danach holst du dir die freigegebenen Geräte, Sensoren, Schalter und Knöpfe in deine Anlage. Sie verhalten sich wie eigene: Dashboard, Regeln, Sichtbarkeit. Ob du sie nur sehen oder auch bedienen darfst, bestimmt der Geber. Entfernst du die Quelle, verschwinden auch alle von dort geholten Einträge.">?</span></h2>
+  <div class="sub">Geräte, die dir jemand anderes freigegeben hat.</div>
+  <div id="sources-list" style="display:flex;flex-direction:column;gap:8px"></div>
+  <div class="admin-only grid2" style="margin-top:12px">
+    <div><label>Name der Quelle</label><input id="src-name" placeholder="z. B. Wohnung Micha" autocomplete="off" maxlength="60"></div>
+    <div><label>Adresse <span class="qhelp" role="button" tabindex="0" data-help="Die Adresse des anderen BlueNexus, z. B. https://micha.beispiel.de oder (im selben Netz) http://192.168.2.40:5000. Steht beim Geber in der Meldung nach dem Anlegen der Freigabe.">?</span></label><input id="src-url" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
+    <div><label>Zugangsschlüssel</label><div class="pw-wrap"><input id="src-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="bnx_…"></div></div>
+  </div>
+  <div class="admin-only" style="margin-top:10px"><button id="src-add" class="ghost">Verbinden</button></div>
+</div>
+
 <div class="card msg-host" id="alexa-card" data-tab="alexa">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Alexa (Sprachsteuerung) <span class="qhelp" role="button" tabindex="0" data-help="Die App gibt sich im Heimnetz als <b>Philips-Hue-Bridge</b> aus. Alexa findet freigegebene Geräte als <b>Lampen</b> oder <b>Steckdosen</b> (je Gerät wählbar). „Alexa, schalte den Warmwasser-Timer ein“ schaltet das Gerät bzw. den eigenen Schalter, der Regeln auslösen kann. Alles läuft lokal. <b>Geräte mit PIN</b> sind ausgeschlossen, damit Sprache die PIN nie umgeht.<br><br><b>So findet Alexa die Geräte:</b><ol><li>Geräte unten freigeben (der Name wird so gesprochen).</li><li>„Alexa, suche meine Geräte“ sagen – oder in der Alexa-App: <i>Geräte → + → Gerät hinzufügen → Licht/Sonstige → Philips Hue</i>.</li><li>Fragt Alexa nach dem Link-Knopf der Bridge: bestätigen (die App akzeptiert immer).</li><li>In der Alexa-App Name und Raum prüfen; die Art (Lampe/Steckdose) lässt sich dort ändern.</li></ol>">?</span></h2>
   <div class="sub">Geräte lokal per Sprache steuern – die App meldet sich als Hue-Bridge.</div>
@@ -1661,6 +1683,7 @@ function uiDialog({ title, message, html, info, label, value = '', type = 'text'
 /* --- Shelly-Geraete + Ueberschuss-Automatik --- */
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyIcons = [];
+const isAc = d => d.kind === 'midea' || d.rkind === 'midea';          // Klimaanlage, auch eine von einer fremden Instanz geteilte
 const PWR_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:middle"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg>';
 const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#fff';          // eingeschaltet = Victron-Blau
 async function shellyApi(url, method, body) {
@@ -1774,17 +1797,17 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="shellyPickIcon('${id}')">${escH(d.icon)}</button>
         <div style="flex:1;min-width:150px"><b>${escH(d.name)}</b>
-          <div class="muted">${escH(d.model)} · ${escH(d.ip)} · <span class="dev-stat">${escH(shellyStatText(d))}</span></div></div>
+          <div class="muted">${escH([d.model, d.ip].filter(Boolean).join(' · '))} · <span class="dev-stat">${escH(shellyStatText(d))}</span></div></div>
         ${d.kind === 'wled' && d.switchable !== false ? `<input type="range" min="0" max="100" step="1" value="${d.on ? (d.brightness || 100) : 0}" style="width:140px" title="Helligkeit in Prozent: ganz links 0 % = aus, ganz rechts 100 % – beim Loslassen übernommen" oninput="this.nextElementSibling.textContent = this.value + ' %'" onchange="wledBrightness('${id}', this.value)"><b class="rng-val" style="min-width:44px;text-align:right">${d.on ? (d.brightness || 100) : 0} %</b>
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
-        ${d.kind === 'midea' && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
+        ${isAc(d) && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
         <button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>
         </div>
       </div>
-      ${d.kind === 'midea' && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
+      ${isAc(d) && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
       ${d.kind === 'wled' && d.switchable !== false ? `<div id="wled-${id}" class="wled-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
       <div class="edit-panel" id="dedit-${id}">
         <div class="edit-row"><input id="dname-${id}" value="${escH(d.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')shellyRenameSave('${id}')">
@@ -1800,7 +1823,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${shellyIcons.map(i => `<button class="ghost" style="font-size:22px;padding:4px 8px" onclick="shellySetIcon('${id}', '${i}')">${i}</button>`).join('')}
       </div></div>`;
   };
-  const acs = list.filter(d => d.kind === 'midea'), others = list.filter(d => d.kind !== 'midea');            // Klimaanlagen haben ihre eigene Rubrik
+  const acs = list.filter(d => isAc(d)), others = list.filter(d => !isAc(d));            // Klimaanlagen haben ihre eigene Rubrik
   box.innerHTML = others.length ? others.map(rowOf).join('') : '<div class="muted">Noch keine Geräte angelegt.</div>';
   const acBox = document.getElementById('ac-devs');
   if (acBox) {
@@ -2319,6 +2342,105 @@ document.getElementById('wol-add').addEventListener('click', async () => {
   } catch (e) { shellyMsg(e.message, true); }
   loadWolAdmin();
 });
+/* --- Teilen: Freigaben (Geber) und Fremde Quellen (Empfaenger), siehe share.py --- */
+const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', virtual: 'Schalter & Knöpfe' };
+let SHARE_CAT = [], SHARE_LIST = [];
+async function loadShares() {
+  const box = document.getElementById('shares-list'); if (!box) return;
+  let j; try { j = await (await fetch('/api/shares', { cache: 'no-store' })).json(); } catch (e) { return; }
+  if (!Array.isArray(j.shares)) return;
+  SHARE_CAT = j.shareable || []; SHARE_LIST = j.shares;
+  const open = [...box.querySelectorAll('.share-panel')].filter(p => p.style.display !== 'none').map(p => p.id);
+  box.innerHTML = j.shares.length ? j.shares.map(s => { const id = escH(s.id); return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">🔗</span>
+        <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b><div class="muted">${s.items.length} ${s.items.length === 1 ? 'Eintrag' : 'Einträge'} freigegeben · ${s.last_seen ? 'zuletzt abgefragt ' + new Date(s.last_seen * 1000).toLocaleString('de-DE') : 'noch nie abgefragt'}</div></div>
+        <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
+          <button class="ghost admin-only" onclick="shareEdit('${id}')">Einträge wählen</button>
+          <button class="ghost admin-only" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
+          <button type="button" class="tgl del admin-only" title="Freigabe löschen" aria-label="Freigabe löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
+        </div></div><div id="sharep-${id}" class="share-panel" style="display:none;margin-top:10px"></div></div>`; }).join('')
+    : '<div class="muted">Noch nichts freigegeben.</div>';
+  open.forEach(pid => { const sid = pid.slice(7); if (j.shares.some(s => s.id === sid)) shareEdit(sid, true); });
+}
+function shareEdit(id, keep) {
+  const p = document.getElementById('sharep-' + id); if (!p) return;
+  if (!keep && p.style.display !== 'none') { p.style.display = 'none'; return; }
+  const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
+  const cur = Object.fromEntries(s.items.map(i => [i.ref, i.mode]));
+  const groups = Object.keys(SHARE_TYPE).map(t => {
+    const rows = SHARE_CAT.filter(c => c.type === t);
+    if (!rows.length) return '';
+    return `<div style="margin-top:8px"><b>${SHARE_TYPE[t]}</b>` + rows.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+        <label class="chk" style="flex:1;min-width:200px"><input type="checkbox" class="sh-cb" data-ref="${escH(c.ref)}" ${cur[c.ref] ? 'checked' : ''}> ${escH(c.icon)} ${escH(c.name)} <span class="muted">· ${escH(c.detail)}</span></label>
+        <select class="sh-mode" data-ref="${escH(c.ref)}" style="width:auto" ${c.type === 'sensor' ? 'disabled title="Sensoren lassen sich nur ansehen"' : ''}><option value="view">nur sehen</option>${c.type === 'sensor' ? '' : `<option value="control" ${cur[c.ref] === 'control' ? 'selected' : ''}>sehen &amp; bedienen</option>`}</select></div>`).join('') + '</div>';
+  }).join('');
+  p.innerHTML = (groups || '<div class="muted">Es gibt noch nichts zum Teilen.</div>') + `<div style="margin-top:12px"><button class="ghost" onclick="shareSave('${id}')">Speichern</button></div>`;
+  p.style.display = '';
+}
+async function shareSave(id) {
+  const p = document.getElementById('sharep-' + id);
+  const items = [...p.querySelectorAll('.sh-cb')].filter(c => c.checked).map(c => ({ ref: c.dataset.ref, mode: p.querySelector(`.sh-mode[data-ref="${CSS.escape(c.dataset.ref)}"]`).value }));
+  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'PATCH', { items }); savedToast(); loadShares(); } catch (e) { shellyMsg(e.message, true, 'shelly-msg'); alert(e.message); }
+}
+async function shareShowKey(name, token) {
+  await uiDialog({ title: 'Zugangsschlüssel für ' + name, message: `Adresse: ${location.origin}\n\nDer Schlüssel wird nur jetzt angezeigt. Adresse und Schlüssel trägt ${name} im eigenen BlueNexus unter Smart Home → Teilen → „Fremde Quellen“ ein. (Sind beide Systeme im selben Netz, geht auch die lokale Adresse mit Port.)`, label: 'Zugangsschlüssel', value: token, okText: 'Fertig' });
+}
+async function shareToken(id) {
+  const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
+  if (!await uiDialog({ title: 'Neuen Schlüssel erzeugen?', message: `Der alte Schlüssel von „${s.name}“ gilt danach nicht mehr – ${s.name} muss den neuen eintragen.`, okText: 'Neu erzeugen' })) return;
+  try { const j = await shellyApi('/api/shares/' + encodeURIComponent(id) + '/token', 'POST'); await shareShowKey(s.name, j.token); } catch (e) { alert(e.message); }
+}
+async function shareDelete(id) {
+  const s = SHARE_LIST.find(x => x.id === id); if (!s) return;
+  if (!await uiDialog({ title: 'Freigabe löschen?', message: `„${s.name}“ sieht und bedient danach nichts mehr von dir.`, okText: 'Löschen' })) return;
+  try { await shellyApi('/api/shares/' + encodeURIComponent(id), 'DELETE'); savedToast('Gelöscht ✓'); loadShares(); } catch (e) { alert(e.message); }
+}
+document.getElementById('share-add')?.addEventListener('click', async () => {
+  const el = document.getElementById('share-name'), name = el.value.trim(); if (!name) { el.focus(); return; }
+  try { const j = await shellyApi('/api/shares', 'POST', { name }); el.value = ''; await loadShares(); shareEdit(j.share.id); await shareShowKey(j.share.name, j.token); } catch (e) { alert(e.message); }
+});
+async function loadSources() {
+  const box = document.getElementById('sources-list'); if (!box) return;
+  let list; try { list = await (await fetch('/api/sources', { cache: 'no-store' })).json(); } catch (e) { return; }
+  if (!Array.isArray(list)) return;
+  const open = [...box.querySelectorAll('.src-panel')].filter(p => p.style.display !== 'none').map(p => p.id);
+  box.innerHTML = list.length ? list.map(s => { const id = escH(s.id); return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">📥</span>
+        <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b><div class="muted">${escH(s.url)}</div></div>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button class="ghost admin-only" onclick="sourceItems('${id}')">Geräte holen</button>
+          <button type="button" class="tgl del admin-only" title="Quelle entfernen (auch alle von dort geholten Einträge)" aria-label="Quelle entfernen" onclick="sourceDelete('${id}')">${I_TRASH}</button>
+        </div></div><div id="srcp-${id}" class="src-panel" style="display:none;margin-top:10px"></div></div>`; }).join('')
+    : '<div class="muted">Noch keine Quelle verbunden.</div>';
+  open.forEach(pid => { const sid = pid.slice(5); if (list.some(s => s.id === sid)) sourceItems(sid, true); });
+}
+async function sourceItems(id, keep) {
+  const p = document.getElementById('srcp-' + id); if (!p) return;
+  if (!keep && p.style.display !== 'none') { p.style.display = 'none'; return; }
+  p.style.display = ''; p.innerHTML = '<div class="muted">wird abgefragt …</div>';
+  let items; try { items = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/items'); } catch (e) { p.innerHTML = `<div class="muted" style="color:#e5544a">${escH(e.message)}</div>`; return; }
+  p.innerHTML = items.length ? Object.keys(SHARE_TYPE).map(t => {
+    const rows = items.filter(i => i.type === t); if (!rows.length) return '';
+    return `<div style="margin-top:8px"><b>${SHARE_TYPE[t]}</b>` + rows.map(i => `<div style="margin-top:4px"><label class="chk"><input type="checkbox" class="src-cb" data-ref="${escH(i.ref)}" ${i.already ? 'checked disabled' : ''}> ${escH(i.icon || '')} ${escH(i.name)} <span class="muted">· ${i.control ? 'bedienbar' : 'nur sehen'}${i.already ? ' · schon geholt' : ''}</span></label></div>`).join('') + '</div>';
+  }).join('') + `<div style="margin-top:12px"><button class="ghost" onclick="sourceImport('${escH(id)}')">Ausgewählte holen</button></div>` : '<div class="muted">Der Geber hat noch nichts freigegeben.</div>';
+}
+async function sourceImport(id) {
+  const p = document.getElementById('srcp-' + id), refs = [...p.querySelectorAll('.src-cb')].filter(c => c.checked && !c.disabled).map(c => c.dataset.ref);
+  if (!refs.length) return;
+  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { alert(e.message); }
+}
+async function sourceDelete(id) {
+  if (!await uiDialog({ title: 'Quelle entfernen?', message: 'Alle von dort geholten Geräte und Sensoren verschwinden aus deiner Anlage.', okText: 'Entfernen' })) return;
+  try { await shellyApi('/api/sources/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadSources(); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { alert(e.message); }
+}
+document.getElementById('src-add')?.addEventListener('click', async () => {
+  const v = id => document.getElementById(id);
+  try {
+    await shellyApi('/api/sources', 'POST', { name: v('src-name').value, url: v('src-url').value, token: v('src-token').value });
+    v('src-name').value = v('src-url').value = v('src-token').value = ''; savedToast('Verbunden ✓'); loadSources();
+  } catch (e) { alert(e.message); }
+});
+loadShares(); loadSources();
 loadWolAdmin(true).then(() => loadWolAdmin()); if (window.PAGE_MODE === 'smarthome') setInterval(() => { if (!openEdits('wedit-').length) loadWolAdmin(); }, 20000);
 
 /* --- Eigene Schalter & Knoepfe --- */
@@ -3307,7 +3429,7 @@ if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
   seg.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; HNTheme.set(b.dataset.t); mark(); });
   mark();
 })();
-const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'wol', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
+const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'teilen', 'wol', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
 const IS_SH = window.PAGE_MODE === 'smarthome';
 const ADMIN_TABS = [
   { id: 'anlage', label: 'Anlage', match: ['Victron Cerbo', 'Ladesteuerung', 'Anlage', 'Batterie-Watchdog', 'Netz-Zähler', 'Periodische Vollladung'] },
@@ -3353,7 +3475,7 @@ const ADMIN_TABS = [
   const TAB_AREA = { anlage: 'settings_anlage', tarif: 'settings_tarif',
     vrm: 'settings_vrm', wetter: 'settings_wetter', meldungen: 'settings_meldungen',
     aktoren: 'settings_geraete', sensoren: 'settings_geraete', thermostate: 'settings_geraete', sicherheit: 'smarthome_sicherheit',
-    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', alexa: 'smarthome_einrichten', wol: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
+    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_einrichten', alexa: 'smarthome_einrichten', wol: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();

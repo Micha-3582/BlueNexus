@@ -26,6 +26,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 | ⚡ **Energie** | Victron Cerbo GX, Tibber-Strompreise, PV-Prognose, intelligente Ladeplanung, Überschuss-Automatik, Kosten und Ersparnis |
 | 🏠 **Smart Home** | Shelly, Tasmota, WLED, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
 | 🏷️ **NFC-Tags** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Nur registrierte Handys, auch unterwegs |
+| 🔗 **Geräte teilen** | Gib Geräte, Sensoren, Schalter und die Klimaanlage an ein anderes BlueNexus weiter (z. B. Mutter im selben Haus). Zugangsdaten und Cloud-Logins bleiben bei dir |
 | 🧠 **Regeln** | Grafischer Regel-Editor: WENN … DANN … SONST, Zeitpläne, Sonnenstand, Abläufe mit Timern, Telegram- und Pushover-Meldungen |
 | 📷 **Kameras** | Reolink und beliebige RTSP-Kameras: Standbild, Live-Bild, Bewegungs- und Klingel-Auslöser |
 | 🗣️ **Alexa** | Sprachsteuerung ohne Amazon-Entwicklerkonto – die App gibt sich im Heimnetz als Hue-Bridge aus |
@@ -139,6 +140,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 - **Homematic-Funk-Diagnose:** Duty Cycle der Funkmodule, gesprächigste Geräte, Befehle der App – plus ein Test „Homematic pausieren“, um den Verursacher von Funklast zu finden.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
 - **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel.
+- **Geräte teilen:** Freigabe mit Zugangsschlüssel an ein anderes BlueNexus (Tunnel oder LAN). Der Empfänger sieht und bedient die gewählten Geräte, Sensoren, Schalter und die Klimaanlage wie eigene und nutzt sie in Regeln; Cloud-Logins (z. B. Medea) bleiben beim Geber.
 - **Klingel:** Reolink-Türklingel als Auslöser („Klingel gedrückt“) – zum Beispiel für einen Gong im Haus.
 - **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen; als Regel-Schritt „Chime läuten“ löst er auch automatisch einen Gong aus.
 - **Sicherheits-Timer (optional):** Geräte schalten sich nach einer einstellbaren Zeit selbst wieder ab, falls eine Regel hängt. Ab Werk aus (0), genau wie die Pause nach Handschaltung.
