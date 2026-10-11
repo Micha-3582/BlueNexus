@@ -205,7 +205,7 @@ Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause un
   Verlorenes Handy? Mit einem Klick in der Liste löschen – sofort gesperrt.
 - **Pro NFC-Tag einstellbar**, welche Handys ihn nutzen dürfen (nicht zeitlich begrenzt – ein registriertes Handy darf, bis du es löschst). Jeder neue NFC-Tag legt automatisch einen eigenen Knopf (🏷️) an,
   den du in Regeln als „WENN Knopf gedrückt“ verwendest.
-- **Tags direkt aus BlueNexus beschreiben:** Am Android-Handy (Chrome) genügt ein Ffingertipp auf „✍ Beschreiben“ und das Handy an den Tag halten – keine Zusatz-App nötig. Die App führt Schritt für Schritt durch, öffnet den Tag danach selbst und meldet den Erfolg. Am PC und iPhone fehlt diese Funktion technisch bedingt; dort zeigt BlueNexus die Adresse zum Kopieren für eine NFC-App.
+- **Tags direkt aus BlueNexus beschreiben:** Am Android-Handy (Chrome) genügt ein Fingertipp auf „✍ Beschreiben“ und das Handy an den Tag halten – keine Zusatz-App nötig. Die App führt Schritt für Schritt durch, öffnet den Tag danach selbst und meldet den Erfolg. Am PC und iPhone fehlt diese Funktion technisch bedingt; dort zeigt BlueNexus die Adresse zum Kopieren für eine NFC-App.
 - **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
   und schließt sich die App beim Scannen von selbst.
 - **PIN-geschützte Ziele:** Nach dem Scannen fragt das Handy die PIN ab (Handy **und** PIN nötig, nach 5 Fehlversuchen gesperrt).
