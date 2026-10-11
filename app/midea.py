@@ -426,12 +426,15 @@ def _mb():
         import midea_beautiful as mb
     except ImportError:
         raise MideaError("Die Bibliothek „midea-beautiful-air“ ist auf dem Server nicht installiert (Server: venv/bin/pip install -r app/requirements.txt, dann die App neu starten)")
+    _install_login_gate(mb)
     return mb
 
 
 def _cloud_explain(e: Exception) -> str:
     name, msg = e.__class__.__name__, str(e)
     low = (name + " " + msg).lower()
+    if "7610" in low or "too many failed login" in low:
+        return "Midea hat das Konto wegen zu vieler Anmeldungen vorübergehend gesperrt (7610) – BlueNexus wartet jetzt 30 Min, bitte nichts tun"
     if "authentication" in low or "login" in low or "password" in low:
         return f"Anmeldung bei der Midea-Cloud fehlgeschlagen ({msg or name}) – E-Mail/Passwort prüfen"
     if "timeout" in low or "timed out" in low or "connection" in low:
@@ -441,6 +444,8 @@ def _cloud_explain(e: Exception) -> str:
 
 LOGIN_BACKOFF_S = 300.0                                     # nach fehlgeschlagener Anmeldung so lange nicht erneut anmelden (zu viele Anmeldungen sperren das Konto)
 LOGIN_BACKOFF_AUTH_S = 3600.0                               # bei "Passwort falsch" deutlich laenger: staendiges Wiederholen kann das Konto sperren
+LOGIN_BACKOFF_LOCK_S = 1800.0                               # Midea meldet "zu viele Anmeldungen" (7610): lange Ruhe, sonst verlaengert jeder Versuch die Sperre
+LOGIN_MIN_INTERVAL_S = 600.0                                # automatisch hoechstens alle 10 Minuten eine Anmeldung pro Konto (von Hand ausgeloest: immer)
 LOGIN_STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "midea_login.json")
 
 
@@ -463,6 +468,57 @@ def _save_login_fail():
 
 
 _login_fail: dict[str, tuple] = _load_login_fail()          # Konto -> (Zeit, Meldung, Wartezeit in s)
+_login_last: dict[str, float] = {}                          # Konto -> Zeit des letzten Anmeldeversuchs
+_login_tl = threading.local()                               # .manual = True, solange eine von Hand ausgeloeste Anmeldung laeuft
+
+
+def _login_wait(msg: str) -> float:
+    low = msg.lower()
+    if "7610" in low or "too many" in low or "retry later" in low:
+        return LOGIN_BACKOFF_LOCK_S
+    if "authentication" in low or "password" in low:
+        return LOGIN_BACKOFF_AUTH_S
+    return LOGIN_BACKOFF_S
+
+
+def _install_login_gate(mb):
+    """Jede Anmeldung bei der Midea-Cloud laeuft durch diese Schranke - auch die, die die Bibliothek selbst ausloest.
+    midea-beautiful meldet sich bei Fehlern wie 3004 ("value is illegal") oder 3106 (Sitzung ungueltig) mitten in einer Abfrage
+    stillschweigend neu an. Bei drei Klimaanlagen und Abfragen alle 45 s waren das so viele Anmeldungen, dass Midea das Konto
+    sperrte (7610 "Too many failed login attempts", vorher auch als "Passwort falsch (3101)")."""
+    from midea_beautiful.cloud import MideaCloud
+    if getattr(MideaCloud, "_bnx_gated", False):
+        return
+    for name in ("_login_proxied", "_login_non_proxied"):
+        orig = getattr(MideaCloud, name)
+
+        def gated(self, _orig=orig):
+            acc = self._account
+            manual = getattr(_login_tl, "manual", False)
+            now = time.time()
+            hit = _login_fail.get(acc)
+            if not manual:
+                if hit and now - hit[0] < hit[2]:
+                    left = int(hit[2] - (now - hit[0]))
+                    raise MideaError(f"{hit[1]} (nächster Versuch in {left // 60 + 1} Min – zum sofortigen Versuch: Klimaanlage → ☁ Zugang)")
+                last = _login_last.get(acc, 0.0)
+                if now - last < LOGIN_MIN_INTERVAL_S:
+                    left = int(LOGIN_MIN_INTERVAL_S - (now - last))
+                    raise MideaError(f"Midea-Cloud: Sitzung abgelaufen, neue Anmeldung erst in {left // 60 + 1} Min (Schutz vor Kontosperre – sofort: ☁ Zugang)")
+            _login_last[acc] = now
+            log.info("Midea-Cloud: Anmeldung für %s (%s)", acc, "von Hand" if manual else "automatisch")
+            try:
+                r = _orig(self)
+            except Exception as e:                           # noqa: BLE001
+                msg = _cloud_explain(e)
+                _login_fail[acc] = (time.time(), msg, _login_wait(msg))
+                _save_login_fail()
+                raise
+            if _login_fail.pop(acc, None):
+                _save_login_fail()
+            return r
+        setattr(MideaCloud, name, gated)
+    MideaCloud._bnx_gated = True
 
 # Die Midea-Cloud begrenzt, wie oft und von wie vielen Orten man sich anmelden darf. Jeder Neustart der App (Update!) meldete sich bisher neu an -
 # nach ein paar Neustarts am Tag lehnt die Cloud die Anmeldung ab ("Passwort falsch (3101)"). Darum wird die laufende Sitzung auf der Platte gemerkt
@@ -558,22 +614,18 @@ def _cloud_conn(account: str, password: str, manual: bool = False):
             hit = _login_fail.get(account)
             if hit and not manual and time.time() - hit[0] < hit[2]:
                 left = int(hit[2] - (time.time() - hit[0]))
-                raise MideaError(f"{hit[1]} (nächster Versuch in {left // 60 + 1} Min – nicht gleichzeitig mit der Handy-App oder einem zweiten Server dasselbe Konto benutzen; "
+                raise MideaError(f"{hit[1]} (nächster Versuch in {left // 60 + 1} Min – zum sofortigen Versuch: Klimaanlage → ☁ Zugang; "
                                  f"bei falschem Passwort: Klimaanlage ✎ → „Zugang erneuern“)")
             c = None if manual else _session_restore(mb, account, password)          # nach einem Neustart die gemerkte Sitzung weiterverwenden
             if c is not None:
                 c.max_retries = 2
                 _clouds[account] = c
                 return c
+            _login_tl.manual = manual                        # die Schranke (_install_login_gate) merkt Fehlversuche und Wartezeiten
             try:
                 c = mb.connect_to_cloud(account=account, password=password)
-            except Exception as e:                           # noqa: BLE001
-                msg = _cloud_explain(e)
-                _login_fail[account] = (time.time(), msg, LOGIN_BACKOFF_AUTH_S if ("authentication" in msg.lower() or "password" in msg.lower()) else LOGIN_BACKOFF_S)
-                _save_login_fail()
-                raise
-            if _login_fail.pop(account, None):
-                _save_login_fail()
+            finally:
+                _login_tl.manual = False
             c.max_retries = 2
             _clouds[account] = c
             _session_save(account, password, c)
