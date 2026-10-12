@@ -634,7 +634,7 @@
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="tuya"> Tuya / Smart Life <span class="qhelp" role="button" tabindex="0" data-help="Tuya- und Smart-Life-Geräte (z. B. Gosund). Geschaltet wird lokal, die Cloud liefert nur einmalig die Schlüssel.">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="homematic"> Homematic / HomematicIP (OpenCCU) <span class="qhelp" role="button" tabindex="0" data-help="Homematic und HomematicIP über die OpenCCU: Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden und Soundmodule.">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="zigbee"> Zigbee (Phoscon / deCONZ) <span class="qhelp" role="button" tabindex="0" data-help="Zigbee-Geräte über ein Phoscon/deCONZ-Gateway (ConBee/RaspBee), auch mehrere Gateways.">?</span></label>
-      <label class="chk"><input type="checkbox" class="fam-cb" data-fam="midea"> Klimaanlage (Midea / NetHome Plus) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen mit NetHome Plus (Midea, Comfee, Inventor, Pioneer u. a.).">?</span></label>
+      <label class="chk"><input type="checkbox" class="fam-cb" data-fam="midea"> Klimaanlage (Midea / MSmartHome) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen mit Midea-Technik (MSmartHome, NetHome Plus, Comfee, Inventor, Pioneer u. a.).">?</span></label>
     </div>
     <div class="muted" id="fam-hint" style="margin-top:8px" hidden>Noch kein System gewählt.</div>
   </div>
@@ -747,15 +747,15 @@
 </div>
 
 <div class="card fam-card msg-host" id="fam-midea" data-tab="suchen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Klimaanlage (Midea / NetHome Plus) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen, die du mit der App <b>NetHome Plus</b> bedienst (auch Comfee, Inventor, Pioneer u. a. mit Midea-Technik), werden im Heimnetz gefunden und lokal gesteuert: Ein/Aus, Modus, Temperatur, Lüfter – auch in Regeln und per Alexa. Beim Anlegen holt die App einmalig den Schlüssel der Anlage aus der NetHome-Plus-Cloud.<br><br><b>Eigenes Konto (Cloud-Weg):</b> Gibt Midea keinen lokalen Schlüssel heraus, trage das Konto aus der NetHome-Plus-App ein. Die Anlagen werden dann über die Midea-Cloud gesteuert (Internet nötig, etwas langsamer). Das Konto wird dafür auf dem Server gespeichert und nie im Browser angezeigt; ohne Cloud-Weg dient es nur der Suche und wird nicht gespeichert.">?</span></h2>
-  <div class="sub">NetHome-Plus-Klimaanlagen suchen und lokal steuern.</div>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Klimaanlage (Midea / MSmartHome) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen mit Midea-Technik (auch Comfee, Inventor, Pioneer u. a.) werden im Heimnetz gefunden und <b>lokal</b> gesteuert – ohne Cloud: Ein/Aus, Modus, Temperatur, Lüfter, auch in Regeln und per Alexa.<br><br><b>Schlüssel:</b> Moderne Anlagen brauchen einmalig einen Schlüssel. Den gibt Midea nur über die App <b>MSmartHome</b> heraus: Anlage in MSmartHome einrichten, hier E-Mail und Passwort dieses Kontos eintragen und suchen. Das Konto wird nur für diese eine Anmeldung benutzt und <b>nicht gespeichert</b>.<br><br><b>Hinweis:</b> Midea lässt pro Konto nur wenige angemeldete Geräte zu. Meldet die Suche „zu viele angemeldete Geräte“, in der MSmartHome-App unter <i>Profil → Angemeldete Geräte verwalten</i> einen Eintrag abmelden.<br><br>Wird eine Anlage neu gekoppelt (WLAN-Reset, neu hinzugefügt), braucht sie einen neuen Schlüssel: an der Anlage „🔑 Schlüssel“.">?</span></h2>
+  <div class="sub">Klimaanlagen im Heimnetz suchen und lokal steuern – ohne Cloud.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <select id="midea-region" style="width:auto" title="Region der NetHome-Plus-Cloud (für Deutschland: DE)"><option value="DE">Region DE</option><option value="US">Region US</option><option value="KR">Region KR</option></select>
+    <select id="midea-region" style="width:auto" title="Region des MSmartHome-Kontos (für Deutschland: DE)"><option value="DE">Region DE</option><option value="US">Region US</option><option value="KR">Region KR</option></select>
     <input type="text" id="midea-ip" placeholder="optional: IP der Klimaanlage" style="flex:1;min-width:190px" autocomplete="off">
     <button id="midea-scan" class="ghost">Klimaanlagen suchen</button>
   </div>
-  <details style="margin-top:10px"><summary>Eigenes NetHome-Plus-Konto (Cloud-Weg)</summary>
-    <div class="grid2"><div><label>E-Mail <span class="qhelp" role="button" tabindex="0" data-help="E-Mail-Adresse deines NetHome-Plus-Kontos.">?</span></label><input id="midea-account" autocomplete="off"></div><div><label>Passwort <span class="qhelp" role="button" tabindex="0" data-help="Passwort des NetHome-Plus-Kontos. Wird nur für den Cloud-Weg gespeichert.">?</span></label><div class="pw-wrap"><input id="midea-pass" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="midea-pass" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div></div>
+  <details style="margin-top:10px" open><summary>MSmartHome-Konto (für den Schlüssel)</summary>
+    <div class="grid2"><div><label>E-Mail <span class="qhelp" role="button" tabindex="0" data-help="E-Mail-Adresse des MSmartHome-Kontos, in dem die Klimaanlagen eingetragen sind. Nur für das einmalige Holen der Schlüssel, wird nicht gespeichert.">?</span></label><input id="midea-account" autocomplete="off"></div><div><label>Passwort <span class="qhelp" role="button" tabindex="0" data-help="Passwort des MSmartHome-Kontos. Wird nicht gespeichert.">?</span></label><div class="pw-wrap"><input id="midea-pass" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="midea-pass" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div></div>
   </details>
 </div>
 
@@ -1853,6 +1853,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
         ${isAc(d) && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
         ${d.kind === 'midea' && d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaCloudRenew('${id}')" title="Neue E-Mail/Passwort des NetHome-Plus-Kontos eintragen (z. B. wenn die Anmeldung abgelehnt wird)">☁ Zugang</button>` : ''}
+        ${d.kind === 'midea' && !d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaRekey('${id}')" title="Neuen Schlüssel holen – nötig, wenn die Anlage neu gekoppelt wurde (WLAN-Reset, in der App neu hinzugefügt)">🔑 Schlüssel</button>` : ''}
         ${d.kind === 'midea' && d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaToLocal('${id}')" title="Auf lokale Steuerung im Heimnetz umstellen – einmalige Anmeldung, danach ohne Cloud">⇄ Lokal</button>` : ''}
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
@@ -1888,7 +1889,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
   reopenEdits(wasOpen);
 
 }
-/* --- Midea-Klimaanlage (NetHome Plus) --- */
+/* --- Midea-Klimaanlage (lokal, Schlüssel über MSmartHome) --- */
 document.getElementById('midea-scan').addEventListener('click', async e => {
   const b = e.target; b.disabled = true; shellyMsg('Klimaanlagen-Suche läuft … (bis zu einer Minute)');
   try {
@@ -1896,9 +1897,9 @@ document.getElementById('midea-scan').addEventListener('click', async e => {
       account: document.getElementById('midea-account').value.trim(), password: document.getElementById('midea-pass').value });
     document.getElementById('midea-pass').value = '';
     const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Klimaanlage(n) gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Klimaanlage gefunden – Klimaanlage im WLAN? Dann ihre IP oben eintragen (Router-Liste oder NetHome-Plus-App).', !found.length);
+    shellyMsg(found.length ? `${found.length} Klimaanlage(n) gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Klimaanlage gefunden – Klimaanlage im WLAN? Dann ihre IP oben eintragen (Router-Liste oder MSmartHome-App).', !found.length);
     foundList(fresh, { key: f => f.id, icons: 'device', reload: loadShellyAdmin,
-      sub: f => `${escH(f.model)} · ${escH(f.ip)} · Protokoll V${f.version}${f.online ? '' : ' · antwortet nicht'}`,
+      sub: f => `${escH(f.model)} · ${escH(f.ip)} · Protokoll V${f.version}${f.online ? '' : ' · antwortet nicht'}${f.nokey ? ' · ⚠ kein Schlüssel (MSmartHome-Konto angeben)' : ''}`,
       add: (ids, edits) => shellyApi('/api/midea/add', 'POST', { ids, edits }) });
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
@@ -1909,6 +1910,15 @@ async function mideaCloudRenew(id) {
   const password = await uiDialog({ title: 'NetHome-Plus-Zugang erneuern', message: `Passwort für ${account}`, label: 'Passwort', type: 'password', okText: 'Prüfen und speichern' });
   if (!password) return;
   try { const j = await shellyApi('/api/midea/cloud', 'POST', { id, account: account.trim(), password }); savedToast(`Verbunden ✓ (${j.devices} Klimaanlage${j.devices === 1 ? '' : 'n'})`); loadShellyAdmin(); } catch (e) { uiAlert(e.message); }
+}
+async function mideaRekey(id) {
+  const account = await uiDialog({ title: 'Neuen Schlüssel holen', message: 'Nötig, wenn die Klimaanlage neu gekoppelt wurde (WLAN-Reset, in der App neu hinzugefügt). E-Mail des MSmartHome-Kontos, in dem die Anlage eingetragen ist – wird nicht gespeichert.', label: 'E-Mail', okText: 'Weiter' });
+  if (!account || !account.trim()) return;
+  const password = await uiDialog({ title: 'Neuen Schlüssel holen', message: `Passwort für ${account.trim()}`, label: 'Passwort', type: 'password', okText: 'Schlüssel holen' });
+  if (!password) return;
+  savedToast('Suche Anlage und hole Schlüssel …');
+  try { const j = await shellyApi('/api/midea/rekey', 'POST', { id, account: account.trim(), password }); savedToast(`Neuer Schlüssel gespeichert ✓ (${j.ip})`); loadShellyAdmin(); }
+  catch (e) { uiAlert(e.message); }
 }
 async function mideaToLocal(id) {
   if (!await uiDialog({ title: 'Auf lokale Steuerung umstellen?', message: 'Alle Klimaanlagen dieses Midea-Kontos werden umgestellt. BlueNexus meldet sich dafür genau einmal bei Midea an, holt die Schlüssel und spricht die Anlagen danach direkt im Heimnetz an – ohne Cloud. Name, Raum, Regeln, Dashboard und Freigaben bleiben erhalten. Tipp: Gib den Klimaanlagen im Router eine feste IP-Adresse.', okText: 'Weiter' })) return;

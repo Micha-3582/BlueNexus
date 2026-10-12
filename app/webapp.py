@@ -224,7 +224,7 @@ ENDPOINT_AREA = {
     "api_battery_cycles": "dashboard", "api_status": "dashboard", "api_history": "dashboard",
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
-    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
+    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
     "report_page": "dashboard", "api_report": "dashboard", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
@@ -5424,7 +5424,7 @@ def api_shelly_brightness(dev_id):
 
 @app.route("/api/midea/scan", methods=["POST"])
 def api_midea_scan():
-    """Klimaanlagen (Midea / NetHome Plus) im Heimnetz suchen. Ein eigenes NetHome-Plus-Konto ist nur zum einmaligen Holen des Schluessels da und wird nicht gespeichert."""
+    """Klimaanlagen (Midea) im Heimnetz suchen. Das MSmartHome-Konto ist nur zum einmaligen Holen des Schluessels da und wird nicht gespeichert."""
     b = request.get_json(silent=True) or {}
     try:
         return jsonify(shelly.midea_scan(b.get("region"), b.get("account"), b.get("password"), b.get("ip")))
@@ -5449,6 +5449,16 @@ def api_midea_local():
     b = request.get_json(silent=True) or {}
     try:
         return jsonify(ok=True, **shelly.midea_to_local(str(b.get("id") or ""), b.get("region"), b.get("account"), b.get("password")))
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.route("/api/midea/rekey", methods=["POST"])
+def api_midea_rekey():
+    """Neue Schluessel fuer eine lokale Klimaanlage (nach neuem Koppeln). Das MSmartHome-Konto wird nicht gespeichert."""
+    b = request.get_json(silent=True) or {}
+    try:
+        return jsonify(ok=True, **shelly.midea_rekey(str(b.get("id") or ""), b.get("account"), b.get("password"), b.get("region")))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
 

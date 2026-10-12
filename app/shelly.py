@@ -368,6 +368,31 @@ def midea_to_local(dev_id: str, region=None, account=None, password=None) -> dic
     return {"done": len(done), "missing": missing}
 
 
+def midea_rekey(dev_id: str, account: str, password: str, region=None) -> dict:
+    """Neue Token/Schluessel fuer eine lokale Klimaanlage (z. B. nach neuem Koppeln in der App). IP wird dabei mit aktualisiert."""
+    d = _midea_dev(dev_id)
+    if d.get("kind") != "midea" or d.get("cloud"):
+        raise ShellyError("Das gibt es nur bei lokal gesteuerten Klimaanlagen")
+    account, password = (account or "").strip(), password or ""
+    if not account or not password:
+        raise ShellyError("E-Mail und Passwort des MSmartHome-Kontos eingeben")
+    try:
+        res = midea.local_keys(region or midea.DEFAULT_REGION, account, password, [d["device_id"]])
+    except midea.MideaError as e:
+        raise ShellyError(str(e))
+    r = res.get(int(d["device_id"]))
+    if not r:
+        raise ShellyError("Kein Schlüssel – ist die Anlage in diesem MSmartHome-Konto eingetragen?")
+    items = load_devices()
+    for x in items:
+        if x["id"] == dev_id:
+            x.update(r)
+    _save(items)
+    midea.cloud_forget(set(), [dev_id])
+    midea._devs.pop(dev_id, None)
+    return {"ip": r["ip"]}
+
+
 def add_midea(ids: list[str]) -> list[dict]:
     """Legt die gewaehlten Klimaanlagen (aus der letzten Suche, samt Token/Schluessel) an."""
     try:

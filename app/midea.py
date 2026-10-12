@@ -284,63 +284,6 @@ _scan: dict[str, dict] = {}                               # Geraete-ID -> Eintra
 _scan_ts = 0.0
 
 
-async def _authenticate_both_endians(cls, dev) -> bool:
-    """Ersatz fuer Discover._authenticate_device: die Bibliothek bricht beim ersten Cloud-Fehler ab. Die Cloud antwortet auf die
-    falsche Byte-Reihenfolge der Geraete-ID aber mit 9999 - deshalb beide Varianten probieren und erst dann aufgeben."""
-    from msmart.cloud import CloudError
-    from msmart.lan import AuthenticationError, Security
-    cloud = await cls._get_cloud()                                      # Anmeldefehler gehen unveraendert nach oben
-    last = None
-    for endian in ("little", "big"):
-        udpid = Security.udpid(dev.id.to_bytes(6, endian)).hex()
-        try:
-            token, key = await cloud.get_token(udpid)
-        except CloudError as e:
-            last = e
-            continue
-        try:
-            await dev.authenticate(token, key)
-            return True
-        except AuthenticationError:                                     # andere Variante probieren
-            continue
-    if last:
-        raise CloudError(f"Failed to get token from cloud. {last}")
-    return False
-
-
-async def _discover(region: str, account, password, target) -> list[dict]:
-    AC, Discover, DeviceType = _lib()
-    Discover._authenticate_device = classmethod(_authenticate_both_endians)
-    kw = {"timeout": DISCOVER_TIMEOUT_S, "region": region, "auto_connect": True}
-    if account and password:
-        kw.update(account=account, password=password)
-    if target:
-        kw["target"] = target
-    try:
-        devs = await Discover.discover(**kw)
-    except Exception as e:
-        if "cloud" not in str(e).lower():
-            raise
-        # NetHome-Plus-Konto abgelehnt (z. B. "9999 system error") -> gleiche Abfrage ueber die SmartHome-Cloud (anderes Konto/Server)
-        import msmart.discover as _md
-        from msmart.cloud import SmartHomeCloud, CloudError
-        orig = _md.NetHomePlusCloud
-        _md.NetHomePlusCloud = SmartHomeCloud
-        try:
-            devs = await Discover.discover(**kw)
-        except Exception as e2:
-            raise CloudError(f"{e} / SmartHome-Cloud: {e2}") from e2
-        finally:
-            _md.NetHomePlusCloud = orig
-    out = []
-    for dev in devs:
-        if getattr(dev, "type", None) != DeviceType.AIR_CONDITIONER:
-            continue
-        out.append({"id": f"midea-{dev.id}", "device_id": int(dev.id), "ip": dev.ip, "port": int(dev.port), "raw_name": dev.name, "sn": dev.sn,
-                    "version": dev.version, "token": dev.token, "key": dev.key, "online": bool(dev.online), "supported": bool(dev.supported)})
-    return out
-
-
 def _check_target(target: str | None) -> str | None:
     if not target:
         return None
@@ -355,7 +298,7 @@ def _check_target(target: str | None) -> str | None:
 
 
 def discover(region: str = DEFAULT_REGION, account: str | None = None, password: str | None = None, target: str | None = None, known_ids=()) -> list[dict]:
-    """Klimaanlagen im Heimnetz suchen (oder eine bestimmte IP). Rueckgabe ohne Token/Schluessel: [{id, ip, name, version, online, known}]."""
+    """Klimaanlagen im Heimnetz suchen (oder eine bestimmte IP), ohne Cloud. Mit MSmartHome-Konto werden die Schluessel einmalig geholt (Konto wird nicht gespeichert)."""
     global _scan_ts
     region = (region or DEFAULT_REGION).upper()
     if region not in REGIONS:
@@ -366,24 +309,25 @@ def discover(region: str = DEFAULT_REGION, account: str | None = None, password:
         # gesperrtes Konto: die Suche wuerde sich bis zu dreimal anmelden (NetHome, SmartHome, Cloud-Liste) und die Sperre jedes Mal verlaengern
         left = int(hit[2] - (time.time() - hit[0]))
         raise MideaError(f"{hit[1]} – Suche mit Konto erst in {left // 60 + 1} Min wieder möglich (jeder Versuch verlängert die Sperre bei Midea)")
-    local_err = None
-    try:
-        found = _run(_discover(region, account, password or None, _check_target(target)), DISCOVER_TIMEOUT_S + 40)
-    except MideaError as e:
-        found, local_err = [], e
-    if account and password and (local_err or not found):
-        # lokal kein Schluessel (Midea gibt ihn nicht mehr heraus) oder nichts gefunden -> Anlagen des Kontos ueber die Cloud
-        try:
-            found = _cloud_list(account, password)
-        except MideaError as e2:
-            raise MideaError(f"{local_err} / Cloud-Zugriff: {e2}" if local_err else str(e2))
-    elif local_err:
-        raise local_err
+    async def scan():
+        lan = await _lan_scan(_check_target(target))
+        keys = {}
+        need = [i for i, d in lan.items() if (d.version or 0) >= 3 and f"midea-{i}" not in set(known_ids)]   # schon angelegte: Schluessel ueber 🔑
+        if account and password and need:
+            keys = await _local_keys(region, account, password, need, lan)
+        return lan, keys
+    lan, keys = _run(scan(), DISCOVER_TIMEOUT_S + 90)
+    found = []
+    for did, d in lan.items():
+        k = keys.get(did, {})
+        found.append({"id": f"midea-{did}", "device_id": did, "ip": d.ip, "port": int(d.port), "raw_name": d.name, "sn": d.sn, "version": d.version,
+                      "token": k.get("token"), "key": k.get("key"), "online": True, "supported": True})
     _scan.clear()
     _scan.update({f["id"]: f for f in found})
     _scan_ts = time.time()
-    return [{"id": f["id"], "ip": f["ip"] or "Cloud", "name": default_name(f), "model": "Midea Klimaanlage" + (" (über die Cloud)" if f.get("cloud") else ""), "version": f["version"], "online": f["online"],
-             "supported": f["supported"], "known": f["id"] in set(known_ids), "room": ""} for f in found]
+    return [{"id": f["id"], "ip": f["ip"] or "Cloud", "name": default_name(f), "model": "Midea Klimaanlage", "version": f["version"], "online": f["online"],
+             "supported": f["supported"], "known": f["id"] in set(known_ids), "room": "",
+             "nokey": (f.get("version") or 0) >= 3 and not (f.get("token") and f.get("key"))} for f in found]
 
 
 def default_name(f: dict) -> str:
@@ -407,7 +351,7 @@ def build_entries(ids: list[str]) -> list[dict]:
                         "model": "Midea Klimaanlage", "name": default_name(f), "room": "", "icon": "❄️"})
             continue
         if (f.get("version") or 0) >= 3 and not (f.get("token") and f.get("key")):
-            raise MideaError(f"{default_name(f)}: Token/Schlüssel konnten nicht geholt werden (Region prüfen oder eigenes NetHome-Plus-Konto angeben)")
+            raise MideaError(f"{default_name(f)}: kein Schlüssel – bei der Suche E-Mail/Passwort des MSmartHome-Kontos angeben, in dem die Anlage eingetragen ist")
         out.append({"id": f["id"], "kind": "midea", "ip": f["ip"], "port": f["port"], "device_id": f["device_id"], "raw_name": f["raw_name"], "sn": f["sn"],
                     "version": f["version"], "token": f["token"], "key": f["key"], "mac": None, "gen": 0, "channel": 0, "model": "Midea Klimaanlage",
                     "name": default_name(f), "room": "", "icon": "❄️"})
@@ -427,21 +371,32 @@ async def _smarthome_token(cloud, udpid: str, appliance_id: int):
     raise mcloud.CloudError(f"Kein Schlüssel für {udpid}")
 
 
-async def _local_keys(region: str, account: str, password: str, device_ids: list) -> dict:
-    """Einmalig: Anlagen im Heimnetz suchen, mit EINER Anmeldung beim MSmartHome-Konto Token/Schluessel holen und lokal pruefen.
-    Rueckgabe {device_id: {ip, port, version, sn, raw_name, token, key}} - nur Anlagen, die lokal wirklich antworten."""
-    AC, Discover, _ = _lib()
-    import msmart.cloud as mcloud
-    from msmart.lan import Security
+async def _lan_scan(target: str | None = None) -> dict:
+    """Klimaanlagen im Heimnetz finden - ohne Cloud. {device_id: Geraet der Bibliothek}"""
+    _, Discover, DeviceType = _lib()
     orig = Discover.__dict__.get("_authenticate_device")
-    Discover._authenticate_device = classmethod(lambda cls, dev: asyncio.sleep(0, False))      # nur finden - ohne Cloud
+    Discover._authenticate_device = classmethod(lambda cls, dev: asyncio.sleep(0, False))      # nur finden
     try:
-        devs = await Discover.discover(timeout=int(DISCOVER_TIMEOUT_S), auto_connect=False)
+        kw = {"timeout": int(DISCOVER_TIMEOUT_S), "auto_connect": False}
+        if target:
+            kw["target"] = target
+        devs = await Discover.discover(**kw)
     finally:
         if orig is not None:
             Discover._authenticate_device = orig
-    wanted = set(device_ids)
-    lan = {int(d.id): d for d in devs if int(d.id) in wanted}
+    return {int(d.id): d for d in devs if getattr(d, "type", None) == DeviceType.AIR_CONDITIONER}
+
+
+async def _local_keys(region: str, account: str, password: str, device_ids: list, lan: dict | None = None) -> dict:
+    """Mit EINER Anmeldung beim MSmartHome-Konto Token/Schluessel holen und lokal pruefen.
+    Rueckgabe {device_id: {ip, port, version, sn, raw_name, token, key}} - nur Anlagen, die lokal wirklich antworten."""
+    AC, _, _ = _lib()
+    import msmart.cloud as mcloud
+    from msmart.lan import Security
+    if lan is None:
+        lan = await _lan_scan()
+    wanted = set(int(i) for i in device_ids)
+    lan = {i: d for i, d in lan.items() if i in wanted}
     if not lan:
         raise MideaError("Keine der Klimaanlagen antwortet im Heimnetz (WLAN der Anlage? gleiches Netz wie der Server?)")
     # Schluessel gibt es nur noch ueber die SmartHome-Cloud (App "MSmartHome"); NetHome Plus antwortet mit 9999.
@@ -452,6 +407,9 @@ async def _local_keys(region: str, account: str, password: str, device_ids: list
         await cloud.login()
     except Exception as e:                                   # noqa: BLE001
         msg = _cloud_explain(e)
+        if "65027" in msg:
+            msg = ("MSmartHome: zu viele angemeldete Geräte für dieses Konto (65027) – in der MSmartHome-App unter "
+                   "Profil → Angemeldete Geräte verwalten einen Eintrag abmelden und noch einmal versuchen")
         _login_fail[account] = (time.time(), msg, _login_wait(msg))
         _save_login_fail()
         raise MideaError(msg)
