@@ -361,6 +361,11 @@ def discover(region: str = DEFAULT_REGION, account: str | None = None, password:
     if region not in REGIONS:
         raise MideaError("Region: " + ", ".join(REGIONS))
     account = (account or "").strip() or None
+    hit = _login_fail.get(account) if account else None
+    if hit and "7610" in hit[1] and time.time() - hit[0] < hit[2]:
+        # gesperrtes Konto: die Suche wuerde sich bis zu dreimal anmelden (NetHome, SmartHome, Cloud-Liste) und die Sperre jedes Mal verlaengern
+        left = int(hit[2] - (time.time() - hit[0]))
+        raise MideaError(f"{hit[1]} – Suche mit Konto erst in {left // 60 + 1} Min wieder möglich (jeder Versuch verlängert die Sperre bei Midea)")
     local_err = None
     try:
         found = _run(_discover(region, account, password or None, _check_target(target)), DISCOVER_TIMEOUT_S + 40)
