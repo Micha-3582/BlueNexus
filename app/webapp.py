@@ -5448,7 +5448,7 @@ def api_midea_local():
     """Cloud-Klimaanlagen auf lokale Steuerung umstellen (einmalige Anmeldung fuer die Schluessel)."""
     b = request.get_json(silent=True) or {}
     try:
-        return jsonify(ok=True, **shelly.midea_to_local(str(b.get("id") or ""), b.get("region")))
+        return jsonify(ok=True, **shelly.midea_to_local(str(b.get("id") or ""), b.get("region"), b.get("account"), b.get("password")))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
 

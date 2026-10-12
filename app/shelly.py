@@ -337,17 +337,18 @@ def midea_cloud_renew(dev_id: str, account: str, password: str) -> int:
     return len(hit)
 
 
-def midea_to_local(dev_id: str, region=None) -> dict:
+def midea_to_local(dev_id: str, region=None, account=None, password=None) -> dict:
     """Cloud-Klimaanlagen eines Kontos auf lokale Steuerung umstellen (einmalige Anmeldung fuer Token/Schluessel, danach nie wieder Cloud).
     ID, Name, Raum, Regeln, Freigaben und Dashboard bleiben erhalten."""
     d = _midea_dev(dev_id)
     if d.get("kind") != "midea" or not d.get("cloud"):
         raise ShellyError("Diese Klimaanlage läuft schon lokal")
     acc, pw = d.get("cloud_account"), d.get("cloud_password")
+    new_acc, new_pw = (account or "").strip(), password or ""            # neu eingegeben (z. B. nach Passwort-Reset), sonst die gespeicherten
     items = load_devices()
     group = [x for x in items if x.get("kind") == "midea" and x.get("cloud") and x.get("cloud_account") == acc]
     try:
-        res = midea.local_keys(region or midea.DEFAULT_REGION, acc, pw, [x["device_id"] for x in group])
+        res = midea.local_keys(region or midea.DEFAULT_REGION, new_acc or acc, new_pw or pw, [x["device_id"] for x in group])
     except midea.MideaError as e:
         raise ShellyError(str(e))
     done, missing = [], []

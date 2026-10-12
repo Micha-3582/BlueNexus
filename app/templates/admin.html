@@ -1911,10 +1911,14 @@ async function mideaCloudRenew(id) {
   try { const j = await shellyApi('/api/midea/cloud', 'POST', { id, account: account.trim(), password }); savedToast(`Verbunden ✓ (${j.devices} Klimaanlage${j.devices === 1 ? '' : 'n'})`); loadShellyAdmin(); } catch (e) { uiAlert(e.message); }
 }
 async function mideaToLocal(id) {
-  if (!await uiDialog({ title: 'Auf lokale Steuerung umstellen?', message: 'Alle Klimaanlagen dieses Midea-Kontos werden umgestellt. BlueNexus meldet sich dafür genau einmal bei Midea an, holt die Schlüssel und spricht die Anlagen danach direkt im Heimnetz an – ohne Cloud. Name, Raum, Regeln, Dashboard und Freigaben bleiben erhalten. Tipp: Gib den Klimaanlagen im Router eine feste IP-Adresse.', okText: 'Umstellen' })) return;
+  if (!await uiDialog({ title: 'Auf lokale Steuerung umstellen?', message: 'Alle Klimaanlagen dieses Midea-Kontos werden umgestellt. BlueNexus meldet sich dafür genau einmal bei Midea an, holt die Schlüssel und spricht die Anlagen danach direkt im Heimnetz an – ohne Cloud. Name, Raum, Regeln, Dashboard und Freigaben bleiben erhalten. Tipp: Gib den Klimaanlagen im Router eine feste IP-Adresse.', okText: 'Weiter' })) return;
+  const account = await uiDialog({ title: 'NetHome-Plus-Konto', message: 'E-Mail des Kontos. Leer lassen = die gespeicherten Zugangsdaten verwenden.', label: 'E-Mail', okText: 'Weiter' });
+  if (account === null || account === false || account === undefined) return;
+  let password = '';
+  if (account.trim()) { password = await uiDialog({ title: 'NetHome-Plus-Konto', message: `Passwort für ${account.trim()}`, label: 'Passwort', type: 'password', okText: 'Umstellen' }); if (!password) return; }
   savedToast('Suche Anlagen und hole Schlüssel …');
   try {
-    const j = await shellyApi('/api/midea/local', 'POST', { id });
+    const j = await shellyApi('/api/midea/local', 'POST', { id, account: account.trim(), password });
     if (j.missing && j.missing.length) uiAlert(`${j.done} Klimaanlage(n) laufen jetzt lokal. Nicht umgestellt (antwortet nicht im Heimnetz): ${j.missing.join(', ')}`);
     else savedToast(`${j.done} Klimaanlage${j.done === 1 ? '' : 'n'} laufen jetzt lokal ✓`);
     loadShellyAdmin();
