@@ -1853,6 +1853,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
         ${isAc(d) && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
         ${d.kind === 'midea' && d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaCloudRenew('${id}')" title="Neue E-Mail/Passwort des NetHome-Plus-Kontos eintragen (z. B. wenn die Anmeldung abgelehnt wird)">☁ Zugang</button>` : ''}
+        ${d.kind === 'midea' && d.cloud && window.IS_ADMIN ? `<button class="ghost" onclick="mideaToLocal('${id}')" title="Auf lokale Steuerung im Heimnetz umstellen – einmalige Anmeldung, danach ohne Cloud">⇄ Lokal</button>` : ''}
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
@@ -1908,6 +1909,16 @@ async function mideaCloudRenew(id) {
   const password = await uiDialog({ title: 'NetHome-Plus-Zugang erneuern', message: `Passwort für ${account}`, label: 'Passwort', type: 'password', okText: 'Prüfen und speichern' });
   if (!password) return;
   try { const j = await shellyApi('/api/midea/cloud', 'POST', { id, account: account.trim(), password }); savedToast(`Verbunden ✓ (${j.devices} Klimaanlage${j.devices === 1 ? '' : 'n'})`); loadShellyAdmin(); } catch (e) { uiAlert(e.message); }
+}
+async function mideaToLocal(id) {
+  if (!await uiDialog({ title: 'Auf lokale Steuerung umstellen?', message: 'Alle Klimaanlagen dieses Midea-Kontos werden umgestellt. BlueNexus meldet sich dafür genau einmal bei Midea an, holt die Schlüssel und spricht die Anlagen danach direkt im Heimnetz an – ohne Cloud. Name, Raum, Regeln, Dashboard und Freigaben bleiben erhalten. Tipp: Gib den Klimaanlagen im Router eine feste IP-Adresse.', okText: 'Umstellen' })) return;
+  savedToast('Suche Anlagen und hole Schlüssel …');
+  try {
+    const j = await shellyApi('/api/midea/local', 'POST', { id });
+    if (j.missing && j.missing.length) uiAlert(`${j.done} Klimaanlage(n) laufen jetzt lokal. Nicht umgestellt (antwortet nicht im Heimnetz): ${j.missing.join(', ')}`);
+    else savedToast(`${j.done} Klimaanlage${j.done === 1 ? '' : 'n'} laufen jetzt lokal ✓`);
+    loadShellyAdmin();
+  } catch (e) { uiAlert(e.message); }
 }
 async function mideaPanel(id) {
   const box = document.getElementById('midea-' + id); if (!box) return;

@@ -414,6 +414,54 @@ def build_entries(ids: list[str]) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- Cloud -> lokal umstellen
+async def _local_keys(region: str, account: str, password: str, device_ids: list) -> dict:
+    """Einmalig: Anlagen im Heimnetz suchen, mit EINER Anmeldung beim NetHome-Plus-Konto Token/Schluessel holen und lokal pruefen.
+    Rueckgabe {device_id: {ip, port, version, sn, raw_name, token, key}} - nur Anlagen, die lokal wirklich antworten."""
+    AC, Discover, _ = _lib()
+    from msmart.cloud import NetHomePlusCloud
+    from msmart.lan import Security
+    orig = Discover.__dict__.get("_authenticate_device")
+    Discover._authenticate_device = classmethod(lambda cls, dev: asyncio.sleep(0, False))      # nur finden - ohne Cloud
+    try:
+        devs = await Discover.discover(timeout=int(DISCOVER_TIMEOUT_S), auto_connect=False)
+    finally:
+        if orig is not None:
+            Discover._authenticate_device = orig
+    wanted = set(device_ids)
+    lan = {int(d.id): d for d in devs if int(d.id) in wanted}
+    if not lan:
+        raise MideaError("Keine der Klimaanlagen antwortet im Heimnetz (WLAN der Anlage? gleiches Netz wie der Server?)")
+    cloud = NetHomePlusCloud(region, account=account, password=password)
+    try:
+        await cloud.login()
+    except Exception as e:                                   # noqa: BLE001
+        msg = _cloud_explain(e)
+        _login_fail[account] = (time.time(), msg, _login_wait(msg))
+        _save_login_fail()
+        raise MideaError(msg)
+    if _login_fail.pop(account, None):
+        _save_login_fail()
+    out = {}
+    for did, d in lan.items():
+        for endian in ("little", "big"):
+            try:
+                token, key = await cloud.get_token(Security.udpid(did.to_bytes(6, endian)).hex())
+                dev = AC(ip=d.ip, port=int(d.port), device_id=did)
+                await dev.authenticate(token, key)
+                await dev.refresh()
+            except Exception as e:                           # noqa: BLE001 - andere Byte-Reihenfolge versuchen
+                log.info("Midea lokal %s (%s): %s", did, endian, e)
+                continue
+            out[did] = {"ip": d.ip, "port": int(d.port), "version": d.version, "sn": d.sn, "raw_name": d.name, "token": token, "key": key}
+            break
+    return out
+
+
+def local_keys(region: str, account: str, password: str, device_ids: list) -> dict:
+    return _run(_local_keys((region or DEFAULT_REGION).upper(), account, password, [int(i) for i in device_ids]), DISCOVER_TIMEOUT_S + 90)
+
+
 # ---------------------------------------------------------------- Cloud-Weg (ohne lokalen Schluessel)
 # Midea gibt den lokalen Schluessel teils nicht mehr heraus (Cloud-Antwort 9999). Dann steuert die App die Anlage ueber die NetHome-Plus-Cloud:
 # Bibliothek `midea-beautiful-air`, Konto (E-Mail/Passwort) bleibt auf dem Server. Langsamer als lokal und braucht Internet.
@@ -450,7 +498,6 @@ def _cloud_explain(e: Exception) -> str:
 LOGIN_BACKOFF_S = 300.0                                     # nach fehlgeschlagener Anmeldung so lange nicht erneut anmelden (zu viele Anmeldungen sperren das Konto)
 LOGIN_BACKOFF_AUTH_S = 3600.0                               # bei "Passwort falsch" deutlich laenger: staendiges Wiederholen kann das Konto sperren
 LOGIN_BACKOFF_LOCK_S = 1800.0                               # Midea meldet "zu viele Anmeldungen" (7610): lange Ruhe, sonst verlaengert jeder Versuch die Sperre
-LOGIN_MIN_INTERVAL_S = 600.0                                # automatisch hoechstens alle 10 Minuten eine Anmeldung pro Konto (von Hand ausgeloest: immer)
 LOGIN_STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "midea_login.json")
 
 
@@ -526,15 +573,10 @@ def _install_login_gate(mb):
             acc = self._account
             manual = getattr(_login_tl, "manual", False)
             now = time.time()
-            hit = _login_fail.get(acc)
             if not manual:
-                if hit and now - hit[0] < hit[2]:
-                    left = int(hit[2] - (now - hit[0]))
-                    raise MideaError(f"{hit[1]} (nächster Versuch in {left // 60 + 1} Min – zum sofortigen Versuch: Klimaanlage → ☁ Zugang)")
-                last = _login_last.get(acc, 0.0)
-                if now - last < LOGIN_MIN_INTERVAL_S:
-                    left = int(LOGIN_MIN_INTERVAL_S - (now - last))
-                    raise MideaError(f"Midea-Cloud: Sitzung abgelaufen, neue Anmeldung erst in {left // 60 + 1} Min (Schutz vor Kontosperre – sofort: ☁ Zugang)")
+                # automatisch nie: jede Anmeldung, die Midea ablehnt, verlaengert die Sperre (7610). Nur von Hand (☁ Zugang, ⇄ Lokal).
+                raise MideaError("Midea-Cloud: Sitzung abgelaufen – automatische Anmeldung ist abgeschaltet (sonst sperrt Midea das Konto). "
+                                 "Abhilfe: Klimaanlage → „⇄ Lokal“ (einmalig, danach ohne Cloud) oder ☁ Zugang")
             _login_last[acc] = now
             log.info("Midea-Cloud: Anmeldung für %s (%s)", acc, "von Hand" if manual else "automatisch")
             try:
