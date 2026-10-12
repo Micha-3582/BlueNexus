@@ -415,11 +415,23 @@ def build_entries(ids: list[str]) -> list[dict]:
 
 
 # ---------------------------------------------------------------- Cloud -> lokal umstellen
+async def _smarthome_token(cloud, udpid: str, appliance_id: int):
+    """getToken der SmartHome-Cloud mit Geraete-ID (applianceCodes) - ohne sie antwortet Midea mit 3004 "value is illegal".
+    Eigene Umsetzung, damit es mit jeder msmart-ng-Version geht (erst ab 2026.9 eingebaut)."""
+    import msmart.cloud as mcloud
+    body = cloud._build_request_body({"udpid": udpid, "applianceCodes": str(appliance_id)})
+    resp = await cloud._api_request("/v1/iot/secure/getToken", body)
+    for t in (resp or {}).get("tokenlist", []):
+        if t.get("udpId") == udpid:
+            return t["token"], t["key"]
+    raise mcloud.CloudError(f"Kein Schlüssel für {udpid}")
+
+
 async def _local_keys(region: str, account: str, password: str, device_ids: list) -> dict:
-    """Einmalig: Anlagen im Heimnetz suchen, mit EINER Anmeldung beim NetHome-Plus-Konto Token/Schluessel holen und lokal pruefen.
+    """Einmalig: Anlagen im Heimnetz suchen, mit EINER Anmeldung beim MSmartHome-Konto Token/Schluessel holen und lokal pruefen.
     Rueckgabe {device_id: {ip, port, version, sn, raw_name, token, key}} - nur Anlagen, die lokal wirklich antworten."""
     AC, Discover, _ = _lib()
-    from msmart.cloud import NetHomePlusCloud
+    import msmart.cloud as mcloud
     from msmart.lan import Security
     orig = Discover.__dict__.get("_authenticate_device")
     Discover._authenticate_device = classmethod(lambda cls, dev: asyncio.sleep(0, False))      # nur finden - ohne Cloud
@@ -432,7 +444,10 @@ async def _local_keys(region: str, account: str, password: str, device_ids: list
     lan = {int(d.id): d for d in devs if int(d.id) in wanted}
     if not lan:
         raise MideaError("Keine der Klimaanlagen antwortet im Heimnetz (WLAN der Anlage? gleiches Netz wie der Server?)")
-    cloud = NetHomePlusCloud(region, account=account, password=password)
+    # Schluessel gibt es nur noch ueber die SmartHome-Cloud (App "MSmartHome"); NetHome Plus antwortet mit 9999.
+    # Feste Kennung: msmart wuerfelt sonst bei jedem Start eine neue, und Midea laesst nur wenige "angemeldete Geraete" je Konto zu (65027).
+    mcloud.BaseCloud.DEVICE_ID = _own_device_id()
+    cloud = mcloud.SmartHomeCloud(region, account=account, password=password)
     try:
         await cloud.login()
     except Exception as e:                                   # noqa: BLE001
@@ -446,12 +461,14 @@ async def _local_keys(region: str, account: str, password: str, device_ids: list
     for did, d in lan.items():
         for endian in ("little", "big"):
             try:
-                token, key = await cloud.get_token(Security.udpid(did.to_bytes(6, endian)).hex())
+                token, key = await _smarthome_token(cloud, Security.udpid(did.to_bytes(6, endian)).hex(), did)
                 dev = AC(ip=d.ip, port=int(d.port), device_id=did)
                 await dev.authenticate(token, key)
                 await dev.refresh()
             except Exception as e:                           # noqa: BLE001 - andere Byte-Reihenfolge versuchen
                 log.info("Midea lokal %s (%s): %s", did, endian, e)
+                if "3201" in str(e):                         # Anlage steckt nicht in diesem MSmartHome-Konto
+                    break
                 continue
             out[did] = {"ip": d.ip, "port": int(d.port), "version": d.version, "sn": d.sn, "raw_name": d.name, "token": token, "key": key}
             break
