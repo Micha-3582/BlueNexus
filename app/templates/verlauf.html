@@ -142,7 +142,7 @@ let ZOOM_MODE = false;
 function setZoomMode(on) {
   ZOOM_MODE = on;
   $('vl-zoom').classList.toggle('on', on); $('vl-zoom').setAttribute('aria-pressed', on);
-  document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = on ? 'crosshair' : 'grab'; });
+  document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
 }
 $('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ZOOM_MODE) setZoomMode(false); });
@@ -177,7 +177,7 @@ async function loadChartData(c) {
 }
 function attachZoom(cid, cv) {
   let pending = null, pan = null;
-  cv.style.touchAction = ZOOM_MODE ? 'none' : 'pan-y'; cv.style.cursor = ZOOM_MODE ? 'crosshair' : 'grab';   // senkrecht scrollt die Seite, seitlich wischt das Diagramm
+  cv.style.touchAction = ZOOM_MODE ? 'none' : 'pan-y'; cv.style.cursor = 'default';     // senkrecht scrollt die Seite, seitlich wischt das Diagramm
   const ch = () => INST[cid];
   const px = e => Math.max(ch().chartArea.left, Math.min(ch().chartArea.right, e.clientX - cv.getBoundingClientRect().left));
   const capture = e => { try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } };
@@ -186,7 +186,7 @@ function attachZoom(cid, cv) {
     const c = ch(); if (!c) return;
     const a = c.chartArea, sx = c.scales.x;
     pan = { x0, t0: sx.min, t1: sx.max, w: a.right - a.left, dt: 0 };
-    cv.style.cursor = 'grabbing'; capture(e);
+    capture(e);
   };
   const movePan = e => {
     const c = ch(); if (!c || !pan) return;
@@ -196,7 +196,7 @@ function attachZoom(cid, cv) {
     c.options.scales.x.min = pan.t0 + dt; c.options.scales.x.max = pan.t1 + dt; c.update('none');
   };
   const endPan = () => {
-    const p = pan; pan = null; cv.style.cursor = ZOOM_MODE ? 'crosshair' : 'grab';
+    const p = pan; pan = null; cv.style.cursor = 'default';
     if (!p) return;
     if (Math.abs(p.dt) > (p.t1 - p.t0) * 0.01) panTo(p.t0 + p.dt, p.t1 + p.dt);
     else { const c = ch(); if (c) { c.options.scales.x.min = p.t0; c.options.scales.x.max = p.t1; c.update('none'); } }
