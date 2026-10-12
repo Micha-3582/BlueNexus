@@ -75,7 +75,7 @@ Thermostate, Klimaanlagen und Kameras. Alles läuft **lokal im Heimnetz**; Gerä
 nicht über die Hersteller-Cloud (Ausnahmen sind unten genannt).
 
 **Geräte verbinden.** Shelly, Tasmota, WLED, Tuya/Smart Life, Homematic und HomematicIP (über OpenCCU),
-Zigbee (über Phoscon/deCONZ, auch mehrere Gateways), Midea-Klimaanlagen (NetHome Plus), Wake-on-LAN-Rechner
+Zigbee (über Phoscon/deCONZ, auch mehrere Gateways), Midea-Klimaanlagen (lokal, Schlüssel über MSmartHome), Wake-on-LAN-Rechner
 sowie Reolink- und RTSP-Kameras. Die App sucht Geräte im Netz selbst; gefundene Treffer werden erst angesehen
 und benannt, dann hinzugefügt.
 
@@ -91,8 +91,8 @@ Viertelstunden, vermeidet Preisspitzen, nutzt die PV-Prognose und schaltet bei �
 PIN-Schutz für heikle Schalter, persönliche Dashboards, Vorschau „so sieht das Konto die App“.
 
 **Ohne Cloud-Zwang, ohne Abo.** Daten bleiben auf dem eigenen Server. Cloud wird nur dort gebraucht, wo es
-nicht anders geht: Tibber-Preise, VRM-Prognose, Wetter (Open-Meteo), Telegram/Pushover und – wahlweise –
-die Midea-Cloud für Klimaanlagen.
+nicht anders geht: Tibber-Preise, VRM-Prognose, Wetter (Open-Meteo), Telegram/Pushover und – einmalig beim
+Einrichten – der Schlüssel für Midea-Klimaanlagen.
 
 ---
 
@@ -125,7 +125,7 @@ Smart Home. Die App läuft auch **ganz ohne Victron** als reines Smart-Home-Syst
 | **Tuya / Smart Life** (z. B. Gosund) | Schalten | Die Cloud liefert nur einmalig die Geräteschlüssel, geschaltet wird **lokal** |
 | **Homematic / HomematicIP** (OpenCCU) | Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden, Soundmodule (Gong), Wandtaster | CCU-Anbindung; optional **Push von der CCU**: Reaktion in unter einer Sekunde, ohne ständiges Abfragen |
 | **Zigbee** (Phoscon / deCONZ) | Aktoren, Sensoren, Thermostate | **Mehrere Gateways** (z. B. eins pro Haus) möglich |
-| **Klimaanlagen** (Midea, NetHome Plus; auch Comfee, Inventor, Pioneer u. a.) | Ein/Aus, Modus, Solltemperatur, Lüfter, Schwenken, Temperaturen | Lokal über die Gerätebibliothek, alternativ über die NetHome-Plus-Cloud (eigenes Konto) |
+| **Klimaanlagen** (Midea, MSmartHome/NetHome Plus; auch Comfee, Inventor, Pioneer u. a.) | Ein/Aus, Modus, Solltemperatur, Lüfter, Schwenken, Temperaturen | Lokal im Heimnetz, ohne Cloud; Schlüssel einmalig über das MSmartHome-Konto (wird nicht gespeichert) |
 | **Wake-on-LAN** | PC, NAS, Server aufwecken | Magic Packet, mit Erreichbarkeitsanzeige |
 | **Eigene Schalter und Knöpfe** | Merker, Auslöser, **Nachlauf-Timer**, Knopf mit **geheimem Web-Aufruf** | Software-Schalter ohne Gerät dahinter, zum Verketten von Regeln |
 | **Kameras** | Standbild, Live-Bild, Bewegung, Klingel | Reolink und RTSP (siehe unten) |
@@ -140,7 +140,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 - **Homematic-Funk-Diagnose:** Duty Cycle der Funkmodule, gesprächigste Geräte, Befehle der App – plus ein Test „Homematic pausieren“, um den Verursacher von Funklast zu finden.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
 - **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel. Tags lassen sich am Android-Handy (Chrome) direkt aus der App beschreiben; auf iPhone und PC weist die App auf die Einschränkung hin.
-- **Geräte teilen:** Person anlegen → ein Einladungscode (Adresse + Schlüssel in einem) wird verschickt und beim anderen BlueNexus in einem Feld eingefügt (Tunnel oder LAN), dann jedes Gerät einzeln über ✎ → Teilen-Symbol freigeben (nur sehen oder bedienen). Der Empfänger sieht und bedient die gewählten Geräte, Sensoren, Schalter und die Klimaanlage wie eigene und nutzt sie in Regeln; Cloud-Logins (z. B. Medea) bleiben beim Geber.
+- **Geräte teilen:** Person anlegen → ein Einladungscode (Adresse + Schlüssel in einem) wird verschickt und beim anderen BlueNexus in einem Feld eingefügt (Tunnel oder LAN), dann jedes Gerät einzeln über ✎ → Teilen-Symbol freigeben (nur sehen oder bedienen). Der Empfänger sieht und bedient die gewählten Geräte, Sensoren, Schalter und die Klimaanlage wie eigene und nutzt sie in Regeln; Zugangsdaten bleiben beim Geber.
 - **Klingel:** Reolink-Türklingel als Auslöser („Klingel gedrückt“) – zum Beispiel für einen Gong im Haus.
 - **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen; als Regel-Schritt „Chime läuten“ löst er auch automatisch einen Gong aus.
 - **Sicherheits-Timer (optional):** Geräte schalten sich nach einer einstellbaren Zeit selbst wieder ab, falls eine Regel hängt. Ab Werk aus (0), genau wie die Pause nach Handschaltung.
