@@ -486,14 +486,39 @@ def _login_wait(msg: str) -> float:
     return LOGIN_BACKOFF_S
 
 
+DEVICE_ID_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "midea_device_id.txt")
+_SHARED_DEVICE_ID = "c1acad8939ac0d7d"                       # fest in midea-beautiful eingebaut - teilen sich alle Nutzer der Bibliothek weltweit
+
+
+def _own_device_id() -> str:
+    """Eigene, dauerhafte Geraete-Kennung dieser Anlage (wie jede echte App-Installation). Mit der eingebauten Kennung meldet sich jede
+    Installation als dasselbe Handy an - Midea sperrt dann Anmeldungen (7610), obwohl die Handy-App mit demselben Konto sofort reinkommt."""
+    try:
+        with open(DEVICE_ID_PATH, encoding="utf-8") as f:
+            v = f.read().strip().lower()
+        if len(v) == 16 and all(c in "0123456789abcdef" for c in v):
+            return v
+    except OSError:
+        pass
+    v = os.urandom(8).hex()
+    try:
+        with open(DEVICE_ID_PATH, "w", encoding="utf-8") as f:
+            f.write(v)
+    except OSError:
+        pass
+    return v
+
+
 def _install_login_gate(mb):
     """Jede Anmeldung bei der Midea-Cloud laeuft durch diese Schranke - auch die, die die Bibliothek selbst ausloest.
     midea-beautiful meldet sich bei Fehlern wie 3004 ("value is illegal") oder 3106 (Sitzung ungueltig) mitten in einer Abfrage
     stillschweigend neu an. Bei drei Klimaanlagen und Abfragen alle 45 s waren das so viele Anmeldungen, dass Midea das Konto
     sperrte (7610 "Too many failed login attempts", vorher auch als "Passwort falsch (3101)")."""
+    import midea_beautiful.cloud as mcloud
     from midea_beautiful.cloud import MideaCloud
     if getattr(MideaCloud, "_bnx_gated", False):
         return
+    mcloud.CLOUD_API_DEVICE_ID = _own_device_id()            # Voreinstellung fuer jede neue MideaCloud (connect_to_cloud, Suche)
     for name in ("_login_proxied", "_login_non_proxied"):
         orig = getattr(MideaCloud, name)
 
@@ -591,6 +616,8 @@ def _session_restore(mb, account: str, password: str):
         from midea_beautiful.cloud import MideaCloud
         from midea_beautiful.midea import DEFAULT_APP_ID, DEFAULT_APPKEY, DEFAULT_HMACKEY, DEFAULT_IOTKEY, DEFAULT_PROXIED, DEFAULT_SIGNKEY
         st = ent["state"]
+        if st.get("_device_id") and st.get("_device_id") != _own_device_id():
+            return None                                       # Sitzung mit der alten, geteilten Kennung -> einmal neu anmelden
         c = MideaCloud(appkey=DEFAULT_APPKEY, account=account, password=password, appid=DEFAULT_APP_ID, hmac_key=DEFAULT_HMACKEY, iot_key=DEFAULT_IOTKEY,
                        api_url=st.get("_api_url") or None, proxied=DEFAULT_PROXIED, sign_key=DEFAULT_SIGNKEY, pushtoken=st.get("_pushtoken"), device_id=st.get("_device_id"))
         for a in _SESSION_ATTRS:
