@@ -197,12 +197,16 @@ async def _with_dev(entry: dict, op):
     obwohl der Schluessel stimmt - deshalb erst nach mehreren Fehlern hintereinander "Schluessel ungueltig" melden."""
     cid = entry["id"]
     last = None
+    t0 = time.time()
     for attempt in range(2):
         dev = None
         try:
             dev = await _get_dev(entry)
             res = await op(dev)
             _auth_fails.pop(cid, None)
+            took = time.time() - t0
+            if took > 3 or attempt:
+                log.info("Klimaanlage %s: Antwort nach %.1f s (Versuch %d)", cid, took, attempt + 1)
             return res
         except MideaError:
             raise                                               # Eingabefehler (z. B. Temperatur ausserhalb) nicht wiederholen
