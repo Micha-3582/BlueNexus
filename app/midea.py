@@ -30,6 +30,7 @@ STATUS_TIMEOUT_S = 25.0           # inkl. einem zweiten Versuch mit frischer Ver
 SET_TIMEOUT_S = 35.0
 LOCAL_RETRY_DELAY_S = 2.0         # WLAN-Module verschlucken sich gern: kurz warten, neu verbinden, noch einmal
 GOOD_GRACE_S = 120.0              # bei einem einzelnen Aussetzer so lange den letzten guten Zustand zeigen statt "nicht erreichbar"
+CONN_LIFETIME_S = 45              # Verbindung danach frisch aufbauen: die Module legen ruhende Verbindungen still, ohne sie zu schliessen
 AUTH_FAIL_LIMIT = 3               # erst nach so vielen Anmeldefehlern hintereinander von "Schluessel ungueltig" ausgehen
 DISCOVER_TIMEOUT_S = 6.0
 REGIONS = ("DE", "US", "KR")
@@ -170,6 +171,10 @@ async def _get_dev(entry: dict):
         _close(dev)
         raise
     dev._vl_key = key
+    try:
+        dev.set_max_connection_lifetime(CONN_LIFETIME_S)     # nie eine alte, vom Modul schon stillgelegte Verbindung weiterbenutzen
+    except Exception:                                        # noqa: BLE001 - aeltere msmart-ng
+        pass
     _devs[cid] = dev
     return dev
 
@@ -193,6 +198,7 @@ async def _with_dev(entry: dict, op):
     cid = entry["id"]
     last = None
     for attempt in range(2):
+        dev = None
         try:
             dev = await _get_dev(entry)
             res = await op(dev)
@@ -202,7 +208,11 @@ async def _with_dev(entry: dict, op):
             raise                                               # Eingabefehler (z. B. Temperatur ausserhalb) nicht wiederholen
         except Exception as e:                                  # noqa: BLE001
             last = e
-            _drop(cid)
+            if dev is None or "Authentication" in e.__class__.__name__:
+                _drop(cid)                                      # Objekt neu aufbauen
+            else:
+                _close(dev)                                     # nur die Verbindung schliessen; das Objekt (samt Faehigkeiten) bleibt,
+                                                                # die Bibliothek verbindet und meldet sich beim naechsten Befehl selbst neu an
             log.info("Klimaanlage %s: Versuch %d fehlgeschlagen: %s: %s", cid, attempt + 1, e.__class__.__name__, e)
             if attempt == 0:
                 await asyncio.sleep(LOCAL_RETRY_DELAY_S)
