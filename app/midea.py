@@ -26,8 +26,11 @@ log = logging.getLogger("midea")
 STATUS_TTL_S = 20.0               # gelesener Zustand gilt so lange
 CLOUD_STATUS_TTL_S = 45.0         # ueber die Cloud seltener fragen
 FAIL_TTL_S = 30.0                 # nach einem Fehler so lange nicht erneut versuchen (haelt die Geraeteliste schnell)
-STATUS_TIMEOUT_S = 12.0
-SET_TIMEOUT_S = 25.0
+STATUS_TIMEOUT_S = 25.0           # inkl. einem zweiten Versuch mit frischer Verbindung
+SET_TIMEOUT_S = 35.0
+LOCAL_RETRY_DELAY_S = 2.0         # WLAN-Module verschlucken sich gern: kurz warten, neu verbinden, noch einmal
+GOOD_GRACE_S = 120.0              # bei einem einzelnen Aussetzer so lange den letzten guten Zustand zeigen statt "nicht erreichbar"
+AUTH_FAIL_LIMIT = 3               # erst nach so vielen Anmeldefehlern hintereinander von "Schluessel ungueltig" ausgehen
 DISCOVER_TIMEOUT_S = 6.0
 REGIONS = ("DE", "US", "KR")
 DEFAULT_REGION = "DE"
@@ -92,9 +95,9 @@ def _run(coro, timeout: float):
 def _explain(e: Exception) -> str:
     name, msg = e.__class__.__name__, str(e)
     if "Authentication" in name or "authent" in msg.lower():
-        return "Anmeldung an der Klimaanlage fehlgeschlagen (Token/Schlüssel ungültig – Klimaanlage neu suchen und anlegen)"
+        return "Anmeldung an der Klimaanlage fehlgeschlagen – gleich noch einmal versuchen; wiederholt sich das, an der Anlage „🔑 Schlüssel“ drücken"
     if "Cloud" in name:
-        return f"Midea-Cloud: {msg or name} (Region prüfen oder eigenes NetHome-Plus-Konto angeben)"
+        return f"Midea-Cloud: {msg or name}"
     return f"{name}: {msg}" if msg else name
 
 
@@ -155,15 +158,50 @@ def _lock_for(cid: str) -> asyncio.Lock:
     return _dlocks.setdefault(cid, asyncio.Lock())
 
 
-async def _read(entry: dict) -> dict:
-    async with _lock_for(entry["id"]):
+class _Offline(Exception):
+    """Anlage hat nicht geantwortet (wird wiederholt)."""
+
+
+_auth_fails: dict[str, int] = {}                             # Geraete-ID -> Anmeldefehler hintereinander
+_good: dict[str, tuple] = {}                                 # Geraete-ID -> (Zeit, letzter guter Zustand)
+
+
+async def _with_dev(entry: dict, op):
+    """op(dev) mit angemeldeter Verbindung ausfuehren. Faellt die Anlage aus (Zeitueberschreitung, Anmeldung abgelehnt, keine Antwort),
+    nach kurzer Pause mit frischer Verbindung noch einmal. Die WLAN-Module lehnen die Anmeldung gelegentlich ab oder antworten nicht,
+    obwohl der Schluessel stimmt - deshalb erst nach mehreren Fehlern hintereinander "Schluessel ungueltig" melden."""
+    cid = entry["id"]
+    last = None
+    for attempt in range(2):
         try:
             dev = await _get_dev(entry)
-            await dev.refresh()
-            return snapshot(dev)
-        except Exception:
-            _devs.pop(entry["id"], None)                    # naechstes Mal neu anmelden
-            raise
+            res = await op(dev)
+            _auth_fails.pop(cid, None)
+            return res
+        except MideaError:
+            raise                                               # Eingabefehler (z. B. Temperatur ausserhalb) nicht wiederholen
+        except Exception as e:                                  # noqa: BLE001
+            last = e
+            _devs.pop(cid, None)
+            log.info("Klimaanlage %s: Versuch %d fehlgeschlagen: %s: %s", cid, attempt + 1, e.__class__.__name__, e)
+            if attempt == 0:
+                await asyncio.sleep(LOCAL_RETRY_DELAY_S)
+    name, msg = last.__class__.__name__, str(last)
+    if "Authentication" in name or "authent" in msg.lower():
+        _auth_fails[cid] = _auth_fails.get(cid, 0) + 1
+        if _auth_fails[cid] >= AUTH_FAIL_LIMIT:
+            raise MideaError("Die Klimaanlage lehnt den Schlüssel wiederholt ab – an der Anlage „🔑 Schlüssel“ drücken (nötig nach neuem Koppeln)")
+    raise MideaError("Die Klimaanlage antwortet gerade nicht (WLAN-Modul beschäftigt oder schwacher Empfang) – gleich noch einmal versuchen")
+
+
+async def _read(entry: dict) -> dict:
+    async def op(dev):
+        await dev.refresh()
+        if not dev.online:
+            raise _Offline("keine Antwort")
+        return snapshot(dev)
+    async with _lock_for(entry["id"]):
+        return await _with_dev(entry, op)
 
 
 def status(d: dict) -> dict:
@@ -178,14 +216,17 @@ def status(d: dict) -> dict:
             return _public_status(hit[1])
         try:
             snap = _cloud_read(d) if d.get("cloud") else _run(_read(d), STATUS_TIMEOUT_S)
+            if not snap.get("online"):
+                raise MideaError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
         except MideaError as e:
+            good = _good.get(cid)
+            if good and time.time() - good[0] < GOOD_GRACE_S:     # einzelner Aussetzer: nicht gleich "nicht erreichbar" zeigen
+                _cache[cid] = (time.time() - (STATUS_TTL_S - 10), good[1])   # in ~10 s wieder fragen
+                return _public_status(good[1])
             _cache[cid] = (time.time(), e)
             return {"online": False, "on": None, "power": None, "error": str(e)}
-        if not snap.get("online"):
-            err = MideaError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
-            _cache[cid] = (time.time(), err)
-            return {"online": False, "on": None, "power": None, "error": str(err)}
         _cache[cid] = (time.time(), snap)
+        _good[cid] = (time.time(), snap)
         return _public_status(snap)
 
 
@@ -208,32 +249,33 @@ def _resolve(AC, enum_name: str, key):
 
 async def _apply(entry: dict, power=None, mode=None, target=None, fan=None, swing=None, eco=None) -> dict:
     AC, _, _ = _lib()
+
+    async def op(dev):
+        await dev.refresh()                                 # aktuellen Zustand holen - apply() schickt immer den ganzen Zustand
+        if not dev.online:
+            raise _Offline("keine Antwort")
+        if power is not None:
+            dev.power_state = bool(power)
+        if mode:
+            dev.operational_mode = _resolve(AC, "OperationalMode", mode)
+        if target is not None:
+            t = float(target)
+            if not dev.min_target_temperature <= t <= dev.max_target_temperature:
+                raise MideaError(f"Solltemperatur zwischen {dev.min_target_temperature} und {dev.max_target_temperature} °C")
+            dev.target_temperature = round(t * 2) / 2
+        if fan:
+            dev.fan_speed = _resolve(AC, "FanSpeed", fan)
+        if swing:
+            dev.swing_mode = _resolve(AC, "SwingMode", swing)
+        if eco is not None and getattr(dev, "supports_eco", False):
+            dev.eco = bool(eco)
+        await dev.apply()                                   # setzt immer den ganzen Zustand - ein zweiter Versuch schadet nicht
+        if not dev.online:
+            raise _Offline("Befehl ohne Antwort")
+        return snapshot(dev)
+
     async with _lock_for(entry["id"]):
-        try:
-            dev = await _get_dev(entry)
-            await dev.refresh()                             # aktuellen Zustand holen - apply() schickt immer den ganzen Zustand
-            if not dev.online:
-                raise MideaError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
-            if power is not None:
-                dev.power_state = bool(power)
-            if mode:
-                dev.operational_mode = _resolve(AC, "OperationalMode", mode)
-            if target is not None:
-                t = float(target)
-                if not dev.min_target_temperature <= t <= dev.max_target_temperature:
-                    raise MideaError(f"Solltemperatur zwischen {dev.min_target_temperature} und {dev.max_target_temperature} °C")
-                dev.target_temperature = round(t * 2) / 2
-            if fan:
-                dev.fan_speed = _resolve(AC, "FanSpeed", fan)
-            if swing:
-                dev.swing_mode = _resolve(AC, "SwingMode", swing)
-            if eco is not None and getattr(dev, "supports_eco", False):
-                dev.eco = bool(eco)
-            await dev.apply()
-            return snapshot(dev)
-        except Exception:
-            _devs.pop(entry["id"], None)
-            raise
+        return await _with_dev(entry, op)
 
 
 def set_params(d: dict, **kw) -> dict:
@@ -246,6 +288,7 @@ def set_params(d: dict, **kw) -> dict:
     finally:
         invalidate(d["id"])
     _cache[d["id"]] = (time.time(), snap)
+    _good[d["id"]] = (time.time(), snap)
     return _public_status(snap)
 
 
@@ -256,22 +299,23 @@ def set_state(d: dict, on: bool, timer_s: int | None = None) -> dict:
 
 async def _details(entry: dict) -> dict:
     AC, _, _ = _lib()
+
+    async def op(dev):
+        await dev.refresh()
+        if not dev.online:
+            raise _Offline("keine Antwort")
+        snap = snapshot(dev)
+        modes = [m for m in (dev.supported_operation_modes or [])] or list(AC.OperationalMode)
+        fans = [f for f in (dev.supported_fan_speeds or [])] or list(AC.FanSpeed)
+        swings = [s for s in (dev.supported_swing_modes or [])] or list(AC.SwingMode)
+        return {"state": snap, "min": dev.min_target_temperature, "max": dev.max_target_temperature, "step": 0.5,
+                "modes": [{"key": _mode_key(m), "label": MODE_LABELS.get(_mode_key(m), _mode_key(m))} for m in modes if _mode_key(m) in MODE_LABELS],
+                "fans": [{"key": _mode_key(f), "label": FAN_LABELS.get(_mode_key(f), _mode_key(f))} for f in fans if _mode_key(f) in FAN_LABELS],
+                "swings": [{"key": _mode_key(s), "label": SWING_LABELS.get(_mode_key(s), _mode_key(s))} for s in swings if _mode_key(s) in SWING_LABELS],
+                "supports_eco": bool(getattr(dev, "supports_eco", False))}
+
     async with _lock_for(entry["id"]):
-        try:
-            dev = await _get_dev(entry)
-            await dev.refresh()
-            snap = snapshot(dev)
-            modes = [m for m in (dev.supported_operation_modes or []) ] or list(AC.OperationalMode)
-            fans = [f for f in (dev.supported_fan_speeds or [])] or list(AC.FanSpeed)
-            swings = [s for s in (dev.supported_swing_modes or [])] or list(AC.SwingMode)
-            return {"state": snap, "min": dev.min_target_temperature, "max": dev.max_target_temperature, "step": 0.5,
-                    "modes": [{"key": _mode_key(m), "label": MODE_LABELS.get(_mode_key(m), _mode_key(m))} for m in modes if _mode_key(m) in MODE_LABELS],
-                    "fans": [{"key": _mode_key(f), "label": FAN_LABELS.get(_mode_key(f), _mode_key(f))} for f in fans if _mode_key(f) in FAN_LABELS],
-                    "swings": [{"key": _mode_key(s), "label": SWING_LABELS.get(_mode_key(s), _mode_key(s))} for s in swings if _mode_key(s) in SWING_LABELS],
-                    "supports_eco": bool(getattr(dev, "supports_eco", False))}
-        except Exception:
-            _devs.pop(entry["id"], None)
-            raise
+        return await _with_dev(entry, op)
 
 
 def details(d: dict) -> dict:
