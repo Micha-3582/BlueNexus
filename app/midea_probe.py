@@ -1,7 +1,8 @@
 """Messung fuer eine lokal gesteuerte Midea-Klimaanlage: wie lange brauchen Verbindung, Anmeldung und Befehle wirklich?
 Aufruf (im App-Ordner, BlueNexus vorher anhalten, damit nichts dazwischenfunkt):
-    ../venv/bin/python midea_probe.py 192.168.2.232            nur lesen
-    ../venv/bin/python midea_probe.py 192.168.2.232 schalten   zusaetzlich einmal umschalten und zurueck
+    ./venv/bin/python midea_probe.py 192.168.2.232            nur lesen
+    ./venv/bin/python midea_probe.py 192.168.2.232 schalten   zusaetzlich einmal umschalten und zurueck
+    ./venv/bin/python midea_probe.py 192.168.2.232 app        derselbe Weg wie BlueNexus (midea.py), auch alle Anlagen gleichzeitig
 Liest Token/Schluessel aus shelly_devices.json (nichts davon wird angezeigt)."""
 import asyncio
 import json
@@ -77,7 +78,49 @@ async def main(ip, toggle):
     dev._lan._disconnect()
 
 
+def app_path(ip):
+    """Gleicher Weg wie die laufende App: midea.status / midea.set_state, einzeln und alle Anlagen gleichzeitig."""
+    import threading
+    import midea
+    logging.getLogger("midea").setLevel(logging.INFO)
+    with open(os.path.join(HERE, "shelly_devices.json"), encoding="utf-8") as f:
+        devs = [d for d in json.load(f) if d.get("kind") == "midea" and not d.get("cloud")]
+    me = entry_for(ip)
+
+    def st(d, label):
+        midea.invalidate(d["id"])
+        t = time.time()
+        r = midea.status(d)
+        print(f"  {label:40} {time.time() - t:5.1f} s  online={r.get('online')} {r.get('error', '')[:60]}")
+
+    print("== einzeln, nacheinander ==")
+    for d in devs:
+        st(d, f"Status {d.get('name')}")
+    for d in devs:
+        st(d, f"Status {d.get('name')} (2.)")
+    print("== alle gleichzeitig (wie Dashboard + Geräteliste) ==")
+    for rnd in range(3):
+        ths = [threading.Thread(target=st, args=(d, f"Runde {rnd + 1}: {d.get('name')}")) for d in devs for _ in range(2)]
+        [t.start() for t in ths]
+        [t.join() for t in ths]
+    print("== schalten ==")
+    was = midea.status(me).get("on")
+    for on in (not was, was):
+        t = time.time()
+        try:
+            midea.set_state(me, on)
+            print(f"  Schalten → {'an' if on else 'aus':34} {time.time() - t:5.1f} s  ok")
+        except Exception as e:
+            print(f"  Schalten → {'an' if on else 'aus':34} {time.time() - t:5.1f} s  FEHLER {e}")
+        st(me, "Status danach")
+        time.sleep(5)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] == "app":
+        logging.basicConfig(level=logging.WARNING, format="     %(levelname)s %(name)s: %(message)s")
+        app_path(sys.argv[1])
+        os._exit(0)
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     logging.basicConfig(level=logging.WARNING, format="     %(levelname)s %(name)s: %(message)s")
