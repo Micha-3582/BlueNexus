@@ -26,7 +26,7 @@ log = logging.getLogger("midea")
 STATUS_TTL_S = 20.0               # gelesener Zustand gilt so lange
 CLOUD_STATUS_TTL_S = 45.0         # ueber die Cloud seltener fragen
 FAIL_TTL_S = 30.0                 # nach einem Fehler so lange nicht erneut versuchen (haelt die Geraeteliste schnell)
-STATUS_TIMEOUT_S = 25.0           # inkl. einem zweiten Versuch mit frischer Verbindung
+STATUS_TIMEOUT_S = 15.0
 SET_TIMEOUT_S = 35.0
 LOCAL_RETRY_DELAY_S = 2.0         # WLAN-Module verschlucken sich gern: kurz warten, neu verbinden, noch einmal
 GOOD_GRACE_S = 120.0              # bei einem einzelnen Aussetzer so lange den letzten guten Zustand zeigen statt "nicht erreichbar"
@@ -191,14 +191,14 @@ _auth_fails: dict[str, int] = {}                             # Geraete-ID -> Anm
 _good: dict[str, tuple] = {}                                 # Geraete-ID -> (Zeit, letzter guter Zustand)
 
 
-async def _with_dev(entry: dict, op):
+async def _with_dev(entry: dict, op, attempts: int = 2):
     """op(dev) mit angemeldeter Verbindung ausfuehren. Faellt die Anlage aus (Zeitueberschreitung, Anmeldung abgelehnt, keine Antwort),
     nach kurzer Pause mit frischer Verbindung noch einmal. Die WLAN-Module lehnen die Anmeldung gelegentlich ab oder antworten nicht,
     obwohl der Schluessel stimmt - deshalb erst nach mehreren Fehlern hintereinander "Schluessel ungueltig" melden."""
     cid = entry["id"]
     last = None
     t0 = time.time()
-    for attempt in range(2):
+    for attempt in range(attempts):
         dev = None
         try:
             dev = await _get_dev(entry)
@@ -218,7 +218,7 @@ async def _with_dev(entry: dict, op):
                 _close(dev)                                     # nur die Verbindung schliessen; das Objekt (samt Faehigkeiten) bleibt,
                                                                 # die Bibliothek verbindet und meldet sich beim naechsten Befehl selbst neu an
             log.info("Klimaanlage %s: Versuch %d fehlgeschlagen: %s: %s", cid, attempt + 1, e.__class__.__name__, e)
-            if attempt == 0:
+            if attempt + 1 < attempts:
                 await asyncio.sleep(LOCAL_RETRY_DELAY_S)
     name, msg = last.__class__.__name__, str(last)
     if "Authentication" in name or "authent" in msg.lower():
@@ -235,7 +235,9 @@ async def _read(entry: dict) -> dict:
             raise _Offline("keine Antwort")
         return snapshot(dev)
     async with _lock_for(entry["id"]):
-        return await _with_dev(entry, op)
+        # Hintergrund-Abfrage: nur ein Versuch. Sie soll die Anlage nicht mit Wiederholungen blockieren, waehrend ein Schaltbefehl
+        # wartet (bei einem Aussetzer zeigt status() ohnehin den letzten guten Zustand). Befehle bekommen den zweiten Versuch.
+        return await _with_dev(entry, op, attempts=1)
 
 
 def status(d: dict) -> dict:
