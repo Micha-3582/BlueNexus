@@ -388,8 +388,7 @@ def midea_rekey(dev_id: str, account: str, password: str, region=None) -> dict:
         if x["id"] == dev_id:
             x.update(r)
     _save(items)
-    midea.cloud_forget(set(), [dev_id])
-    midea._devs.pop(dev_id, None)
+    midea.cloud_forget(set(), [dev_id])                                # neue Verbindung baut _get_dev beim naechsten Zugriff (schliesst die alte)
     return {"ip": r["ip"]}
 
 

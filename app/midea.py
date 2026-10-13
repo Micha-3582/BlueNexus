@@ -136,6 +136,21 @@ def info_text(s: dict) -> str:
     return " · ".join(parts)
 
 
+def _close(dev) -> None:
+    """TCP-Verbindung zur Anlage wirklich schliessen. Die WLAN-Module nehmen meist nur EINE Verbindung an: bleibt die alte offen,
+    laeuft die neue ins Leere ("antwortet nicht")."""
+    try:
+        dev._lan._disconnect()
+    except Exception:                                        # noqa: BLE001
+        pass
+
+
+def _drop(cid: str) -> None:
+    dev = _devs.pop(cid, None)
+    if dev is not None:
+        _close(dev)
+
+
 async def _get_dev(entry: dict):
     """Angemeldetes Geraeteobjekt (neu aufgebaut, wenn noetig)."""
     AC, _, _ = _lib()
@@ -144,11 +159,16 @@ async def _get_dev(entry: dict):
     key = (entry.get("ip"), entry.get("token"), entry.get("key"))
     if dev is not None and getattr(dev, "_vl_key", None) == key:
         return dev
+    _drop(cid)                                              # alte Verbindung (z. B. alter Schluessel/IP) zuerst schliessen
     dev = AC(ip=entry["ip"], port=int(entry.get("port") or 6444), device_id=int(entry["device_id"]), sn=entry.get("sn"), name=entry.get("raw_name"),
              version=entry.get("version"))
-    if (entry.get("version") or 0) >= 3:
-        await dev.authenticate(entry["token"], entry["key"])
-    await dev.get_capabilities()
+    try:
+        if (entry.get("version") or 0) >= 3:
+            await dev.authenticate(entry["token"], entry["key"])
+        await dev.get_capabilities()
+    except BaseException:
+        _close(dev)
+        raise
     dev._vl_key = key
     _devs[cid] = dev
     return dev
@@ -182,7 +202,7 @@ async def _with_dev(entry: dict, op):
             raise                                               # Eingabefehler (z. B. Temperatur ausserhalb) nicht wiederholen
         except Exception as e:                                  # noqa: BLE001
             last = e
-            _devs.pop(cid, None)
+            _drop(cid)
             log.info("Klimaanlage %s: Versuch %d fehlgeschlagen: %s: %s", cid, attempt + 1, e.__class__.__name__, e)
             if attempt == 0:
                 await asyncio.sleep(LOCAL_RETRY_DELAY_S)
@@ -465,8 +485,11 @@ async def _local_keys(region: str, account: str, password: str, device_ids: list
             try:
                 token, key = await _smarthome_token(cloud, Security.udpid(did.to_bytes(6, endian)).hex(), did)
                 dev = AC(ip=d.ip, port=int(d.port), device_id=did)
-                await dev.authenticate(token, key)
-                await dev.refresh()
+                try:
+                    await dev.authenticate(token, key)
+                    await dev.refresh()
+                finally:
+                    _close(dev)                              # Pruefverbindung schliessen, sonst blockiert sie die Anlage
             except Exception as e:                           # noqa: BLE001 - andere Byte-Reihenfolge versuchen
                 log.info("Midea lokal %s (%s): %s", did, endian, e)
                 if "3201" in str(e):                         # Anlage steckt nicht in diesem MSmartHome-Konto
