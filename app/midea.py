@@ -27,10 +27,13 @@ STATUS_TTL_S = 20.0               # gelesener Zustand gilt so lange
 CLOUD_STATUS_TTL_S = 45.0         # ueber die Cloud seltener fragen
 FAIL_TTL_S = 30.0                 # nach einem Fehler so lange nicht erneut versuchen (haelt die Geraeteliste schnell)
 STATUS_TIMEOUT_S = 15.0
-SET_TIMEOUT_S = 35.0
+SET_TIMEOUT_S = 70.0              # 3 Versuche mit Rueckpruefung und Pausen
 LOCAL_RETRY_DELAY_S = 2.0         # WLAN-Module verschlucken sich gern: kurz warten, neu verbinden, noch einmal
 GOOD_GRACE_S = 120.0              # bei einem einzelnen Aussetzer so lange den letzten guten Zustand zeigen statt "nicht erreichbar"
 CONN_LIFETIME_S = 45              # Verbindung danach frisch aufbauen: die Module legen ruhende Verbindungen still, ohne sie zu schliessen
+COMMAND_DELAYS_S = (2.0, 6.0)     # Befehl: bis zu 3 Versuche direkt (Pausen dazwischen), jeder mit Rueckpruefung
+PENDING_EVERY_S = 30.0            # klappt es trotzdem nicht: im Hintergrund alle 30 s nachliefern ...
+PENDING_MAX_S = 900.0             # ... bis zu 15 Minuten lang (neuerer Befehl fuer dieselbe Anlage ersetzt den alten)
 AUTH_FAIL_LIMIT = 3               # erst nach so vielen Anmeldefehlern hintereinander von "Schluessel ungueltig" ausgehen
 DISCOVER_TIMEOUT_S = 6.0
 REGIONS = ("DE", "US", "KR")
@@ -183,6 +186,10 @@ def _lock_for(cid: str) -> asyncio.Lock:
     return _dlocks.setdefault(cid, asyncio.Lock())
 
 
+class Unreachable(MideaError):
+    """Anlage nach allen Versuchen nicht erreicht (Befehle werden im Hintergrund nachgeliefert)."""
+
+
 class _Offline(Exception):
     """Anlage hat nicht geantwortet (wird wiederholt)."""
 
@@ -191,7 +198,7 @@ _auth_fails: dict[str, int] = {}                             # Geraete-ID -> Anm
 _good: dict[str, tuple] = {}                                 # Geraete-ID -> (Zeit, letzter guter Zustand)
 
 
-async def _with_dev(entry: dict, op, attempts: int = 2):
+async def _with_dev(entry: dict, op, attempts: int = 2, delays=(LOCAL_RETRY_DELAY_S,)):
     """op(dev) mit angemeldeter Verbindung ausfuehren. Faellt die Anlage aus (Zeitueberschreitung, Anmeldung abgelehnt, keine Antwort),
     nach kurzer Pause mit frischer Verbindung noch einmal. Die WLAN-Module lehnen die Anmeldung gelegentlich ab oder antworten nicht,
     obwohl der Schluessel stimmt - deshalb erst nach mehreren Fehlern hintereinander "Schluessel ungueltig" melden."""
@@ -219,13 +226,13 @@ async def _with_dev(entry: dict, op, attempts: int = 2):
                                                                 # die Bibliothek verbindet und meldet sich beim naechsten Befehl selbst neu an
             log.info("Klimaanlage %s: Versuch %d fehlgeschlagen: %s: %s", cid, attempt + 1, e.__class__.__name__, e)
             if attempt + 1 < attempts:
-                await asyncio.sleep(LOCAL_RETRY_DELAY_S)
+                await asyncio.sleep(delays[min(attempt, len(delays) - 1)])
     name, msg = last.__class__.__name__, str(last)
     if "Authentication" in name or "authent" in msg.lower():
         _auth_fails[cid] = _auth_fails.get(cid, 0) + 1
         if _auth_fails[cid] >= AUTH_FAIL_LIMIT:
             raise MideaError("Die Klimaanlage lehnt den Schlüssel wiederholt ab – an der Anlage „🔑 Schlüssel“ drücken (nötig nach neuem Koppeln)")
-    raise MideaError("Die Klimaanlage antwortet gerade nicht (WLAN-Modul beschäftigt oder schwacher Empfang) – gleich noch einmal versuchen")
+    raise Unreachable("Die Klimaanlage antwortet gerade nicht (WLAN-Modul beschäftigt oder schwacher Empfang)")
 
 
 async def _read(entry: dict) -> dict:
@@ -241,6 +248,14 @@ async def _read(entry: dict) -> dict:
 
 
 def status(d: dict) -> dict:
+    r = _status(d)
+    p = pending(d["id"])
+    if p:
+        r = {**r, "info": (r.get("info") or r.get("error") or "") + " · ⏳ Befehl wird nachgereicht"}
+    return r
+
+
+def _status(d: dict) -> dict:
     """{'online': bool, 'on': bool|None, 'power': None, 'info': Text, mode/target_c/indoor_c/outdoor_c/fan/swing ...}"""
     cid = d["id"]
     with _slocks.setdefault(cid, threading.Lock()):
@@ -308,24 +323,99 @@ async def _apply(entry: dict, power=None, mode=None, target=None, fan=None, swin
         await dev.apply()                                   # setzt immer den ganzen Zustand - ein zweiter Versuch schadet nicht
         if not dev.online:
             raise _Offline("Befehl ohne Antwort")
+        if power is not None or target is not None:         # Rueckpruefung: hat die Anlage es wirklich uebernommen?
+            await dev.refresh()
+            if power is not None and bool(dev.power_state) != bool(power):
+                raise _Offline("Ein/Aus nicht übernommen")
+            if target is not None and abs(float(dev.target_temperature) - round(float(target) * 2) / 2) > 0.26:
+                raise _Offline("Solltemperatur nicht übernommen")
         return snapshot(dev)
 
     async with _lock_for(entry["id"]):
-        return await _with_dev(entry, op)
+        return await _with_dev(entry, op, attempts=len(COMMAND_DELAYS_S) + 1, delays=COMMAND_DELAYS_S)
+
+
+_pending: dict[str, dict] = {}                              # Geraete-ID -> {"d", "kw", "since", "next"}: noch nachzuliefernder Befehl
+_pending_lock = threading.Lock()
+_pending_thread = None
 
 
 def set_params(d: dict, **kw) -> dict:
-    """Modus/Solltemperatur/Luefter/Schwenken/Ein-Aus setzen (nur die genannten). Rueckgabe: neuer Zustand."""
+    """Modus/Solltemperatur/Luefter/Schwenken/Ein-Aus setzen (nur die genannten). Rueckgabe: neuer Zustand.
+    Lokal: bis zu 3 Versuche mit Rueckpruefung. Bleibt die Anlage unerreichbar, wird der Befehl im Hintergrund nachgeliefert
+    (alle 30 s, bis 15 Min) - wichtig fuer Regeln, bei denen niemand danebensteht."""
     kw = {k: v for k, v in kw.items() if v not in (None, "")}
     if not kw:
         raise MideaError("Nichts zu setzen")
+    cid = d["id"]
+    if not d.get("cloud"):
+        with _pending_lock:
+            _pending.pop(cid, None)                         # neuer Befehl ersetzt einen noch offenen alten
     try:
         snap = _cloud_apply(d, **kw) if d.get("cloud") else _run(_apply(d, **kw), SET_TIMEOUT_S)
+    except Unreachable as e:
+        _queue(d, kw)
+        raise Unreachable(f"{e} – BlueNexus versucht es automatisch weiter (alle 30 s, bis 15 Minuten)")
+    except MideaError as e:
+        if not d.get("cloud") and "Zeitüberschreitung" in str(e):
+            _queue(d, kw)
+            raise Unreachable(f"{e} – BlueNexus versucht es automatisch weiter (alle 30 s, bis 15 Minuten)")
+        raise
     finally:
-        invalidate(d["id"])
-    _cache[d["id"]] = (time.time(), snap)
-    _good[d["id"]] = (time.time(), snap)
+        invalidate(cid)
+    _cache[cid] = (time.time(), snap)
+    _good[cid] = (time.time(), snap)
     return _public_status(snap)
+
+
+def _queue(d: dict, kw: dict) -> None:
+    global _pending_thread
+    now = time.time()
+    with _pending_lock:
+        _pending[d["id"]] = {"d": dict(d), "kw": dict(kw), "since": now, "next": now + PENDING_EVERY_S}
+        if _pending_thread is None or not _pending_thread.is_alive():
+            _pending_thread = threading.Thread(target=_pending_loop, name="midea-nachliefern", daemon=True)
+            _pending_thread.start()
+    log.warning("Klimaanlage %s: Befehl %s nicht angekommen – wird nachgeliefert", d.get("name") or d["id"], kw)
+
+
+def _pending_loop() -> None:
+    while True:
+        time.sleep(5)
+        with _pending_lock:
+            if not _pending:
+                return
+            due = [(cid, p) for cid, p in _pending.items() if time.time() >= p["next"]]
+        for cid, p in due:
+            name = p["d"].get("name") or cid
+            if time.time() - p["since"] > PENDING_MAX_S:
+                with _pending_lock:
+                    if _pending.get(cid) is p:
+                        _pending.pop(cid, None)
+                log.error("Klimaanlage %s: Befehl %s nach 15 Minuten aufgegeben – Anlage nicht erreichbar", name, p["kw"])
+                continue
+            try:
+                snap = _run(_apply(p["d"], **p["kw"]), SET_TIMEOUT_S)
+            except MideaError as e:
+                with _pending_lock:
+                    if _pending.get(cid) is p:
+                        p["next"] = time.time() + PENDING_EVERY_S
+                log.info("Klimaanlage %s: Nachliefern noch nicht möglich (%s)", name, e)
+                continue
+            with _pending_lock:
+                if _pending.get(cid) is p:
+                    _pending.pop(cid, None)
+            invalidate(cid)
+            _cache[cid] = (time.time(), snap)
+            _good[cid] = (time.time(), snap)
+            log.warning("Klimaanlage %s: Befehl %s nachgeliefert (nach %d s)", name, p["kw"], int(time.time() - p["since"]))
+
+
+def pending(cid: str) -> dict | None:
+    """Noch offener Befehl fuer die Anlage (fuer die Anzeige)."""
+    with _pending_lock:
+        p = _pending.get(cid)
+        return {"kw": p["kw"], "since": p["since"]} if p else None
 
 
 def set_state(d: dict, on: bool, timer_s: int | None = None) -> dict:
