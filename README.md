@@ -59,6 +59,7 @@ Smart-Home-Zentrale mit Kameras – wer nur Energie will, blendet den Rest aus.
 - [Fernzugriff von unterwegs](#fernzugriff-von-unterwegs)
 - [Live-Demo](#live-demo)
 - [Installation](#installation)
+  - [Welche Hardware?](#welche-hardware)
 - [Einrichtung](#einrichtung)
 - [Konfigurierbare Parameter](#konfigurierbare-parameter)
 - [Datenquellen und Register](#datenquellen-und-register)
@@ -442,6 +443,32 @@ betreiben möchte, findet den Demo-Modus im [Handbuch](MANUAL.md#15-update-siche
 ---
 
 ## Installation
+
+### Welche Hardware?
+
+BlueNexus ist schlank: eine Python-Webapp ohne eigenen Datenbankserver, die meiste Zeit wartet sie auf Antworten
+von Cerbo, Geräten und Diensten. Im Normalbetrieb braucht sie deutlich weniger als 250 MB Arbeitsspeicher. Jeder
+Linux-Rechner im Heimnetz reicht – entscheidend ist **Zuverlässigkeit**, nicht Rechenleistung.
+
+| Gerät | Eignung |
+|---|---|
+| **Gebrauchter Thin Client** (z. B. HP t630/t640, Fujitsu Futro, Dell Wyse 5070) | günstigste Lösung, für BlueNexus völlig ausreichend, mit echter SSD |
+| **Mini-PC mit Intel N100/N150**, 8 GB RAM, SSD | viel Reserve (Kameras, lange Verläufe, mehrere Benutzer); auch als Proxmox-Host für weitere Dienste |
+| **Raspberry Pi 4 / 5** (2 GB RAM oder mehr) | gute Wahl, Pi 4 getestet; am besten von einer USB-SSD starten |
+| **Raspberry Pi 3B / 3B+** | reicht für Energiesteuerung und Smart Home ohne viele Kameras; 64-Bit-OS nehmen |
+
+**Empfehlung, wenn noch keine Hardware da ist:** ein gebrauchter Thin Client oder ein kleiner Mini-PC. Er kostet
+oft nicht mehr als ein Raspberry Pi mit Netzteil, Gehäuse und SSD, hat eine echte SSD eingebaut und deutlich mehr
+Reserven. Der Stromverbrauch liegt im Leerlauf bei etwa 6–10 W (Raspberry Pi: 3–5 W) – im Jahr nur wenige Euro
+Unterschied. Ein vorhandener Raspberry Pi ist trotzdem eine gute Wahl.
+
+**Worauf es ankommt:**
+- **SSD statt SD-Karte:** BlueNexus schreibt laufend Verlaufsdaten und Protokolle. SD-Karten verschleißen dabei;
+  beim Raspberry Pi deshalb von einer USB-SSD starten oder wenigstens eine „High Endurance“-Karte nehmen.
+- **Gutes Netzteil:** Unterspannung ist beim Raspberry Pi die häufigste Ursache für unerklärliche Abstürze.
+- **Netzwerkkabel** statt WLAN, wenn möglich, und eine **feste IP-Adresse** im Router.
+- **Betriebssystem:** Raspberry Pi OS (64-Bit), Debian oder Ubuntu Server. Auf einem Mini-PC Debian oder Ubuntu
+  Server installieren – der Installer unten funktioniert dort genauso. Alternativ als Container unter Proxmox.
 
 ### Raspberry Pi / Debian / Ubuntu – ein Befehl
 

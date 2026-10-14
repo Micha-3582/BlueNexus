@@ -9,6 +9,7 @@ Die technische Beschreibung der Lade-Strategie, Installation und Architektur ste
 ## Inhalt
 
 1. [Überblick](#1-überblick)
+   - [Welche Hardware?](#welche-hardware)
 2. [Anmelden, Benutzer und Rechte](#2-anmelden-benutzer-und-rechte)
 3. [Das Dashboard](#3-das-dashboard)
    - [Kameras (Reolink)](#3a-kameras-reolink-und-andere-mit-rtsp)
@@ -88,6 +89,23 @@ Die App besteht aus Modulen, die du einzeln an- und ausschalten kannst:
 - **Dry-Run / Trockenlauf:** Die Ladesteuerung und die Regeln haben je einen Trockenlauf-Schalter. Dabei wird alles berechnet und protokolliert, aber nichts wirklich geschaltet. Ideal zum Ausprobieren.
 - **Sicherheitsgrenzen:** Es wird nie über das Ladelimit aus dem Netz geladen (Standard 90 %), egal ob Automatik, Ladetermin oder Sofort-Override.
 - **Die App ist installierbar** (PWA): Im Handy-Browser „Zum Startbildschirm hinzufügen“.
+
+### Welche Hardware?
+
+BlueNexus braucht wenig Rechenleistung – es läuft auf jedem Linux-Rechner im Heimnetz. Wichtiger als Tempo ist,
+dass das Gerät **zuverlässig rund um die Uhr** läuft.
+
+| Gerät | Eignung |
+|---|---|
+| **Gebrauchter Thin Client** (z. B. HP t630/t640, Fujitsu Futro, Dell Wyse 5070) | günstigste Lösung, für BlueNexus völlig ausreichend, mit echter SSD |
+| **Mini-PC mit Intel N100/N150**, 8 GB RAM, SSD | viel Reserve (Kameras, lange Verläufe, mehrere Benutzer); auch als Proxmox-Host für weitere Dienste |
+| **Raspberry Pi 4 / 5** (2 GB RAM oder mehr) | gute Wahl, Pi 4 getestet; am besten von einer USB-SSD starten |
+| **Raspberry Pi 3B / 3B+** | reicht für Energiesteuerung und Smart Home ohne viele Kameras; 64-Bit-OS nehmen |
+
+- **Noch keine Hardware?** Dann ist ein gebrauchter Thin Client oder ein kleiner Mini-PC meist die bessere Wahl: ähnlich teuer wie ein Raspberry Pi mit Zubehör, aber mit eingebauter SSD und mehr Reserven. Er braucht im Leerlauf etwa 6–10 W (Raspberry Pi 3–5 W).
+- **Schon einen Raspberry Pi?** Dann nimm ihn. Wichtig: von einer **USB-SSD** starten (oder eine „High Endurance“-SD-Karte), ein **gutes Netzteil** und ein **64-Bit-System**.
+- **Wann wird ein Pi 3 knapp?** Bei vielen Kameras mit Ereignis-Videos, sehr langen Zeiträumen in den Verläufen oder vielen gleichzeitigen Benutzern. Energiesteuerung, Regeln und Smart Home laufen problemlos.
+- **Allgemein:** Netzwerkkabel statt WLAN, feste IP-Adresse im Router. Installation und unterstützte Systeme (Raspberry Pi OS, Debian, Ubuntu, Proxmox-Container): siehe [README – Installation](README.md#installation).
 
 ---
 
