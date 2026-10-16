@@ -2195,6 +2195,7 @@ def _telegram_words() -> list:
 
 import demo_sim
 demo_sim.activate()                                            # Demo-Modus (BLUENEXUS_DEMO=1): simulierte Geraete/Kameras/CCU
+demo_sim.seed_favorites(users)                                  # Demo: feste erfundene Favoriten (Kachel 'Favoriten')
 
 ctrl = Controller()
 
@@ -2658,7 +2659,7 @@ def api_status():
           "show_savings_card": bool(cfg.get("show_savings_card", True)),
           "show_verlauf_card": bool(cfg.get("show_verlauf_card", True)) and auth.has_level(g.perms, "verlauf", "read"),
           "show_plansim_card": bool(cfg.get("show_plansim_card", True)) and cfg.get("tariff_mode") != "fixed",
-          "can_favorite": auth.has_level(g.perms, "settings_anzeige", "read") and not demo.ACTIVE,          # Sterne setzen = die eigene Ansicht aendern (wie "Meine Ansicht")
+          "can_favorite": auth.has_level(g.perms, "settings_anzeige", "read"),          # Sterne setzen = die eigene Ansicht aendern (wie "Meine Ansicht")
           "tile_order": [k for k in (cfg.get("tile_order") or []) if isinstance(k, str)]}
     for k in auth._off(store.modules(cfg), auth.MODULE_TILES):             # Module aus: deren Kacheln sind weg (Daten bleiben)
         ui[k] = False

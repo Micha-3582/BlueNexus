@@ -526,6 +526,23 @@ def neutral_names() -> None:
                     f.write(new)
         except OSError:
             pass
+    try:                                                    # Klimaanlagen der Demo laufen lokal (Knopf "Schluessel" statt Cloud-Zugang)
+        import json as _json
+        p = os.path.join(d, "shelly_devices.json")
+        with open(p, "r", encoding="utf-8") as f:
+            devs = _json.load(f)
+        changed = False
+        for dv in devs if isinstance(devs, list) else []:
+            if dv.get("kind") == "midea" and dv.get("cloud"):
+                dv["cloud"] = False
+                for k in ("account", "password", "cloud_account", "cloud_password", "email"):
+                    dv.pop(k, None)
+                changed = True
+        if changed:
+            with open(p, "w", encoding="utf-8") as f:
+                _json.dump(devs, f, ensure_ascii=False)
+    except (OSError, ValueError):
+        pass
     try:                                                    # der Knopf hinter dem Garagentor-Tag heisst "Garagentor" (der Tag selbst "Garagentor-Tag")
         p = os.path.join(d, "virtual.json")
         with open(p, "r", encoding="utf-8") as f:
@@ -609,3 +626,48 @@ def _demo_grid_buckets_factory(orig):
                 t += _td(minutes=15)
         return res
     return f
+
+
+def seed_favorites(users) -> None:
+    """Feste, erfundene Favoriten fuer alle Konten der Demo (Dashboard-Kachel 'Favoriten'); in der Demo wird nichts gespeichert."""
+    if not ACTIVE:
+        return
+    try:
+        import homematic
+        import shelly
+        import virtual
+        devs = shelly.load_devices()
+        sens = homematic.load_sensors()
+        virt = list(virtual.load())
+
+        def dev(*names):
+            for n in names:
+                for d in devs:
+                    if n.lower() in str(d.get("name") or "").lower():
+                        return "shelly:" + d["id"]
+            return None
+
+        refs = [dev("Küchenlicht", "Kuechenlicht"), dev("Haustürbeleuchtung", "Haustuerbeleuchtung")]
+        v = next((x for x in virt if "garagentor" in str(x.get("name") or "").lower()), None)
+        refs.append("virtual:" + v["id"] if v else None)
+        t = next((x for x in sens if "wohnzimmer" in str(x.get("name") or "").lower() and "temperatur" in str(x.get("name") or "").lower()), None)
+        refs.append("sensor:" + t["id"] if t else None)
+        refs.append(dev("Pool-Waermepumpe", "Poolhaus"))
+        refs = [r for r in refs if r]
+        if not refs:
+            return
+        import store
+        cfg = store.load_config()                           # Kachel 'Favoriten' direkt unter die Live-Werte legen
+        order = [k for k in (cfg.get("tile_order") or []) if k != "show_favorites_card"]
+        if order and "show_favorites_card" not in (cfg.get("tile_order") or []):
+            order.insert(order.index("show_live_values") + 1 if "show_live_values" in order else 0, "show_favorites_card")
+            cfg["tile_order"] = order
+            store.save_config(cfg)
+        for u in users.list():
+            try:
+                users.set_favorites(u["username"], refs)
+            except Exception:                               # noqa: BLE001
+                pass
+    except Exception:                                       # noqa: BLE001 - die Demo muss auch ohne Favoriten starten
+        import logging
+        logging.getLogger("demo_sim").exception("Favoriten konnten nicht angelegt werden")
