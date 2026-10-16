@@ -31,7 +31,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 | 📷 **Kameras** | Reolink und beliebige RTSP-Kameras: Standbild, Live-Bild, Bewegungs- und Klingel-Auslöser |
 | 🗣️ **Alexa** | Sprachsteuerung ohne Amazon-Entwicklerkonto – die App gibt sich im Heimnetz als Hue-Bridge aus |
 | 📈 **Verläufe** | Eigene Diagramme für alle Messwerte (Ersatz für InfluxDB + Grafana) |
-| 🌍 **Fernzugriff** | Sicherer Zugriff von unterwegs per Cloudflare-Tunnel, direkt in den Einstellungen eingerichtet |
+| 🌍 **Fernzugriff** | Sicherer Zugriff von unterwegs per Cloudflare-Tunnel, direkt in den Einstellungen eingerichtet – inklusive Hinweis und Ein-Klick-Update, wenn Cloudflare eine neue Version veröffentlicht |
 
 Jedes Modul lässt sich **einzeln ein- und ausschalten**. Wer keine PV-Anlage hat, nutzt die App als reine
 Smart-Home-Zentrale mit Kameras – wer nur Energie will, blendet den Rest aus.

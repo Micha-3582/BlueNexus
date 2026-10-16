@@ -248,7 +248,7 @@ ENDPOINT_AREA = {
     "api_notify_test": "settings_meldungen", "api_notify_recipient_add": "settings_meldungen", "api_notify_recipient_modify": "settings_meldungen",
     "api_notify_recipients": "rules", "api_notify_requests": "settings_meldungen", "api_notify_request": "settings_meldungen", "api_tibber_token_delete": "settings_tarif",
     "api_tunnel_info": "settings_system", "api_tunnel_log": "settings_system", "api_tunnel_token": "settings_system", "api_tunnel_enable": "settings_system",
-    "api_tunnel_install": "settings_system",
+    "api_tunnel_install": "settings_system", "api_tunnel_check": "settings_system", "api_tunnel_update": "settings_system",
     "api_pushover_info": "settings_meldungen", "api_pushover_credentials": "settings_meldungen", "api_pushover_recipient_add": "settings_meldungen",
     "api_pushover_recipient_modify": "settings_meldungen", "api_pushover_test": "settings_meldungen", "api_pushover_recipients": "rules",
     "api_vrm_info": "settings_vrm", "api_vrm_credentials": "settings_vrm", "api_vrm_restore": "settings_vrm",
@@ -3683,6 +3683,23 @@ def api_tunnel_enable():
 def api_tunnel_install():
     try:
         v = tunnel.install()
+    except tunnel.TunnelError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, version=v)
+
+
+@app.route("/api/tunnel/check", methods=["POST"])
+def api_tunnel_check():
+    """Jetzt nach einer neueren cloudflared-Version suchen (sonst fragt die App nur alle paar Stunden im Hintergrund)."""
+    tunnel.check_latest(force=True)
+    return jsonify(tunnel.status())
+
+
+@app.route("/api/tunnel/update", methods=["POST"])
+def api_tunnel_update():
+    """cloudflared auf die neueste Version aktualisieren (laeuft der Tunnel, wird er kurz neu gestartet)."""
+    try:
+        v = tunnel.update()
     except tunnel.TunnelError as e:
         return jsonify(error=str(e)), 400
     return jsonify(ok=True, version=v)

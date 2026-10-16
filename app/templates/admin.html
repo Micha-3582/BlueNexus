@@ -152,6 +152,10 @@
   </div>
   <div id="tn-install-row" style="display:none;margin-bottom:10px"><button id="tn-install" class="ghost" type="button">cloudflared installieren</button>
     <span class="muted" id="tn-install-hint"></span></div>
+  <div id="tn-update-row" style="display:none;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap"><button id="tn-update" type="button">⬆ Aktualisieren</button>
+    <span class="muted" id="tn-update-hint"></span></div>
+  <div id="tn-check-row" style="display:none;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap"><button id="tn-check" class="ghost" type="button" title="Fragt jetzt bei Cloudflare nach der neuesten Version (sonst prüft die App das alle paar Stunden von selbst)">Nach Updates suchen</button>
+    <span class="muted" id="tn-check-hint"></span></div>
   <div class="grid2">
     <div><label>Tunnel-Token <span class="qhelp" role="button" tabindex="0" data-help="Token des Cloudflare-Tunnels (beginnt mit eyJ). Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="tn-token" type="password" autocomplete="new-password" placeholder="eyJ…"><button type="button" class="pw-toggle" data-for="tn-token" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap"><button id="tn-save" class="ghost" type="button">Token speichern</button>
@@ -3209,6 +3213,7 @@ document.getElementById('tibber-forget').addEventListener('click', () => forgetC
   'Der Tibber-Token wird gelöscht. Die App holt dann keine Strompreise mehr (sie nutzt höchstens gespeicherte Preise), bis du wieder einen Token einträgst – oder auf festen Tarif umstellst.',
   () => { document.getElementById('tibber_token').value = ''; window.tibberTokenSet = false; if (window.updateTariffFields) updateTariffFields(); }));
 /* --- Fernzugriff: Cloudflare Tunnel --- */
+let tnUpdate = null;
 function tnMsg(t, err) { const m = document.getElementById('tn-msg'); m.textContent = t; m.style.color = err ? '#e5544a' : ''; }
 async function tnLoad() {
   let n; try { n = await (await fetch('/api/tunnel', { cache: 'no-store' })).json(); } catch (e) { return; }
@@ -3218,6 +3223,13 @@ async function tnLoad() {
   document.getElementById('tn-enabled').checked = !!n.enabled;
   document.getElementById('tn-install-row').style.display = n.installed ? 'none' : '';
   document.getElementById('tn-install').disabled = !n.can_install;
+  tnUpdate = n;
+  const upRow = document.getElementById('tn-update-row'), ckRow = document.getElementById('tn-check-row');
+  upRow.style.display = n.installed && n.update ? 'flex' : 'none';
+  ckRow.style.display = n.installed && !n.update ? 'flex' : 'none';
+  document.getElementById('tn-update').textContent = '⬆ Auf Version ' + n.latest + ' aktualisieren';
+  document.getElementById('tn-update-hint').textContent = 'Neue cloudflared-Version verfügbar (installiert: ' + n.version + ').';
+  document.getElementById('tn-check-hint').textContent = n.latest ? 'cloudflared ist auf dem neuesten Stand (' + n.version + ').' : 'Die neueste Version konnte noch nicht abgefragt werden.';
   document.getElementById('tn-install-hint').textContent = n.can_install ? ' lädt das offizielle Programm von Cloudflare (' + n.asset + ')' : ' automatisch nur unter Linux – bitte cloudflared von Hand installieren';
   document.getElementById('tn-token').placeholder = n.has_token ? '(gespeichert – leer lassen = unverändert)' : 'eyJ…';
   document.getElementById('tn-setup').open = !n.has_token;
@@ -3241,6 +3253,19 @@ document.getElementById('tn-enabled').addEventListener('change', async e => {
 document.getElementById('tn-install').addEventListener('click', async e => {
   const b = e.target; b.disabled = true; tnMsg('Lade cloudflared herunter … (kann eine Minute dauern)');
   try { const r = await shellyApi('/api/tunnel/install', 'POST'); tnMsg('Installiert: Version ' + r.version + ' ✓'); savedToast(); } catch (err) { tnMsg(err.message, true); }
+  b.disabled = false; tnLoad();
+});
+document.getElementById('tn-check').addEventListener('click', async e => {
+  const b = e.target; b.disabled = true; tnMsg('Suche nach einer neueren Version …');
+  try { const n = await shellyApi('/api/tunnel/check', 'POST'); tnMsg(n.update ? 'Neue Version ' + n.latest + ' gefunden.' : (n.latest ? 'Schon die neueste Version (' + n.version + ') ✓' : 'Die neueste Version konnte nicht abgefragt werden – später noch einmal versuchen.'), !n.latest); } catch (err) { tnMsg(err.message, true); }
+  b.disabled = false; tnLoad();
+});
+document.getElementById('tn-update').addEventListener('click', async e => {
+  const b = e.target, n = tnUpdate || {};
+  const running = n.running;
+  if (!await uiDialog({ title: 'cloudflared aktualisieren?', okText: 'Aktualisieren', message: 'Die neue Version ' + (n.latest || '') + ' wird von Cloudflare geladen und installiert.' + (running ? ' Der Fernzugriff wird dabei für einen Moment unterbrochen (einige Sekunden). Bist du gerade über den Tunnel verbunden, lädt die Seite danach einfach neu.' : '') })) return;
+  b.disabled = true; tnMsg('Lade die neue Version herunter … (kann eine Minute dauern)');
+  try { const r = await shellyApi('/api/tunnel/update', 'POST'); tnMsg('Aktualisiert auf Version ' + r.version + ' ✓'); savedToast(); } catch (err) { tnMsg(err.message, true); }
   b.disabled = false; tnLoad();
 });
 document.getElementById('tn-save').addEventListener('click', async () => {

@@ -38,6 +38,9 @@ BIN_DIR = os.path.join(_DIR, "bin")
 BIN_PATH = os.path.join(BIN_DIR, "cloudflared")
 PID_PATH = os.path.join(_DIR, "cloudflared.pid")
 RELEASE_BASE = "https://github.com/cloudflare/cloudflared/releases/latest/download/"
+RELEASE_LATEST = "https://github.com/cloudflare/cloudflared/releases/latest"          # leitet auf .../tag/<Version> weiter (ohne API-Grenze)
+LATEST_TTL_S = 6 * 3600                                    # neueste Version hoechstens alle 6 Stunden erfragen
+LATEST_RETRY_S = 900                                       # nach einem Fehlschlag fruehestens nach 15 Minuten wieder
 ARCH_ASSET = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64", "armv7l": "armhf", "armv8l": "armhf", "armv6l": "arm"}
 MAX_DOWNLOAD = 120 * 1024 * 1024
 SUPERVISE_S = 5.0                                          # so oft schaut die Ueberwachung nach
@@ -173,6 +176,75 @@ def _version_uncached(b: str) -> str:
     return m.group(1) if m else out.strip()[:40]
 
 
+_latest = {"ver": "", "at": 0.0, "tried": 0.0, "busy": False}
+
+
+def _ver_tuple(v: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", v or "")[:4])
+
+
+def fetch_latest() -> str:
+    """Neueste cloudflared-Version aus dem offiziellen Release (GitHub) erfragen, z. B. "2025.9.1". Leer = nicht erreichbar."""
+    try:
+        r = requests.head(RELEASE_LATEST, allow_redirects=False, timeout=10)
+        m = re.search(r"/tag/v?([0-9][0-9A-Za-z.\-]*)$", r.headers.get("Location", ""))
+        return m.group(1) if m else ""
+    except requests.RequestException:
+        return ""
+
+
+def check_latest(force: bool = False) -> str:
+    """Wie fetch_latest, aber mit Zwischenspeicher (neueste Version nur alle paar Stunden erfragen). Blockiert bis zur Antwort."""
+    now = time.time()
+    with _lock:
+        if not force and _latest["ver"] and now - _latest["at"] < LATEST_TTL_S:
+            return _latest["ver"]
+        if not force and now - _latest["tried"] < LATEST_RETRY_S:
+            return _latest["ver"]
+        _latest["tried"] = now
+    v = fetch_latest()
+    with _lock:
+        if v:
+            _latest["ver"], _latest["at"] = v, time.time()
+        return _latest["ver"]
+
+
+def _refresh_latest_bg() -> None:
+    """Im Hintergrund die neueste Version erfragen, falls der Zwischenspeicher alt ist (die Statusabfrage der Seite darf nie warten)."""
+    now = time.time()
+    with _lock:
+        stale = not _latest["ver"] or now - _latest["at"] >= LATEST_TTL_S
+        if _latest["busy"] or not stale or now - _latest["tried"] < LATEST_RETRY_S or sandbox.ACTIVE:
+            return
+        _latest["busy"] = True
+
+    def work():
+        try:
+            check_latest()
+        finally:
+            with _lock:
+                _latest["busy"] = False
+    threading.Thread(target=work, daemon=True, name="cloudflared-latest").start()
+
+
+def update_info() -> dict:
+    """Installierte und neueste Version; update = es gibt eine neuere."""
+    cur = version() if find_binary() else ""
+    new = _latest["ver"]
+    return {"latest": new, "update": bool(cur and new and _ver_tuple(new) > _ver_tuple(cur))}
+
+
+def update() -> str:
+    """Neueste Version installieren; lief der Tunnel, wird er mit dem neuen Programm neu gestartet (kurze Unterbrechung). Rueckgabe: neue Version."""
+    was_running = _running()
+    v = install()
+    with _lock:
+        _ver_cache.clear()
+    if was_running and enabled():
+        start()
+    return version() or v
+
+
 def install() -> str:
     """Laedt cloudflared aus dem offiziellen Cloudflare-Release (GitHub) nach app/bin/ und prueft, dass es laeuft. Rueckgabe: Version."""
     name = asset_name()
@@ -194,6 +266,8 @@ def install() -> str:
         if size < 1_000_000:
             raise TunnelError("Download unvollständig (Datei zu klein)")
         os.chmod(tmp, 0o755)
+        if not _version_uncached(tmp):
+            raise TunnelError("Das heruntergeladene Programm läuft auf diesem Gerät nicht (falsche Architektur?) – das bisherige bleibt unverändert")
         os.replace(tmp, BIN_PATH)
     except requests.RequestException as e:
         raise TunnelError(f"Download fehlgeschlagen: {e}")
@@ -395,7 +469,9 @@ def status() -> dict:
         text = "Verbinde …"
     else:
         text = "Gestoppt – wird neu gestartet"
+    _refresh_latest_bg()
     return {"has_token": bool(c.get("token")), "enabled": bool(c.get("enabled")), "installed": bool(find_binary()), "version": version() if find_binary() else "",
+            **update_info(),
             "can_install": asset_name() is not None, "asset": asset_name() or "", "running": run, "connected": conns > 0, "connections": conns,
             "text": text, "last_error": _state["last_error"], "restarts": _state["restarts"],
             "uptime_s": int(time.time() - _state["since"]) if run else 0}
