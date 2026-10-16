@@ -280,6 +280,7 @@ Ersparnis · Wetter.
 
 - Welche Kacheln erscheinen, entscheidet der Admin global – jeder Benutzer stellt unter **„Meine Ansicht“**
   seine eigene Auswahl und Reihenfolge zusammen.
+- **Favoriten:** Jedes Gerät, jeder Sensor und jeder Schalter hat einen **Stern ☆** – wer ihn antippt, sieht das Ding zusätzlich in der Kachel **„Favoriten“** ganz oben, zum Schalten und Ablesen an einer Stelle. Die Liste ist persönlich pro Konto, respektiert Sichtbarkeit und Rechte und lässt sich wie jede Kachel ein-/ausblenden und sortieren.
 - **Jede Liste ist per langem Druck und Ziehen sortierbar** (Geräte, Sensoren, Schalter, Kameras, Regeln …).
 - Schalten per Antippen, bei Bedarf mit **PIN**.
 - **Hell oder dunkel:** Unter *Einstellungen → Dashboard → Darstellung* wählt jedes Gerät **Dunkel, Hell oder Automatisch**

@@ -143,6 +143,10 @@
   <div class="table-scroll"><table id="ev-list" style="margin-top:16px"></table></div>
 </div>
 
+<div class="card full" id="favorites-card" hidden style="margin-bottom:14px">
+  <h2>Favoriten</h2>
+  <div id="fav-grid"></div>
+</div>
 <div class="card full" id="shelly-card" hidden style="margin-bottom:14px">
   <h2>Geräte</h2>
   <div class="sysgrid" id="shelly-grid"></div>
@@ -326,7 +330,7 @@ const TILE_IDS = {
   show_charge_log: 'charge-log-card', show_ev_card: 'ev-card',
 };
 // Reihenfolge der Kacheln (Einstellungen -> Kacheln); Standard = Reihenfolge dieser Liste.
-const ORDER_IDS = { ...TILE_IDS, show_shelly_card: 'shelly-card', show_sensors_card: 'sensors-card', show_virtual_card: 'virtual-card', show_weather_card: 'weather-card', show_plansim_card: 'plansim-card', show_savings_card: 'savings-card', show_verlauf_card: 'verlauf-card' };
+const ORDER_IDS = { ...TILE_IDS, show_favorites_card: 'favorites-card', show_shelly_card: 'shelly-card', show_sensors_card: 'sensors-card', show_virtual_card: 'virtual-card', show_weather_card: 'weather-card', show_plansim_card: 'plansim-card', show_savings_card: 'savings-card', show_verlauf_card: 'verlauf-card' };
 function applyTileOrder(order) {
   const keys = Object.keys(ORDER_IDS), given = (order || []).filter(k => keys.includes(k));
   [...given, ...keys.filter(k => !given.includes(k))].forEach((k, i) => { const el = $(ORDER_IDS[k]); if (el) el.style.order = i; });
@@ -348,9 +352,12 @@ if (DASHBOARD_LEVEL === 'read') {
 }
 
 let sensorsDragActive = false, virtualDragActive = false, virtualCache = [], wolCache = [];
-let virtualEnabled = true, sensorsEnabled = true, shellyEnabled = true, weatherEnabled = true, plansimEnabled = true, savingsEnabled = true, verlaufEnabled = true;
+let favCan = false, favRefs = new Set(), favCache = {}, favDragActive = false;
+let favoritesEnabled = true, virtualEnabled = true, sensorsEnabled = true, shellyEnabled = true, weatherEnabled = true, plansimEnabled = true, savingsEnabled = true, verlaufEnabled = true;
 function applyTileVisibility(ui) {
   applyTileOrder(ui.tile_order);
+  { const was = favCan; favCan = !!ui.can_favorite; if (was !== favCan && typeof loadFavorites === 'function') setTimeout(loadFavorites, 0); }
+  if (favoritesEnabled !== (ui.show_favorites_card !== false)) { favoritesEnabled = ui.show_favorites_card !== false; if (typeof loadFavorites === 'function') loadFavorites(); }
   shellyEnabled = ui.show_shelly_card !== false;
   sensorsEnabled = ui.show_sensors_card !== false;
   virtualEnabled = ui.show_virtual_card !== false;
@@ -1580,6 +1587,85 @@ setInterval(loadMonth, 300000); // Monatsüberblick (ändert sich langsam)
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyCache = [];
 let shellyDragActive = false;   // waehrend Verschieben: Neuaufbau pausieren
+function shellyTile(d, tid) {
+    const stat = !d.online ? 'nicht erreichbar'
+      : (d.on ? 'an' : 'aus') + (d.power != null && d.switchable !== false ? ` · ${Math.round(d.power)} W` : '') + (d.automated ? ' · Auto' : '') + (d.switchable === false ? ' · Überwachung' : '');
+    return `<div class="systile" data-tile-id="${escH(tid || d.id)}" ${d.online ? '' : 'style="opacity:.55"'}>${favStar('shelly', d.id)}
+      <div class="systile-t">${escH(d.name)}${d.pin_set && d.switchable !== false ? ' 🔒' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-size:30px;line-height:1.1">${escH(d.icon)}</span>
+        ${d.switchable === false
+          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${d.on ? 'var(--on)' : 'var(--muted)'}">${d.online ? (d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
+          : `<label class="switch${d.pin_set ? ' pinned' : ''}" ${d.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${d.on ? 'checked' : ''} ${d.online ? '' : 'disabled'}
+          onchange="shellySwitch('${escH(d.id)}', this.checked, this)"><span class="slider"></span></label>`}
+      </div>
+      <div class="systile-s">${stat}</div></div>`;
+}
+function sensorTile(s, tid) {
+    const v = s.value, ok = v !== null && v !== undefined, w = SENSOR_WORDS[s.kind] ? (s.invert ? [SENSOR_WORDS[s.kind][1], SENSOR_WORDS[s.kind][0]] : SENSOR_WORDS[s.kind]) : ['Ja', 'Nein'];
+    const big = !ok ? '<span style="font-size:22px;font-weight:700;color:var(--muted)">–</span>'
+      : s.binary ? `<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${v ? 'var(--green)' : '#e5544a'};box-shadow:0 0 10px ${v ? 'var(--green)' : '#e5544a'}66"></span>`
+                 : `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums">${escH(String(v).replace('.', ','))}${s.unit ? ' ' + escH(s.unit) : ''}</span>`;
+    const sub = !ok ? 'kein Wert' : s.binary ? (v ? w[0] : w[1]) : escH(s.room || '');
+    const ic = escH(s.icon || SENSOR_ICON[s.kind] || '📡');
+    return `<div class="systile" data-tile-id="${escH(tid || s.id)}" ${ok ? '' : 'style="opacity:.55"'}>${favStar('sensor', s.id)}<div class="systile-t">${escH(s.name)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${ic}</span>${big}</div><div class="systile-s">${sub}</div></div>`;
+}
+function virtualTile(v, tid) {
+  return `<div class="systile" data-tile-id="${escH(tid || v.id)}">${favStar('virtual', v.id)}<div class="systile-t">${escH(v.name)}${v.pin_set ? ' 🔒' : ''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(v.icon)}</span>
+      ${v.kind === 'button' ? `<button type="button" class="tilebtn${v.pin_set ? ' pinned' : ''}" title="${v.pin_set ? 'Drücken (PIN-geschützt)' : 'Drücken'}" aria-label="Drücken" onclick="virtualPress('${escH(v.id)}', this)">${TILE_ICON_PRESS}</button>`
+        : `<label class="switch${v.pin_set ? ' pinned' : ''}" ${v.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${v.on ? 'checked' : ''} onchange="virtualSet('${escH(v.id)}', this.checked, this)"><span class="slider"></span></label>`}</div>
+    <div class="systile-s">${v.kind === 'button' ? 'Knopf' : (v.kind === 'timer' ? (v.on ? 'läuft, noch <span class="vrem" data-rem="' + (v.remaining_s || 0) + '">' + fmtRemain(v.remaining_s || 0) + '</span>' : 'Timer aus') : (v.on ? 'an' : 'aus'))}${v.running ? ` · Ablauf läuft, noch <span class="vrem" data-rem="${v.running.remaining_s}">${fmtRemain(v.running.remaining_s)}</span>` : ''}</div></div>`;
+}
+function wolTile(w, tid) {
+  return `<div class="systile" data-tile-id="${escH(tid || w.id)}">${favStar('wol', w.id)}<div class="systile-t">${escH(w.name)}${w.pin_set ? ' 🔒' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(w.icon)}</span>
+        <button type="button" class="tilebtn${w.pin_set ? ' pinned' : ''}" title="${w.pin_set ? 'Aufwecken (PIN-geschützt)' : 'Aufwecken'}" aria-label="Aufwecken" onclick="wolWake('${escH(w.id)}', this)">${TILE_ICON_WAKE}</button></div>
+      <div class="systile-s">${w.up === true ? '🟢 erreichbar' : w.up === false ? '⚪ nicht erreichbar' : 'Wake-on-LAN'}</div></div>`;
+}
+/* --- Favoriten (Sterne): persoenlich pro Konto; die Kachel "Favoriten" sammelt Geraete, Schalter, Sensoren und Aufwecken-Ziele --- */
+const favItem = (kind, id) => (favCache[kind + ':' + id] || {}).item;
+const FAV_STAR = on => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><polygon points="12 2.5 14.9 8.7 21.5 9.5 16.6 14 17.9 20.6 12 17.3 6.1 20.6 7.4 14 2.5 9.5 9.1 8.7"/></svg>`;
+function favStar(kind, id) {
+  if (!favCan) return '';
+  const on = favRefs.has(kind + ':' + id), t = on ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten';
+  return `<button type="button" class="favstar${on ? ' on' : ''}" aria-pressed="${on}" title="${t}" aria-label="${t}" onclick="favToggleTile('${kind}','${escH(id)}')">${FAV_STAR(on)}</button>`;
+}
+async function favToggleTile(kind, id) {
+  const ref = kind + ':' + id, on = !favRefs.has(ref);
+  try {
+    const r = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref, on }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { showToast(j.error || 'Favorit konnte nicht gespeichert werden', true); return; }
+    favRefs = new Set(j.refs || []);
+  } catch (e) { showToast('Server nicht erreichbar', true); return; }
+  showToast(on ? 'Zu den Favoriten hinzugefügt ★' : 'Aus den Favoriten entfernt');
+  virtualTouched = 0;
+  loadShelly(); loadSensors(); loadVirtual(); loadFavorites();
+}
+async function loadFavorites() {
+  const card = $('favorites-card');
+  if (!favoritesEnabled) { card.hidden = true; return; }
+  let d;
+  try { d = await (await fetch('/api/favorites', { cache: 'no-store' })).json(); } catch (e) { return; }
+  if (!favoritesEnabled) { card.hidden = true; return; }              // waehrend des Wartens ausgeschaltet worden
+  if (!d || !Array.isArray(d.items)) return;
+  favRefs = new Set(d.refs || []);
+  favCache = {}; d.items.forEach(x => { favCache[x.ref] = x; });
+  card.hidden = false;
+  if (favDragActive || Date.now() - virtualTouched < 1200) return;     // beim Verschieben oder gerade bedient nicht dazwischenzeichnen
+  const grid = $('fav-grid');
+  if (!d.items.length) {
+    grid.className = '';
+    grid.innerHTML = `<div class="muted">Noch keine Favoriten.${favCan ? ' Tippe bei einem Gerät, Schalter oder Sensor auf den Stern ☆ – dann erscheint er hier.' : ''}</div>`;
+    return;
+  }
+  grid.className = 'sysgrid';
+  grid.innerHTML = d.items.map(x => x.kind === 'shelly' ? shellyTile(x.item, x.ref) : x.kind === 'sensor' ? sensorTile(x.item, x.ref)
+    : x.kind === 'wol' ? wolTile(x.item, x.ref) : virtualTile(x.item, x.ref)).join('');
+  virtualFetchedAt = Date.now();
+}
 async function loadShelly() {
   if (shellyDragActive) return;
   const card = $('shelly-card');
@@ -1591,20 +1677,7 @@ async function loadShelly() {
   if (!Array.isArray(list) || !list.length) { card.hidden = true; return; }
   shellyCache = list;
   card.hidden = false;
-  $('shelly-grid').innerHTML = list.map(d => {
-    const stat = !d.online ? 'nicht erreichbar'
-      : (d.on ? 'an' : 'aus') + (d.power != null && d.switchable !== false ? ` · ${Math.round(d.power)} W` : '') + (d.automated ? ' · Auto' : '') + (d.switchable === false ? ' · Überwachung' : '');
-    return `<div class="systile" data-tile-id="${escH(d.id)}" ${d.online ? '' : 'style="opacity:.55"'}>
-      <div class="systile-t">${escH(d.name)}${d.pin_set && d.switchable !== false ? ' 🔒' : ''}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span style="font-size:30px;line-height:1.1">${escH(d.icon)}</span>
-        ${d.switchable === false
-          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${d.on ? 'var(--on)' : 'var(--muted)'}">${d.online ? (d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
-          : `<label class="switch${d.pin_set ? ' pinned' : ''}" ${d.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${d.on ? 'checked' : ''} ${d.online ? '' : 'disabled'}
-          onchange="shellySwitch('${escH(d.id)}', this.checked, this)"><span class="slider"></span></label>`}
-      </div>
-      <div class="systile-s">${stat}</div></div>`;
-  }).join('');
+  $('shelly-grid').innerHTML = list.map(d => shellyTile(d)).join('');
 }
 /* Sensoren (nur lesen): Ja/Nein als Punkt - gruen = Ja, rot = Nein; Messwerte als Zahl */
 const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
@@ -1618,16 +1691,7 @@ async function loadSensors() {
   if (!sensorsEnabled || !list.length) { card.hidden = true; return; }
   card.hidden = false;
   if (sensorsDragActive) return;
-  $('sensors-grid').innerHTML = list.map(s => {
-    const v = s.value, ok = v !== null && v !== undefined, w = SENSOR_WORDS[s.kind] ? (s.invert ? [SENSOR_WORDS[s.kind][1], SENSOR_WORDS[s.kind][0]] : SENSOR_WORDS[s.kind]) : ['Ja', 'Nein'];
-    const big = !ok ? '<span style="font-size:22px;font-weight:700;color:var(--muted)">–</span>'
-      : s.binary ? `<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${v ? 'var(--green)' : '#e5544a'};box-shadow:0 0 10px ${v ? 'var(--green)' : '#e5544a'}66"></span>`
-                 : `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums">${escH(String(v).replace('.', ','))}${s.unit ? ' ' + escH(s.unit) : ''}</span>`;
-    const sub = !ok ? 'kein Wert' : s.binary ? (v ? w[0] : w[1]) : escH(s.room || '');
-    const ic = escH(s.icon || SENSOR_ICON[s.kind] || '📡');
-    return `<div class="systile" data-tile-id="${escH(s.id)}" ${ok ? '' : 'style="opacity:.55"'}><div class="systile-t">${escH(s.name)}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${ic}</span>${big}</div><div class="systile-s">${sub}</div></div>`;
-  }).join('');
+  $('sensors-grid').innerHTML = list.map(s => sensorTile(s)).join('');
 }
 /* Eigene Schalter & Knoepfe (Software): Knopf = Drucktaste, Schalter = Kippschalter */
 const TILE_SVG = p => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -1646,20 +1710,12 @@ async function loadVirtual() {
   if (Date.now() - virtualTouched < 1200) return;                                    // gerade bedient: kurz nicht dazwischenzeichnen (der Aufruf nach dem Klick zeichnet ohnehin neu)
   card.hidden = false;
   if (virtualDragActive) return;
-  $('virtual-grid').innerHTML = list.map(v => `<div class="systile" data-tile-id="${escH(v.id)}"><div class="systile-t">${escH(v.name)}${v.pin_set ? ' 🔒' : ''}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(v.icon)}</span>
-      ${v.kind === 'button' ? `<button type="button" class="tilebtn${v.pin_set ? ' pinned' : ''}" title="${v.pin_set ? 'Drücken (PIN-geschützt)' : 'Drücken'}" aria-label="Drücken" onclick="virtualPress('${escH(v.id)}', this)">${TILE_ICON_PRESS}</button>`
-        : `<label class="switch${v.pin_set ? ' pinned' : ''}" ${v.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${v.on ? 'checked' : ''} onchange="virtualSet('${escH(v.id)}', this.checked, this)"><span class="slider"></span></label>`}</div>
-    <div class="systile-s">${v.kind === 'button' ? 'Knopf' : (v.kind === 'timer' ? (v.on ? 'läuft, noch <span class="vrem" data-rem="' + (v.remaining_s || 0) + '">' + fmtRemain(v.remaining_s || 0) + '</span>' : 'Timer aus') : (v.on ? 'an' : 'aus'))}${v.running ? ` · Ablauf läuft, noch <span class="vrem" data-rem="${v.running.remaining_s}">${fmtRemain(v.running.remaining_s)}</span>` : ''}</div></div>`).join('')
-    + wols.map(w => `<div class="systile" data-tile-id="${escH(w.id)}"><div class="systile-t">${escH(w.name)}${w.pin_set ? ' 🔒' : ''}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:30px;line-height:1.1">${escH(w.icon)}</span>
-        <button type="button" class="tilebtn${w.pin_set ? ' pinned' : ''}" title="${w.pin_set ? 'Aufwecken (PIN-geschützt)' : 'Aufwecken'}" aria-label="Aufwecken" onclick="wolWake('${escH(w.id)}', this)">${TILE_ICON_WAKE}</button></div>
-      <div class="systile-s">${w.up === true ? '🟢 erreichbar' : w.up === false ? '⚪ nicht erreichbar' : 'Wake-on-LAN'}</div></div>`).join('');
+  $('virtual-grid').innerHTML = list.map(v => virtualTile(v)).join('') + wols.map(w => wolTile(w)).join('');
   virtualFetchedAt = Date.now();
 }
 let virtualFetchedAt = 0, virtualLast = 0, virtualTouched = 0;
 function tickVirtual() {                          // Restzeit sekundengenau herunterzaehlen (der Server wird nur alle paar Sekunden gefragt)
-  const els = document.querySelectorAll('#virtual-grid .vrem'); if (!els.length) return;
+  const els = document.querySelectorAll('#virtual-grid .vrem, #fav-grid .vrem'); if (!els.length) return;
   const passed = Math.floor((Date.now() - virtualFetchedAt) / 1000);
   let zero = false;
   els.forEach(e => { const left = Math.max(0, +e.dataset.rem - passed); e.textContent = fmtRemain(left); if (left <= 0) zero = true; });
@@ -1682,7 +1738,7 @@ async function virtualCall(url, body, el, name, needsPin) {
     el.disabled = true; virtualTouched = Date.now();
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (r.ok) { virtualLastCall = await r.json().catch(() => null); virtualTouched = 0; loadVirtual(); return true; }
+      if (r.ok) { virtualLastCall = await r.json().catch(() => null); virtualTouched = 0; loadVirtual(); loadFavorites(); return true; }
       const j = await r.json().catch(() => ({}));
       if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; hint = 'Falsche PIN – bitte erneut'; needsPin = true; continue; }
       showToast(j.error || `Fehlgeschlagen (Server-Antwort ${r.status})`, true);
@@ -1692,7 +1748,7 @@ async function virtualCall(url, body, el, name, needsPin) {
   virtualTouched = 0; loadVirtual();
   return false;
 }
-const virtualItem = id => (virtualCache || []).find(v => v.id === id) || (wolCache || []).find(v => v.id === id) || {};
+const virtualItem = id => (virtualCache || []).find(v => v.id === id) || (wolCache || []).find(v => v.id === id) || favItem('virtual', id) || favItem('wol', id) || {};
 const wolWake = (id, el) => virtualCall('/api/wol/' + encodeURIComponent(id) + '/wake', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => { if (ok) showToast('Aufwecken gesendet ✓'); });
 const virtualPress = (id, el) => virtualCall('/api/virtual/' + encodeURIComponent(id) + '/press', {}, el, virtualItem(id).name, !!virtualItem(id).pin_set).then(ok => {
   if (!ok) return;
@@ -1716,7 +1772,7 @@ function showToast(text, isErr) {
 }
 async function shellySwitch(id, on, el) {
   if (DASHBOARD_LEVEL !== 'write') { showToast('Dieses Konto darf nur ansehen, nicht schalten.'); return; }
-  const dv = (shellyCache || []).find(x => x.id === id) || {};
+  const dv = (shellyCache || []).find(x => x.id === id) || favItem('shelly', id) || {};
   let needsPin = !!dv.pin_set, hint = dv.name, body = { on };
   for (;;) {
     if (needsPin) {
@@ -1735,8 +1791,8 @@ async function shellySwitch(id, on, el) {
     } catch (e) { showToast('Schalten fehlgeschlagen – Server nicht erreichbar', true); }
     break;
   }
-  loadShelly();
-  setTimeout(loadShelly, 2000);   // Leistungsmessung des Shelly braucht einen Moment
+  loadShelly(); loadFavorites();
+  setTimeout(() => { loadShelly(); loadFavorites(); }, 2000);   // Leistungsmessung des Shelly braucht einen Moment
 }
 /* Umsortieren wie bei den Live-Werten: lang druecken, dann ueber andere Kachel ziehen. */
 function initShellyDragging() { makeSortable('shelly-grid', '/api/shelly/order', v => { shellyDragActive = v; }); }
@@ -1790,6 +1846,9 @@ function makeSortable(gridId, saveUrl, setActive) {
 initShellyDragging();
 makeSortable('sensors-grid', '/api/sensors/order', v => { sensorsDragActive = v; });
 makeSortable('virtual-grid', '/api/virtual/order', v => { virtualDragActive = v; });
+makeSortable('fav-grid', '/api/favorites', v => { favDragActive = v; });
+loadFavorites();
+setInterval(loadFavorites, 5000);
 setInterval(loadShelly, 15000);
 
 /* --- Solar-Prognose aus dem VRM-Portal: fliesst in den Energieverlauf ein (Zugang in den Einstellungen; Server puffert 30 min) --- */

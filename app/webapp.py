@@ -316,7 +316,7 @@ for _f in ("tibber_token", "tariff_mode", "fixed_price_ct", "max_charge_soc", "a
 for _f in ("app_display_name", "show_live_values", "show_energy_chart", "show_flow_chart",
            "show_week_overview", "show_month_overview", "show_tibber_card", "show_override_card",
            "show_price_plan", "show_charge_log", "show_ev_card", "show_shelly_card", "show_sensors_card", "show_virtual_card",
-           "show_weather_card", "show_plansim_card", "show_savings_card", "show_verlauf_card", "tile_order",
+           "show_weather_card", "show_plansim_card", "show_savings_card", "show_verlauf_card", "show_favorites_card", "tile_order",
            "chart_energy_hourly", "chart_flow_hourly"):
     FIELD_AREA[_f] = "settings_anzeige"
 for _f in ("dry_run", "poll_seconds", "energy_sample_seconds"):          # Karte "Ladesteuerung" im Reiter Anlage
@@ -425,6 +425,13 @@ def _require_login():
     if request.endpoint == "api_my_tiles":
         # Die eigene Ansicht ansehen/laden braucht nur Lesezugriff aufs Dashboard; sie AENDERN (Seite "Meine Ansicht" in den
         # Einstellungen) nur, wenn dem Konto der Bereich "Einstellungen: Dashboard" nicht entzogen wurde.
+        blocked = _check_area("dashboard", "read")
+        if blocked or request.method in ("GET", "HEAD", "OPTIONS"):
+            return blocked
+        return _check_area("settings_anzeige", "read")
+    if request.endpoint == "api_favorites":
+        # Favoriten ansehen: Lesezugriff aufs Dashboard. Sterne setzen/sortieren ist Teil der eigenen Ansicht und braucht wie "Meine Ansicht"
+        # zusaetzlich den Bereich "Einstellungen: Dashboard" (wem der entzogen wurde, kann seine Ansicht nicht selbst aendern).
         blocked = _check_area("dashboard", "read")
         if blocked or request.method in ("GET", "HEAD", "OPTIONS"):
             return blocked
@@ -2456,13 +2463,13 @@ def setup():
 def admin():
     if not any(g.perms.get(x, "none") != "none" for x in SETTINGS_PAGE_AREAS):          # nichts einzustellen -> nicht auf einer leeren Seite landen
         return redirect(url_for("automation_page") if g.perms.get("automation", "none") != "none" else url_for("index"))
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, page_mode="admin")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), page_mode="admin")
 
 
 @app.route("/smarthome")
 def smarthome_page():
     """Smart Home: Geraete, Sensoren, Thermostate, Sicherheit, Suche, WOL - dieselbe Vorlage/Skripte wie /admin, nur andere Reiter."""
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, page_mode="smarthome")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), page_mode="smarthome")
 
 
 @app.route("/solar-log")
@@ -2643,6 +2650,7 @@ def api_status():
           "show_price_plan": bool(cfg.get("show_price_plan", True)),
           "show_charge_log": bool(cfg.get("show_charge_log", True)),
           "show_ev_card": bool(cfg.get("show_ev_card", True)),
+          "show_favorites_card": bool(cfg.get("show_favorites_card", True)),
           "show_shelly_card": bool(cfg.get("show_shelly_card", True)),
           "show_sensors_card": bool(cfg.get("show_sensors_card", True)),
           "show_virtual_card": bool(cfg.get("show_virtual_card", True)),
@@ -2650,6 +2658,7 @@ def api_status():
           "show_savings_card": bool(cfg.get("show_savings_card", True)),
           "show_verlauf_card": bool(cfg.get("show_verlauf_card", True)) and auth.has_level(g.perms, "verlauf", "read"),
           "show_plansim_card": bool(cfg.get("show_plansim_card", True)) and cfg.get("tariff_mode") != "fixed",
+          "can_favorite": auth.has_level(g.perms, "settings_anzeige", "read") and not demo.ACTIVE,          # Sterne setzen = die eigene Ansicht aendern (wie "Meine Ansicht")
           "tile_order": [k for k in (cfg.get("tile_order") or []) if isinstance(k, str)]}
     for k in auth._off(store.modules(cfg), auth.MODULE_TILES):             # Module aus: deren Kacheln sind weg (Daten bleiben)
         ui[k] = False
@@ -2720,6 +2729,76 @@ def api_my_tiles():
     except UserError as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(ok=True)
+
+
+def _fav_known(ref: str) -> bool:
+    """Gibt es den Eintrag und darf dieses Konto ihn sehen?"""
+    kind, _, item_id = ref.partition(":")
+    if kind not in _VIS_KINDS or kind not in auth.FAVORITE_KINDS:
+        return False
+    load, _save = _VIS_KINDS[kind]()
+    return any(x.get("id") == item_id and _visible(x) for x in load())
+
+
+def _fav_items(refs: list) -> list:
+    """Die Favoriten als Kacheldaten (gleiche Felder wie die Dashboard-Listen), in der Reihenfolge des Kontos. Nur Sichtbares, nur gewaehlte Arten abgefragt."""
+    kinds = {r.split(":", 1)[0] for r in refs}
+    data = {}
+    if "shelly" in kinds:
+        data["shelly"] = {d["id"]: d for d in _shelly_payload(False, True)}
+    if "sensor" in kinds:
+        try:
+            data["sensor"] = {d["id"]: d for d in _vis_filter(homematic.list_sensors_with_values(live=True))}
+        except Exception as e:                                                  # noqa: BLE001
+            log.warning("Favoriten (Sensoren): %s", e)
+            data["sensor"] = {}
+    if "virtual" in kinds:
+        data["virtual"] = {d["id"]: d for d in json.loads(api_virtual_list().get_data(as_text=True))}
+    if "wol" in kinds:
+        data["wol"] = {d["id"]: d for d in json.loads(api_wol_list().get_data(as_text=True))}
+    out = []
+    for r in refs:
+        kind, _, item_id = r.partition(":")
+        it = (data.get(kind) or {}).get(item_id)
+        if it is not None:
+            out.append({"ref": r, "kind": kind, "item": it})
+    return out
+
+
+@app.route("/api/favorites", methods=["GET", "POST"])
+def api_favorites():
+    """Favoriten (Sterne) des angemeldeten Kontos - rein persoenlich. GET: Kacheldaten (?refs=1: nur die Liste der Verweise).
+    POST {ref, on}: Stern setzen/entfernen; POST {ids}: Reihenfolge der Favoriten."""
+    user = users.get(g.user) or {}
+    refs = auth.normalize_favorites(user.get("favorites"))
+    if request.method == "GET":
+        if not store.module_on("smarthome"):
+            return jsonify(refs=[], items=[])
+        if request.args.get("refs") == "1":
+            return jsonify(refs=refs)
+        return jsonify(refs=refs, items=_fav_items(refs))
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo werden keine Favoriten gespeichert."), 403
+    body = request.get_json(silent=True) or {}
+    if isinstance(body.get("ids"), list):
+        order = [r for r in body["ids"] if isinstance(r, str) and r in refs]
+        refs = order + [r for r in refs if r not in order]
+    else:
+        ref = body.get("ref")
+        if not isinstance(ref, str) or ":" not in ref:
+            return jsonify(error="ref fehlt"), 400
+        if bool(body.get("on")):
+            if not _fav_known(ref):
+                return jsonify(error="nicht gefunden"), 404
+            if ref not in refs:
+                refs.append(ref)
+        else:
+            refs = [r for r in refs if r != ref]
+    try:
+        users.set_favorites(g.user, refs)
+    except UserError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(ok=True, refs=auth.normalize_favorites(refs))
 
 
 @app.route("/api/history")
@@ -2935,7 +3014,7 @@ def api_config():
                "show_live_values", "show_energy_chart", "show_flow_chart",
                "show_week_overview", "show_month_overview", "show_tibber_card",
                "show_override_card", "show_price_plan", "show_charge_log",
-               "show_ev_card", "show_shelly_card", "show_sensors_card", "show_virtual_card", "show_weather_card", "show_plansim_card", "show_savings_card", "show_verlauf_card", "pv_auto_calibration", "smart_planner_enabled", "surplus_enabled", "surplus_dry_run", "rules_enabled", "rules_dry_run", "rules_manual_hold_min", "rules_failsafe_min",
+               "show_ev_card", "show_favorites_card", "show_shelly_card", "show_sensors_card", "show_virtual_card", "show_weather_card", "show_plansim_card", "show_savings_card", "show_verlauf_card", "pv_auto_calibration", "smart_planner_enabled", "surplus_enabled", "surplus_dry_run", "rules_enabled", "rules_dry_run", "rules_manual_hold_min", "rules_failsafe_min",
                "surplus_min_soc", "tile_order", "scan_networks",
                "has_pv_inverter", "has_mppt", "tariff_mode",
                "fixed_price_ct", "pv_inverters",
@@ -3248,7 +3327,11 @@ def api_shelly_list():
     """?dashboard=1: nur die in den Einstellungen fuers Dashboard freigegebenen."""
     if not store.module_on("smarthome"):
         return jsonify([])                                   # Modul Smart Home aus (Geraete bleiben gespeichert)
-    devs = _vis_filter(shelly.list_with_status(only_shown=request.args.get("dashboard") == "1", live=request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
+    return jsonify(_shelly_payload(request.args.get("dashboard") == "1", request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
+
+
+def _shelly_payload(only_shown: bool, live: bool) -> list:
+    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live))
     ruled = {i for r in rules.list_rules() if r.get("enabled", True) for i in rules.devices_of(r)} if rules.enabled(store.load_config()) else set()
     show_ip = auth.has_level(g.perms, "settings_geraete", "write")
     for d in devs:
@@ -3256,7 +3339,7 @@ def api_shelly_list():
         if not show_ip and d.get("ip"):
             d["ip_hidden"] = True
             d["ip"] = "•.•.•.•"                    # interne IP nicht ohne Schreibrecht auf Geraete-Verwaltung zeigen
-    return jsonify(devs)
+    return devs
 
 
 @app.route("/api/shelly/auto", methods=["GET"])

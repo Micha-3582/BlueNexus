@@ -116,6 +116,7 @@ DASHBOARD_TILES = [
     ("show_price_plan", "Strompreis & Ladeplan", "Preiskurve mit Ladeplan, manuelle Termine markieren."),
     ("show_charge_log", "Ladevorgänge (heute)", "Protokoll geplanter/durchgeführter Ladungen."),
     ("show_ev_card", "Manuelle Ladetermine", "Formular zum Anlegen eines Ladetermins."),
+    ("show_favorites_card", "Favoriten", "Deine mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle (Sterne setzt jedes Konto für sich)."),
     ("show_shelly_card", "Geräte (Smart Home)", "Schalter für Steckdosen, Lichter und andere Aktoren (Shelly, Tasmota, Tuya, Homematic)."),
     ("show_virtual_card", "Eigene Schalter & Aktionen (Software)", "Selbst angelegte Knöpfe und Schalter sowie „Rechner aufwecken“ (Wake-on-LAN)."),
     ("show_sensors_card", "Sensoren (Smart Home)", "Ja/Nein-Anzeige und Messwerte der Sensoren (z. B. Fenster, Bewegung, Temperatur)."),
@@ -137,7 +138,7 @@ MODULE_AREAS = {
 MODULE_TILES = {
     "energy": ("show_live_values", "show_energy_chart", "show_flow_chart", "show_week_overview", "show_month_overview", "show_tibber_card",
                "show_override_card", "show_price_plan", "show_charge_log", "show_ev_card", "show_savings_card", "show_plansim_card"),
-    "smarthome": ("show_shelly_card", "show_virtual_card", "show_sensors_card"),
+    "smarthome": ("show_favorites_card", "show_shelly_card", "show_virtual_card", "show_sensors_card"),
     "cameras": (),
     "verlauf": ("show_verlauf_card",),
 }
@@ -182,6 +183,18 @@ def normalize_tiles(tiles) -> list | None:
         return None
     keep = [k for k in tiles if k in DASHBOARD_TILE_KEYS]
     return keep if len(keep) < len(DASHBOARD_TILE_KEYS) else None    # alles angehakt = keine Einschraenkung
+
+
+FAVORITE_KINDS = ("shelly", "sensor", "virtual", "wol")
+
+
+def normalize_favorites(refs) -> list:
+    """Favoriten-Liste bereinigen: nur "art:id" mit bekannter Art, eindeutig, begrenzt."""
+    out = []
+    for r in refs if isinstance(refs, list) else []:
+        if isinstance(r, str) and ":" in r and r.split(":", 1)[0] in FAVORITE_KINDS and 0 < len(r.split(":", 1)[1]) <= 64 and r not in out and len(out) < 300:
+            out.append(r)
+    return out
 
 
 def complete_tile_order(order) -> list:
@@ -445,6 +458,22 @@ class UserStore:
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
             user["dashboard_order"] = normalize_tile_order(order)
+            self._write()
+            return dict(user)
+
+    def set_favorites(self, username: str, refs) -> dict:
+        """Favoriten des Kontos (Sterne): geordnete Liste wie "shelly:ID", "sensor:ID", "virtual:ID", "wol:ID" - rein persoenlich."""
+        key = _norm(username)
+        clean = normalize_favorites(refs)
+        with self._lock:
+            self._sync()
+            user = self._users.get(key)
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            if clean:
+                user["favorites"] = clean
+            else:
+                user.pop("favorites", None)
             self._write()
             return dict(user)
 
