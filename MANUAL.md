@@ -899,6 +899,7 @@ Werte von `state` für Ja/Nein-Sensoren (ist ein Sensor in BlueNexus „umgekehr
 | `contact` (Tür/Fenster/Tor) | `open` | `closed` |
 | `lock` (Schloss) | `locked` | `unlocked` |
 | `motion` | `motion` | `none` |
+| Kamera-Erkennung: Person / Fahrzeug / Tier / Klingel | `person` / `vehicle` / `animal` / `ring` | `none` |
 | `presence` | `present` | `absent` |
 | `input` | `active` | `inactive` |
 | `key_short`, `key_long` (Taster) | `pressed` | `idle` |

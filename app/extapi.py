@@ -284,6 +284,14 @@ _SENSOR_WORDS = {
     "key_long": ("pressed", "idle", "lang gedrückt", "nicht gedrückt"),
     "key_long_release": ("released", "idle", "lang losgelassen", "nicht losgelassen"),
 }
+# Kamera-Erkennungen (Reolink): je Erkennungsart eigene Worte (die Sensoren laufen intern alle als Art "motion")
+_CAMERA_WORDS = {
+    "md": ("motion", "none", "Bewegung", "keine Bewegung"),
+    "people": ("person", "none", "Person erkannt", "keine Person"),
+    "vehicle": ("vehicle", "none", "Fahrzeug erkannt", "kein Fahrzeug"),
+    "dog_cat": ("animal", "none", "Tier erkannt", "kein Tier"),
+    "visitor": ("ring", "none", "Klingel gedrückt", "nicht geklingelt"),
+}
 _track: dict = {}
 _track_loaded = False
 _track_saved = 0.0
@@ -333,6 +341,8 @@ def _sensor_item(s: dict, now: float) -> dict:
     state, text = None, "kein Wert"
     if ok and binary:
         w = _SENSOR_WORDS.get(s.get("kind"), ("on", "off", "Ja", "Nein"))
+        if s.get("source") == "camera" and s.get("datapoint") in _CAMERA_WORDS:
+            w = _CAMERA_WORDS[s["datapoint"]]
         if s.get("invert"):
             w = (w[1], w[0], w[3], w[2])
         state, text = (w[0], w[2]) if v else (w[1], w[3])
