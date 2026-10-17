@@ -1053,17 +1053,18 @@ function renderMyTileToggles() {
   const defs = myTileOrder.map(k => myTileDefs.find(t => t.key === k)).filter(Boolean);   // vom Admin nicht freigegebene Kacheln stehen gar nicht erst in myTileDefs
   document.getElementById('my-tile-toggles').innerHTML = defs.map((t, i) => `
     <div style="display:flex;align-items:center;gap:14px">
-      <label class="switch" style="margin:0"><input type="checkbox" id="my-${t.key}"><span class="slider"></span></label>
+      <label class="switch" style="margin:0"><input type="checkbox" id="my-${t.key}"${t.key === 'show_favorites_card' ? ' checked disabled title="Favoriten sind immer da"' : ''}><span class="slider"></span></label>
       <div style="flex:1;min-width:0"><b>${t.label}</b><div class="muted">${t.hint}</div></div>
       <button type="button" class="ghost" onclick="moveMyTile('${t.key}', -1)" ${i === 0 ? 'disabled' : ''} title="Weiter nach oben">▲</button>
       <button type="button" class="ghost" onclick="moveMyTile('${t.key}', 1)" ${i === defs.length - 1 ? 'disabled' : ''} title="Weiter nach unten">▼</button>
     </div>`).join('');
-  myTileDefs.forEach(t => { if (t.key in checks) document.getElementById('my-' + t.key).checked = checks[t.key]; });
+  myTileDefs.forEach(t => { if (t.key in checks && t.key !== 'show_favorites_card') document.getElementById('my-' + t.key).checked = checks[t.key]; });
 }
 async function loadMyTiles() {
   let d; try { d = await (await fetch('/api/my-tiles')).json(); } catch (e) { return; }
   myAdminCeiling = d.admin_tiles;
   const allowedKeys = new Set(myAdminCeiling || d.tiles.map(([key]) => key));
+  allowedKeys.add('show_favorites_card');                        // Favoriten sind immer da (nur die Position ist waehlbar)
   myTileDefs = d.tiles.filter(([key]) => allowedKeys.has(key)).map(([key, label, hint]) => ({ key, label, hint }));
   myBaseOrder = (d.base_order || []).filter(k => allowedKeys.has(k));            // Grundlage: Vorgabe des Admins bzw. globale Reihenfolge
   myTileOrder = (d.my_order || d.base_order || []).filter(k => allowedKeys.has(k));
@@ -1071,7 +1072,7 @@ async function loadMyTiles() {
   renderMyTileToggles();
   myTileDefs.forEach(t => {
     const el = document.getElementById('my-' + t.key);
-    if (el) el.checked = !d.my_tiles || d.my_tiles.includes(t.key);
+    if (el) el.checked = t.key === 'show_favorites_card' || !d.my_tiles || d.my_tiles.includes(t.key);
   });
 }
 document.getElementById('my-tiles-save').addEventListener('click', async () => {
@@ -1502,7 +1503,7 @@ function tilesHtml(idPrefix, tiles, order) {
     <div class="tile-list" data-prefix="${idPrefix}">${keys.map(k => { const [, label] = byKey[k]; return `
       <div class="tile-row" data-tile-row="${k}">
         <button type="button" class="ghost tile-mv" data-dir="-1" title="Nach oben" aria-label="Nach oben">▲</button><button type="button" class="ghost tile-mv" data-dir="1" title="Nach unten" aria-label="Nach unten">▼</button>
-        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) ? 'checked' : ''}><span>${escHUsers(label)}</span></label>
+        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) || k === 'show_favorites_card' ? 'checked' : ''}${k === 'show_favorites_card' ? ' disabled' : ''}><span>${escHUsers(label)}${k === 'show_favorites_card' ? ' <span class="muted">(immer an)</span>' : ''}</span></label>
       </div>`; }).join('')}</div>
   </div>`;
 }
@@ -1846,7 +1847,7 @@ async function pickVisibility(kind, id, btn) {
 const I_BELL = svgi('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');
 const I_CHECK = svgi('<polyline points="20 6 9 17 4 12"/>');
 const I_STAR = svgi('<polygon points="12 2.5 14.9 8.7 21.5 9.5 16.6 14 17.9 20.6 12 17.3 6.1 20.6 7.4 14 2.5 9.5 9.1 8.7"/>');
-const canFav = () => ((window.USER_PERMS || {}).settings_anzeige || 'none') !== 'none' && !window.DEMO_VIEW;
+const canFav = () => ((window.USER_PERMS || {}).dashboard || 'none') !== 'none' && !window.DEMO_VIEW;      // jedes Konto mit Dashboard-Zugriff
 /* Favoriten-Stern (persoenlich, pro Konto): kind = shelly | sensor | virtual | wol */
 const favBtn = (kind, id) => !canFav() ? '' : `<button type="button" class="tgl fav${window.FAVS.has(kind + ':' + id) ? ' on' : ''}" aria-pressed="${window.FAVS.has(kind + ':' + id) ? 'true' : 'false'}" title="Favorit – erscheint in der Kachel „Favoriten“ auf dem Dashboard" aria-label="Favorit" onclick="favToggle(this,'${kind}','${id}')">${I_STAR}</button>`;
 async function favToggle(btn, kind, id) {
@@ -1891,6 +1892,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
+        ${favBtn('shelly', id)}
         <button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>
         </div>
       </div>
@@ -1901,7 +1903,6 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="shellyRenameSave('${id}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
-          ${favBtn('shelly', id)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
           ${visBtn('shelly', id, d.users)}
           ${shareBtn('shelly', id, d.kind === 'remote')}
@@ -2354,13 +2355,13 @@ async function loadSensorsAdmin(light) {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="sensorPickIcon('${sid}')">${escH(s.icon || SENSOR_ICON[s.kind] || '📡')}</button>
       <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b>${shareMark('sensor', sid, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : s.source === 'camera' ? ' · Kamera' : ''}${s.room ? ' · ' + escH(s.room) : ''} · <b>${escH(sensorValueText(s))}</b></div></div>
+      ${favBtn('sensor', sid)}
       <button class="ghost admin-only" onclick="editToggle('sedit-${sid}')" title="Bearbeiten: Name, Dashboard, Umkehren, Entfernen">✎</button></div>
       <div class="edit-panel" id="sedit-${sid}">
         <div class="edit-row"><input id="sname-${sid}" value="${escH(s.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')sensorRenameSave('${sid}')">
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="sensorRenameSave('${sid}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(s.show !== false, I_EYE, 'Auf dem Dashboard in der Kachel „Sensoren“ zeigen', `tglField(this,'sensor','${sid}','show','Dashboard')`)}
-          ${favBtn('sensor', sid)}
           ${visBtn('sensor', sid, s.users)}
           ${shareBtn('sensor', sid, s.source === 'remote')}
           ${s.binary && !/^key_/.test(s.kind) ? tglBtn(!!s.invert, I_SWAP, `${INV_LABEL[s.kind] || 'Umkehren'} – Legt fest, was TRUE bedeutet. An: ${INV_ON[s.kind] || 'TRUE und FALSE vertauscht'}. Aus: ${INV_OFF[s.kind] || 'wie vom Sensor gemeldet'}.`, `tglField(this,'sensor','${sid}','invert','${escH(INV_LABEL[s.kind] || 'Umkehren')}')`) : ''}
@@ -2414,6 +2415,7 @@ async function loadWolAdmin(light) {
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`wolPin('${wid}', ${w.pin_set ? 'true' : 'false'})`, !!w.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('wedit-${wid}')" title="Bearbeiten: Name, Dashboard, Sichtbarkeit, Entfernen">✎</button>
+      ${favBtn('wol', wid)}
       <button type="button" class="tgl${w.pin_set ? ' pinned' : ''}" style="opacity:1" title="Jetzt aufwecken (Wake-on-LAN-Paket senden)" aria-label="Aufwecken" onclick="wolTest('${wid}', ${w.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(w.name)}">${I_BELL}</button>
       </div></div>
       <div class="edit-panel" id="wedit-${wid}">
@@ -2421,7 +2423,6 @@ async function loadWolAdmin(light) {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="wolRenameSave('${wid}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(w.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'wol','${wid}','show','Dashboard')`)}
-          ${favBtn('wol', wid)}
           ${visBtn('wol', wid, w.users)}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="wolRemove('${wid}')">${I_TRASH}</button>
         </div>
@@ -2637,6 +2638,7 @@ async function loadVirtualAdmin() {
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`virtPin('${vid}', ${v.pin_set ? 'true' : 'false'})`, !!v.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('vedit-${vid}')" title="Bearbeiten: Name, Dashboard, Entfernen">✎</button>
+      ${favBtn('virtual', vid)}
       <button type="button" class="tgl${isSw && v.on ? ' on' : ''}${v.pin_set ? ' pinned' : ''}" style="opacity:1" title="${isSw ? (v.on ? 'Ausschalten' : 'Einschalten') : 'Drücken'}" aria-label="${isSw ? 'Schalten' : 'Drücken'}" onclick="virtAct('${vid}', ${isSw ? 'true' : 'false'}, ${v.on ? 'true' : 'false'}, ${v.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(v.name)}">${isSw ? I_SWITCH : I_PLAY}</button>
       </div></div>
       <div class="edit-panel" id="vedit-${vid}">
@@ -2649,7 +2651,6 @@ async function loadVirtualAdmin() {
           ${v.has_url ? `<select style="width:auto" title="Art des Aufrufs" onchange="virtPatch('${vid}', { method: this.value })"><option value="GET"${v.method !== 'POST' ? ' selected' : ''}>GET</option><option value="POST"${v.method === 'POST' ? ' selected' : ''}>POST</option></select>` : ''}</div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(v.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'virtual','${vid}','show','Dashboard')`)}
-          ${favBtn('virtual', vid)}
           ${visBtn('virtual', vid, v.users)}
           ${shareBtn('virtual', vid, false)}
           ${v.nfc ? '' : `<button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="virtRemove('${vid}')">${I_TRASH}</button>`}

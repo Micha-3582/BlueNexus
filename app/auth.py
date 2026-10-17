@@ -116,7 +116,7 @@ DASHBOARD_TILES = [
     ("show_price_plan", "Strompreis & Ladeplan", "Preiskurve mit Ladeplan, manuelle Termine markieren."),
     ("show_charge_log", "Ladevorgänge (heute)", "Protokoll geplanter/durchgeführter Ladungen."),
     ("show_ev_card", "Manuelle Ladetermine", "Formular zum Anlegen eines Ladetermins."),
-    ("show_favorites_card", "Favoriten", "Deine mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle (Sterne setzt jedes Konto für sich)."),
+    ("show_favorites_card", "Favoriten", "Immer für alle Konten da (nicht abwählbar): die mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle – Sterne setzt jedes Konto für sich."),
     ("show_shelly_card", "Geräte (Smart Home)", "Schalter für Steckdosen, Lichter und andere Aktoren (Shelly, Tasmota, Tuya, Homematic)."),
     ("show_virtual_card", "Eigene Schalter & Aktionen (Software)", "Selbst angelegte Knöpfe und Schalter sowie „Rechner aufwecken“ (Wake-on-LAN)."),
     ("show_sensors_card", "Sensoren (Smart Home)", "Ja/Nein-Anzeige und Messwerte der Sensoren (z. B. Fenster, Bewegung, Temperatur)."),
@@ -126,6 +126,7 @@ DASHBOARD_TILES = [
     ("show_weather_card", "Wetter", "Wettervorhersage für den Standort (Standort im Reiter „Wetter“)."),
 ]
 DASHBOARD_TILE_KEYS = [k for k, _, _ in DASHBOARD_TILES]
+ALWAYS_TILES = {"show_favorites_card"}          # fuer jedes Konto da: Admin-Obergrenze und "Meine Ansicht" schraenken sie nicht ein (Position bleibt waehlbar)
 
 # Module (siehe store.modules): welche Rechte-Bereiche und Dashboard-Kacheln nur zu einem Modul gehoeren. Ist ein Modul aus, gelten seine
 # Bereiche fuer alle Konten als "Kein Zugriff" (gespeicherte Rechte bleiben unveraendert und wirken wieder, sobald das Modul an ist).

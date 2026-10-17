@@ -431,12 +431,9 @@ def _require_login():
             return blocked
         return _check_area("settings_anzeige", "read")
     if request.endpoint == "api_favorites":
-        # Favoriten ansehen: Lesezugriff aufs Dashboard. Sterne setzen/sortieren ist Teil der eigenen Ansicht und braucht wie "Meine Ansicht"
-        # zusaetzlich den Bereich "Einstellungen: Dashboard" (wem der entzogen wurde, kann seine Ansicht nicht selbst aendern).
-        blocked = _check_area("dashboard", "read")
-        if blocked or request.method in ("GET", "HEAD", "OPTIONS"):
-            return blocked
-        return _check_area("settings_anzeige", "read")
+        # Favoriten sind fuer jedes Konto da, das aufs Dashboard darf (auch nur lesend): ansehen, Sterne setzen, sortieren - rein persoenlich,
+        # ohne dass ein Administrator etwas freigeben muss. Schalten laeuft weiter ueber die normalen Endpunkte mit ihren Rechten.
+        return _check_area("dashboard", "read")
     if request.endpoint == "api_cameras_my_order":                 # eigene Kamera-Reihenfolge: jedes Konto mit Recht "Kameras" (auch nur Lesen)
         return _check_area("kameras", "read")
     any_areas = ANY_READ.get(request.endpoint)
@@ -2661,7 +2658,7 @@ def api_status():
           "show_savings_card": bool(cfg.get("show_savings_card", True)),
           "show_verlauf_card": bool(cfg.get("show_verlauf_card", True)) and auth.has_level(g.perms, "verlauf", "read"),
           "show_plansim_card": bool(cfg.get("show_plansim_card", True)) and cfg.get("tariff_mode") != "fixed",
-          "can_favorite": auth.has_level(g.perms, "settings_anzeige", "read"),          # Sterne setzen = die eigene Ansicht aendern (wie "Meine Ansicht")
+          "can_favorite": auth.has_level(g.perms, "dashboard", "read"),          # Sterne setzen darf jedes Konto mit Dashboard-Zugriff
           "tile_order": [k for k in (cfg.get("tile_order") or []) if isinstance(k, str)]}
     for k in auth._off(store.modules(cfg), auth.MODULE_TILES):             # Module aus: deren Kacheln sind weg (Daten bleiben)
         ui[k] = False
@@ -2674,7 +2671,7 @@ def api_status():
     for restriction in (admin_tiles, my_tiles):
         if restriction is not None:
             for k in auth.DASHBOARD_TILE_KEYS:
-                if k not in restriction:
+                if k not in restriction and k not in auth.ALWAYS_TILES:               # Favoriten: immer da, weder Obergrenze noch "Meine Ansicht" nehmen sie weg
                     ui[k] = False
     return jsonify({
         "status": status,
