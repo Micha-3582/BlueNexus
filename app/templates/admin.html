@@ -902,7 +902,7 @@
 </div>
 
 <div class="card msg-host" id="nfc-card" data-tab="nfc" data-area="smarthome_nfc">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7a4 4 0 0 1 6 0M10.5 10a1.5 1.5 0 0 1 3 0"/><circle cx="12" cy="18" r=".6"/></svg>NFC + QR <span class="qhelp" role="button" tabindex="0" data-help="Mit dem Handy einen NFC-Tag scannen löst einen eigenen Knopf oder Schalter aus – ohne dass die App geöffnet sein muss. Auf den Tag schreibst du die Adresse (z. B. mit der kostenlosen App „NFC Tools“: Schreiben → Datensatz hinzufügen → URL). Der Tag muss ein NFC-Tag sein (NTAG/MIFARE, 13,56 MHz); ältere 125-kHz-RFID-Tags kann ein Handy nicht lesen.<br><br><b>QR-Etikett:</b> Mit „🏷 Etikett“ am Tag druckst du denselben Link als QR-Code mit dem Namen auf ein Niimbot-Etikett (Bluetooth-Drucker D110, am Android-Handy mit Chrome). Wer den Code mit der Handy-Kamera scannt, löst genauso aus wie beim Tag.<br><br><b>Sicherheit:</b> Ausgelöst wird nur von einem <b>registrierten Handy</b>. Ein kopierter Tag nützt nichts, und registrierte Handys lassen sich jederzeit löschen. PIN-geschützte Knöpfe sind ausgeschlossen. Was der Knopf bewirkt, legst du in <a href='/rules'>Regeln</a> fest („WENN Knopf gedrückt“).">?</span></h2>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7a4 4 0 0 1 6 0M10.5 10a1.5 1.5 0 0 1 3 0"/><circle cx="12" cy="18" r=".6"/></svg>NFC + QR <span class="qhelp" role="button" tabindex="0" data-help="Mit dem Handy einen NFC-Tag scannen löst einen eigenen Knopf oder Schalter aus – ohne dass die App geöffnet sein muss. Auf den Tag schreibst du die Adresse (z. B. mit der kostenlosen App „NFC Tools“: Schreiben → Datensatz hinzufügen → URL). Der Tag muss ein NFC-Tag sein (NTAG/MIFARE, 13,56 MHz); ältere 125-kHz-RFID-Tags kann ein Handy nicht lesen.<br><br><b>QR-Etikett:</b> Mit „🏷 QR-Code“ am Tag druckst du denselben Link als QR-Code mit dem Namen auf ein Niimbot-Etikett (Bluetooth-Drucker D110, am Android-Handy mit Chrome). Wer den Code mit der Handy-Kamera scannt, löst genauso aus wie beim Tag.<br><br><b>Sicherheit:</b> Ausgelöst wird nur von einem <b>registrierten Handy</b>. Ein kopierter Tag nützt nichts, und registrierte Handys lassen sich jederzeit löschen. PIN-geschützte Knöpfe sind ausgeschlossen. Was der Knopf bewirkt, legst du in <a href='/rules'>Regeln</a> fest („WENN Knopf gedrückt“).">?</span></h2>
   <div class="sub">Tag oder QR-Code scannen, Knopf auslösen – nur von registrierten Handys.</div>
   <label>Adresse für die Tags <span class="qhelp" role="button" tabindex="0" data-help="Unter dieser Adresse erreicht das Handy die Zentrale. Empfohlen ist die Adresse des Fernzugriffs (https://…): Sie funktioniert zu Hause und unterwegs, und die Registrierung eines Handys gilt immer für genau diese Adresse. Leer = Adresse, unter der du diese Seite gerade geöffnet hast. Nach einer Änderung müssen die Tags neu beschrieben und die Handys neu registriert werden.">?</span></label>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="nfc-base" placeholder="https://nexus.deine-domain.de" autocomplete="off" style="flex:1;min-width:220px"><button id="nfc-base-save" class="ghost" type="button">Speichern</button></div>
@@ -3401,9 +3401,9 @@ async function nfcLoad() {
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:20px">🏷️</span>
         <div style="flex:1;min-width:150px"><b>${escH(t.name)}</b><div class="muted">löst aus: ${tgt ? escH(tgt.name) : '<span style="color:#e5544a">(Ziel fehlt oder PIN-geschützt)</span>'} · erlaubt: ${escH(who)}<br>zuletzt: ${nfcWhen(t.last_used)}</div></div>
-        ${d.masked ? '' : (wst.kind === 'desktop' ? '' : `<button class="ghost" type="button" title="Den Tag mit diesem Handy beschreiben (Android/Chrome)" onclick="nfcWrite('${escH(t.id)}')">✍ Beschreiben</button>`)}
+        ${d.masked ? '' : (wst.kind === 'desktop' ? '' : `<button class="ghost" type="button" title="Den Tag mit diesem Handy beschreiben (Android/Chrome)" onclick="nfcWrite('${escH(t.id)}')">✍ NFC beschreiben</button>`)}
         ${d.masked || wst.kind === 'ok' ? '' : `<button class="ghost" type="button" title="Adresse des Tags kopieren (für eine NFC-App)" onclick="nfcCopy('${escH(t.id)}')">📋 Adresse</button>`}
-        ${d.masked || est.kind === 'other' ? '' : `<button class="ghost" type="button" title="QR-Code mit Namen auf ein Niimbot-Etikett drucken" onclick="etikettDrucken('${escH(t.id)}')">🏷 Etikett</button>`}
+        ${d.masked || est.kind === 'other' ? '' : `<button class="ghost" type="button" title="QR-Code mit Namen auf ein Niimbot-Etikett drucken" onclick="etikettDrucken('${escH(t.id)}')">🏷 QR-Code</button>`}
         <button class="ghost" type="button" title="Welche Handys dürfen diesen Tag nutzen?" onclick="editToggle('nfcw-${escH(t.id)}')">✎</button>
         <button class="tgl del" type="button" title="Tag löschen" onclick="nfcDelTag('${escH(t.id)}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>
       <div class="edit-panel" id="nfcw-${escH(t.id)}" style="margin-top:8px">
@@ -3419,10 +3419,10 @@ async function nfcLoad() {
 /* --- QR-Etikett drucken (Niimbot per Web Bluetooth; Code in /static/etikett/, wird erst beim ersten Klick geladen) --- */
 function etikettState() {
   const android = /Android/i.test(navigator.userAgent || '');
-  if (!android) return { ok: false, kind: 'other', text: 'Etiketten drucken geht am Android-Handy (Chrome): Öffne BlueNexus dort und drücke bei einem Tag „🏷 Etikett“.' };
+  if (!android) return { ok: false, kind: 'other', text: 'Etiketten drucken geht am Android-Handy (Chrome): Öffne BlueNexus dort und drücke bei einem Tag „🏷 QR-Code“.' };
   if (!window.isSecureContext) return { ok: false, kind: 'http', text: 'Etiketten drucken geht nur über eine sichere Adresse (https://, z. B. dein Fernzugriff).' };
   if (!navigator.bluetooth) return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine Bluetooth-Drucker ansprechen. Öffne BlueNexus in Chrome, um Etiketten zu drucken.' };
-  return { ok: true, kind: 'ok', text: 'Etiketten mit QR-Code und Namen drucken: „🏷 Etikett“ am Tag (Niimbot-Drucker D110, per Bluetooth).' };
+  return { ok: true, kind: 'ok', text: 'Etiketten mit QR-Code und Namen drucken: „🏷 QR-Code“ am Tag (Niimbot-Drucker D110, per Bluetooth).' };
 }
 let etikettLoading = null;
 function etikettLoad() {
@@ -3445,9 +3445,9 @@ function nfcWriteState() {
   const ua = navigator.userAgent || '';
   const apple = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);          // iPhone, iPad (auch als "Mac" getarnt)
   const android = /Android/i.test(ua);
-  if ('NDEFReader' in window && window.isSecureContext) return { ok: true, kind: 'ok', text: 'Dieses Handy kann Tags beschreiben: „✍ Beschreiben“ drücken und das Handy an den Tag halten.' };
+  if ('NDEFReader' in window && window.isSecureContext) return { ok: true, kind: 'ok', text: 'Dieses Handy kann Tags beschreiben: „✍ NFC beschreiben“ drücken und das Handy an den Tag halten.' };
   if (apple) return { ok: false, kind: 'apple', text: 'Auf iPhone und iPad können Webseiten und Apps ohne Zusatzprogramm keine NFC-Tags beschreiben – das ist eine Einschränkung von Apple, BlueNexus ist nicht kaputt. Beschreibe den Tag mit einem Android-Handy (dort geht es direkt hier) oder mit einer NFC-App wie „NFC Tools“ (Knopf „📋 Adresse“, dann in der App Schreiben → Datensatz hinzufügen → URL). Scannen funktioniert auf dem iPhone ganz normal.' };
-  if (!android) return { ok: false, kind: 'desktop', text: 'Am PC gibt es keine NFC-Schnittstelle. Öffne BlueNexus zum Beschreiben auf einem Android-Handy (Chrome) und drücke dort „✍ Beschreiben“.' };
+  if (!android) return { ok: false, kind: 'desktop', text: 'Am PC gibt es keine NFC-Schnittstelle. Öffne BlueNexus zum Beschreiben auf einem Android-Handy (Chrome) und drücke dort „✍ NFC beschreiben“.' };
   if (!window.isSecureContext) return { ok: false, kind: 'http', text: 'Das Beschreiben geht nur über eine sichere Adresse (https://, z. B. dein Fernzugriff). Öffne BlueNexus am Handy über diese Adresse.' };
   return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine NFC-Tags beschreiben. Öffne BlueNexus in Chrome (Android); Samsung Internet und Firefox unterstützen das nicht.' };
 }

@@ -23,7 +23,7 @@
     if (!/Android/i.test(navigator.userAgent || '')) return { ok: false, kind: 'other', text: 'Etiketten drucken geht am Android-Handy (Chrome): Öffne BlueNexus dort.' };
     if (!window.isSecureContext) return { ok: false, kind: 'http', text: 'Das Drucken geht nur über eine sichere Adresse (https://, z. B. dein Fernzugriff). Öffne BlueNexus über diese Adresse.' };
     if (!navigator.bluetooth) return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine Bluetooth-Drucker ansprechen. Öffne BlueNexus in Chrome.' };
-    return { ok: true, kind: 'ok', text: 'Etiketten mit QR-Code und Namen lassen sich mit einem Niimbot-Drucker (D110) drucken: „🏷 Etikett“ am Tag.' };
+    return { ok: true, kind: 'ok', text: 'Etiketten mit QR-Code und Namen lassen sich mit einem Niimbot-Drucker (D110) drucken: „🏷 QR-Code“ am Tag.' };
   }
 
   const lengthDots = () => Label.lengthDots(S.size === 'custom' ? Math.max(10, Math.min(80, Number(S.customMm) || 30)) : SIZES[S.size].mm);
@@ -50,7 +50,7 @@
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-start;justify-content:center;z-index:1000;padding:16px;overflow:auto';
     ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:440px;margin:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
-      <h3 style="margin:0 0 4px;font-size:18px">🏷 Etikett drucken</h3>
+      <h3 style="margin:0 0 4px;font-size:18px">🏷 QR-Etikett drucken</h3>
       <div class="muted" style="margin-bottom:12px">QR-Code und Name für den Tag „${esc(tagName)}“ (derselbe Link wie auf dem NFC-Tag).</div>
       <div style="background:#fff;border-radius:6px;padding:8px;display:inline-block;max-width:100%;overflow:auto"><canvas id="etk-prev" style="display:block;image-rendering:pixelated;max-width:100%;height:auto"></canvas></div>
       <div class="muted" id="etk-info" style="margin:6px 0 10px"></div>
