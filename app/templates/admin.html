@@ -1505,7 +1505,7 @@ function tilesHtml(idPrefix, tiles, order) {
     <div class="tile-list" data-prefix="${idPrefix}">${keys.map(k => { const [, label] = byKey[k]; return `
       <div class="tile-row" data-tile-row="${k}">
         <button type="button" class="ghost tile-mv" data-dir="-1" title="Nach oben" aria-label="Nach oben">▲</button><button type="button" class="ghost tile-mv" data-dir="1" title="Nach unten" aria-label="Nach unten">▼</button>
-        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) || k === 'show_favorites_card' ? 'checked' : ''}${k === 'show_favorites_card' ? ' disabled' : ''}><span>${escHUsers(label)}${k === 'show_favorites_card' ? ' <span class="muted">(immer erlaubt – das Konto entscheidet selbst)</span>' : ''}</span></label>
+        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) || k === 'show_favorites_card' ? 'checked' : ''}${k === 'show_favorites_card' ? ' disabled' : ''}><span>${escHUsers(label)}${k === 'show_favorites_card' ? '' : ''}</span></label>
       </div>`; }).join('')}</div>
   </div>`;
 }

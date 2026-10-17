@@ -116,7 +116,7 @@ DASHBOARD_TILES = [
     ("show_price_plan", "Strompreis & Ladeplan", "Preiskurve mit Ladeplan, manuelle Termine markieren."),
     ("show_charge_log", "Ladevorgänge (heute)", "Protokoll geplanter/durchgeführter Ladungen."),
     ("show_ev_card", "Manuelle Ladetermine", "Formular zum Anlegen eines Ladetermins."),
-    ("show_favorites_card", "Favoriten", "Für jedes Konto da (der Administrator kann sie niemandem nehmen): die mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle. Jedes Konto entscheidet unter „Meine Ansicht“ selbst, ob es sie sehen will."),
+    ("show_favorites_card", "Favoriten", "Die mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle."),
     ("show_shelly_card", "Geräte (Smart Home)", "Schalter für Steckdosen, Lichter und andere Aktoren (Shelly, Tasmota, Tuya, Homematic)."),
     ("show_virtual_card", "Eigene Schalter & Aktionen (Software)", "Selbst angelegte Knöpfe und Schalter sowie „Rechner aufwecken“ (Wake-on-LAN)."),
     ("show_sensors_card", "Sensoren (Smart Home)", "Ja/Nein-Anzeige und Messwerte der Sensoren (z. B. Fenster, Bewegung, Temperatur)."),
