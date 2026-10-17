@@ -2746,15 +2746,16 @@ def _fav_known(ref: str) -> bool:
     return any(x.get("id") == item_id and _visible(x) for x in load())
 
 
-def _fav_items(refs: list) -> list:
-    """Die Favoriten als Kacheldaten (gleiche Felder wie die Dashboard-Listen), in der Reihenfolge des Kontos. Nur Sichtbares, nur gewaehlte Arten abgefragt."""
+def _fav_items(refs: list, live: bool = True) -> list:
+    """Die Favoriten als Kacheldaten (gleiche Felder wie die Dashboard-Listen), in der Reihenfolge des Kontos. Nur Sichtbares, nur gewaehlte Arten abgefragt.
+    live=False: ohne Abfrage der Geraete/Sensoren/Ping (sofort da: Namen, Symbole, Reihenfolge) - die Eintraege tragen dann "pending": true."""
     kinds = {r.split(":", 1)[0] for r in refs}
     data = {}
     if "shelly" in kinds:
-        data["shelly"] = {d["id"]: d for d in _shelly_payload(False, True)}
+        data["shelly"] = {d["id"]: d for d in _shelly_payload(False, live)}
     if "sensor" in kinds:
         try:
-            data["sensor"] = {d["id"]: d for d in _vis_filter(homematic.list_sensors_with_values(live=True))}
+            data["sensor"] = {d["id"]: d for d in _vis_filter(homematic.list_sensors_with_values(live=live))}
         except Exception as e:                                                  # noqa: BLE001
             log.warning("Favoriten (Sensoren): %s", e)
             data["sensor"] = {}
@@ -2767,6 +2768,8 @@ def _fav_items(refs: list) -> list:
         kind, _, item_id = r.partition(":")
         it = (data.get(kind) or {}).get(item_id)
         if it is not None:
+            if not live and kind in ("shelly", "sensor", "wol"):
+                it["pending"] = True
             out.append({"ref": r, "kind": kind, "item": it})
     return out
 
@@ -2782,7 +2785,7 @@ def api_favorites():
             return jsonify(refs=[], items=[])
         if request.args.get("refs") == "1":
             return jsonify(refs=refs)
-        return jsonify(refs=refs, items=_fav_items(refs))
+        return jsonify(refs=refs, items=_fav_items(refs, live=request.args.get("light") != "1"))      # ?light=1: sofort, ohne Live-Abfrage der Geraete
     if demo.ACTIVE:
         return jsonify(error="In der Demo werden keine Favoriten gespeichert."), 403
     body = request.get_json(silent=True) or {}

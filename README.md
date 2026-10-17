@@ -281,7 +281,7 @@ Ersparnis · Wetter.
 
 - Welche Kacheln erscheinen, entscheidet der Admin global – jeder Benutzer stellt unter **„Meine Ansicht“**
   seine eigene Auswahl und Reihenfolge zusammen.
-- **Favoriten:** Jedes Gerät, jeder Sensor und jeder Schalter hat einen **Stern ☆** – wer ihn antippt, sieht das Ding zusätzlich in der Kachel **„Favoriten“** ganz oben, zum Schalten und Ablesen an einer Stelle. Jeder hat seine eigene Liste.
+- **Favoriten:** Unter *Smart Home* hat jedes Gerät, jeder Sensor und jeder Schalter einen **Stern ☆** – wer ihn antippt, sieht das Ding zusätzlich in der Kachel **„Favoriten“** ganz oben auf dem Dashboard, zum Schalten und Ablesen an einer Stelle. Jeder hat seine eigene Liste.
 - **Offen für andere Programme:** Unter *Einstellungen → System → Schnittstelle (API)* legst du für jedes Programm im Heimnetz einen Schlüssel an und gibst frei, was es lesen darf. Dann liefert `GET /api/v1/items` die Zustände als JSON (nur lesen, nur aus dem lokalen Netz – auch bei laufendem Fernzugriff nicht von außen erreichbar). Beschreibung mit Beispielen: [Handbuch](MANUAL.md#13e-schnittstelle-für-andere-programme-api).
 - **Jede Liste ist per langem Druck und Ziehen sortierbar** (Geräte, Sensoren, Schalter, Kameras, Regeln …).
 - Schalten per Antippen, bei Bedarf mit **PIN**.

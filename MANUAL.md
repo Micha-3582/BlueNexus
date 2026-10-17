@@ -187,7 +187,7 @@ Das Dashboard zeigt den Zustand der Anlage und erlaubt Eingriffe. Die Live-Kache
 | **Strompreis & Ladeplan** | Preiskurve heute/morgen mit eingezeichneten Ladefenstern. Manuelle Termine lassen sich per Klick/Ziehen markieren. |
 | **Ladevorgänge (heute)** | Protokoll: geplant / läuft / geladen, mit kWh, Kosten und Ø-Preis. |
 | **Manuelle Ladetermine** | Formular für einen festen Ladezeitraum (z. B. E-Auto), überschreibt die Automatik für diesen Zeitraum. |
-| **Favoriten** | Deine mit einem **Stern ☆** markierten Geräte, Schalter, Sensoren und Aufwecken-Ziele an einer Stelle – schalten und ablesen wie in den eigenen Kacheln (siehe unten). |
+| **Favoriten** | Deine unter *Smart Home* mit einem **Stern ☆** markierten Geräte, Schalter, Sensoren und Aufwecken-Ziele an einer Stelle – schalten und ablesen wie in den eigenen Kacheln (siehe unten). |
 | **Geräte (Smart Home)** | Schalter für Steckdosen, Lichter und andere Aktoren. |
 | **Eigene Schalter & Aktionen (Software)** | Selbst angelegte Schalter und Knöpfe sowie „Rechner aufwecken“. |
 | **Sensoren (Smart Home)** | Fenster/Tür, Bewegung, Temperatur usw. – grün/rot bzw. Messwert. |
@@ -200,7 +200,7 @@ Das Dashboard zeigt den Zustand der Anlage und erlaubt Eingriffe. Die Live-Kache
 - **Schalten:** Auf die Gerätekachel tippen. Ist ein **PIN** gesetzt, erscheint zuerst ein Ziffernblock (siehe [PIN-Schutz](#8-pin-schutz)).
 - **Reihenfolge ändern:** Kachel **lang drücken** und verschieben (Geräte, Sensoren, Schalter & Aktionen).
 - **Eigene Schalter/Knöpfe:** Tippen schaltet bzw. drückt. Läuft ein Ablauf mit Timer, zeigt die Kachel die **Restzeit**; nochmal tippen bricht ab (bei Schaltern).
-- **Favoriten (Stern):** Jede Kachel von Geräten, Sensoren, eigenen Schaltern/Knöpfen und Wake-on-LAN-Zielen hat oben rechts einen **Stern ☆**. Antippen macht sie zum Favoriten (★) – sie erscheint dann zusätzlich in der Kachel **Favoriten** ganz oben und lässt sich dort genauso schalten (mit PIN, wenn gesetzt). Nochmal auf den Stern tippen nimmt sie wieder heraus. Den Stern gibt es auch in den Smart-Home-Listen, direkt neben dem Ein-/Aus-Knopf. Die **Reihenfolge** in der Favoriten-Kachel ändert man wie überall: lang drücken und ziehen. Jeder hat seine eigene Favoritenliste. Wer die Kachel nicht braucht, schaltet sie unter *Einstellungen → Dashboard → Meine Ansicht* ab.
+- **Favoriten (Stern):** Unter *Smart Home* hat jeder Eintrag (Geräte, Sensoren, eigene Schalter, Wake-on-LAN) direkt neben dem Ein-/Aus-Knopf einen **Stern ☆**. Antippen macht ihn zum Favoriten (★) – er erscheint dann zusätzlich in der Kachel **Favoriten** ganz oben auf dem Dashboard und lässt sich dort genauso schalten (mit PIN, wenn gesetzt). Zum Entfernen den Stern in der Smart-Home-Liste nochmal antippen. Die **Reihenfolge** in der Favoriten-Kachel ändert man wie überall: lang drücken und ziehen. Jeder hat seine eigene Favoritenliste. Wer die Kachel nicht braucht, schaltet sie unter *Einstellungen → Dashboard → Meine Ansicht* ab.
 - **Sensoren** sind nur Anzeige. Rot/Grün hängt davon ab, wie der Sensor eingestellt ist (siehe [Sensoren](#7-sensoren-thermostate-und-türschlösser)).
 
 ### 3a. Kameras (Reolink und andere mit RTSP)
