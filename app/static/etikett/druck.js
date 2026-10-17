@@ -20,11 +20,9 @@
 
   /** Kann dieses Gerät/dieser Browser Bluetooth-Drucker ansprechen? */
   function support() {
-    const ua = navigator.userAgent || '';
-    const apple = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (apple) return { ok: false, kind: 'apple', text: 'Auf iPhone und iPad können Webseiten keine Bluetooth-Drucker ansprechen – das ist eine Einschränkung von Apple. Drucke das Etikett von einem Android-Handy oder von einem PC mit Chrome.' };
+    if (!/Android/i.test(navigator.userAgent || '')) return { ok: false, kind: 'other', text: 'Etiketten drucken geht am Android-Handy (Chrome): Öffne BlueNexus dort.' };
     if (!window.isSecureContext) return { ok: false, kind: 'http', text: 'Das Drucken geht nur über eine sichere Adresse (https://, z. B. dein Fernzugriff). Öffne BlueNexus über diese Adresse.' };
-    if (!navigator.bluetooth) return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine Bluetooth-Drucker ansprechen. Öffne BlueNexus in Chrome oder Edge.' };
+    if (!navigator.bluetooth) return { ok: false, kind: 'browser', text: 'Dieser Browser kann keine Bluetooth-Drucker ansprechen. Öffne BlueNexus in Chrome.' };
     return { ok: true, kind: 'ok', text: 'Etiketten mit QR-Code und Namen lassen sich mit einem Niimbot-Drucker (D110) drucken: „🏷 Etikett“ am Tag.' };
   }
 
@@ -47,7 +45,7 @@
 
   function open(opts) {
     const st = support();
-    if (!st.ok) { if (root.uiAlert) root.uiAlert(st.text, st.kind === 'apple' ? 'Auf dem iPhone nicht möglich' : 'Drucken hier nicht möglich'); return; }
+    if (!st.ok) { if (root.uiAlert) root.uiAlert(st.text, 'Drucken hier nicht möglich'); return; }
     const tagName = opts.name || 'Tag', url = opts.url;
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-start;justify-content:center;z-index:1000;padding:16px;overflow:auto';
