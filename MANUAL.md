@@ -839,7 +839,7 @@ BlueNexus ist **offen für andere Programme im eigenen Netz**: Ein Info-Monitor,
 
 **Abrufen**
 
-Der Schlüssel kommt in die Kopfzeile `Authorization: Bearer <Schlüssel>`. Die Antworten sind JSON (UTF-8). Der Port ist der von BlueNexus (z. B. `5000`).
+Der Schlüssel kommt in die Kopfzeile `Authorization: Bearer <Schlüssel>`. Die Antworten sind JSON (UTF-8). Die Adresse ist die **im Heimnetz** (z. B. `http://192.168.2.40:5005` – die Karte in den Einstellungen zeigt sie an), **nicht** die Internet-Adresse des Fernzugriffs: Über die ist die Schnittstelle gesperrt.
 
 | Aufruf | Antwort |
 |---|---|
@@ -850,18 +850,18 @@ Der Schlüssel kommt in die Kopfzeile `Authorization: Bearer <Schlüssel>`. Die 
 | `GET /api/v1/items/<ref>` | ein einzelner Eintrag (404, wenn es ihn nicht gibt oder der Schlüssel ihn nicht sehen darf) |
 
 ```bash
-curl -H "Authorization: Bearer bnxapi_…" http://192.168.2.40:5000/api/v1/items?type=sensor
+curl -H "Authorization: Bearer bnxapi_…" http://192.168.2.40:5005/api/v1/items?type=sensor
 ```
 
 ```python
 import requests
-r = requests.get("http://192.168.2.40:5000/api/v1/items", headers={"Authorization": "Bearer bnxapi_…"}, timeout=10)
+r = requests.get("http://192.168.2.40:5005/api/v1/items", headers={"Authorization": "Bearer bnxapi_…"}, timeout=10)
 for it in r.json()["items"]:
     print(it["name"], it["text"], "seit", it["changed_at"])
 ```
 
 ```javascript
-const r = await fetch("http://192.168.2.40:5000/api/v1/items", { headers: { Authorization: "Bearer bnxapi_…" } });
+const r = await fetch("http://192.168.2.40:5005/api/v1/items", { headers: { Authorization: "Bearer bnxapi_…" } });
 const { items } = await r.json();
 ```
 

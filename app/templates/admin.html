@@ -168,6 +168,7 @@
 <div class="card" id="api-card" data-tab="system" data-area="user_management">
   <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg>Schnittstelle (API) für andere Programme <span class="qhelp" role="button" tabindex="0" data-help="Andere Programme im selben Netzwerk – ein Info-Monitor, ein Skript, ein anderes Smart-Home-System, ein eigenes Projekt – können hier Zustände von BlueNexus <b>lesen</b>. Jedes Programm bekommt einen eigenen Schlüssel. Es geht nur lesen (nichts schalten), nur aus dem lokalen Netz (nie über den Fernzugriff/Tunnel) und nur für die Sensoren, Geräte und Schalter, die du dem Schlüssel freigibst. Das Teilen mit anderen BlueNexus-Anlagen ist davon getrennt und bleibt unverändert.">?</span></h2>
   <div class="sub">Zustände für andere Programme im Heimnetz – nur lesen, nur im lokalen Netz.</div>
+  <div class="muted" id="api-lan" style="margin-top:6px"></div>
   <div id="api-list" style="display:flex;flex-direction:column;gap:8px;margin:10px 0"></div>
   <div class="edit-row"><input id="api-new-name" maxlength="60" placeholder="Name des Programms (z. B. Info-Monitor)" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')apiAdd()">
     <button id="api-add" class="ghost" type="button" onclick="apiAdd()">Schlüssel anlegen</button></div>
@@ -3290,7 +3291,8 @@ tnLoad(); setInterval(tnLoad, 5000);
 /* --- Schnittstelle (API) für andere Programme --- */
 function apiMsg(t, err) { const m = document.getElementById('api-msg'); if (m) { m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; } }
 const apiWhen = t => t ? new Date(t * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'noch nie';
-let apiCat = { sensor: [], device: [], virtual: [] }, apiKeys = [];
+let apiCat = { sensor: [], device: [], virtual: [] }, apiKeys = [], apiBase = '';
+const apiUrl = () => apiBase || 'http://<Adresse von BlueNexus im Heimnetz>:<Port>';
 async function apiCatalog() {
   const get = async u => { try { const r = await fetch(u, { cache: 'no-store' }); const j = await r.json(); return Array.isArray(j) ? j : []; } catch (e) { return []; } };
   const [se, de, vi] = await Promise.all([get('/api/sensors?light=1'), get('/api/shelly?light=1'), get('/api/virtual')]);
@@ -3325,12 +3327,15 @@ async function apiLoad() {
   if (!window.IS_ADMIN) { card.style.display = 'none'; return; }
   let list; try { list = await shellyApi('/api/apikeys'); } catch (e) { return; }
   apiKeys = list;
+  try { apiBase = (await shellyApi('/api/apikeys/info')).base_url || ''; } catch (e) { apiBase = ''; }
   const open = openEdits('apiedit-');
   await apiCatalog();
   document.getElementById('api-list').innerHTML = list.length ? list.map(apiRow).join('') : '<div class="muted">Noch kein Schlüssel angelegt.</div>';
   reopenEdits(open);
   const ex = document.getElementById('api-example');
-  if (ex) ex.textContent = 'curl -H "Authorization: Bearer <Schlüssel>" ' + location.origin + '/api/v1/items\n\n# nur Sensoren:   ' + location.origin + '/api/v1/items?type=sensor\n# ein Eintrag:    ' + location.origin + '/api/v1/items/sensor:<ID>';
+  if (ex) ex.textContent = 'curl -H "Authorization: Bearer <Schlüssel>" ' + apiUrl() + '/api/v1/items\n\n# nur Sensoren:   ' + apiUrl() + '/api/v1/items?type=sensor\n# ein Eintrag:    ' + apiUrl() + '/api/v1/items/sensor:<ID>';
+  const note = document.getElementById('api-lan');
+  if (note) note.innerHTML = apiBase ? 'Adresse im Heimnetz: <b>' + escH(apiBase) + '</b> – nur diese (nicht die Internet-Adresse des Fernzugriffs, dort ist die Schnittstelle gesperrt).' : 'Die Adresse im Heimnetz konnte nicht ermittelt werden – es ist die Adresse, unter der du BlueNexus zu Hause erreichst (nicht die des Fernzugriffs).';
 }
 function apiCopy(id, btn) {
   const el = document.getElementById(id); el.focus(); el.select();
@@ -3343,7 +3348,7 @@ function apiShowToken(name, token, fresh) {
     <p style="margin:0 0 10px">Schlüssel für <b>${escH(name)}</b>. <b>Er wird nur jetzt angezeigt</b> – bitte gleich in das andere Programm einfügen oder sicher aufbewahren. Danach kann er nur noch durch einen neuen ersetzt werden.</p>
     <input id="api-tok" readonly value="${escH(token)}" onclick="this.select()" style="width:100%;font-family:monospace">
     <div style="margin:8px 0 10px"><button type="button" class="ghost" onclick="apiCopy('api-tok', this)">📋 Kopieren</button></div>
-    <p style="margin:0" class="muted">Das Programm schickt ihn in der Kopfzeile <code>Authorization: Bearer …</code> an <code>${escH(location.origin)}/api/v1/items</code>. Es sieht nur, was du für diesen Schlüssel freigibst (unter ✎).</p>` });
+    <p style="margin:0" class="muted">Das Programm schickt ihn in der Kopfzeile <code>Authorization: Bearer …</code> an <code>${escH(apiUrl())}/api/v1/items</code> (Adresse im Heimnetz – über den Fernzugriff ist die Schnittstelle gesperrt). Es sieht nur, was du für diesen Schlüssel freigibst (unter ✎).</p>` });
 }
 async function apiAdd() {
   const inp = document.getElementById('api-new-name'), name = inp.value.trim();

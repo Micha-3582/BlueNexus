@@ -4867,6 +4867,14 @@ def api_apikeys():
     return jsonify(key=k, token=token), 201
 
 
+@app.route("/api/apikeys/info", methods=["GET"])
+def api_apikeys_info():
+    """Adresse, unter der andere Programme im Heimnetz diese Anlage erreichen (nicht die Internet-Adresse des Fernzugriffs - dort gilt die Schnittstelle nicht)."""
+    ip = extapi.lan_ip()
+    port = request.environ.get("SERVER_PORT") or ""
+    return jsonify(base_url=f"http://{ip}:{port}" if ip and port else "")
+
+
 @app.route("/api/apikeys/<kid>", methods=["PATCH", "DELETE"])
 def api_apikey(kid):
     if request.method == "DELETE":

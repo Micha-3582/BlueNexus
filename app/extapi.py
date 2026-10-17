@@ -243,6 +243,21 @@ def lan_request_ok(headers, remote_addr: str) -> bool:
     return _private(remote_addr or "")
 
 
+def lan_ip() -> str:
+    """Adresse dieses Rechners im lokalen Netz (die, unter der andere Programme BlueNexus erreichen). Leer = nicht ermittelbar."""
+    import socket
+    for target in ("8.8.8.8", "192.168.0.1", "10.0.0.1", "172.16.0.1"):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect((target, 9))                           # UDP: es wird nichts gesendet, nur die Route bestimmt
+                ip = s.getsockname()[0]
+        except OSError:
+            continue
+        if _private(ip) and not ip.startswith("127."):
+            return ip
+    return ""
+
+
 def ip_allowed(key: dict, ip: str) -> bool:
     """Hat der Schluessel eine Liste erlaubter Absender, muss die Adresse dazu passen."""
     allow = key.get("allow") or []
