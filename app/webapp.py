@@ -45,6 +45,7 @@ import notify_in
 import pushover
 import pwreset
 import tunnel
+import extapi
 import opslog
 import price_cache
 import rules
@@ -161,7 +162,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -2179,6 +2180,7 @@ class Controller:
         notify_in.start(_telegram_words, self._rules_wake.set, lambda: not (demo.ACTIVE or sandbox.ACTIVE))        # Telegram-Befehle (Triggerworte)
         homematic.push_start()
         tunnel.startup()                                           # Cloudflare-Tunnel (Fernzugriff) wieder verbinden, falls eingeschaltet
+        extapi.start_sampler(lambda: not (demo.ACTIVE or sandbox.ACTIVE))       # Schnittstelle: Zeitpunkt der letzten Aenderung festhalten
         _alexa_sync()                                              # Alexa-Anbindung (Hue-Emulation), nur wenn das Modul an ist
 
 
@@ -4770,6 +4772,119 @@ def _share_auth():
         note_failed_attempt(key)
         return None, (jsonify(error="Zugangsschlüssel ungültig"), 401)
     return s, None
+
+
+# ---- Offene Lese-Schnittstelle fuer andere Programme (extapi.py): nur lesend, nur im lokalen Netz, eigene Schluessel ----
+def _api_json(payload, code: int = 200):
+    r = jsonify(payload)
+    r.status_code = code
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
+def _api_auth():
+    """(Schluessel, None) oder (None, Fehlerantwort). Reihenfolge: nur lokales Netz -> Bremse gegen Raten -> Schluessel -> erlaubte Absender."""
+    ip = request.remote_addr or "?"
+    if not extapi.lan_request_ok(request.headers, ip):
+        log.warning("Schnittstelle: Anfrage von ausserhalb des lokalen Netzes abgewiesen (%s)", ip)
+        return None, _api_json({"error": "Diese Schnittstelle ist nur im lokalen Netz erreichbar."}, 403)
+    limiter = "api:" + ip
+    if too_many_attempts(limiter):
+        return None, _api_json({"error": "Zu viele Versuche – bitte später erneut."}, 429)
+    h = request.headers.get("Authorization", "")
+    key = extapi.by_token(h[7:].strip() if h[:7].lower() == "bearer " else "", ip)
+    if not key:
+        note_failed_attempt(limiter)
+        return None, _api_json({"error": "Schlüssel fehlt oder ist ungültig (Kopfzeile Authorization: Bearer <Schlüssel>)"}, 401)
+    if not extapi.ip_allowed(key, ip):
+        return None, _api_json({"error": "Von dieser Adresse ist der Schlüssel nicht erlaubt."}, 403)
+    return key, None
+
+
+def _api_name() -> str:
+    return store.load_config().get("app_display_name") or store.default_app_name()
+
+
+@app.route("/api/v1", methods=["GET"])
+@app.route("/api/v1/", methods=["GET"])
+def api_v1_info():
+    """Kennung der Schnittstelle: Name, Versionen, Uhrzeit, was dieser Schluessel sehen darf."""
+    key, bad = _api_auth()
+    if bad:
+        return bad
+    try:
+        ver = updater.current_version()
+    except Exception:                                                  # noqa: BLE001
+        ver = ""
+    return _api_json({"api": "BlueNexus", "v": extapi.API_VERSION, "name": _api_name(), "version": ver, "time": datetime.now().astimezone().isoformat(timespec="seconds"),
+                      "key": {"name": key["name"], "all": bool(key.get("all")), "items": len(key.get("items") or [])},
+                      "endpoints": {"items": "/api/v1/items", "item": "/api/v1/items/<ref>"}})
+
+
+@app.route("/api/v1/items", methods=["GET"])
+def api_v1_items():
+    """Freigegebene Eintraege samt Zustand. ?type=sensor,device,virtual (nur diese Arten), ?ref=sensor:ID,device:ID (nur diese)."""
+    key, bad = _api_auth()
+    if bad:
+        return bad
+    types = {t.strip() for t in (request.args.get("type") or "").split(",") if t.strip()}
+    if types - set(extapi.REF_TYPES):
+        return _api_json({"error": "type: sensor, device oder virtual (mehrere mit Komma)"}, 400)
+    refs = [r.strip() for r in (request.args.get("ref") or "").split(",") if r.strip()] or None
+    try:
+        items = extapi.build_items(key, types or None, refs)
+    except Exception as e:                                             # noqa: BLE001
+        log.warning("Schnittstelle: %s", e)
+        return _api_json({"error": "Zustand nicht lesbar"}, 500)
+    return _api_json({"v": extapi.API_VERSION, "name": _api_name(), "time": datetime.now().astimezone().isoformat(timespec="seconds"), "items": items})
+
+
+@app.route("/api/v1/items/<path:ref>", methods=["GET"])
+def api_v1_item(ref):
+    key, bad = _api_auth()
+    if bad:
+        return bad
+    try:
+        items = extapi.build_items(key, None, [ref])
+    except Exception as e:                                             # noqa: BLE001
+        log.warning("Schnittstelle: %s", e)
+        return _api_json({"error": "Zustand nicht lesbar"}, 500)
+    if not items:
+        return _api_json({"error": "nicht gefunden"}, 404)
+    return _api_json({"v": extapi.API_VERSION, "item": items[0]})
+
+
+# Verwaltung der Schluessel (nur Administratoren: nicht in ENDPOINT_AREA = Benutzerverwaltung noetig)
+@app.route("/api/apikeys", methods=["GET", "POST"])
+def api_apikeys():
+    if request.method == "GET":
+        return jsonify(extapi.list_public())
+    b = request.get_json(silent=True) or {}
+    try:
+        k, token = extapi.create(b.get("name"), bool(b.get("all")), b.get("items"), b.get("allow"))
+    except extapi.ApiKeyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(key=k, token=token), 201
+
+
+@app.route("/api/apikeys/<kid>", methods=["PATCH", "DELETE"])
+def api_apikey(kid):
+    if request.method == "DELETE":
+        return jsonify(ok=True) if extapi.remove(kid) else (jsonify(error="nicht gefunden"), 404)
+    b = request.get_json(silent=True) or {}
+    try:
+        k = extapi.update(kid, b.get("name"), b.get("all") if isinstance(b.get("all"), bool) else None, b.get("items") if isinstance(b.get("items"), list) else None,
+                          b.get("allow") if isinstance(b.get("allow"), list) else None)
+    except extapi.ApiKeyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(key=k) if k else (jsonify(error="nicht gefunden"), 404)
+
+
+@app.route("/api/apikeys/<kid>/token", methods=["POST"])
+def api_apikey_token(kid):
+    r = extapi.regenerate(kid)
+    return jsonify(key=r[0], token=r[1]) if r else (jsonify(error="nicht gefunden"), 404)
+
 
 
 @app.route("/share/v1/items", methods=["GET"])

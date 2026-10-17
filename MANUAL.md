@@ -29,6 +29,7 @@ Die technische Beschreibung der Lade-Strategie, Installation und Architektur ste
 13b. [Fernzugriff von unterwegs (Cloudflare Tunnel)](#13b-fernzugriff-von-unterwegs-cloudflare-tunnel)
 13c. [NFC-Tags (Handy scannen, Knopf auslösen)](#13c-nfc-tags-handy-scannen-knopf-auslösen)
 13d. [Geräte teilen (zwischen BlueNexus-Anlagen)](#13d-geräte-teilen-zwischen-bluenexus-anlagen)
+13e. [Schnittstelle für andere Programme (API)](#13e-schnittstelle-für-andere-programme-api)
 14. [Kosten, Tarife und Tarifwechsel](#14-kosten-tarife-und-tarifwechsel)
 15. [Update, Sicherung, Datenhaltung](#15-update-sicherung-datenhaltung)
 16. [Beispiele](#16-beispiele)
@@ -817,6 +818,104 @@ Die jeweils passende Erklärung steht auch als Hinweiszeile unter der Tag-Liste.
 - Freigaben und Quellen gehören zur Sicherung (Kapitel 15). Beim Zurückspielen auf einem anderen System bleibt der Schlüssel gültig.
 
 **Grenzen:** Ist der Geber oder seine Verbindung weg, zeigen die geholten Geräte „nicht erreichbar“, und der Empfänger kann sie nicht bedienen. Zustände werden etwa alle paar Sekunden abgefragt, Klingel-/Tür-Ereignisse kommen also mit kleiner Verzögerung. Kamerabilder, Thermostate, Schlösser und Rollläden lassen sich noch nicht teilen (folgt später).
+
+## 13e. Schnittstelle für andere Programme (API)
+
+BlueNexus ist **offen für andere Programme im eigenen Netz**: Ein Info-Monitor, ein Skript, ein anderes Smart-Home-System oder ein eigenes Projekt kann Zustände von Sensoren, Geräten und Schaltern **lesen** – ohne Anpassung an BlueNexus, mit einem eigenen Schlüssel pro Programm. Die Schnittstelle ist allgemein gehalten (nichts darin ist auf ein bestimmtes Projekt zugeschnitten) und ändert sich innerhalb der Version `v1` nicht mehr: Felder können dazukommen, bestehende bleiben.
+
+**Die Eckpunkte**
+
+- **Nur lesen.** Über die Schnittstelle lässt sich nichts schalten und nichts ändern. Zugangsdaten, PINs und interne Adressen sind nie in der Antwort.
+- **Nur im lokalen Netz.** Anfragen aus dem Internet werden abgewiesen – auch bei laufendem Fernzugriff (Cloudflare-Tunnel) und auch bei einer Portfreigabe im Router. BlueNexus prüft dazu die Absenderadresse **und** erkennt Anfragen, die über den Tunnel oder einen Proxy aus dem Internet kommen.
+- **Ein Schlüssel pro Programm**, nur für die Einträge, die du freigibst. Optional nur von bestimmten Rechnern (z. B. dem Server des Monitors).
+- **Getrennt vom Teilen.** *Teilen* (Kapitel 13d) verbindet BlueNexus-Anlagen miteinander, auch über das Internet, und bleibt unverändert. Die Schnittstelle hat eigene Schlüssel, eine eigene Datei und einen eigenen Pfad (`/api/v1/…`).
+
+**Schlüssel anlegen** (nur Administratoren): *Einstellungen → System → Schnittstelle (API)*.
+
+1. Namen eintragen (z. B. den Namen des Programms) → **Schlüssel anlegen**. Der Schlüssel (beginnt mit `bnxapi_`) wird **nur einmal** angezeigt – gleich in das andere Programm eintragen. Gespeichert wird nur ein Hash.
+2. Unter **✎** wählen, welche **Sensoren, Geräte und Schalter** der Schlüssel lesen darf – oder **„Alles lesen“** (dann auch später neu angelegte Einträge).
+3. Optional **Erlaubte Rechner**: eine Adresse oder ein Netz pro Zeile (`192.168.2.40`, `192.168.2.0/24`). Leer = jeder Rechner im lokalen Netz.
+4. **🔑** erzeugt einen neuen Schlüssel (der alte ist sofort ungültig), **🗑** löscht ihn. Pro Schlüssel steht, wann und von welcher Adresse er zuletzt benutzt wurde.
+
+**Abrufen**
+
+Der Schlüssel kommt in die Kopfzeile `Authorization: Bearer <Schlüssel>`. Die Antworten sind JSON (UTF-8). Der Port ist der von BlueNexus (z. B. `5000`).
+
+| Aufruf | Antwort |
+|---|---|
+| `GET /api/v1/` | Kennung: `api`, `v` (Version der Schnittstelle), `name` der Anlage, `version` von BlueNexus, `time`, was der Schlüssel sehen darf |
+| `GET /api/v1/items` | Alle freigegebenen Einträge mit Zustand |
+| `GET /api/v1/items?type=sensor,device,virtual` | nur diese Arten (`sensor` = Sensoren, `device` = Geräte/Aktoren, `virtual` = eigene Schalter und Knöpfe) |
+| `GET /api/v1/items?ref=sensor:tor,device:lampe` | nur diese Einträge |
+| `GET /api/v1/items/<ref>` | ein einzelner Eintrag (404, wenn es ihn nicht gibt oder der Schlüssel ihn nicht sehen darf) |
+
+```bash
+curl -H "Authorization: Bearer bnxapi_…" http://192.168.2.40:5000/api/v1/items?type=sensor
+```
+
+```python
+import requests
+r = requests.get("http://192.168.2.40:5000/api/v1/items", headers={"Authorization": "Bearer bnxapi_…"}, timeout=10)
+for it in r.json()["items"]:
+    print(it["name"], it["text"], "seit", it["changed_at"])
+```
+
+```javascript
+const r = await fetch("http://192.168.2.40:5000/api/v1/items", { headers: { Authorization: "Bearer bnxapi_…" } });
+const { items } = await r.json();
+```
+
+Ein Aufruf aus dem Browser einer fremden Webseite (JavaScript) wird vom Browser blockiert – die Schnittstelle ist für **Programme und Server** gedacht, die selbst abfragen.
+
+**Antwort von `/api/v1/items`**
+
+```json
+{ "v": 1, "name": "Mein Zuhause", "time": "2026-10-17T12:30:05+02:00",
+  "items": [
+    { "ref": "sensor:tor", "id": "tor", "type": "sensor", "kind": "contact", "name": "Hallentor", "room": "Halle", "icon": "🚪",
+      "online": true, "value": true, "state": "open", "text": "offen", "unit": "", "binary": true, "source": "zigbee",
+      "changed_at": "2026-10-17T11:58:12+02:00", "updated_at": "2026-10-17T12:30:05+02:00" } ] }
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `ref` | Eindeutige Kennung `<Art>:<ID>` (`sensor:…`, `device:…`, `virtual:…`) – bleibt gleich, auch wenn der Name geändert wird |
+| `type`, `kind` | Art des Eintrags und genauer Typ (Sensor: `contact`, `motion`, `temperature` …; Gerät: Familie wie `shelly`, `zigbee`; Schalter: `button`, `switch`, `timer`) |
+| `name`, `room`, `icon` | Anzeigename, Raum (falls vergeben), Symbol |
+| `online` | `false`, wenn BlueNexus keinen Wert bekommt (Sensor ohne Wert, Gerät nicht erreichbar) – dann ist `value` leer (`null`), **nie ein altes „zu“** |
+| `value` | Rohwert: Zahl (Messwert), `true`/`false` (Sensor Ja/Nein bzw. Gerät an/aus), `null` = unbekannt |
+| `state` | Maschinenlesbares Wort (siehe Tabelle), `null` bei Messwerten und unbekanntem Zustand |
+| `text` | Dasselbe als deutscher Anzeigetext („offen“, „aus“, „4,5 °C“, „kein Wert“) |
+| `unit`, `binary` | Einheit eines Messwerts; ob es ein Ja/Nein-Wert ist |
+| `power_w` | Nur Geräte mit Leistungsmessung: aktuelle Leistung in Watt |
+| `switchable`, `remaining_s` | Gerät schaltbar oder nur Überwachung; bei laufenden Timern die Restzeit in Sekunden |
+| `changed_at` | **Seit wann** der Eintrag diesen Zustand hat (Zeitpunkt, an dem BlueNexus den Zustand zuerst gesehen hat; bleibt nach einem Neustart erhalten) – z. B. für „Tor offen seit 11:58“ |
+| `updated_at` | Zeitpunkt der Abfrage |
+
+Werte von `state` für Ja/Nein-Sensoren (ist ein Sensor in BlueNexus „umgekehrt“ eingestellt, sind `state` und `text` bereits darauf angepasst):
+
+| Sensorart | wahr (`true`) | falsch (`false`) |
+|---|---|---|
+| `contact` (Tür/Fenster/Tor) | `open` | `closed` |
+| `lock` (Schloss) | `locked` | `unlocked` |
+| `motion` | `motion` | `none` |
+| `presence` | `present` | `absent` |
+| `input` | `active` | `inactive` |
+| `key_short`, `key_long` (Taster) | `pressed` | `idle` |
+| andere | `on` | `off` |
+
+Geräte und Schalter liefern `on`/`off`, Knöpfe `button`.
+
+**Empfehlung für Programme:** **Regelmäßig abfragen** (z. B. alle 30–60 Sekunden) statt auf Meldungen zu warten. Geht dabei eine Abfrage verloren, stimmt die nächste wieder – es kann kein falscher Zustand „hängen bleiben“. Für „keine Meldung seit …“ reichen die Zeit der letzten erfolgreichen Abfrage und `online`/`changed_at`. Bei Fehlern (kein Netz, 401/403) das Programm eine **Störung anzeigen** lassen statt den letzten Wert weiterzuzeigen.
+
+**Fehlercodes:** `401` Schlüssel fehlt oder ist ungültig · `403` nicht aus dem lokalen Netz bzw. Rechner nicht erlaubt · `404` Eintrag nicht gefunden · `429` zu viele falsche Schlüssel von einer Adresse (10 in 5 Minuten, danach kurze Sperre) · `400` ungültiger Parameter.
+
+**Hinweise**
+
+- Die Schnittstelle ist ein **Hinweis- und Anzeigeweg, kein Sicherheitssystem**: Wer ein Tor überwachen will, verlässt sich nicht allein auf eine Anzeige.
+- Bei Sensoren, die BlueNexus von einer anderen Anlage per *Teilen* geholt hat, liefert die Schnittstelle den zuletzt geholten Zustand (`source: "remote"`).
+- Mehrere Standorte (Teilen über das Internet) lassen sich so in **einem** BlueNexus sammeln und dort per Schnittstelle an andere Programme im Netz weitergeben.
+- Kein Schlüssel angelegt = nichts erreichbar. Die Schnittstelle ist also von Anfang an „zu“, bis du einen Schlüssel erzeugst.
 
 ## 14. Kosten, Tarife und Tarifwechsel
 

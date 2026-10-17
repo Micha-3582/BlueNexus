@@ -165,6 +165,18 @@
   <details style="margin-top:8px"><summary>Protokoll von cloudflared</summary><pre id="tn-log" style="max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:8px 0 0"></pre></details>
 </div>
 
+<div class="card" id="api-card" data-tab="system" data-area="user_management">
+  <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg>Schnittstelle (API) für andere Programme <span class="qhelp" role="button" tabindex="0" data-help="Andere Programme im selben Netzwerk – ein Info-Monitor, ein Skript, ein anderes Smart-Home-System, ein eigenes Projekt – können hier Zustände von BlueNexus <b>lesen</b>. Jedes Programm bekommt einen eigenen Schlüssel. Es geht nur lesen (nichts schalten), nur aus dem lokalen Netz (nie über den Fernzugriff/Tunnel) und nur für die Sensoren, Geräte und Schalter, die du dem Schlüssel freigibst. Das Teilen mit anderen BlueNexus-Anlagen ist davon getrennt und bleibt unverändert.">?</span></h2>
+  <div class="sub">Zustände für andere Programme im Heimnetz – nur lesen, nur im lokalen Netz.</div>
+  <div id="api-list" style="display:flex;flex-direction:column;gap:8px;margin:10px 0"></div>
+  <div class="edit-row"><input id="api-new-name" maxlength="60" placeholder="Name des Programms (z. B. Info-Monitor)" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')apiAdd()">
+    <button id="api-add" class="ghost" type="button" onclick="apiAdd()">Schlüssel anlegen</button></div>
+  <div class="muted" id="api-msg" style="margin-top:8px"></div>
+  <details style="margin-top:8px"><summary>So ruft ein Programm die Daten ab</summary>
+    <div class="muted" style="margin:8px 0">Mit dem Schlüssel in der Kopfzeile <code>Authorization: Bearer …</code>. Antwort ist JSON. Ausführlich im Handbuch (Kapitel „Schnittstelle für andere Programme“).</div>
+    <pre id="api-example" style="font-size:12px;white-space:pre-wrap;margin:0"></pre></details>
+</div>
+
 <div class="card" id="report-admin">
   <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.">?</span></h2>
   <div class="sub">Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.</div>
@@ -3275,6 +3287,86 @@ document.getElementById('tn-save').addEventListener('click', async () => {
 document.getElementById('tn-forget').addEventListener('click', () => forgetCreds('/api/tunnel/token', 'Tunnel-Token löschen?',
   'Der Tunnel wird gestoppt und der Token gelöscht. Die Steuerung ist dann von außen nicht mehr erreichbar, bis du einen Token einträgst. (Den Tunnel selbst kannst du bei Cloudflare löschen.)', () => tnLoad()));
 tnLoad(); setInterval(tnLoad, 5000);
+/* --- Schnittstelle (API) für andere Programme --- */
+function apiMsg(t, err) { const m = document.getElementById('api-msg'); if (m) { m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; } }
+const apiWhen = t => t ? new Date(t * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'noch nie';
+let apiCat = { sensor: [], device: [], virtual: [] }, apiKeys = [];
+async function apiCatalog() {
+  const get = async u => { try { const r = await fetch(u, { cache: 'no-store' }); const j = await r.json(); return Array.isArray(j) ? j : []; } catch (e) { return []; } };
+  const [se, de, vi] = await Promise.all([get('/api/sensors?light=1'), get('/api/shelly?light=1'), get('/api/virtual')]);
+  apiCat = { sensor: se.map(x => ({ ref: 'sensor:' + x.id, name: x.name })), device: de.map(x => ({ ref: 'device:' + x.id, name: x.name })), virtual: vi.map(x => ({ ref: 'virtual:' + x.id, name: x.name })) };
+}
+function apiRow(k) {
+  const id = escH(k.id);
+  const scope = k.all ? 'alles (Sensoren, Geräte, Schalter)' : (k.items.length ? k.items.length + ' Einträge' : 'noch nichts freigegeben');
+  const who = k.allow.length ? 'nur von ' + k.allow.join(', ') : 'jeder Rechner im lokalen Netz';
+  const group = (title, list) => !list.length ? '' : `<div class="muted" style="margin:8px 0 4px">${title}</div>` + list.map(x =>
+    `<label class="chk" style="display:flex;gap:8px;align-items:center;margin:2px 0"><input type="checkbox" class="api-ref" value="${escH(x.ref)}" ${k.items.includes(x.ref) ? 'checked' : ''}${k.all ? ' disabled' : ''}> ${escH(x.name)}</label>`).join('');
+  return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:170px"><b>${escH(k.name)}</b> <span class="muted">${escH(k.prefix)}…</span>
+        <div class="muted">${escH(scope)} · ${escH(who)}</div>
+        <div class="muted">zuletzt benutzt: ${escH(apiWhen(k.last_used))}${k.last_ip ? ' von ' + escH(k.last_ip) : ''}</div></div>
+      <button type="button" class="ghost" title="Bearbeiten: Name, freigegebene Einträge, erlaubte Rechner" onclick="editToggle('apiedit-${id}')">✎</button>
+      <button type="button" class="ghost" title="Neuen Schlüssel erzeugen (der alte wird ungültig)" onclick="apiRegen('${id}')">🔑</button>
+      <button type="button" class="ghost" title="Schlüssel löschen" style="color:var(--red)" onclick="apiDel('${id}')">🗑</button>
+    </div>
+    <div class="edit-panel" id="apiedit-${id}">
+      <div class="edit-row"><input id="apiname-${id}" value="${escH(k.name)}" maxlength="60" style="flex:1;min-width:150px"></div>
+      <label class="chk" style="display:flex;gap:8px;align-items:center;margin:10px 0 0"><input type="checkbox" id="apiall-${id}" ${k.all ? 'checked' : ''} onchange="document.querySelectorAll('#apiedit-${id} .api-ref').forEach(c => c.disabled = this.checked)"> <b>Alles lesen</b> <span class="muted">(alle Sensoren, Geräte und Schalter – auch später neu angelegte)</span></label>
+      ${group('Sensoren', apiCat.sensor)}${group('Geräte', apiCat.device)}${group('Schalter &amp; Knöpfe', apiCat.virtual)}
+      <div style="margin-top:10px"><label>Erlaubte Rechner <span class="qhelp" role="button" tabindex="0" data-help="Leer = jeder Rechner im lokalen Netz darf mit diesem Schlüssel lesen. Sonst eine Adresse oder ein Netz pro Zeile, z. B. 192.168.2.40 oder 192.168.2.0/24.">?</span></label>
+        <textarea id="apiallow-${id}" rows="2" style="width:100%" placeholder="leer = jeder Rechner im lokalen Netz">${escH(k.allow.join('\n'))}</textarea></div>
+      <div class="edit-row" style="margin-top:10px"><button type="button" onclick="apiSave('${id}')">Speichern</button></div>
+    </div></div>`;
+}
+async function apiLoad() {
+  const card = document.getElementById('api-card'); if (!card) return;
+  if (!window.IS_ADMIN) { card.style.display = 'none'; return; }
+  let list; try { list = await shellyApi('/api/apikeys'); } catch (e) { return; }
+  apiKeys = list;
+  const open = openEdits('apiedit-');
+  await apiCatalog();
+  document.getElementById('api-list').innerHTML = list.length ? list.map(apiRow).join('') : '<div class="muted">Noch kein Schlüssel angelegt.</div>';
+  reopenEdits(open);
+  const ex = document.getElementById('api-example');
+  if (ex) ex.textContent = 'curl -H "Authorization: Bearer <Schlüssel>" ' + location.origin + '/api/v1/items\n\n# nur Sensoren:   ' + location.origin + '/api/v1/items?type=sensor\n# ein Eintrag:    ' + location.origin + '/api/v1/items/sensor:<ID>';
+}
+function apiCopy(id, btn) {
+  const el = document.getElementById(id); el.focus(); el.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* egal */ }
+  if (!ok && navigator.clipboard) navigator.clipboard.writeText(el.value).then(() => { btn.textContent = 'Kopiert ✓'; }, () => {});
+  else btn.textContent = ok ? 'Kopiert ✓' : 'Markiert – mit Strg+C kopieren';
+}
+function apiShowToken(name, token, fresh) {
+  return uiDialog({ title: fresh ? 'Schlüssel angelegt' : 'Neuer Schlüssel', okText: 'Fertig', info: true, html: `
+    <p style="margin:0 0 10px">Schlüssel für <b>${escH(name)}</b>. <b>Er wird nur jetzt angezeigt</b> – bitte gleich in das andere Programm einfügen oder sicher aufbewahren. Danach kann er nur noch durch einen neuen ersetzt werden.</p>
+    <input id="api-tok" readonly value="${escH(token)}" onclick="this.select()" style="width:100%;font-family:monospace">
+    <div style="margin:8px 0 10px"><button type="button" class="ghost" onclick="apiCopy('api-tok', this)">📋 Kopieren</button></div>
+    <p style="margin:0" class="muted">Das Programm schickt ihn in der Kopfzeile <code>Authorization: Bearer …</code> an <code>${escH(location.origin)}/api/v1/items</code>. Es sieht nur, was du für diesen Schlüssel freigibst (unter ✎).</p>` });
+}
+async function apiAdd() {
+  const inp = document.getElementById('api-new-name'), name = inp.value.trim();
+  if (!name) { apiMsg('Bitte einen Namen eintragen (z. B. Info-Monitor).', true); return; }
+  try { const r = await shellyApi('/api/apikeys', 'POST', { name }); inp.value = ''; apiMsg('Schlüssel angelegt – jetzt unter ✎ die Einträge auswählen, die er lesen darf.'); await apiLoad(); await apiShowToken(r.key.name, r.token, true); }
+  catch (e) { apiMsg(e.message, true); }
+}
+async function apiSave(id) {
+  const body = { name: document.getElementById('apiname-' + id).value, all: document.getElementById('apiall-' + id).checked,
+    items: [...document.querySelectorAll('#apiedit-' + id + ' .api-ref')].filter(c => c.checked).map(c => c.value),
+    allow: document.getElementById('apiallow-' + id).value.split(/[\s,;]+/).filter(Boolean) };
+  try { await shellyApi('/api/apikeys/' + encodeURIComponent(id), 'PATCH', body); apiMsg(''); savedToast(); await apiLoad(); } catch (e) { apiMsg(e.message, true); }
+}
+async function apiRegen(id) {
+  const k = apiKeys.find(x => x.id === id) || {};
+  if (!await uiDialog({ title: 'Neuen Schlüssel erzeugen?', okText: 'Neu erzeugen', message: 'Der bisherige Schlüssel von „' + (k.name || '') + '“ wird sofort ungültig. Das Programm muss den neuen Schlüssel bekommen.' })) return;
+  try { const r = await shellyApi('/api/apikeys/' + encodeURIComponent(id) + '/token', 'POST'); await apiLoad(); await apiShowToken(r.key.name, r.token, false); } catch (e) { apiMsg(e.message, true); }
+}
+function apiDel(id) {
+  const k = apiKeys.find(x => x.id === id) || {};
+  forgetCreds('/api/apikeys/' + encodeURIComponent(id), 'Schlüssel löschen?', 'Der Schlüssel von „' + (k.name || '') + '“ wird gelöscht. Das Programm kann danach nichts mehr aus BlueNexus lesen.', () => apiLoad());
+}
+apiLoad();
 /* --- NFC-Tags --- */
 let nfcData = null;
 function nfcMsg(t, err) { const m = document.getElementById('nfc-msg'); if (m) { m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; } }

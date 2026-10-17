@@ -68,6 +68,8 @@ app/nfc.json
 demo-quelle/
 app/demo_data.json
 app/shares.json
+app/api_keys.json
+app/api_changes.json
 app/sources.json
 app/midea_login.json
 app/midea_session.json

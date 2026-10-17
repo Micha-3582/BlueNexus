@@ -27,6 +27,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 | 🏠 **Smart Home** | Shelly, Tasmota, WLED, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
 | 🏷️ **NFC-Tags** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Tags beschreibst du direkt in BlueNexus (Android). Nur registrierte Handys, auch unterwegs |
 | 🔗 **Geräte teilen** | Gib Geräte, Sensoren, Schalter und die Klimaanlage an ein anderes BlueNexus weiter (z. B. Mutter im selben Haus). Zugangsdaten und Cloud-Logins bleiben bei dir |
+| 🔌 **Offene Schnittstelle** | Andere Programme im Heimnetz (Info-Monitor, Skripte, eigene Projekte) lesen Zustände von Sensoren, Geräten und Schaltern per JSON-API – nur lesend, nur im lokalen Netz, mit eigenem Schlüssel pro Programm und Zeitpunkt der letzten Änderung |
 | 🧠 **Regeln** | Grafischer Regel-Editor: WENN … DANN … SONST, Zeitpläne, Sonnenstand, Abläufe mit Timern, Telegram- und Pushover-Meldungen |
 | 📷 **Kameras** | Reolink und beliebige RTSP-Kameras: Standbild, Live-Bild, Bewegungs- und Klingel-Auslöser |
 | 🗣️ **Alexa** | Sprachsteuerung ohne Amazon-Entwicklerkonto – die App gibt sich im Heimnetz als Hue-Bridge aus |
@@ -281,6 +282,7 @@ Ersparnis · Wetter.
 - Welche Kacheln erscheinen, entscheidet der Admin global – jeder Benutzer stellt unter **„Meine Ansicht“**
   seine eigene Auswahl und Reihenfolge zusammen.
 - **Favoriten:** Jedes Gerät, jeder Sensor und jeder Schalter hat einen **Stern ☆** – wer ihn antippt, sieht das Ding zusätzlich in der Kachel **„Favoriten“** ganz oben, zum Schalten und Ablesen an einer Stelle. Die Liste ist persönlich pro Konto, respektiert Sichtbarkeit und Rechte und lässt sich wie jede Kachel ein-/ausblenden und sortieren.
+- **Offen für andere Programme:** Unter *Einstellungen → System → Schnittstelle (API)* legst du für jedes Programm im Heimnetz einen Schlüssel an und gibst frei, was es lesen darf. Dann liefert `GET /api/v1/items` die Zustände als JSON (nur lesen, nur aus dem lokalen Netz – auch bei laufendem Fernzugriff nicht von außen erreichbar). Beschreibung mit Beispielen: [Handbuch](MANUAL.md#13e-schnittstelle-für-andere-programme-api).
 - **Jede Liste ist per langem Druck und Ziehen sortierbar** (Geräte, Sensoren, Schalter, Kameras, Regeln …).
 - Schalten per Antippen, bei Bedarf mit **PIN**.
 - **Hell oder dunkel:** Unter *Einstellungen → Dashboard → Darstellung* wählt jedes Gerät **Dunkel, Hell oder Automatisch**
@@ -581,6 +583,7 @@ camera.py        Reolink / RTSP, Standbild, Live (ffmpeg), Bewegung, Klingel
 alexa.py         Hue-Bridge-Emulation für Sprachsteuerung
 notify.py pushover.py   Telegram und Pushover
 tunnel.py        Cloudflare-Tunnel (cloudflared) mit Überwachung
+extapi.py        Offene Lese-Schnittstelle /api/v1 (Schlüssel, nur lokales Netz)
 auth.py pins.py visibility.py   Benutzer, Rechte, PIN, Sichtbarkeit
 verlauf.py       Aufzeichnung und Diagramme (SQLite)
 store.py         Persistenz: Config, State, Register, Ladeprotokoll, Historie
