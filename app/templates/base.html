@@ -105,6 +105,7 @@
     .switch input:checked + .slider:before { transform: translateX(22px); }
     /* PIN-geschuetzt: gelber Rahmen am Schalter/Knopf, damit er sich von den ungeschuetzten abhebt */
     .switch.pinned .slider, .tilebtn.pinned, .tgl.pinned, button.pinned { box-shadow: 0 0 0 2px #f0b429; }
+    .switch.pinned input:checked + .slider { box-shadow: 0 0 0 2px #f0b429, 0 0 10px var(--glow); }      /* auch eingeschaltet bleibt der gelbe PIN-Rahmen */
     .switch input:disabled + .slider { opacity: .4; cursor: not-allowed; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     td { padding: 8px 4px; border-bottom: 1px solid var(--border); }
