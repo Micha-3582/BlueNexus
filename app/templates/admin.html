@@ -1020,6 +1020,7 @@ function collectPvInverters() {
 }
 
 window.USER_PERMS = {{ user_perms | tojson }};
+window.FAV_OFF = {{ 'true' if favorites_off else 'false' }};      // das Konto hat Favoriten abgeschaltet (Meine Ansicht)
 window.FAVS = new Set({{ (favorites or []) | tojson }});      // eigene Favoriten (Sterne), siehe favBtn
 window.TILE_CEILING = {{ tile_ceiling | tojson }};          // null = alle Kacheln erlaubt, sonst Liste der fuer dieses Konto erlaubten
 window.DEMO_VIEW = {{ 'true' if demo_view else 'false' }};
@@ -1053,12 +1054,12 @@ function renderMyTileToggles() {
   const defs = myTileOrder.map(k => myTileDefs.find(t => t.key === k)).filter(Boolean);   // vom Admin nicht freigegebene Kacheln stehen gar nicht erst in myTileDefs
   document.getElementById('my-tile-toggles').innerHTML = defs.map((t, i) => `
     <div style="display:flex;align-items:center;gap:14px">
-      <label class="switch" style="margin:0"><input type="checkbox" id="my-${t.key}"${t.key === 'show_favorites_card' ? ' checked disabled title="Favoriten sind immer da"' : ''}><span class="slider"></span></label>
+      <label class="switch" style="margin:0"><input type="checkbox" id="my-${t.key}"><span class="slider"></span></label>
       <div style="flex:1;min-width:0"><b>${t.label}</b><div class="muted">${t.hint}</div></div>
       <button type="button" class="ghost" onclick="moveMyTile('${t.key}', -1)" ${i === 0 ? 'disabled' : ''} title="Weiter nach oben">▲</button>
       <button type="button" class="ghost" onclick="moveMyTile('${t.key}', 1)" ${i === defs.length - 1 ? 'disabled' : ''} title="Weiter nach unten">▼</button>
     </div>`).join('');
-  myTileDefs.forEach(t => { if (t.key in checks && t.key !== 'show_favorites_card') document.getElementById('my-' + t.key).checked = checks[t.key]; });
+  myTileDefs.forEach(t => { if (t.key in checks) document.getElementById('my-' + t.key).checked = checks[t.key]; });
 }
 async function loadMyTiles() {
   let d; try { d = await (await fetch('/api/my-tiles')).json(); } catch (e) { return; }
@@ -1072,17 +1073,18 @@ async function loadMyTiles() {
   renderMyTileToggles();
   myTileDefs.forEach(t => {
     const el = document.getElementById('my-' + t.key);
-    if (el) el.checked = t.key === 'show_favorites_card' || !d.my_tiles || d.my_tiles.includes(t.key);
+    if (el) el.checked = t.key === 'show_favorites_card' ? d.favorites_on !== false : (!d.my_tiles || d.my_tiles.includes(t.key));
   });
 }
 document.getElementById('my-tiles-save').addEventListener('click', async () => {
   const msg = document.getElementById('my-tiles-msg');
-  const boxes = myTileDefs.map(t => document.getElementById('my-' + t.key)).filter(el => el && !el.disabled);
+  const boxes = myTileDefs.map(t => document.getElementById('my-' + t.key)).filter(el => el && !el.disabled && el.id !== 'my-show_favorites_card');      // Favoriten sind keine Einschraenkung der Admin-Auswahl, sondern eine eigene Wahl
   const checked = boxes.filter(el => el.checked).map(el => el.id.slice(3));
   const my_tiles = checked.length === boxes.length ? null : checked;   // alles an = keine Einschraenkung
   const my_order = myTileOrder.join(',') === myBaseOrder.join(',') ? null : myTileOrder;   // unveraendert = keine eigene Reihenfolge
   try {
-    await shellyApi('/api/my-tiles', 'POST', { my_tiles, my_order });
+    const fav = document.getElementById('my-show_favorites_card');
+    await shellyApi('/api/my-tiles', 'POST', fav ? { my_tiles, my_order, favorites_on: fav.checked } : { my_tiles, my_order });
     savedToast('Gespeichert ✓');
   } catch (e) { msg.textContent = e.message; msg.style.color = '#e5544a'; setTimeout(() => { msg.style.color = ''; msg.textContent = ''; }, 6000); }
 });
@@ -1503,7 +1505,7 @@ function tilesHtml(idPrefix, tiles, order) {
     <div class="tile-list" data-prefix="${idPrefix}">${keys.map(k => { const [, label] = byKey[k]; return `
       <div class="tile-row" data-tile-row="${k}">
         <button type="button" class="ghost tile-mv" data-dir="-1" title="Nach oben" aria-label="Nach oben">▲</button><button type="button" class="ghost tile-mv" data-dir="1" title="Nach unten" aria-label="Nach unten">▼</button>
-        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) || k === 'show_favorites_card' ? 'checked' : ''}${k === 'show_favorites_card' ? ' disabled' : ''}><span>${escHUsers(label)}${k === 'show_favorites_card' ? ' <span class="muted">(immer an)</span>' : ''}</span></label>
+        <label class="chip" style="font-weight:normal"><input type="checkbox" id="${idPrefix}-tile-${k}" ${allowed.includes(k) || k === 'show_favorites_card' ? 'checked' : ''}${k === 'show_favorites_card' ? ' disabled' : ''}><span>${escHUsers(label)}${k === 'show_favorites_card' ? ' <span class="muted">(immer erlaubt – das Konto entscheidet selbst)</span>' : ''}</span></label>
       </div>`; }).join('')}</div>
   </div>`;
 }
@@ -1847,7 +1849,7 @@ async function pickVisibility(kind, id, btn) {
 const I_BELL = svgi('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');
 const I_CHECK = svgi('<polyline points="20 6 9 17 4 12"/>');
 const I_STAR = svgi('<polygon points="12 2.5 14.9 8.7 21.5 9.5 16.6 14 17.9 20.6 12 17.3 6.1 20.6 7.4 14 2.5 9.5 9.1 8.7"/>');
-const canFav = () => ((window.USER_PERMS || {}).dashboard || 'none') !== 'none' && !window.DEMO_VIEW;      // jedes Konto mit Dashboard-Zugriff
+const canFav = () => ((window.USER_PERMS || {}).dashboard || 'none') !== 'none' && !window.DEMO_VIEW && !window.FAV_OFF;      // jedes Konto mit Dashboard-Zugriff, ausser es hat Favoriten abgeschaltet
 /* Favoriten-Stern (persoenlich, pro Konto): kind = shelly | sensor | virtual | wol */
 const favBtn = (kind, id) => !canFav() ? '' : `<button type="button" class="tgl fav${window.FAVS.has(kind + ':' + id) ? ' on' : ''}" aria-pressed="${window.FAVS.has(kind + ':' + id) ? 'true' : 'false'}" title="Favorit – erscheint in der Kachel „Favoriten“ auf dem Dashboard" aria-label="Favorit" onclick="favToggle(this,'${kind}','${id}')">${I_STAR}</button>`;
 async function favToggle(btn, kind, id) {

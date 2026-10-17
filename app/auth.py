@@ -116,7 +116,7 @@ DASHBOARD_TILES = [
     ("show_price_plan", "Strompreis & Ladeplan", "Preiskurve mit Ladeplan, manuelle Termine markieren."),
     ("show_charge_log", "Ladevorgänge (heute)", "Protokoll geplanter/durchgeführter Ladungen."),
     ("show_ev_card", "Manuelle Ladetermine", "Formular zum Anlegen eines Ladetermins."),
-    ("show_favorites_card", "Favoriten", "Immer für alle Konten da (nicht abwählbar): die mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle – Sterne setzt jedes Konto für sich."),
+    ("show_favorites_card", "Favoriten", "Für jedes Konto da (der Administrator kann sie niemandem nehmen): die mit einem Stern markierten Geräte, Schalter und Sensoren an einer Stelle. Jedes Konto entscheidet unter „Meine Ansicht“ selbst, ob es sie sehen will."),
     ("show_shelly_card", "Geräte (Smart Home)", "Schalter für Steckdosen, Lichter und andere Aktoren (Shelly, Tasmota, Tuya, Homematic)."),
     ("show_virtual_card", "Eigene Schalter & Aktionen (Software)", "Selbst angelegte Knöpfe und Schalter sowie „Rechner aufwecken“ (Wake-on-LAN)."),
     ("show_sensors_card", "Sensoren (Smart Home)", "Ja/Nein-Anzeige und Messwerte der Sensoren (z. B. Fenster, Bewegung, Temperatur)."),
@@ -126,7 +126,7 @@ DASHBOARD_TILES = [
     ("show_weather_card", "Wetter", "Wettervorhersage für den Standort (Standort im Reiter „Wetter“)."),
 ]
 DASHBOARD_TILE_KEYS = [k for k, _, _ in DASHBOARD_TILES]
-ALWAYS_TILES = {"show_favorites_card"}          # fuer jedes Konto da: Admin-Obergrenze und "Meine Ansicht" schraenken sie nicht ein (Position bleibt waehlbar)
+ALWAYS_TILES = {"show_favorites_card"}          # fuer jedes Konto da: die Admin-Obergrenze und die Kachel-Liste in "Meine Ansicht" nehmen sie nicht weg; abschalten kann sie nur das Konto selbst (hide_favorites)
 
 # Module (siehe store.modules): welche Rechte-Bereiche und Dashboard-Kacheln nur zu einem Modul gehoeren. Ist ein Modul aus, gelten seine
 # Bereiche fuer alle Konten als "Kein Zugriff" (gespeicherte Rechte bleiben unveraendert und wirken wieder, sobald das Modul an ist).
@@ -459,6 +459,21 @@ class UserStore:
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
             user["dashboard_order"] = normalize_tile_order(order)
+            self._write()
+            return dict(user)
+
+    def set_hide_favorites(self, username: str, hide: bool) -> dict:
+        """Das Konto will die Favoriten-Kachel (und die Sterne) nicht sehen - rein persoenliche Wahl ("Meine Ansicht")."""
+        key = _norm(username)
+        with self._lock:
+            self._sync()
+            user = self._users.get(key)
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            if hide:
+                user["hide_favorites"] = True
+            else:
+                user.pop("hide_favorites", None)
             self._write()
             return dict(user)
 

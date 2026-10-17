@@ -406,11 +406,13 @@ def _require_login():
     g.my_tiles = auth.normalize_tiles(user.get("my_tiles"))                   # eigene Wahl ("Meine Ansicht")
     g.my_order = auth.normalize_tile_order(user.get("my_order"))              # eigene Reihenfolge ("Meine Ansicht")
     g.my_order_explicit = bool(user.get("my_order_explicit"))
+    g.hide_favorites = bool(user.get("hide_favorites"))                       # Favoriten abgeschaltet (eigene Wahl)
     g.admin_order = auth.normalize_tile_order(user.get("dashboard_order"))    # vom Admin fuer dieses Konto vorgegebene Reihenfolge
     if g.perms.get("settings_anzeige", "none") == "none":
         # Wem "Einstellungen: Dashboard" entzogen wurde, der darf sein Dashboard nicht (mehr) selbst anpassen: frueher gespeicherte
         # eigene Auswahl/Reihenfolge ("Meine Ansicht") wirken dann nicht mehr - es gilt, was der Administrator vorgibt.
         g.my_tiles, g.my_order, g.my_order_explicit = None, None, False
+        g.hide_favorites = False                                               # ohne dieses Recht gilt auch diese eigene Wahl nicht
 
     if g.preview and request.method not in ("GET", "HEAD", "OPTIONS") and request.endpoint not in ("preview_start", "preview_stop"):
         return jsonify(error="Vorschau-Modus: Das Konto wird nur angesehen, hier wird nichts geändert. Oben „Vorschau beenden“ drücken."), 403
@@ -2463,13 +2465,13 @@ def setup():
 def admin():
     if not any(g.perms.get(x, "none") != "none" for x in SETTINGS_PAGE_AREAS):          # nichts einzustellen -> nicht auf einer leeren Seite landen
         return redirect(url_for("automation_page") if g.perms.get("automation", "none") != "none" else url_for("index"))
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), page_mode="admin")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), page_mode="admin")
 
 
 @app.route("/smarthome")
 def smarthome_page():
     """Smart Home: Geraete, Sensoren, Thermostate, Sicherheit, Suche, WOL - dieselbe Vorlage/Skripte wie /admin, nur andere Reiter."""
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), page_mode="smarthome")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), page_mode="smarthome")
 
 
 @app.route("/solar-log")
@@ -2658,7 +2660,7 @@ def api_status():
           "show_savings_card": bool(cfg.get("show_savings_card", True)),
           "show_verlauf_card": bool(cfg.get("show_verlauf_card", True)) and auth.has_level(g.perms, "verlauf", "read"),
           "show_plansim_card": bool(cfg.get("show_plansim_card", True)) and cfg.get("tariff_mode") != "fixed",
-          "can_favorite": auth.has_level(g.perms, "dashboard", "read"),          # Sterne setzen darf jedes Konto mit Dashboard-Zugriff
+          "can_favorite": auth.has_level(g.perms, "dashboard", "read") and not getattr(g, "hide_favorites", False),          # Sterne setzen darf jedes Konto mit Dashboard-Zugriff (ausser es hat Favoriten abgeschaltet)
           "tile_order": [k for k in (cfg.get("tile_order") or []) if isinstance(k, str)]}
     for k in auth._off(store.modules(cfg), auth.MODULE_TILES):             # Module aus: deren Kacheln sind weg (Daten bleiben)
         ui[k] = False
@@ -2673,6 +2675,8 @@ def api_status():
             for k in auth.DASHBOARD_TILE_KEYS:
                 if k not in restriction and k not in auth.ALWAYS_TILES:               # Favoriten: immer da, weder Obergrenze noch "Meine Ansicht" nehmen sie weg
                     ui[k] = False
+    if getattr(g, "hide_favorites", False):
+        ui["show_favorites_card"] = False                                       # das Konto will keine Favoriten sehen
     return jsonify({
         "status": status,
         "ui": ui,
@@ -2719,9 +2723,11 @@ def api_my_tiles():
                                                      getattr(g, "dashboard_tiles", None), store.load_config()),
                        admin_order=auth.normalize_tile_order(user.get("dashboard_order")),
                        base_order=auth.complete_tile_order(auth.normalize_tile_order(user.get("dashboard_order")) or [k for k in (store.load_config().get("tile_order") or []) if isinstance(k, str)]),
-                       admin_tiles=getattr(g, "dashboard_tiles", None))
+                       admin_tiles=getattr(g, "dashboard_tiles", None), favorites_on=not getattr(g, "hide_favorites", False))
     body = request.json or {}
     try:
+        if isinstance(body.get("favorites_on"), bool):
+            users.set_hide_favorites(g.user, not body["favorites_on"])
         if "my_tiles" in body:
             users.set_my_tiles(g.user, body.get("my_tiles"))
         if "my_order" in body:
