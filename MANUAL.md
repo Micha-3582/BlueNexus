@@ -27,7 +27,7 @@ Die technische Beschreibung der Lade-Strategie, Installation und Architektur ste
 13. [Benachrichtigungen (Telegram)](#13-benachrichtigungen-telegram)
 13a. [Telegram-Befehle (Triggerwörter an den Bot)](#13a-telegram-befehle-triggerwörter-an-den-bot)
 13b. [Fernzugriff von unterwegs (Cloudflare Tunnel)](#13b-fernzugriff-von-unterwegs-cloudflare-tunnel)
-13c. [NFC-Tags (Handy scannen, Knopf auslösen)](#13c-nfc-tags-handy-scannen-knopf-auslösen)
+13c. [NFC + QR (Handy scannen, Knopf auslösen)](#13c-nfc--qr-handy-scannen-knopf-auslösen)
 13d. [Geräte teilen (zwischen BlueNexus-Anlagen)](#13d-geräte-teilen-zwischen-bluenexus-anlagen)
 13e. [Schnittstelle für andere Programme (API)](#13e-schnittstelle-für-andere-programme-api)
 14. [Kosten, Tarife und Tarifwechsel](#14-kosten-tarife-und-tarifwechsel)
@@ -54,7 +54,7 @@ Die Software besteht aus drei Teilen, die zusammenarbeiten:
 | **Dashboard** | Ein Dashboard für alles: Energie, Preise, Geräte, Schalter und Sensoren. |
 | **Verläufe** | Diagramme aufgezeichneter Messwerte (siehe [Kapitel 3b](#3b-verläufe-diagramme-der-messwerte)); nur mit dem Recht „Verläufe“. |
 | **Kameras** | Standbilder und Live-Ansicht der Reolink-Kameras (nur sichtbar, wenn das Konto das Recht „Kameras“ hat). |
-| **Smart Home** | Alles rund ums Haus. Unter-Reiter: **Aktoren · Sensoren · Thermostate · Sicherheit · Regeln · Geräte suchen · NFC-Tags · Teilen · Wake-on-LAN · Sonstiges**. Es öffnet immer bei „Aktoren“. |
+| **Smart Home** | Alles rund ums Haus. Unter-Reiter: **Aktoren · Sensoren · Thermostate · Sicherheit · Regeln · Geräte suchen · NFC + QR · Teilen · Wake-on-LAN · Sonstiges**. Es öffnet immer bei „Aktoren“. |
 | **Einstellungen** | Die Energiesteuerung und die App selbst: Anlage, Tarif & Laden, VRM, **Automatik** (Überschuss-Schaltung), Wetter, Meldungen, Dashboard, System, **Konto & Benutzer**. |
 
 So bleiben Energiesteuerung (Einstellungen) und Smart Home (eigener Bereich) getrennt, und trotzdem siehst du alles zusammen auf **einem** Dashboard.
@@ -138,7 +138,7 @@ Nach jedem Zurücksetzen kommt eine Nachricht an Telegram und Pushover („Passw
 | **Einstellungen** | Anlage · Tarif & Laden · VRM · Automatik (Überschuss) · Wetter · Meldungen · Dashboard · System | Je ein Bereich pro Einstellungs-Reiter. |
 | **Konto & Verwaltung** | Eigenes Konto | Eigenen Namen/Passwort ändern. |
 | | Teilen | Der Reiter Teilen (Geräte mit anderen BlueNexus-Anlagen teilen, Kapitel 13d) – hier die **Fremden Quellen**. **Lesen** zeigt nur die Liste der verbundenen Quellen. **Schreiben** = Einladungscode einer anderen Anlage einfügen, Quelle verbinden/löschen und Geräte von dort holen. Zugang **an andere vergeben** (Personen anlegen, Einladungscodes erzeugen, Geräte freigeben) darf immer nur ein **Administrator** – die Karte „Teilen mit anderen“ ist für andere Konten gar nicht sichtbar. Geholte Geräte **bedienen** darf jedes Konto, das Geräte bedienen darf. Standard für neue Konten: kein Zugriff. |
-| | NFC-Tags | Der Reiter NFC-Tags. **Lesen** zeigt Tags, Handys und Freigaben (gut für Demo-Konten), aber **keine Adressen** – weder die der Tags noch die der Zentrale. **Schreiben** = Tags anlegen/umbenennen/löschen, Handys registrieren, Freigaben ändern; nur dann sind die Adressen sichtbar. Bei „Kein“ fehlt der Reiter. |
+| | NFC + QR | Der Reiter NFC + QR. **Lesen** zeigt Tags, Handys und Freigaben (gut für Demo-Konten), aber **keine Adressen** – weder die der Tags noch die der Zentrale. **Schreiben** = Tags anlegen/umbenennen/löschen, Handys registrieren, Freigaben ändern; nur dann sind die Adressen sichtbar. Bei „Kein“ fehlt der Reiter. |
 | | Benutzerverwaltung | Nur für Administratoren (Haken „Administrator“, siehe oben) – in der Tabelle nicht einstellbar. |
 
 - **Vorlagen:** Über „Vorlage anwenden“ füllst du alles auf einmal vor – **Admin** (alles), **Benutzer** (nur Dashboard), **Smart-Home-Nutzer** (Dashboard + Geräte schreiben, Regeln/Automatik ansehen) und **Demo** (alles ansehen). Danach ist jede Zeile einzeln änderbar.
@@ -747,7 +747,7 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 2. Bei Cloudflare **Domain hinzufügen** (kostenloser Tarif). Cloudflare liest vorhandene DNS-Einträge ein: Einträge des Anbieters zu seiner Startseite (A-Eintrag, `*`- und `www`-CNAME) **löschen**, Mail-Einträge (MX/SPF) nur behalten, wenn du Mail über den Anbieter nutzt.
 3. Cloudflare nennt **zwei Nameserver** (`…ns.cloudflare.com`). Beim Domain-Anbieter die Nameserver darauf umstellen (bei All-Inkl: KAS → Domainverwaltung → Domain → Nameserver). **DNSSEC** dort vorher ausschalten. Danach wenige Minuten bis einige Stunden warten, bis Cloudflare „aktiv“ meldet.
 4. Im Tunnel unter **Public Hostname** die neue Adresse hinzufügen (Subdomain, Domain, Dienst **HTTP**, Ziel `localhost:<Port der App>`). Ein bestehender Tunnel kann **mehrere Adressen** bedienen, die alte darf zunächst bleiben.
-5. **NFC-Umzug:** Die Kennzeichen der Handys und die installierte App gelten nur für **eine** Adresse. Nach dem Wechsel: *NFC-Tags → Adresse für die Tags* ändern, Handys neu registrieren, App neu installieren, Tags neu beschreiben, danach die alte Adresse aus dem Tunnel entfernen.
+5. **NFC-Umzug:** Die Kennzeichen der Handys und die installierte App gelten nur für **eine** Adresse. Nach dem Wechsel: *NFC + QR → Adresse für die Tags* ändern, Handys neu registrieren, App neu installieren, Tags neu beschreiben, danach die alte Adresse aus dem Tunnel entfernen.
 6. **Fehlerbild „Zertifikat passt nicht“ nur im Heimnetz:** Ein lokaler DNS-Server (z. B. AdGuard Home oder der Router) kann die alte Antwort noch zwischenspeichern. Über Mobilfunk testen: Klappt es dort, ist alles richtig. Dann den DNS-Cache leeren oder kurz einen anderen Upstream (z. B. `1.1.1.1`) verwenden; sonst vergisst der Server die alte Antwort nach spätestens einem Tag. Am PC zusätzlich `ipconfig /flushdns` und im Browser den Host-Cache leeren.
 7. **Mehrere Installationen unter einer Domain:** Jede Installation bekommt ihre eigene Unteradresse (`name.deinedomain.de`) und ihren eigenen Tunnel samt Token, den der Besitzer in seiner App einträgt. Der Betreiber der Domain ist dann auch für diese Adressen verantwortlich.
 
@@ -761,9 +761,9 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 
 ---
 
-## 13c. NFC-Tags (Handy scannen, Knopf auslösen)
+## 13c. NFC + QR (Handy scannen, Knopf auslösen)
 
-*Smart Home → NFC-Tags* (Recht „Smart Home: NFC-Tags“; Lesen zeigt alles außer den Adressen, Schreiben verwaltet). Ein NFC-Tag trägt eine Internet-Adresse. Hältst du ein **registriertes Handy** daran, öffnet es die Adresse von selbst (auch bei geschlossener App, der Bildschirm muss entsperrt sein), und die Zentrale **drückt einen eigenen Knopf** bzw. schaltet einen eigenen Schalter oder startet einen Timer. Was daraus folgt (Licht, Video, Nachricht …), legst du wie immer in **Regeln** fest (WENN Knopf gedrückt).
+*Smart Home → NFC + QR* (Recht „Smart Home: NFC + QR“; Lesen zeigt alles außer den Adressen, Schreiben verwaltet). Ein NFC-Tag trägt eine Internet-Adresse. Hältst du ein **registriertes Handy** daran, öffnet es die Adresse von selbst (auch bei geschlossener App, der Bildschirm muss entsperrt sein), und die Zentrale **drückt einen eigenen Knopf** bzw. schaltet einen eigenen Schalter oder startet einen Timer. Was daraus folgt (Licht, Video, Nachricht …), legst du wie immer in **Regeln** fest (WENN Knopf gedrückt).
 
 **Geeignete Tags:** NFC-Tags (NTAG/MIFARE, 13,56 MHz), z. B. Aufkleber oder Schlüsselanhänger. Ältere 125-kHz-RFID-Tags (Türschloss-Chips, viele Arduino-Sets) kann ein Handy nicht lesen. Ob ein Tag taugt, zeigt die kostenlose App „NFC Tools“.
 
@@ -778,6 +778,14 @@ Mit einem **Cloudflare Tunnel** erreichst du die Steuerung auch von außen – *
 - **iPhone / iPad:** Apple erlaubt Webseiten das Beschreiben von NFC-Tags nicht (BlueNexus ist nicht kaputt). Dort Adresse mit „📋 Adresse“ kopieren und mit einer NFC-App wie „NFC Tools“ schreiben, oder den Tag mit einem Android-Handy beschreiben. **Scannen** funktioniert auf dem iPhone ganz normal.
 - **Android, aber anderer Browser** (Samsung Internet, Firefox): in Chrome öffnen.
 Die jeweils passende Erklärung steht auch als Hinweiszeile unter der Tag-Liste. Die Knöpfe passen sich dem Gerät an: Am **PC** gibt es keinen „✍ Beschreiben“-Knopf (nur „📋 Adresse“), am **Android-Handy** mit NFC keinen „📋 Adresse“-Knopf (die App schreibt selbst); am iPhone und bei anderen Browsern bleiben beide, damit „Beschreiben“ die Erklärung zeigt und „Adresse“ den Weg über eine NFC-App ermöglicht.
+
+**QR-Etikett drucken.** Statt eines NFC-Tags – oder zusätzlich – lässt sich der Link eines Tags als **QR-Code mit dem Namen** auf ein **Niimbot-Etikett** drucken (Drucker D110 und D110_M, per Bluetooth). Wer den Code mit der Handy-Kamera scannt, löst genauso aus wie beim Tag (nur registrierte Handys). Am Tag gibt es dafür den Knopf **„🏷 Etikett“**:
+1. **Fenster öffnen:** Es zeigt eine Vorschau des Etiketts.
+2. **Etikettengröße wählen:** 14 × 30 mm, 12 × 22 mm oder eine andere Länge – passend zu den Etiketten, die gerade im Drucker liegen. BlueNexus merkt sich die Größe je Drucker; wechselst du die Rolle, stellst du sie hier um. Außerdem lässt sich der Aufbau wählen (QR-Code links oder rechts vom Namen, oder nur der QR-Code).
+3. **Drucken:** Beim ersten Mal wählst du den Drucker in der Bluetooth-Auswahl des Browsers aus, danach bleibt er verbunden. Pro Druck kommt **ein** Etikett heraus; für mehrere einfach noch einmal drücken.
+- **Wo es geht:** Am **Android-Handy** und am **PC** mit Chrome oder Edge, über eine sichere Adresse (https, z. B. dein Fernzugriff). Am iPhone und iPad ist Drucken nicht möglich (Apple lässt Webseiten keine Bluetooth-Drucker ansprechen); dort ein Android-Handy oder den PC nehmen. Am Windows-PC hängt die Bluetooth-Verbindung bei manchen Druckern – dann das Handy nehmen.
+- **Klappt es nicht:** Drucker einschalten, die Niimbot-App am Handy beenden (der Drucker verbindet sich nur mit einem Gerät) und noch einmal drucken. Erscheint der Drucker nicht in der Liste, unter „Hilfe bei Problemen“ alle Bluetooth-Geräte anzeigen lassen.
+- **Zu langer Link:** Ist der Link für das Etikett zu lang (der QR-Code würde zu klein), weist das Fenster darauf hin; dann ein größeres Etikett wählen.
 
 **Sicherheit**
 - Ausgelöst wird **nur von registrierten Handys**. Ein kopierter, fotografierter oder nachgebauter Tag nützt niemandem.

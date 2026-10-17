@@ -462,7 +462,7 @@ SMARTHOME_TABS = [
     ("sicherheit", "Sicherheit", "/smarthome#sicherheit", "smarthome_sicherheit", 1),
     ("regeln", "Regeln", "/rules", "rules", 2),
     ("suchen", "Geräte suchen", "/smarthome#suchen", "smarthome_einrichten", 3),
-    ("nfc", "NFC-Tags", "/smarthome#nfc", "smarthome_nfc", 3),
+    ("nfc", "NFC + QR", "/smarthome#nfc", "smarthome_nfc", 3),
     ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
@@ -4651,7 +4651,7 @@ def api_virtual_modify(vid):
         return hidden
     if request.method == "DELETE":
         if nfc.is_target(vid):
-            return jsonify(error="Dieser Knopf gehört zu einem NFC-Tag und wird mit dem Tag unter Smart Home → NFC-Tags gelöscht."), 400
+            return jsonify(error="Dieser Knopf gehört zu einem NFC-Tag und wird mit dem Tag unter Smart Home → NFC + QR gelöscht."), 400
         busy = _in_use("virtual", vid)
         if busy:
             return busy
@@ -4677,7 +4677,7 @@ def api_virtual_modify(vid):
             return jsonify(error="Das Symbol eines NFC-Knopfs ist fest (Etikett)."), 400
         try:
             if isinstance(body.get("name"), str) and nfc.is_target(vid) and body["name"].strip() != next((v["name"] for v in virtual.load() if v["id"] == vid), ""):
-                return jsonify(error="Der Name eines NFC-Knopfs wird unter Smart Home → NFC-Tags geändert."), 400
+                return jsonify(error="Der Name eines NFC-Knopfs wird unter Smart Home → NFC + QR geändert."), 400
             ok = virtual.update(vid, name=body.get("name") if isinstance(body.get("name"), str) else None,
                                 icon=body.get("icon") if isinstance(body.get("icon"), str) else None,
                                 show=body.get("show") if isinstance(body.get("show"), bool) else None,

@@ -44,8 +44,8 @@ AREAS = [
      "Die Reiter Geräte suchen, Alexa (falls das Modul an ist) und Sonstiges: Systeme auswählen, Geräte suchen/hinzufügen, Zugangsdaten (CCU, Tuya, Zigbee), Homematic-Push und Alexa-Status; Freigaben für Alexa legt nur ein Administrator an. Zugangsdaten und Geräte-IP-Adressen sind nur bei „Schreiben“ im Klartext sichtbar."),
     ("smarthome_teilen", "Smart Home: Teilen (Fremde Quellen)",
      "Der Reiter Teilen: die Fremden Quellen ansehen. Schreiben = Einladungscodes anderer Anlagen einfügen, Quellen verbinden/löschen und Geräte von dort holen. „Lesen“ zeigt nur die Liste. Das Vergeben von Zugang an andere (Personen anlegen, Einladungscodes erzeugen, Geräte freigeben) darf immer nur ein Administrator. Die geholten Geräte bedienen darf, wer Geräte bedienen darf (Aktoren/Dashboard)."),
-    ("smarthome_nfc", "Smart Home: NFC-Tags",
-     "Der Reiter NFC-Tags: Tags, registrierte Handys und Freigaben ansehen. Die Adressen der Tags (damit kann ein Tag beschrieben werden) und die Adresse der Zentrale sind nur bei „Schreiben“ sichtbar. Schreiben = Tags anlegen/umbenennen/löschen, Handys registrieren und Freigaben ändern."),
+    ("smarthome_nfc", "Smart Home: NFC + QR",
+     "Der Reiter NFC + QR: Tags, registrierte Handys und Freigaben ansehen. Die Adressen der Tags (damit kann ein Tag beschrieben werden) und die Adresse der Zentrale sind nur bei „Schreiben“ sichtbar. Schreiben = Tags anlegen/umbenennen/löschen, Handys registrieren und Freigaben ändern."),
     # --- Menue "Einstellungen"
     ("settings_anlage", "Einstellungen: Anlage", "Cerbo-Zugang, Batteriekapazität, Inbetriebnahme-Datum. Die Cerbo-IP-Adresse ist nur bei „Schreiben“ im Klartext sichtbar."),
     ("settings_tarif", "Einstellungen: Tarif & Laden", "Tibber/fester Tarif, Ladestrategie, Vertragskosten. Der Tibber-Zugangs-Token ist nur bei „Schreiben“ sichtbar."),

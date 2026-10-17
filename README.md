@@ -25,7 +25,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 |---|---|
 | ⚡ **Energie** | Victron Cerbo GX, Tibber-Strompreise, PV-Prognose, intelligente Ladeplanung, Überschuss-Automatik, Kosten und Ersparnis |
 | 🏠 **Smart Home** | Shelly, Tasmota, WLED, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
-| 🏷️ **NFC-Tags** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Tags beschreibst du direkt in BlueNexus (Android). Nur registrierte Handys, auch unterwegs |
+| 🏷️ **NFC + QR** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Tags beschreibst du direkt in BlueNexus (Android). Nur registrierte Handys, auch unterwegs |
 | 🔗 **Geräte teilen** | Gib Geräte, Sensoren, Schalter und die Klimaanlage an ein anderes BlueNexus weiter (z. B. Mutter im selben Haus). Zugangsdaten und Cloud-Logins bleiben bei dir |
 | 🔌 **Offene Schnittstelle** | Andere Programme im Heimnetz (Info-Monitor, Skripte, eigene Projekte) lesen Zustände von Sensoren, Geräten und Schaltern per JSON-API – nur lesend, nur im lokalen Netz, mit eigenem Schlüssel pro Programm und Zeitpunkt der letzten Änderung |
 | 🧠 **Regeln** | Grafischer Regel-Editor: WENN … DANN … SONST, Zeitpläne, Sonnenstand, Abläufe mit Timern, Telegram- und Pushover-Meldungen |
@@ -45,7 +45,7 @@ Smart-Home-Zentrale mit Kameras – wer nur Energie will, blendet den Rest aus.
 - [Module](#module)
 - [Smart Home: unterstützte Geräte und Systeme](#smart-home-unterstützte-geräte-und-systeme)
 - [Regeln und Abläufe](#regeln-und-abläufe)
-- [NFC-Tags](#nfc-tags)
+- [NFC + QR](#nfc--qr)
 - [Kameras](#kameras)
 - [Sprachsteuerung mit Alexa](#sprachsteuerung-mit-alexa)
 - [Benachrichtigungen](#benachrichtigungen)
@@ -141,7 +141,7 @@ Weitere Netze und VLANs lassen sich für die Suche zusätzlich eintragen.
 - **Türschlösser (HomematicIP und das klassische Keymatic):** öffnen, entriegeln, verriegeln – mit PIN und eigener Freigabe, ob Regeln öffnen dürfen.
 - **Homematic-Funk-Diagnose:** Duty Cycle der Funkmodule, gesprächigste Geräte, Befehle der App – plus ein Test „Homematic pausieren“, um den Verursacher von Funklast zu finden.
 - **Kurzer und langer Tastendruck** an Wandtastern als getrennte Auslöser.
-- **NFC-Tags:** Handy an einen Tag halten löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel. Tags lassen sich am Android-Handy (Chrome) direkt aus der App beschreiben; auf iPhone und PC weist die App auf die Einschränkung hin.
+- **NFC + QR:** Handy an einen Tag halten (oder den QR-Code auf dem Etikett scannen) löst einen Knopf (und damit jede Regel) aus – nur registrierte Handys, einzeln sperrbar, auch unterwegs über den Tunnel. Tags lassen sich am Android-Handy (Chrome) direkt aus der App beschreiben; auf iPhone und PC weist die App auf die Einschränkung hin.
 - **Geräte teilen:** Person anlegen → ein Einladungscode (Adresse + Schlüssel in einem) wird verschickt und beim anderen BlueNexus in einem Feld eingefügt (Tunnel oder LAN), dann jedes Gerät einzeln über ✎ → Teilen-Symbol freigeben (nur sehen oder bedienen). Der Empfänger sieht und bedient die gewählten Geräte, Sensoren, Schalter und die Klimaanlage wie eigene und nutzt sie in Regeln; Zugangsdaten bleiben beim Geber.
 - **Klingel:** Reolink-Türklingel als Auslöser („Klingel gedrückt“) – zum Beispiel für einen Gong im Haus.
 - **Chime:** Der Türgong der Reolink-Video-Türklingel lässt sich in der App ausprobieren (Klingelton wählen, läuten) und in der Lautstärke einstellen; als Regel-Schritt „Chime läuten“ löst er auch automatisch einen Gong aus.
@@ -195,7 +195,7 @@ Kamera-Standbild** · **Telegram mit Video zum Ereignis** (aus der SD-Karten-Auf
 
 ---
 
-## NFC-Tags
+## NFC + QR
 
 Ein günstiger **NFC-Aufkleber oder Schlüsselanhänger** wird zum physischen Knopf für dein Smart Home: Handy kurz
 daranhalten, und BlueNexus löst aus, was du in den Regeln festgelegt hast – Licht an, Garagentor, Gong im Haus,
@@ -208,14 +208,15 @@ Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause un
 - **Pro NFC-Tag einstellbar**, welche Handys ihn nutzen dürfen (nicht zeitlich begrenzt – ein registriertes Handy darf, bis du es löschst). Jeder neue NFC-Tag legt automatisch einen eigenen Knopf (🏷️) an,
   den du in Regeln als „WENN Knopf gedrückt“ verwendest.
 - **Tags direkt aus BlueNexus beschreiben:** Am Android-Handy (Chrome) genügt ein Fingertipp auf „✍ Beschreiben“ und das Handy an den Tag halten – keine Zusatz-App nötig. Die App führt Schritt für Schritt durch, öffnet den Tag danach selbst und meldet den Erfolg. Am PC und iPhone fehlt diese Funktion technisch bedingt; dort zeigt BlueNexus die Adresse zum Kopieren für eine NFC-App.
+- **QR-Etiketten drucken:** Am Tag druckt „🏷 Etikett“ den Link als **QR-Code mit Namen** auf ein Niimbot-Etikett (D110 / D110_M, per Bluetooth, am Android-Handy oder PC mit Chrome) – für Stellen, an denen kein NFC-Tag klebt. Etikettengröße (14 × 30 mm, 12 × 22 mm oder eigene Länge) wählbar.
 - **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
   und schließt sich die App beim Scannen von selbst.
 - **PIN-geschützte Ziele:** Nach dem Scannen fragt das Handy die PIN ab (Handy **und** PIN nötig, nach 5 Fehlversuchen gesperrt).
-- **Rechte:** eigener Bereich „Smart Home: NFC-Tags“. Ein Lese-Konto (z. B. Demo) sieht Tags, Handys und Freigaben, aber
+- **Rechte:** eigener Bereich „Smart Home: NFC + QR“. Ein Lese-Konto (z. B. Demo) sieht Tags, Handys und Freigaben, aber
   **keine Adressen**; verwalten darf nur, wer Schreibrecht hat.
 - Registrierungen gehören zur **Sicherung** und werden mit wiederhergestellt. Abgelehnte Versuche stehen im Logbuch.
-- Erprobt mit **Android**; geeignet sind NFC-Tags nach NTAG/MIFARE-Standard (13,56 MHz). Einrichtung unter *Smart Home → NFC-Tags*,
-  ausführlich im [Handbuch](MANUAL.md#13c-nfc-tags-handy-scannen-knopf-auslösen).
+- Erprobt mit **Android**; geeignet sind NFC-Tags nach NTAG/MIFARE-Standard (13,56 MHz). Einrichtung unter *Smart Home → NFC + QR*,
+  ausführlich im [Handbuch](MANUAL.md#13c-nfc--qr-handy-scannen-knopf-auslösen).
 
 ---
 
