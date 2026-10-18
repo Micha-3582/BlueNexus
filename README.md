@@ -210,6 +210,7 @@ Foto der Kamera aufs Handy, Szene „Gute Nacht“. Das funktioniert zu Hause un
 - **Tags direkt aus BlueNexus beschreiben:** Am Android-Handy (Chrome) genügt ein Fingertipp auf „✍ NFC beschreiben“ und das Handy an den Tag halten – keine Zusatz-App nötig. Die App führt Schritt für Schritt durch, öffnet den Tag danach selbst und meldet den Erfolg. Am PC und iPhone fehlt diese Funktion technisch bedingt; dort zeigt BlueNexus die Adresse zum Kopieren für eine NFC-App.
 - **QR-Etiketten drucken:** Am Tag druckt „🏷 QR-Code“ den Link als **QR-Code mit Namen** auf ein Niimbot-Etikett (D110 / D110_M, per Bluetooth, am Android-Handy mit Chrome) – für Stellen, an denen kein NFC-Tag klebt. Etikettengröße (14 × 30 mm, 12 × 22 mm oder eigene Länge) wählbar.
 - **QR-Code scannen:** Mit der Kamera-App oder einer QR-Scanner-App des Handys; der Link muss im Browser öffnen, in dem das Handy registriert ist.
+- **QR Direkt (Android):** Die kleine Zusatz-App [QR Direkt](https://github.com/Micha-3582/QR-Direkt/releases) scannt den Code und öffnet den Link sofort im Browser – ohne Scanner-Fenster zum Schließen.
 - **App installierbar:** Die Einrichtungsseite `/nfc` führt Handy-Nutzer ohne Anmeldung durch die Installation – danach öffnet
   und schließt sich die App beim Scannen von selbst.
 - **PIN-geschützte Ziele:** Nach dem Scannen fragt das Handy die PIN ab (Handy **und** PIN nötig, nach 5 Fehlversuchen gesperrt).
