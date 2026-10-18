@@ -784,6 +784,7 @@ Die jeweils passende Erklärung steht auch als Hinweiszeile unter der Tag-Liste.
 2. **Etikettengröße wählen:** 14 × 30 mm, 12 × 22 mm oder eine andere Länge – passend zu den Etiketten, die gerade im Drucker liegen. BlueNexus merkt sich die Größe je Drucker; wechselst du die Rolle, stellst du sie hier um. Außerdem lässt sich der Aufbau wählen (QR-Code links oder rechts vom Namen, oder nur der QR-Code).
 3. **Drucken:** Beim ersten Mal wählst du den Drucker in der Bluetooth-Auswahl des Browsers aus, danach bleibt er verbunden. Pro Druck kommt **ein** Etikett heraus; für mehrere einfach noch einmal drücken.
 - **Wo es geht:** Am **Android-Handy** mit Chrome, über eine sichere Adresse (https, z. B. dein Fernzugriff). Auf dem PC und auf iPhone/iPad gibt es den Knopf „🏷 QR-Code“ nicht; dort steht unter der Tag-Liste ein Hinweis.
+- **Scannen:** Der QR-Code lässt sich mit der Kamera-App des Handys oder einer beliebigen QR-Scanner-App scannen. Der Link muss in dem Browser öffnen, in dem das Handy registriert wurde (meist Chrome); sonst löst der Scan nichts aus.
 - **Klappt es nicht:** Drucker einschalten, die Niimbot-App am Handy beenden (der Drucker verbindet sich nur mit einem Gerät) und noch einmal drucken. Erscheint der Drucker nicht in der Liste, unter „Hilfe bei Problemen“ alle Bluetooth-Geräte anzeigen lassen.
 - **Zu langer Link:** Ist der Link für das Etikett zu lang (der QR-Code würde zu klein), weist das Fenster darauf hin; dann ein größeres Etikett wählen.
 
