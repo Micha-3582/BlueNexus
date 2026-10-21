@@ -563,13 +563,20 @@ def _num(v, lo, hi, what):
 
 def update(dev_id: str, name: str | None = None, icon: str | None = None,
            show: bool | None = None, auto: bool | None = None, power_w=None,
-           min_on_min=None, min_off_min=None, switchable: bool | None = None) -> bool:
-    """Name, Symbol, Dashboard-Sichtbarkeit, Schaltbarkeit und Ueberschuss-Automatik eines Geraets aendern."""
+           min_on_min=None, min_off_min=None, switchable: bool | None = None, ip: str | None = None) -> bool:
+    """Name, Symbol, Dashboard-Sichtbarkeit, Schaltbarkeit, Ueberschuss-Automatik und (bei Geraeten im Heimnetz) die IP-Adresse eines Geraets aendern."""
     if icon is not None and icon not in ICONS:
         raise ShellyError("Unbekanntes Symbol")
+    new_ip = check_ip(ip) if ip is not None else None             # vorher pruefen: bei Fehler wird nichts veraendert
     items = load_devices()
     for d in items:
         if d["id"] == dev_id:
+            if new_ip is not None:
+                if d.get("kind") == "remote" or d.get("cloud") or not d.get("ip"):
+                    raise ShellyError("Dieses Gerät hat keine eigene IP-Adresse (Cloud, Gateway oder geteilt) – hier gibt es nichts zu ändern")
+                same = [x for x in items if x is d or (d.get("mac") and x.get("mac") == d.get("mac") and x.get("kind") == d.get("kind"))]       # mehrere Kanaele eines Geraets teilen die Adresse
+                for x in same:
+                    x["ip"] = new_ip
             if power_w is not None:
                 d["power_w"] = _num(power_w, 0, 20000, "Leistung (W)")
             if min_on_min is not None:

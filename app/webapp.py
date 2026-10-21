@@ -5610,9 +5610,15 @@ def api_shelly_modify(dev_id):
                                show=body.get("show"), auto=body.get("auto"),
                                power_w=body.get("power_w"), min_on_min=body.get("min_on_min"),
                                min_off_min=body.get("min_off_min"),
-                               switchable=body.get("switchable"))
+                               switchable=body.get("switchable"), ip=body.get("ip") if isinstance(body.get("ip"), str) else None)
         except shelly.ShellyError as e:
             return jsonify(error=str(e)), 400
+        if ok and isinstance(body.get("ip"), str):                               # neue Adresse gleich pruefen: antwortet das Geraet dort?
+            try:
+                live = shelly.list_with_status(ids={dev_id}, live=True)
+                return jsonify(ok=True, ip=shelly.check_ip(body["ip"]), online=bool(live and live[0].get("online")))
+            except Exception:                                                    # noqa: BLE001
+                return jsonify(ok=True, ip=shelly.check_ip(body["ip"]), online=False)
     return jsonify(ok=True) if ok else (jsonify(error="nicht gefunden"), 404)
 
 

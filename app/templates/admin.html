@@ -1905,6 +1905,8 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
       <div class="edit-panel" id="dedit-${id}">
         <div class="edit-row"><input id="dname-${id}" value="${escH(d.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')shellyRenameSave('${id}')">
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="shellyRenameSave('${id}')">${I_CHECK}</button></div>
+        ${d.ip && !d.ip_hidden && d.kind !== 'remote' && !d.cloud ? `<div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">IP-Adresse</span><input id="dip-${id}" value="${escH(d.ip)}" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="192.168.2.50" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')shellyIpSave('${id}')">
+          <button type="button" class="tgl" title="IP-Adresse speichern (z. B. wenn der Router dem Gerät eine neue vergeben hat)" aria-label="IP-Adresse speichern" onclick="shellyIpSave('${id}')">${I_CHECK}</button></div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
@@ -2042,6 +2044,15 @@ async function shellySetIcon(id, icon) { try { await shellyApi('/api/shelly/' + 
 async function shellyRenameSave(id) {
   const n = (document.getElementById('dname-' + id)?.value || '').trim(); if (!n) return;
   try { await shellyApi('/api/shelly/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
+  loadShellyAdmin();
+}
+async function shellyIpSave(id) {
+  const v = (document.getElementById('dip-' + id)?.value || '').trim(); if (!v) return;
+  try {
+    const r = await shellyApi('/api/shelly/' + encodeURIComponent(id), 'PATCH', { ip: v });
+    if (r.online) savedToast('Adresse gespeichert – das Gerät antwortet ✓');
+    else { savedToast(); shellyMsg('Adresse gespeichert, aber das Gerät antwortet unter ' + r.ip + ' nicht. Adresse prüfen und Gerät einschalten.', true); }
+  } catch (e) { shellyMsg(e.message, true); }
   loadShellyAdmin();
 }
 async function shellyPin(id, has) {
@@ -2425,6 +2436,10 @@ async function loadWolAdmin(light) {
       <div class="edit-panel" id="wedit-${wid}">
         <div class="edit-row"><input id="wname-${wid}" value="${escH(w.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolRenameSave('${wid}')">
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="wolRenameSave('${wid}')">${I_CHECK}</button></div>
+        ${w.ip_hidden ? '' : `<div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">IP-Adresse</span><input id="wip-${wid}" value="${escH(w.ip || '')}" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="leer = ohne Erreichbarkeitsprüfung" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolIpSave('${wid}')">
+          <button type="button" class="tgl" title="IP-Adresse speichern" aria-label="IP-Adresse speichern" onclick="wolIpSave('${wid}')">${I_CHECK}</button></div>
+        <div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">MAC-Adresse</span><input id="wmac-${wid}" value="${escH(w.mac || '')}" maxlength="17" autocomplete="off" placeholder="AA:BB:CC:DD:EE:FF" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolMacSave('${wid}')">
+          <button type="button" class="tgl" title="MAC-Adresse speichern" aria-label="MAC-Adresse speichern" onclick="wolMacSave('${wid}')">${I_CHECK}</button></div>`}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(w.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'wol','${wid}','show','Dashboard')`)}
           ${visBtn('wol', wid, w.users)}
@@ -2456,6 +2471,8 @@ async function wolRenameSave(id) {
   const n = (document.getElementById('wname-' + id)?.value || '').trim();
   if (n) wolPatch(id, { name: n });
 }
+async function wolIpSave(id) { wolPatch(id, { ip: (document.getElementById('wip-' + id)?.value || '').trim() }); }
+async function wolMacSave(id) { const m = (document.getElementById('wmac-' + id)?.value || '').trim(); if (m) wolPatch(id, { mac: m }); }
 async function wolRemove(id) {
   if (await inUseBlock('wol', id)) return;
   if (!await uiDialog({ title: 'Rechner entfernen?', message: 'Regeln, die ihn aufwecken, verlieren diesen Schritt.', okText: 'Entfernen' })) return;
