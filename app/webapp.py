@@ -2751,11 +2751,15 @@ def _fav_items(refs: list, live: bool = True) -> list:
     live=False: ohne Abfrage der Geraete/Sensoren/Ping (sofort da: Namen, Symbole, Reihenfolge) - die Eintraege tragen dann "pending": true."""
     kinds = {r.split(":", 1)[0] for r in refs}
     data = {}
+    want = lambda kind: {r.split(":", 1)[1] for r in refs if r.startswith(kind + ":")}
     if "shelly" in kinds:
-        data["shelly"] = {d["id"]: d for d in _shelly_payload(False, live)}
+        data["shelly"] = {d["id"]: d for d in _shelly_payload(False, live, want("shelly"))}              # nur die Favoriten abfragen, nicht jedes Geraet (schont Steckdosen)
     if "sensor" in kinds:
         try:
-            data["sensor"] = {d["id"]: d for d in _vis_filter(homematic.list_sensors_with_values(live=live))}
+            ids = want("sensor")
+            items = [s for s in homematic.load_sensors() if s["id"] in ids]
+            vals = homematic.read_values(items) if (live and items) else {}
+            data["sensor"] = {d["id"]: d for d in _vis_filter([{**s, "value": vals.get(s["id"])} for s in items])}
         except Exception as e:                                                  # noqa: BLE001
             log.warning("Favoriten (Sensoren): %s", e)
             data["sensor"] = {}
@@ -3339,8 +3343,8 @@ def api_shelly_list():
     return jsonify(_shelly_payload(request.args.get("dashboard") == "1", request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
 
 
-def _shelly_payload(only_shown: bool, live: bool) -> list:
-    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live))
+def _shelly_payload(only_shown: bool, live: bool, ids: set | None = None) -> list:
+    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids))        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
     ruled = {i for r in rules.list_rules() if r.get("enabled", True) for i in rules.devices_of(r)} if rules.enabled(store.load_config()) else set()
     show_ip = auth.has_level(g.perms, "settings_geraete", "write")
     for d in devs:
