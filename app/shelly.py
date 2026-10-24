@@ -742,10 +742,9 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
         return status(d)
     if d.get("kind") == "tasmota":
         try:
-            tasmota.set_state(d, on, timer_s)
+            return tasmota.set_state(d, on, timer_s)             # Zustand aus der Antwort des Befehls: kein zweiter Abruf (schont das Geraet, schnellere Rueckmeldung)
         except tasmota.TasmotaError as e:
             raise ShellyError(str(e))
-        return status(d)
     try:
         if d["gen"] >= 2:
             # Gen2/3 kennen kein "Timer 0 = aus" (toggle_after=0 wird mit HTTP 500 abgelehnt, am Plus 1PM geprueft) -> ohne Timer schalten

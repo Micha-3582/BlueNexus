@@ -8,6 +8,7 @@ Passwortgeschuetzte Geraete (WebPassword) werden per HTTP-Basic-Auth (Benutzer "
 from __future__ import annotations
 
 import re
+import time
 
 import requests
 
@@ -93,14 +94,33 @@ def _pulse_value(secs: int) -> int:
     return 100 + max(12, min(int(secs), 64800))
 
 
-def set_state(d: dict, on: bool, timer_s: int | None = None):
+_pulse_zero: dict = {}                                      # (IP, Kanal) -> Zeitpunkt, an dem "PulseTime 0" gesetzt wurde
+PULSE_ZERO_S = 3600                                         # so lange muss "PulseTime 0" nicht bei jedem Einschalten neu gesendet werden
+
+
+def _state_from(resp: dict, ch: int, on: bool) -> dict:
+    """Zustand aus der Antwort des Befehls (kein zweiter Abruf noetig). Fehlt er dort, gilt der gewuenschte Zustand."""
+    for key in (f"POWER{ch}", "POWER"):
+        if key in resp:
+            return {"online": True, "on": str(resp[key]).upper() == "ON", "power": None}
+    return {"online": True, "on": bool(on), "power": None}
+
+
+def set_state(d: dict, on: bool, timer_s: int | None = None) -> dict:
     """Schaltet einen Kanal. `timer_s` (nur Einschalten): Rueckschalt-Timer ueber PulseTime (Sekunden);
-    0 hebt einen gesetzten PulseTime auf. Ohne Angabe bleibt eine vorhandene Einstellung unberuehrt."""
+    0 hebt einen gesetzten PulseTime auf. Ohne Angabe bleibt eine vorhandene Einstellung unberuehrt.
+    "PulseTime 0" wird nur gesendet, wenn es nicht schon (innerhalb der letzten Stunde) gesetzt wurde: Der Sammelbefehl (Backlog) kostet das Geraet
+    rund 200 ms Pause, und jede PulseTime-Aenderung schreibt in seinen Flash-Speicher. Rueckgabe: Zustand laut Antwort des Geraets."""
     ch = int(d["channel"])
+    key = (d.get("ip"), ch)
     power = f"Power{ch} {'On' if on else 'Off'}"
+    pulse = None
     if on and timer_s is not None:
         pulse = 0 if int(timer_s) <= 0 else _pulse_value(int(timer_s))
-        cmnd = f"Backlog PulseTime{ch} {pulse}; {power}"
+        if pulse == 0 and time.time() - _pulse_zero.get(key, 0.0) < PULSE_ZERO_S:
+            cmnd, pulse = power, None                         # PulseTime ist schon 0
+        else:
+            cmnd = f"Backlog PulseTime{ch} {pulse}; {power}"
     else:
         cmnd = power
     try:
@@ -111,3 +131,9 @@ def set_state(d: dict, on: bool, timer_s: int | None = None):
         raise TasmotaError(f"Schalten fehlgeschlagen: {e}")
     if "Command" in resp and str(resp.get("Command")).lower().startswith("unknown"):
         raise TasmotaError("Schalten fehlgeschlagen: Befehl unbekannt")
+    if pulse is not None:                                     # gesendeten PulseTime merken (0 = kein Rueckschalt-Timer)
+        if pulse == 0:
+            _pulse_zero[key] = time.time()
+        else:
+            _pulse_zero.pop(key, None)
+    return _state_from(resp, ch, on)
