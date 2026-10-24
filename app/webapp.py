@@ -3343,7 +3343,7 @@ def api_shelly_list():
     return jsonify(_shelly_payload(request.args.get("dashboard") == "1", request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
 
 
-def _shelly_payload(only_shown: bool, live: bool, ids: set | None = None) -> list:
+def _shelly_payload(only_shown: bool, live: bool, ids: "set | None" = None) -> list:
     devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids))        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
     ruled = {i for r in rules.list_rules() if r.get("enabled", True) for i in rules.devices_of(r)} if rules.enabled(store.load_config()) else set()
     show_ip = auth.has_level(g.perms, "settings_geraete", "write")
