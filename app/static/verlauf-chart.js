@@ -1,3 +1,19 @@
+/* Handy/Tablet (keine Maus): Der Infokasten, der beim Antippen eines Diagramms erscheint, bleibt sonst stehen - hier blendet er sich nach 3 Sekunden selbst aus.
+   Gilt fuer alle Diagramme der Seite (Chart.js-Plugin). Am PC mit Maus unveraendert: Kasten nur beim Drueberfahren. */
+(function () {
+  if (!window.Chart || !window.matchMedia || !window.matchMedia('(hover: none)').matches) return;
+  Chart.register({
+    id: 'tooltipAutoHide',
+    afterEvent: function (chart) {
+      var tt = chart.tooltip, act = tt && tt.getActiveElements ? tt.getActiveElements() : [];
+      clearTimeout(chart._ttHide);
+      if (!act || !act.length) return;
+      chart._ttHide = setTimeout(function () {
+        try { tt.setActiveElements([], { x: 0, y: 0 }); chart.setActiveElements([]); chart.update('none'); } catch (e) { /* Diagramm schon weg */ }
+      }, 3000);
+    }
+  });
+})();
 /* Gemeinsame Diagramm-Zeichnung fuer die Verlaeufe (Seite "Verlaeufe" und Dashboard-Kachel). Benoetigt Chart.js.
  *
  *   VLChart.draw(inst, c, series, d, t0, t1, cv, opts) -> { any, created }
