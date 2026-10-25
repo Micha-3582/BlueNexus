@@ -1454,7 +1454,7 @@ let GROUPS_META = [], PRESET_LABELS_META = {};
 const AREA_HINT = {          // kurze, sichtbare Zusatzzeile je Bereich (die Langfassung steht im "?")
   dashboard: ['Schreiben = Geräte schalten, Sofort-Laden, Ladetermine'],
   settings_geraete: ['Schreiben = bedienen (schalten, drücken, aufwecken). Anlegen, umbenennen, ändern, löschen nur Admin'],
-  smarthome_sicherheit: ['Türschlösser ansehen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
+  smarthome_sicherheit: ['Schreiben = Türschlösser verriegeln, entriegeln, öffnen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
   rules: ['⚠ Regeln schalten auch PIN-Geräte ohne PIN – nur vertrauten Konten „Schreiben“ geben', true],
   smarthome_einrichten: ['Geräte suchen, Zugangsdaten (CCU, Tuya, Zigbee), Push'],
   smarthome_teilen: ['Fremde Quellen: Schreiben = Einladungscode einfügen, Geräte holen. Zugang vergeben (Codes erzeugen) nur Admin'],
@@ -2849,11 +2849,25 @@ async function loadLocksAdmin(light) {
   document.getElementById('hm-locks').innerHTML = list.length ? list.map(x => `<div data-sort-id="${escH(x.id)}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="flex:1;min-width:150px"><b>🔒 ${escH(x.name)}</b>${shareMark('lock', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b>${x._pending ? 'wird gelesen …' : x.locked === true ? 'verriegelt' : x.locked === false ? 'entriegelt' : 'unbekannt'}</b></div></div>
       <label class="chk admin-only"><input type="checkbox" ${x.allow_open ? 'checked' : ''} onchange="lockAllow('${escH(x.id)}', this.checked)"> Regeln dürfen entriegeln / öffnen <span class="qhelp" role="button" tabindex="0" data-help="Aus: Regeln dürfen dieses Schloss nur verriegeln. An: Regeln dürfen es auch entriegeln und die Tür öffnen.">?</span></label>
+      ${lockCtl(x)}
       ${shareBtn('lock', escH(x.id), x.source === 'remote')}
       <button class="ghost admin-only" onclick="lockRename('${escH(x.id)}', this)" data-name="${escH(x.name)}" title="Umbenennen">✎</button>
       <button class="ghost admin-only" onclick="lockRemove('${escH(x.id)}')" title="Entfernen">✕</button></div>`).join('')
     : '<div class="muted">Noch keine Türschlösser für Regeln angelegt.</div>';
   famSeen('fam-locks', 'hint-sicherheit', list.length);
+}
+const lockCan = x => (window.IS_ADMIN || (window.USER_PERMS || {}).smarthome_sicherheit === 'write') && !window.DEMO_VIEW && !(x.source === 'remote' && x.switchable === false);
+const lockCtl = x => !lockCan(x) ? '' : `<div style="display:flex;gap:6px;flex-wrap:wrap">
+  <button class="ghost" onclick="lockDo('${escH(x.id)}','lock',this)" title="Verriegeln">🔒 Verriegeln</button>
+  <button class="ghost" onclick="lockDo('${escH(x.id)}','unlock',this)" title="Entriegeln">🔓 Entriegeln</button>
+  <button class="ghost" onclick="lockDo('${escH(x.id)}','open',this)" title="Tür öffnen (Falle zurückziehen)">🚪 Öffnen</button></div>`;
+async function lockDo(id, action, btn) {
+  const name = (btn.closest('[data-sort-id]')?.querySelector('b')?.textContent || 'Türschloss').replace(/^\s*🔒\s*/, '').trim();
+  if (action !== 'lock' && !await uiDialog({ title: action === 'open' ? 'Tür öffnen?' : 'Entriegeln?', message: `„${name}“ wird ${action === 'open' ? 'geöffnet (die Falle wird zurückgezogen)' : 'entriegelt'}.`, okText: action === 'open' ? 'Öffnen' : 'Entriegeln' })) return;
+  btn.disabled = true;
+  try { await shellyApi('/api/homematic/locks/' + encodeURIComponent(id) + '/action', 'POST', { action }); shellyMsg(''); savedToast(`${name}: ${({ lock: 'verriegelt', unlock: 'entriegelt', open: 'geöffnet' })[action]} ✓`); setTimeout(loadLocksAdmin, 3000); }
+  catch (e) { shellyMsg(e.message, true); }
+  btn.disabled = false;
 }
 async function lockAllow(id, on) {
   if (on && !await uiDialog({ title: 'Entriegeln und Öffnen freigeben?', message: 'Regeln der Art „Ablauf“ können dieses Schloss dann entriegeln und die Tür öffnen – auch wenn niemand zu Hause ist. Jede solche Aktion steht im Logbuch (und wird per Telegram gemeldet, falls eingerichtet).', okText: 'Freigeben' })) { loadLocksAdmin(); return; }

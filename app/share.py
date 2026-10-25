@@ -373,7 +373,7 @@ def _act_more(t: str, i: str, body: dict) -> dict:
     try:
         if t == "lock":
             action = str(body.get("action") or "")
-            homematic.lock_action(i, action)                       # Entriegeln/Oeffnen nur, wenn der Geber es dort freigegeben hat (allow_open)
+            homematic.lock_action(i, action, manual=bool(body.get("manual")))        # von Hand bedient: ausdruecklich erlaubt (sehen & bedienen); durch Regeln: nur mit allow_open des Gebers
             return {"name": name, "on": True, "log": f"{name}: Schloss „{action}“", "state": {"online": True}}
         if t == "blind":
             if body.get("stop"):

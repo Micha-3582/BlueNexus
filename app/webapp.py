@@ -273,7 +273,7 @@ ENDPOINT_AREA = {
     "api_sound_list": "dashboard", "api_sound_scan": "smarthome_einrichten", "api_sound_add": "smarthome_einrichten", "api_sound_modify": "settings_geraete", "api_sound_play": "smarthome_einrichten",
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
-    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
+    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_lock_action": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
     "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete", "api_virtual_url": "settings_geraete",
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
@@ -5134,6 +5134,20 @@ def api_lock_add():
         return jsonify(added=res)
     except homematic.HomematicError as e:
         return jsonify(error=str(e)), 400
+
+
+@app.route("/api/homematic/locks/<lid>/action", methods=["POST"])
+def api_lock_action(lid):
+    """Tuerschloss von Hand bedienen: {action: lock | unlock | open}. Braucht das Recht "Sicherheit: Schreiben"; die Bestaetigung (Entriegeln/Oeffnen) fragt die Seite ab."""
+    action = str((request.get_json(silent=True) or {}).get("action") or "")
+    if action not in homematic.LOCK_LEVELS:
+        return jsonify(error="Unbekannte Schloss-Aktion"), 400
+    try:
+        name = homematic.lock_action(lid, action, manual=True)
+    except homematic.HomematicError as e:
+        return jsonify(error=str(e)), 400
+    opslog.log("rules", f"Türschloss {name}: von Hand {({'lock': 'verriegelt', 'unlock': 'entriegelt', 'open': 'geöffnet'})[action]} (Konto {g.user_display})")
+    return jsonify(ok=True, name=name)
 
 
 @app.route("/api/homematic/locks/<lid>", methods=["PATCH", "DELETE"])

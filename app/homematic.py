@@ -1081,19 +1081,20 @@ def list_locks_with_state(live: bool = True) -> list[dict]:
     return [{**x, "locked": lock_state(x)} for x in items]
 
 
-def lock_action(lid: str, action: str) -> str:
-    """'lock' | 'unlock' | 'open'. Entriegeln/Oeffnen nur mit Freigabe (allow_open). Rueckgabe: Name des Schlosses."""
+def lock_action(lid: str, action: str, manual: bool = False) -> str:
+    """'lock' | 'unlock' | 'open'. Entriegeln/Oeffnen durch REGELN nur mit Freigabe (allow_open); manual=True: eine Person hat es ausdruecklich am Bildschirm
+    bedient (Bestaetigung dort) - das braucht die Regel-Freigabe nicht. Rueckgabe: Name des Schlosses."""
     if action not in LOCK_LEVELS:
         raise HomematicError("Unbekannte Schloss-Aktion")
     x = next((y for y in load_locks() if y["id"] == lid), None)
     if not x:
         raise HomematicError("Türschloss existiert nicht mehr")
-    if action != "lock" and not x.get("allow_open"):
+    if action != "lock" and not manual and not x.get("allow_open"):
         raise HomematicError(f"{x['name']}: Entriegeln/Öffnen durch Regeln ist nicht freigegeben (Smart Home → Sicherheit)")
     if x.get("source") == "remote":                                          # geteilt: der Geber fuehrt es aus (und prueft dort seine eigene Freigabe)
         import share
         try:
-            share.remote_act(x, {"action": action})
+            share.remote_act(x, {"action": action, "manual": bool(manual)})
         except share.ShareError as e:
             raise HomematicError(str(e))
         return x["name"]
