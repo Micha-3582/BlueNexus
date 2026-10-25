@@ -2294,9 +2294,9 @@ function applyFamilies(f) {
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
-  show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee); show('fam-locks', f.homematic); show('fam-sounds', f.homematic); show('fam-blinds', f.homematic); show('fam-wol', true);
+  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic); show('fam-sounds', f.homematic); show('fam-blinds', f.homematic); show('fam-wol', true);
   show('hm-push-card', f.homematic);
-  show('hint-sensoren', !(f.homematic || f.zigbee)); show('hint-thermostate', !(f.homematic || f.zigbee)); show('hint-sicherheit', !f.homematic);
+  show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !f.homematic);
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
   document.getElementById('fam-hint').hidden = any;
 }
@@ -2400,6 +2400,8 @@ async function loadSensorsAdmin(light) {
       <div id="sicons-${sid}" style="display:none;flex-wrap:wrap;gap:4px;width:100%;margin-top:8px">${[...new Set([...SENSOR_EXTRA_ICONS, ...shellyIcons])].map(ic => `<button class="ghost" style="font-size:20px;padding:2px 8px" onclick="sensorSetIcon('${sid}', '${ic}')">${ic}</button>`).join('')}</div></div>`; }).join('')
     : '<div class="muted">Noch keine Sensoren angelegt.</div>';
   reopenEdits(wasOpen);
+  window.SENS_COUNT = list.length; const seCard = document.getElementById('fam-sensors'), seHint = document.getElementById('hint-sensoren');
+  if (list.length) { if (seCard) seCard.classList.remove('fam-off'); if (seHint) seHint.classList.add('fam-off'); }        // auch nur geteilte Sensoren zeigen die Liste (ohne eigene CCU/Zigbee)
 }
 async function sensorRenameSave(id) {
   const n = (document.getElementById('sname-' + id)?.value || '').trim(); if (!n) return;
@@ -2781,6 +2783,8 @@ async function loadSetpointsAdmin(light) {
       </div></div>`; }).join('')
     : '<div class="muted">Noch keine Thermostate angelegt.</div>';
   reopenEdits(open);
+  window.SP_COUNT = list.length; const spCard = document.getElementById('fam-setpoints'), spHint = document.getElementById('hint-thermostate');
+  if (spCard) spCard.classList.toggle('fam-off', !(window.FAM_HM || list.length)); if (spHint) spHint.classList.toggle('fam-off', !!(window.FAM_HM || list.length));        // auch nur geteilte Thermostate zeigen die Liste (ohne eigene CCU)
 }
 function spSlide(id, val, send) {                                   // Regler: Anzeige beim Ziehen, senden beim Loslassen
   const row = document.querySelector(`[data-sp="${CSS.escape(id)}"]`); if (!row) return;
