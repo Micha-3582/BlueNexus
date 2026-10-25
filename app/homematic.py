@@ -1057,6 +1057,9 @@ def remove_lock(lid: str) -> bool:
 
 def lock_state(x: dict):
     """True = verriegelt, False = entriegelt, None = unbekannt/nicht lesbar."""
+    if x.get("source") == "remote":                                          # von einer fremden BlueNexus-Anlage geteilt
+        import share
+        return share.read_lock(x)
     try:
         if x.get("lock_kind") == "keymatic":                                # klassisches Keymatic: STATE wahr = entriegelt
             v = _get_value(x["interface"], x["address"], "STATE")
@@ -1087,6 +1090,13 @@ def lock_action(lid: str, action: str) -> str:
         raise HomematicError("Türschloss existiert nicht mehr")
     if action != "lock" and not x.get("allow_open"):
         raise HomematicError(f"{x['name']}: Entriegeln/Öffnen durch Regeln ist nicht freigegeben (Smart Home → Sicherheit)")
+    if x.get("source") == "remote":                                          # geteilt: der Geber fuehrt es aus (und prueft dort seine eigene Freigabe)
+        import share
+        try:
+            share.remote_act(x, {"action": action})
+        except share.ShareError as e:
+            raise HomematicError(str(e))
+        return x["name"]
     if x.get("lock_kind") == "keymatic":                                    # klassisches Keymatic: verriegeln = STATE aus, entriegeln = STATE an, oeffnen = OPEN
         key, val = ("OPEN", True) if action == "open" else ("STATE", action == "unlock")
         _pushed.pop((x["interface"], x["address"], "STATE"), None)
@@ -1252,6 +1262,13 @@ def sound_play(sid: str, track, volume=100, repeats=1) -> str:
     x = next((y for y in load_sounds() if y["id"] == sid), None)
     if not x:
         raise HomematicError("Soundmodul existiert nicht mehr")
+    if x.get("source") == "remote":                                          # geteilt: der Geber spielt es ab
+        import share
+        try:
+            share.remote_act(x, {"track": track, "volume": volume, "repeats": repeats})
+        except share.ShareError as e:
+            raise HomematicError(str(e))
+        return x["name"]
     _call("Interface.setValue", {"interface": x["interface"], "address": x["address"], "valueKey": "SUBMIT", "type": "string", "value": value})
     return x["name"]
 
@@ -1380,6 +1397,9 @@ def remove_blind(bid: str) -> bool:
 
 def blind_level(x: dict):
     """Position in Prozent (0 = zu, 100 = auf) oder None (nicht lesbar/Geraet nicht erreichbar)."""
+    if x.get("source") == "remote":                                          # von einer fremden BlueNexus-Anlage geteilt
+        import share
+        return share.read_blind_level(x)
     try:
         v = _get_value(x["interface"], x["address"], "LEVEL")
         if _unreach(x):
@@ -1419,6 +1439,13 @@ def blind_set(bid: str, level) -> str:
     """Faehrt den Rollladen auf `level` Prozent (0 zu, 100 auf). Rueckgabe: Name."""
     pct = blind_check_level(level)
     x = _blind_item(bid)
+    if x.get("source") == "remote":                                          # geteilt: der Geber faehrt ihn
+        import share
+        try:
+            share.remote_act(x, {"level": pct})
+        except share.ShareError as e:
+            raise HomematicError(str(e))
+        return x["name"]
     _call("Interface.setValue", {"interface": x["interface"], "address": x["address"], "valueKey": "LEVEL", "type": "double", "value": pct / 100})
     _pushed.pop((x["interface"], x["address"], "LEVEL"), None)
     return x["name"]
@@ -1427,6 +1454,13 @@ def blind_set(bid: str, level) -> str:
 def blind_stop(bid: str) -> str:
     """Haelt den Rollladen an. Rueckgabe: Name."""
     x = _blind_item(bid)
+    if x.get("source") == "remote":
+        import share
+        try:
+            share.remote_act(x, {"stop": True})
+        except share.ShareError as e:
+            raise HomematicError(str(e))
+        return x["name"]
     _call("Interface.setValue", {"interface": x["interface"], "address": x["address"], "valueKey": "STOP", "type": "bool", "value": True})
     _pushed.pop((x["interface"], x["address"], "LEVEL"), None)
     return x["name"]

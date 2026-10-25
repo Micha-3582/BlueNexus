@@ -5066,8 +5066,9 @@ def api_sources():
 @app.route("/api/sources/<sid>", methods=["DELETE"])
 def api_source_delete(sid):
     dev_ids, sen_ids = share.imported_ids(sid)
-    sp_ids = share.imported_setpoint_ids(sid)
-    for kind, ids in (("device", dev_ids), ("sensor", sen_ids), ("setpoint", sp_ids)):
+    more = share.imported_other_ids(sid)
+    sp_ids = [i for ids in more.values() for i in ids]
+    for kind, ids in [("device", dev_ids), ("sensor", sen_ids)] + list(more.items()):
         for i in ids:
             busy = _in_use(kind, i)
             if busy:
@@ -5096,7 +5097,7 @@ def api_source_import(sid):
         res = share.import_items(sid, refs)
     except share.ShareError as e:
         return _share_err(e)
-    return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]), added_setpoints=len(res["setpoints"]))
+    return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]), added_setpoints=len(res["setpoints"]), added_other=len(res["others"]))
 
 
 try:

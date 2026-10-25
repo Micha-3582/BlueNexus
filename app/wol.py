@@ -184,6 +184,13 @@ def wake(wid: str) -> list[str]:
     it = next((x for x in load() if x["id"] == wid), None)
     if not it:
         raise WolError("Ziel existiert nicht (mehr)")
+    if it.get("source") == "remote":                                         # von einer fremden BlueNexus-Anlage geteilt: der Geber weckt den Rechner auf
+        import share
+        try:
+            share.remote_act(it, {})
+        except share.ShareError as e:
+            raise WolError(str(e))
+        return ["Geber"]
     pkt = magic_packet(it["mac"])
     sent = []
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -225,7 +232,11 @@ def is_up(ip: str) -> bool | None:
 def public(item: dict, with_status: bool = True) -> dict:
     out = pins.strip(item)
     if with_status:
-        out["up"] = is_up(item.get("ip", ""))
+        if item.get("source") == "remote":
+            import share
+            out["up"] = share.read_wol_up(item)
+        else:
+            out["up"] = is_up(item.get("ip", ""))
     return out
 
 

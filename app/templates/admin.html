@@ -1815,13 +1815,13 @@ const I_SHARE = svgi('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"
 /* Teilen mit anderen BlueNexus-Anlagen (share.py): Knopf im Stift-Menue jedes Geraets/Sensors/Schalters + kleines Zeichen am Namen */
 let SHARE_MAP = {}, SHARE_LIST = [], SHARE_CAT = [], SHARE_SIG = '';
 const SHARE_OPEN = new Set();                                                   // aufgeklappte Personen im Reiter Teilen           // SHARE_MAP: Referenz -> [{id, name, mode}]
-const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:', setpoint: 'setpoint:' }[kind] || '?:') + id;
+const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:', setpoint: 'setpoint:', lock: 'lock:', blind: 'blind:', sound: 'sound:', wol: 'wol:' }[kind] || '?:') + id;
 const shareWho = ref => (SHARE_MAP[ref] || []).map(x => `${x.name} (${x.mode === 'control' ? 'bedienen' : 'nur sehen'})`).join(', ');
 const shareWrite = () => !!window.IS_ADMIN && ((window.USER_PERMS || {}).smarthome_teilen === 'write');
 const shareBtn = (kind, id, skip) => (!shareWrite() || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
 const shareMark = (kind, id, skip) => (!window.IS_ADMIN || skip || !(SHARE_MAP[shareRef(kind, id)] || []).length) ? '' : `<span class="share-mark" title="${escH('Geteilt mit: ' + shareWho(shareRef(kind, id)))}">${I_SHARE}</span>`;
 const VIS_URL = { shelly: '/api/shelly/', sensor: '/api/sensors/', virtual: '/api/virtual/', wol: '/api/wol/', sound: '/api/homematic/sounds/', blind: '/api/homematic/blinds/', setpoint: '/api/homematic/setpoints/' };
-const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); }, setpoint: () => loadSetpointsAdmin() };
+const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); }, setpoint: () => loadSetpointsAdmin(), lock: () => loadLocksAdmin(), wol: () => loadWolAdmin() };
 function userPickDialog(names, current) {                       // -> undefined (abgebrochen) | null (alle) | Liste
   return new Promise(resolve => {
     const ov = document.createElement('div');
@@ -2289,14 +2289,20 @@ async function loadHomematicInfo() {
   document.getElementById('hm-setup').open = !h.configured;
 }
 /* --- Auswahl der Smart-Home-Systeme --- */
+window.FAM_N = {};                                                  // Anzahl der Eintraege je Liste (auch geteilte ohne eigenes System)
+const famN = id => (window.FAM_N[id] || 0) > 0;
+function famSeen(cardId, hintId, n) {
+  window.FAM_N[cardId] = n; const c = document.getElementById(cardId), h = hintId && document.getElementById(hintId);
+  if (n) { if (c) c.classList.remove('fam-off'); if (h) h.classList.add('fam-off'); }
+}
 function applyFamilies(f) {
   const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
-  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic); show('fam-sounds', f.homematic); show('fam-blinds', f.homematic); show('fam-wol', true);
+  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
-  show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !f.homematic);
+  show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !(f.homematic || famN('fam-locks')));
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
   document.getElementById('fam-hint').hidden = any;
 }
@@ -2442,7 +2448,7 @@ async function loadWolAdmin(light) {
   document.getElementById('wol-list').innerHTML = list.length ? list.map(w => { const wid = escH(w.id); return `<div data-sort-id="${wid}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:22px">${escH(w.icon)}</span>
-      <div style="flex:1;min-width:150px"><b>${escH(w.name)}</b><div class="muted">${escH(w.mac)}${w.ip ? ' · ' + escH(w.ip) : ''}${w.up === true ? ' · 🟢 erreichbar' : w.up === false ? ' · ⚪ nicht erreichbar' : ''}</div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(w.name)}</b>${shareMark('wol', wid, w.source === 'remote')}<div class="muted">${w.source === 'remote' ? escH(w.model || 'geteilt') : escH(w.mac) + (w.ip ? ' · ' + escH(w.ip) : '')}${w.up === true ? ' · 🟢 erreichbar' : w.up === false ? ' · ⚪ nicht erreichbar' : ''}</div></div>
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`wolPin('${wid}', ${w.pin_set ? 'true' : 'false'})`, !!w.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('wedit-${wid}')" title="Bearbeiten: Name, Dashboard, Sichtbarkeit, Entfernen">✎</button>
@@ -2452,13 +2458,14 @@ async function loadWolAdmin(light) {
       <div class="edit-panel" id="wedit-${wid}">
         <div class="edit-row"><input id="wname-${wid}" value="${escH(w.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolRenameSave('${wid}')">
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="wolRenameSave('${wid}')">${I_CHECK}</button></div>
-        ${w.ip_hidden ? '' : `<div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">IP-Adresse</span><input id="wip-${wid}" value="${escH(w.ip || '')}" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="leer = ohne Erreichbarkeitsprüfung" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolIpSave('${wid}')">
+        ${(w.ip_hidden || w.source === 'remote') ? '' : `<div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">IP-Adresse</span><input id="wip-${wid}" value="${escH(w.ip || '')}" maxlength="15" inputmode="decimal" autocomplete="off" placeholder="leer = ohne Erreichbarkeitsprüfung" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolIpSave('${wid}')">
           <button type="button" class="tgl" title="IP-Adresse speichern" aria-label="IP-Adresse speichern" onclick="wolIpSave('${wid}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px"><span class="muted" style="min-width:86px">MAC-Adresse</span><input id="wmac-${wid}" value="${escH(w.mac || '')}" maxlength="17" autocomplete="off" placeholder="AA:BB:CC:DD:EE:FF" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')wolMacSave('${wid}')">
           <button type="button" class="tgl" title="MAC-Adresse speichern" aria-label="MAC-Adresse speichern" onclick="wolMacSave('${wid}')">${I_CHECK}</button></div>`}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(w.show !== false, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'wol','${wid}','show','Dashboard')`)}
           ${visBtn('wol', wid, w.users)}
+          ${shareBtn('wol', wid, w.source === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="wolRemove('${wid}')">${I_TRASH}</button>
         </div>
       </div></div>`; }).join('')
@@ -2503,7 +2510,7 @@ document.getElementById('wol-add').addEventListener('click', async () => {
   loadWolAdmin();
 });
 /* --- Teilen: Personen/Anlagen (Geber) und Fremde Quellen (Empfaenger), siehe share.py --- */
-const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', setpoint: 'Thermostate', virtual: 'Schalter & Knöpfe' };
+const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', setpoint: 'Thermostate', lock: 'Türschlösser', blind: 'Rollläden', sound: 'Soundmodule', wol: 'Wake-on-LAN', virtual: 'Schalter & Knöpfe' };
 async function loadShares() {
   let j; try { j = await (await fetch('/api/shares', { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(j.shares)) return;
@@ -2511,7 +2518,7 @@ async function loadShares() {
   SHARE_MAP = {};
   j.shares.forEach(sh => (sh.items || []).forEach(it => { (SHARE_MAP[it.ref] = SHARE_MAP[it.ref] || []).push({ id: sh.id, name: sh.name, mode: it.mode }); }));
   const sig = JSON.stringify(SHARE_MAP);
-  if (sig !== SHARE_SIG) { const first = SHARE_SIG === ''; SHARE_SIG = sig; if (!first || sig !== '{}') { ['shelly', 'sensor', 'virtual', 'setpoint'].forEach(k => { try { VIS_RELOAD[k](); } catch (e) { /* Liste noch nicht da */ } }); } }
+  if (sig !== SHARE_SIG) { const first = SHARE_SIG === ''; SHARE_SIG = sig; if (!first || sig !== '{}') { ['shelly', 'sensor', 'virtual', 'setpoint', 'lock', 'blind', 'sound', 'wol'].forEach(k => { try { VIS_RELOAD[k](); } catch (e) { /* Liste noch nicht da */ } }); } }
   const box = document.getElementById('shares-list'); if (!box) return;
   const nameOf = Object.fromEntries(SHARE_CAT.map(c => [c.ref, c]));
   const I_CHEV = svgi('<polyline points="6 9 12 15 18 9"/>');
@@ -2641,7 +2648,7 @@ async function sourceItems(id, keep) {
 async function sourceImport(id) {
   const p = document.getElementById('srcp-' + id), refs = [...p.querySelectorAll('.src-cb')].filter(c => c.checked && !c.disabled).map(c => c.dataset.ref);
   if (!refs.length) { savedToast('Nichts Neues ausgewählt'); return; }
-  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors + (j.added_setpoints || 0)} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); if (typeof loadSetpointsAdmin === 'function') loadSetpointsAdmin(); } catch (e) { uiAlert(e.message); }
+  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors + (j.added_setpoints || 0) + (j.added_other || 0)} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); if (typeof loadSetpointsAdmin === 'function') loadSetpointsAdmin(); } catch (e) { uiAlert(e.message); }
 }
 async function sourceDelete(id) {
   if (!await uiDialog({ title: 'Quelle entfernen?', message: 'Alle von dort geholten Geräte und Sensoren verschwinden aus deiner Anlage.', okText: 'Entfernen' })) return;
@@ -2840,11 +2847,13 @@ async function loadLocksAdmin(light) {
   if (!Array.isArray(list)) return;
   list.forEach(x => { x._pending = !!light; });
   document.getElementById('hm-locks').innerHTML = list.length ? list.map(x => `<div data-sort-id="${escH(x.id)}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px">
-      <div style="flex:1;min-width:150px"><b>🔒 ${escH(x.name)}</b><div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b>${x._pending ? 'wird gelesen …' : x.locked === true ? 'verriegelt' : x.locked === false ? 'entriegelt' : 'unbekannt'}</b></div></div>
+      <div style="flex:1;min-width:150px"><b>🔒 ${escH(x.name)}</b>${shareMark('lock', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b>${x._pending ? 'wird gelesen …' : x.locked === true ? 'verriegelt' : x.locked === false ? 'entriegelt' : 'unbekannt'}</b></div></div>
       <label class="chk admin-only"><input type="checkbox" ${x.allow_open ? 'checked' : ''} onchange="lockAllow('${escH(x.id)}', this.checked)"> Regeln dürfen entriegeln / öffnen <span class="qhelp" role="button" tabindex="0" data-help="Aus: Regeln dürfen dieses Schloss nur verriegeln. An: Regeln dürfen es auch entriegeln und die Tür öffnen.">?</span></label>
+      ${shareBtn('lock', escH(x.id), x.source === 'remote')}
       <button class="ghost admin-only" onclick="lockRename('${escH(x.id)}', this)" data-name="${escH(x.name)}" title="Umbenennen">✎</button>
       <button class="ghost admin-only" onclick="lockRemove('${escH(x.id)}')" title="Entfernen">✕</button></div>`).join('')
     : '<div class="muted">Noch keine Türschlösser für Regeln angelegt.</div>';
+  famSeen('fam-locks', 'hint-sicherheit', list.length);
 }
 async function lockAllow(id, on) {
   if (on && !await uiDialog({ title: 'Entriegeln und Öffnen freigeben?', message: 'Regeln der Art „Ablauf“ können dieses Schloss dann entriegeln und die Tür öffnen – auch wenn niemand zu Hause ist. Jede solche Aktion steht im Logbuch (und wird per Telegram gemeldet, falls eingerichtet).', okText: 'Freigeben' })) { loadLocksAdmin(); return; }
@@ -2890,7 +2899,7 @@ async function loadSoundsAdmin() {
   const sCard = document.getElementById('fam-sounds'); if (sCard) sCard.style.display = (!window.IS_ADMIN && !list.length) ? 'none' : '';      // Konten ohne sichtbares Soundmodul sehen die Kachel nicht
   document.getElementById('hm-sounds').innerHTML = list.length ? list.map(x => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px" data-sid="${escH(x.id)}" data-sort-id="${escH(x.id)}">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="soundIconGrid(this)">${escH(x.icon || '🔔')}</button>
-      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b><div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · ${escH(x.address)}</div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b>${shareMark('sound', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''}${x.source === 'remote' ? '' : ' · ' + escH(x.address)}</div></div>
       <span class="muted">Titel</span><input class="snd-track" type="number" min="1" max="255" value="${val(x.id, 'track', 1)}" oninput="sndKeep(this)" style="width:76px">
       <span class="muted">Lautstärke %</span><input class="snd-vol" type="number" min="0" max="100" value="${val(x.id, 'vol', 100)}" oninput="sndKeep(this)" style="width:76px">
       <button class="ghost" onclick="soundTest('${escH(x.id)}', this)" title="Titel jetzt abspielen">▶</button>
@@ -2900,11 +2909,14 @@ async function loadSoundsAdmin() {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="soundRenameSave('${escH(x.id)}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${visBtn('sound', escH(x.id), x.users)}
+          ${shareBtn('sound', escH(x.id), x.source === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="soundRemove('${escH(x.id)}')">${I_TRASH}</button>
         </div>
       </div>
       <div class="snd-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:170px;overflow-y:auto;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="soundSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
     : '<div class="muted">Noch keine Soundmodule angelegt – unter „Geräte suchen“ bei Homematic „Homematic-Soundmodule suchen“.</div>';
+  list.filter(x => x.source === 'remote' && x.switchable === false).forEach(x => { const row = document.querySelector(`[data-sid="${CSS.escape(x.id)}"]`); if (row) row.querySelectorAll(':scope > span.muted, .snd-track, .snd-vol, [onclick^="soundTest"]').forEach(e => { e.style.display = 'none'; }); });      // nur zum Ansehen geteilt
+  famSeen('fam-sounds', null, list.length);
   reopenEdits(sOpen);
 }
 function sndKeep(el) { const row = el.closest('[data-sid]'); SND_VALS[row.dataset.sid] = { track: row.querySelector('.snd-track').value, vol: row.querySelector('.snd-vol').value }; }
@@ -2959,7 +2971,7 @@ async function loadBlindsAdmin() {
   BL_SIG = sig; const bOpen = openEdits('bedit-');
   document.getElementById('hm-blinds').innerHTML = list.length ? list.map(x => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px" data-bid="${escH(x.id)}" data-sort-id="${escH(x.id)}">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="blindIconGrid(this)">${escH(x.icon || '🪟')}</button>
-      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b><div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b class="bl-pos">${escH(blPos(x.level))}</b></div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b>${shareMark('blind', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b class="bl-pos">${escH(blPos(x.level))}</b></div></div>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','level',100)" title="Ganz auf">▲ Auf</button>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','stop')" title="Anhalten">■ Stopp</button>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','level',0)" title="Ganz zu">▼ Zu</button>
@@ -2970,11 +2982,14 @@ async function loadBlindsAdmin() {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="blindRenameSave('${escH(x.id)}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${visBtn('blind', escH(x.id), x.users)}
+          ${shareBtn('blind', escH(x.id), x.source === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="blindRemove('${escH(x.id)}')">${I_TRASH}</button>
         </div>
       </div>
       <div class="bl-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:170px;overflow-y:auto;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="blindSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
     : '<div class="muted">Noch keine Rollläden angelegt – unter „Geräte suchen“ bei Homematic „Homematic-Rollläden suchen“.</div>';
+  list.filter(x => x.source === 'remote' && x.switchable === false).forEach(x => { const row = document.querySelector(`[data-bid="${CSS.escape(x.id)}"]`); if (row) row.querySelectorAll('[onclick^="blindDo"], .bl-range, .bl-rv').forEach(e => { e.style.display = 'none'; }); });      // nur zum Ansehen geteilt: keine Bedienung
+  famSeen('fam-blinds', null, list.length);
   reopenEdits(bOpen);
 }
 function blindIconGrid(btn) { const g = btn.closest('[data-bid]').querySelector('.bl-grid'); g.style.display = g.style.display === 'none' ? 'flex' : 'none'; }

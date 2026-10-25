@@ -10,7 +10,8 @@ wie eigene Geraete bzw. Sensoren (mit Vermerk "von ..."), lassen sich in Regeln 
 Alles laeuft ueber HTTP(S) mit "Authorization: Bearer <Schluessel>" gegen /share/v1/...; es gibt keine Verbindung zu irgendeinem Dritten.
 Weitergeben ist nicht moeglich: einen Eintrag, der selbst von einer Quelle stammt, kann man nicht weiter freigeben.
 
-Eintraege werden ueber eine Referenz angesprochen: "device:<id>", "sensor:<id>", "virtual:<id>", "setpoint:<id>" (Thermostat).
+Eintraege werden ueber eine Referenz angesprochen: "device:<id>", "sensor:<id>", "virtual:<id>", "setpoint:<id>" (Thermostat), "lock:<id>" (Tuerschloss),
+"blind:<id>" (Rollladen), "sound:<id>" (Soundmodul), "wol:<id>" (Wake-on-LAN-Ziel). Alles laesst sich teilen (Kameras ausgenommen: Video geht nicht ueber diese Schnittstelle).
 Ein Empfaenger-Geraet ist ein normaler Geraete-Eintrag mit kind="remote" (rkind = Art beim Geber, z. B. "midea"); ein Empfaenger-Sensor ein Sensor mit source="remote".
 """
 from __future__ import annotations
@@ -33,7 +34,8 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 SHARES_PATH = os.path.join(_DIR, "shares.json")            # Geber: Freigaben
 SOURCES_PATH = os.path.join(_DIR, "sources.json")          # Empfaenger: Fremde Quellen (mit Schluessel!)
 API_VERSION = 1
-REF_TYPES = ("device", "sensor", "virtual", "setpoint")
+REF_TYPES = ("device", "sensor", "virtual", "setpoint", "lock", "blind", "sound", "wol")
+MORE_TYPES = ("setpoint", "lock", "blind", "sound", "wol")        # Eintraege, die in eigenen Registern landen (nicht bei Geraeten/Sensoren)
 MODES = ("view", "control")
 MAX_ITEMS = 300
 DEFAULT_ICON = "👤"
@@ -114,6 +116,20 @@ def remove(share_id: str) -> bool:
         return True
 
 
+def _more_registries() -> list:
+    """(Art, laden, Bezeichnung, Standardsymbol) der Register fuer Thermostate, Tuerschloesser, Rollladen, Soundmodule und Wake-on-LAN."""
+    import homematic
+    import wol
+    return [("setpoint", homematic.load_setpoints, "Thermostat", "🌡️"), ("lock", homematic.load_locks, "Türschloss", "🔒"),
+            ("blind", homematic.load_blinds, "Rollladen", "🪟"), ("sound", homematic.load_sounds, "Soundmodul", "🔔"), ("wol", wol.load, "Wake-on-LAN", "💻")]
+
+
+def _more_saves() -> dict:
+    import homematic
+    import wol
+    return {"setpoint": homematic._save_setpoints, "lock": homematic._save_locks, "blind": homematic._save_blinds, "sound": homematic._save_sounds, "wol": wol._save}
+
+
 def shareable() -> list[dict]:
     """Was sich teilen laesst: [{ref, type, name, icon, detail}] - ohne Eintraege, die selbst aus einer fremden Quelle stammen."""
     import homematic
@@ -129,10 +145,11 @@ def shareable() -> list[dict]:
         if s.get("source") == "remote":
             continue
         out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "📟", "detail": "Sensor"})
-    for sp in homematic.load_setpoints():
-        if sp.get("source") == "remote":
-            continue
-        out.append({"ref": "setpoint:" + sp["id"], "type": "setpoint", "name": sp.get("name") or sp["id"], "icon": "🌡️", "detail": "Thermostat"})
+    for kind, load, label, icon in _more_registries():
+        for x in load():
+            if x.get("source") == "remote":
+                continue
+            out.append({"ref": kind + ":" + x["id"], "type": kind, "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "detail": label})
     for v in virtual.load():
         out.append({"ref": "virtual:" + v["id"], "type": "virtual", "name": v.get("name") or v["id"], "icon": v.get("icon") or "🎚️",
                     "detail": {"button": "Knopf", "switch": "Schalter", "timer": "Nachlauf-Timer"}.get(v.get("kind"), "Schalter")})
@@ -264,6 +281,22 @@ def provider_items(share: dict) -> list[dict]:
             out.append({"ref": "setpoint:" + s["id"], "type": "setpoint", "name": s.get("name") or s["id"], "icon": "🌡️", "kind": "setpoint",
                         "control": mode["setpoint:" + s["id"]] == "control", "min": max(5.0, float(s.get("min", 5))), "max": min(30.0, float(s.get("max", 30))),
                         "room": s.get("room") or "", "state": {"online": v is not None, "value": v}})
+    for kind, load, label, icon in _more_registries()[1:]:                    # Schloesser, Rollladen, Soundmodule, Wake-on-LAN
+        ids = {r.split(":", 1)[1] for r in mode if r.startswith(kind + ":")}
+        for x in [y for y in load() if y["id"] in ids and y.get("source") != "remote"]:
+            if kind == "lock":
+                lk = homematic.lock_state(x)
+                state = {"online": lk is not None, "locked": lk}
+            elif kind == "blind":
+                lv = homematic.blind_level(x)
+                state = {"online": lv is not None, "level": lv}
+            elif kind == "wol":
+                import wol
+                state = {"online": True, "up": wol.is_up(x.get("ip", ""))}
+            else:
+                state = {"online": True}
+            out.append({"ref": kind + ":" + x["id"], "type": kind, "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "kind": kind,
+                        "control": mode[kind + ":" + x["id"]] == "control", "room": x.get("room") or "", "state": state})
     snap = virtual.snapshot()
     for v in virtual.load():
         r = "virtual:" + v["id"]
@@ -301,6 +334,8 @@ def provider_act(share: dict, ref: str, body: dict) -> dict:
         except homematic.HomematicError as e:
             raise ShareError(str(e), 400)
         return {"name": name, "on": True, "log": f"{name}: Solltemperatur von Hand auf {v:g} °C gestellt", "state": {"online": True, "value": v}}
+    if t in ("lock", "blind", "sound", "wol"):
+        return _act_more(t, i, body)
     if t == "device":
         d = next((x for x in shelly.load_devices() if x["id"] == i and x.get("kind") != "remote"), None)
         if not d:
@@ -324,6 +359,35 @@ def provider_act(share: dict, ref: str, body: dict) -> dict:
             raise ShareError("Eintrag nicht gefunden", 404)
         return {"name": v.get("name") or i, "on": on, "state": {"online": True, "on": False if v["kind"] == "button" else on}}
     raise ShareError("Dieser Eintrag lässt sich nicht schalten", 400)
+
+
+def _act_more(t: str, i: str, body: dict) -> dict:
+    """Schloss, Rollladen, Soundmodul, Wake-on-LAN beim Geber bedienen (mit SEINEN Zugangsdaten)."""
+    import homematic
+    import wol
+    load = {k: ld for k, ld, _l, _i in _more_registries()}[t]
+    x = next((y for y in load() if y["id"] == i and y.get("source") != "remote"), None)
+    if not x:
+        raise ShareError("Eintrag nicht gefunden", 404)
+    name = x.get("name") or i
+    try:
+        if t == "lock":
+            action = str(body.get("action") or "")
+            homematic.lock_action(i, action)                       # Entriegeln/Oeffnen nur, wenn der Geber es dort freigegeben hat (allow_open)
+            return {"name": name, "on": True, "log": f"{name}: Schloss „{action}“", "state": {"online": True}}
+        if t == "blind":
+            if body.get("stop"):
+                homematic.blind_stop(i)
+                return {"name": name, "on": True, "log": f"{name}: Rollladen angehalten", "state": {"online": True}}
+            homematic.blind_set(i, body.get("level"))
+            return {"name": name, "on": True, "log": f"{name}: Rollladen auf {int(round(float(body['level'])))} % gefahren", "state": {"online": True}}
+        if t == "sound":
+            homematic.sound_play(i, body.get("track", 1), body.get("volume", 100), body.get("repeats", 1))
+            return {"name": name, "on": True, "log": f"{name}: Ton abgespielt", "state": {"online": True}}
+        wol.wake(i)
+        return {"name": name, "on": True, "log": f"{name}: aufgeweckt (Wake-on-LAN)", "state": {"online": True}}
+    except (homematic.HomematicError, wol.WolError) as e:
+        raise ShareError(str(e), 400)
 
 
 def provider_ac(share: dict, ref: str, body: dict | None) -> dict:
@@ -463,9 +527,13 @@ def imported_ids(source_id: str) -> tuple[list[str], list[str]]:
             [s["id"] for s in homematic.load_sensors() if s.get("source") == "remote" and s.get("src") == source_id])
 
 
+def imported_other_ids(source_id: str) -> dict:
+    """Von dieser Quelle geholte Thermostate/Schloesser/Rollladen/Soundmodule/Wake-on-LAN: {Art: [ids]}."""
+    return {kind: [s["id"] for s in load() if s.get("source") == "remote" and s.get("src") == source_id] for kind, load, _l, _i in _more_registries()}
+
+
 def imported_setpoint_ids(source_id: str) -> list[str]:
-    import homematic
-    return [s["id"] for s in homematic.load_setpoints() if s.get("source") == "remote" and s.get("src") == source_id]
+    return imported_other_ids(source_id)["setpoint"]
 
 
 def remove_source(source_id: str) -> bool:
@@ -479,11 +547,13 @@ def remove_source(source_id: str) -> bool:
             return False
         _save(SOURCES_PATH, keep)
     dev_ids, sen_ids = imported_ids(source_id)
-    sp_ids = imported_setpoint_ids(source_id)
     shelly._save([d for d in shelly.load_devices() if d["id"] not in dev_ids])
     homematic._save_sensors([s for s in homematic.load_sensors() if s["id"] not in sen_ids])
-    if sp_ids:
-        homematic._save_setpoints([s for s in homematic.load_setpoints() if s["id"] not in sp_ids])
+    saves = _more_saves()
+    for kind, ids in imported_other_ids(source_id).items():
+        if ids:
+            load = {k: ld for k, ld, _l, _i in _more_registries()}[kind]
+            saves[kind]([s for s in load() if s["id"] not in ids])
     _cache.pop(source_id, None)
     return True
 
@@ -523,7 +593,7 @@ def source_items(source_id: str) -> list[dict]:
         raise ShareError(err or "Quelle nicht erreichbar", 502)
     migrate_imports()
     have_d, have_s = imported_ids(source_id)
-    have = set(have_d) | set(have_s) | set(imported_setpoint_ids(source_id))
+    have = set(have_d) | set(have_s) | {i for ids in imported_other_ids(source_id).values() for i in ids}
     return [{"ref": x["ref"], "type": x.get("type"), "name": x.get("name"), "icon": x.get("icon"), "kind": x.get("kind"), "control": bool(x.get("control")),
              "already": _local_id(source_id, x["ref"]) in have} for x in items]
 
@@ -542,9 +612,9 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         raise ShareError(err or "Quelle nicht erreichbar", 502)
     by_ref = {x["ref"]: x for x in items}
     devs, sens = shelly.load_devices(), homematic.load_sensors()
-    sps = homematic.load_setpoints()
-    have = {d["id"] for d in devs} | {s["id"] for s in sens} | {s["id"] for s in sps}
-    new_d, new_s, new_p = [], [], []
+    regs = {kind: load() for kind, load, _l, _i in _more_registries()}
+    have = {d["id"] for d in devs} | {s["id"] for s in sens} | {y["id"] for lst in regs.values() for y in lst}
+    new_d, new_s, new_p, new_o = [], [], [], []
     for ref in refs:
         x = by_ref.get(ref)
         if not x:
@@ -553,7 +623,19 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         if lid in have:
             continue
         model = "von " + src["name"]
-        if x.get("type") == "setpoint":
+        if x.get("type") in ("lock", "blind", "sound", "wol"):
+            kind = x["type"]
+            base = {"id": lid, "address": ref, "interface": "remote", "model": model, "room": x.get("room") or "", "name": x.get("name") or ref, "source": "remote",
+                    "src": source_id, "rref": ref, "switchable": bool(x.get("control")), "vis2": True}
+            if kind == "lock":
+                base.update({"allow_open": False})                   # Regeln duerfen es hier nur verriegeln, bis der Empfaenger mehr erlaubt (und der Geber es zulaesst)
+            elif kind == "wol":
+                base.update({"icon": x.get("icon") or "💻", "mac": "00:00:00:00:00:00", "ip": "", "show": True})
+            else:
+                base.update({"icon": x.get("icon") or ("🪟" if kind == "blind" else "🔔")})
+            regs[kind].append(base)
+            new_o.append((kind, base))
+        elif x.get("type") == "setpoint":
             new_p.append({"id": lid, "address": ref, "interface": "remote", "datapoint": "", "min": float(x.get("min") or 5.0), "max": float(x.get("max") or 30.0),
                           "model": model, "room": x.get("room") or "", "name": x.get("name") or ref, "source": "remote", "src": source_id, "rref": ref,
                           "switchable": bool(x.get("control")), "vis2": True})                           # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
@@ -572,8 +654,11 @@ def import_items(source_id: str, refs: list[str]) -> dict:
     if new_s:
         homematic._save_sensors(sens + new_s)
     if new_p:
-        homematic._save_setpoints(sps + new_p)
-    return {"devices": new_d, "sensors": new_s, "setpoints": new_p}
+        regs["setpoint"].extend(new_p)
+    saves = _more_saves()
+    for kind in {k for k, _b in new_o} | ({"setpoint"} if new_p else set()):
+        saves[kind](regs[kind])
+    return {"devices": new_d, "sensors": new_s, "setpoints": new_p, "others": [b for _k, b in new_o]}
 
 
 # ---- Einbindung in Geraete / Sensoren / Klima -----------------------------------------
@@ -619,6 +704,41 @@ def read_sensor(sen: dict):
         return round(float(v), 1)
     except (TypeError, ValueError):
         return None
+
+
+def remote_state(x: dict):
+    """Zustand eines geteilten Eintrags (Schloss/Rollladen/Wake-on-LAN) aus dem Zwischenspeicher der Quelle, sonst None."""
+    it, err = _item(x.get("src", ""), x.get("rref", ""))
+    return None if (it is None or err) else (it.get("state") or {})
+
+
+def read_lock(x: dict):
+    v = (remote_state(x) or {}).get("locked")
+    return v if isinstance(v, bool) else None
+
+
+def read_blind_level(x: dict):
+    v = (remote_state(x) or {}).get("level")
+    return int(round(float(v))) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def read_wol_up(x: dict):
+    v = (remote_state(x) or {}).get("up")
+    return v if isinstance(v, bool) else None
+
+
+def remote_act(x: dict, body: dict) -> dict:
+    """Bedient einen geteilten Eintrag beim Geber (Schloss, Rollladen, Soundmodul, Wake-on-LAN). Wirft ShareError mit verstaendlichem Text."""
+    it, err = _item(x.get("src", ""), x.get("rref", ""))
+    if err:
+        raise ShareError(err, 502)
+    if it is None:
+        raise ShareError("Nicht mehr freigegeben", 404)
+    if not it.get("control"):
+        raise ShareError("Der Geber hat dies nur zum Ansehen freigegeben", 403)
+    j = _http(_source(x["src"]), "POST", "/share/v1/act", json={"ref": x["rref"], **body})
+    fetch(x["src"], force=True)
+    return j
 
 
 def read_setpoint(sp: dict):
