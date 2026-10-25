@@ -449,7 +449,7 @@ def _require_login():
         return _gate_automation_save()
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
-        if not auth.is_full_admin(g.perms):
+        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info")):      # Demo: Schnittstellen-Karte nur ansehen
             return _deny("Kein Zugriff mit diesem Konto.")
         return None
     need = "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write"
@@ -4909,6 +4909,8 @@ def api_apikeys():
 @app.route("/api/apikeys/info", methods=["GET"])
 def api_apikeys_info():
     """Adresse, unter der andere Programme im Heimnetz diese Anlage erreichen (nicht die Internet-Adresse des Fernzugriffs - dort gilt die Schnittstelle nicht)."""
+    if demo.ACTIVE:                                     # Demo: erfundene Heimnetz-Adresse
+        return jsonify(base_url="http://192.168.1.50:5005")
     ip = extapi.lan_ip()
     port = request.environ.get("SERVER_PORT") or ""
     return jsonify(base_url=f"http://{ip}:{port}" if ip and port else "")

@@ -341,6 +341,11 @@ def activate() -> None:
     import store as _store
     _store.list_charge_sessions = _demo_charge_sessions        # Ladevorgaenge heute: erfundene Nachtfenster statt leerer Liste
     _store.energy_grid_charge_buckets = _demo_grid_buckets_factory(_store.energy_grid_charge_buckets)
+    try:
+        import extapi
+        extapi.list_public = demo_apikeys                  # Schnittstelle (API): erfundene Schluessel nur zur Ansicht
+    except Exception:                                       # noqa: BLE001
+        pass
     shelly.status = _device_status
     shelly.set_state = _device_set
     neutral_names()                                         # private Vornamen in den Demo-Daten neutral benennen
@@ -460,6 +465,13 @@ def seed_share() -> None:
     def items(*pairs):
         return [{"ref": r, "mode": m} for r, m in pairs if r]
 
+    try:
+        sets = list(homematic.load_setpoints())
+        locks = list(homematic.load_locks())
+    except Exception:                                       # noqa: BLE001
+        sets, locks = [], []
+    k_therm = _find(sets, "Kinderzimmer Ben", "Schlafzimmer")
+    k_lock = _find(locks, "Gast", "Anna", "")
     now = time.time()
     k_licht = _find(devs, "Küchenlicht", "Kuechenlicht", "Flurbeleuchtung")
     k_tuer = _find(devs, "Haustürbeleuchtung", "Haustuerbeleuchtung", "Aussenbeleuchtung")
@@ -469,11 +481,11 @@ def seed_share() -> None:
     v_knopf = _find(virt, "Haustüröffner", "Haustueroeffner", "Warmwasser")
     shares = [
         {"id": "s-demo0001", "name": "Anna", "icon": "👩", "token_hash": secrets.token_hex(32), "created": now - 21 * 86400, "last_seen": now - 3600 * 5,
-         "items": items((ref("device", k_licht), "control"), (ref("device", k_tuer), "control"), (ref("sensor", s_fenster), "view"))},
+         "items": items((ref("device", k_licht), "control"), (ref("device", k_tuer), "control"), (ref("sensor", s_fenster), "view"), (ref("setpoint", k_therm), "control"))},
         {"id": "s-demo0002", "name": "Ben", "icon": "🧑‍🔧", "token_hash": secrets.token_hex(32), "created": now - 9 * 86400, "last_seen": now - 86400 * 2,
          "items": items((ref("device", k_huhn), "control"), (ref("device", k_garage), "view"))},
         {"id": "s-demo0003", "name": "Ferienwohnung", "icon": "🏖️", "token_hash": secrets.token_hex(32), "created": now - 3 * 86400, "last_seen": 0,
-         "items": items((ref("virtual", v_knopf), "control"), (ref("device", k_licht), "view"))},
+         "items": items((ref("virtual", v_knopf), "control"), (ref("device", k_licht), "view"), (ref("lock", k_lock), "control"))},
     ]
     share._save(share.SHARES_PATH, shares)
     share._save(share.SOURCES_PATH, [{"id": "q-demo0001", "name": "Haus Nord", "url": "https://nord.beispiel.de", "token": "bnx_demo_" + secrets.token_hex(12)}])
@@ -671,3 +683,20 @@ def seed_favorites(users) -> None:
     except Exception:                                       # noqa: BLE001 - die Demo muss auch ohne Favoriten starten
         import logging
         logging.getLogger("demo_sim").exception("Favoriten konnten nicht angelegt werden")
+
+
+def demo_apikeys() -> list:
+    """Zwei erfundene Schnittstellen-Schluessel (nur die Anzeige; es gibt keine echten Schluessel und keine Abfragen)."""
+    import shelly
+    import homematic
+    now = time.time()
+    devs = shelly.load_devices()
+    sens = homematic.load_sensors()
+    d = [("device:" + x["id"]) for x in devs[:3]]
+    t = [("sensor:" + x["id"]) for x in sens if "temperatur" in str(x.get("name") or "").lower()][:3]
+    return [
+        {"id": "k-demo0001", "name": "Wandtablet im Flur", "prefix": "bnx_Wt4k", "created": now - 12 * 86400, "last_used": now - 40, "last_ip": "192.168.1.23",
+         "all": False, "items": d + t, "allow": []},
+        {"id": "k-demo0002", "name": "Auswertung (Node-RED)", "prefix": "bnx_Nr7q", "created": now - 5 * 86400, "last_used": now - 90, "last_ip": "192.168.1.31",
+         "all": True, "items": [], "allow": []},
+    ]

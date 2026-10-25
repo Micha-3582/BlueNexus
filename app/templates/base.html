@@ -481,6 +481,7 @@ function askPin(title) {
   /* Demo: Tags nie wirklich beschreiben (die Demo-Adresse ist oeffentlich) - auf dem Handy erscheint nur der Hinweis */
   window.addEventListener('load', function () {
     if (typeof window.nfcWrite === 'function' && !window.__nfcAllow) window.nfcWrite = function () { toast(); };
+    if (typeof window.etikettDrucken === 'function' && !window.__nfcAllow) window.etikettDrucken = function () { toast(); };
   });
   /* Technische Absagemeldungen der Seiten durch den Demo-Hinweis ersetzen */
   new MutationObserver(function () {
