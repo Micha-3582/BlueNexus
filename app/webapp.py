@@ -4956,7 +4956,7 @@ def share_act():
         res = share.provider_act(s, str(b.get("ref") or ""), b)
     except share.ShareError as e:
         return jsonify(error=str(e)), e.code
-    opslog.log("rules", f"Freigabe „{s['name']}“: {res['name']} {'eingeschaltet' if res['on'] else 'ausgeschaltet'}", dry=False)
+    opslog.log("rules", f"Freigabe „{s['name']}“: " + (res["log"] if res.get("log") else f"{res['name']} {'eingeschaltet' if res['on'] else 'ausgeschaltet'}"), dry=False)
     if str(b.get("ref") or "").startswith("device:"):
         cfg_ = store.load_config()
         did = str(b["ref"]).split(":", 1)[1]
@@ -5066,12 +5066,13 @@ def api_sources():
 @app.route("/api/sources/<sid>", methods=["DELETE"])
 def api_source_delete(sid):
     dev_ids, sen_ids = share.imported_ids(sid)
-    for kind, ids in (("device", dev_ids), ("sensor", sen_ids)):
+    sp_ids = share.imported_setpoint_ids(sid)
+    for kind, ids in (("device", dev_ids), ("sensor", sen_ids), ("setpoint", sp_ids)):
         for i in ids:
             busy = _in_use(kind, i)
             if busy:
                 return busy
-    return jsonify(ok=True, removed=len(dev_ids) + len(sen_ids)) if share.remove_source(sid) else (jsonify(error="nicht gefunden"), 404)
+    return jsonify(ok=True, removed=len(dev_ids) + len(sen_ids) + len(sp_ids)) if share.remove_source(sid) else (jsonify(error="nicht gefunden"), 404)
 
 
 @app.route("/api/sources/<sid>/items", methods=["GET"])
@@ -5095,7 +5096,7 @@ def api_source_import(sid):
         res = share.import_items(sid, refs)
     except share.ShareError as e:
         return _share_err(e)
-    return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]))
+    return jsonify(added_devices=len(res["devices"]), added_sensors=len(res["sensors"]), added_setpoints=len(res["setpoints"]))
 
 
 try:

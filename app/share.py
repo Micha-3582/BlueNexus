@@ -10,7 +10,7 @@ wie eigene Geraete bzw. Sensoren (mit Vermerk "von ..."), lassen sich in Regeln 
 Alles laeuft ueber HTTP(S) mit "Authorization: Bearer <Schluessel>" gegen /share/v1/...; es gibt keine Verbindung zu irgendeinem Dritten.
 Weitergeben ist nicht moeglich: einen Eintrag, der selbst von einer Quelle stammt, kann man nicht weiter freigeben.
 
-Eintraege werden ueber eine Referenz angesprochen: "device:<id>", "sensor:<id>", "virtual:<id>".
+Eintraege werden ueber eine Referenz angesprochen: "device:<id>", "sensor:<id>", "virtual:<id>", "setpoint:<id>" (Thermostat).
 Ein Empfaenger-Geraet ist ein normaler Geraete-Eintrag mit kind="remote" (rkind = Art beim Geber, z. B. "midea"); ein Empfaenger-Sensor ein Sensor mit source="remote".
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 SHARES_PATH = os.path.join(_DIR, "shares.json")            # Geber: Freigaben
 SOURCES_PATH = os.path.join(_DIR, "sources.json")          # Empfaenger: Fremde Quellen (mit Schluessel!)
 API_VERSION = 1
-REF_TYPES = ("device", "sensor", "virtual")
+REF_TYPES = ("device", "sensor", "virtual", "setpoint")
 MODES = ("view", "control")
 MAX_ITEMS = 300
 DEFAULT_ICON = "👤"
@@ -129,6 +129,10 @@ def shareable() -> list[dict]:
         if s.get("source") == "remote":
             continue
         out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "📟", "detail": "Sensor"})
+    for sp in homematic.load_setpoints():
+        if sp.get("source") == "remote":
+            continue
+        out.append({"ref": "setpoint:" + sp["id"], "type": "setpoint", "name": sp.get("name") or sp["id"], "icon": "🌡️", "detail": "Thermostat"})
     for v in virtual.load():
         out.append({"ref": "virtual:" + v["id"], "type": "virtual", "name": v.get("name") or v["id"], "icon": v.get("icon") or "🎚️",
                     "detail": {"button": "Knopf", "switch": "Schalter", "timer": "Nachlauf-Timer"}.get(v.get("kind"), "Schalter")})
@@ -251,6 +255,15 @@ def provider_items(share: dict) -> list[dict]:
         for s in sens:
             out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "📟", "kind": s.get("kind") or "",
                         "binary": bool(s.get("binary")), "unit": s.get("unit") or "", "room": s.get("room") or "", "control": False, "state": {"value": vals.get(s["id"])}})
+    sp_ids = {r.split(":", 1)[1] for r in mode if r.startswith("setpoint:")}
+    if sp_ids:
+        sps = [s for s in homematic.load_setpoints() if s["id"] in sp_ids and s.get("source") != "remote"]
+        with ThreadPoolExecutor(max_workers=min(8, len(sps))) as ex:
+            vals = list(ex.map(homematic.setpoint_value, sps)) if sps else []
+        for s, v in zip(sps, vals):
+            out.append({"ref": "setpoint:" + s["id"], "type": "setpoint", "name": s.get("name") or s["id"], "icon": "🌡️", "kind": "setpoint",
+                        "control": mode["setpoint:" + s["id"]] == "control", "min": max(5.0, float(s.get("min", 5))), "max": min(30.0, float(s.get("max", 30))),
+                        "room": s.get("room") or "", "state": {"online": v is not None, "value": v}})
     snap = virtual.snapshot()
     for v in virtual.load():
         r = "virtual:" + v["id"]
@@ -278,6 +291,16 @@ def provider_act(share: dict, ref: str, body: dict) -> dict:
     import virtual
     t, i = _granted(share, ref, True)
     on = bool(body.get("on"))
+    if t == "setpoint":
+        import homematic
+        sp = next((x for x in homematic.load_setpoints() if x["id"] == i and x.get("source") != "remote"), None)
+        if not sp:
+            raise ShareError("Thermostat nicht gefunden", 404)
+        try:
+            name, v = homematic.setpoint_set_manual(i, body.get("value"))
+        except homematic.HomematicError as e:
+            raise ShareError(str(e), 400)
+        return {"name": name, "on": True, "log": f"{name}: Solltemperatur von Hand auf {v:g} °C gestellt", "state": {"online": True, "value": v}}
     if t == "device":
         d = next((x for x in shelly.load_devices() if x["id"] == i and x.get("kind") != "remote"), None)
         if not d:
@@ -440,8 +463,13 @@ def imported_ids(source_id: str) -> tuple[list[str], list[str]]:
             [s["id"] for s in homematic.load_sensors() if s.get("source") == "remote" and s.get("src") == source_id])
 
 
+def imported_setpoint_ids(source_id: str) -> list[str]:
+    import homematic
+    return [s["id"] for s in homematic.load_setpoints() if s.get("source") == "remote" and s.get("src") == source_id]
+
+
 def remove_source(source_id: str) -> bool:
-    """Quelle samt aller von dort geholten Geraete und Sensoren entfernen."""
+    """Quelle samt aller von dort geholten Geraete, Sensoren und Thermostate entfernen."""
     import homematic
     import shelly
     with _lock:
@@ -451,8 +479,11 @@ def remove_source(source_id: str) -> bool:
             return False
         _save(SOURCES_PATH, keep)
     dev_ids, sen_ids = imported_ids(source_id)
+    sp_ids = imported_setpoint_ids(source_id)
     shelly._save([d for d in shelly.load_devices() if d["id"] not in dev_ids])
     homematic._save_sensors([s for s in homematic.load_sensors() if s["id"] not in sen_ids])
+    if sp_ids:
+        homematic._save_setpoints([s for s in homematic.load_setpoints() if s["id"] not in sp_ids])
     _cache.pop(source_id, None)
     return True
 
@@ -492,7 +523,7 @@ def source_items(source_id: str) -> list[dict]:
         raise ShareError(err or "Quelle nicht erreichbar", 502)
     migrate_imports()
     have_d, have_s = imported_ids(source_id)
-    have = set(have_d) | set(have_s)
+    have = set(have_d) | set(have_s) | set(imported_setpoint_ids(source_id))
     return [{"ref": x["ref"], "type": x.get("type"), "name": x.get("name"), "icon": x.get("icon"), "kind": x.get("kind"), "control": bool(x.get("control")),
              "already": _local_id(source_id, x["ref"]) in have} for x in items]
 
@@ -511,8 +542,9 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         raise ShareError(err or "Quelle nicht erreichbar", 502)
     by_ref = {x["ref"]: x for x in items}
     devs, sens = shelly.load_devices(), homematic.load_sensors()
-    have = {d["id"] for d in devs} | {s["id"] for s in sens}
-    new_d, new_s = [], []
+    sps = homematic.load_setpoints()
+    have = {d["id"] for d in devs} | {s["id"] for s in sens} | {s["id"] for s in sps}
+    new_d, new_s, new_p = [], [], []
     for ref in refs:
         x = by_ref.get(ref)
         if not x:
@@ -521,7 +553,11 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         if lid in have:
             continue
         model = "von " + src["name"]
-        if x.get("type") == "sensor":
+        if x.get("type") == "setpoint":
+            new_p.append({"id": lid, "address": ref, "interface": "remote", "datapoint": "", "min": float(x.get("min") or 5.0), "max": float(x.get("max") or 30.0),
+                          "model": model, "room": x.get("room") or "", "name": x.get("name") or ref, "source": "remote", "src": source_id, "rref": ref,
+                          "switchable": bool(x.get("control")), "vis2": True})                           # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
+        elif x.get("type") == "sensor":
             new_s.append({"id": lid, "kind": x.get("kind") or "", "source": "remote", "src": source_id, "rref": ref, "address": ref, "interface": "remote", "datapoint": "",
                           "unit": x.get("unit") or "", "binary": bool(x.get("binary")), "model": model, "room": x.get("room") or "", "name": x.get("name") or ref,
                           "icon": x.get("icon") or "📟", "show": True, "vis2": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
@@ -535,7 +571,9 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         shelly._save(devs + new_d)
     if new_s:
         homematic._save_sensors(sens + new_s)
-    return {"devices": new_d, "sensors": new_s}
+    if new_p:
+        homematic._save_setpoints(sps + new_p)
+    return {"devices": new_d, "sensors": new_s, "setpoints": new_p}
 
 
 # ---- Einbindung in Geraete / Sensoren / Klima -----------------------------------------
@@ -581,6 +619,35 @@ def read_sensor(sen: dict):
         return round(float(v), 1)
     except (TypeError, ValueError):
         return None
+
+
+def read_setpoint(sp: dict):
+    """Solltemperatur eines geteilten Thermostats (aus dem Zwischenspeicher der Quelle) oder None."""
+    x, err = _item(sp.get("src", ""), sp.get("rref", ""))
+    if x is None or err:
+        return None
+    v = (x.get("state") or {}).get("value")
+    try:
+        return None if v is None else round(float(v), 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def set_setpoint(sp: dict, value: float) -> float:
+    """Solltemperatur eines geteilten Thermostats beim Geber setzen. Gibt den dort gesetzten Wert zurueck."""
+    x, err = _item(sp.get("src", ""), sp.get("rref", ""))
+    if err:
+        raise ShareError(err, 502)
+    if x is None:
+        raise ShareError("Nicht mehr freigegeben", 404)
+    if not x.get("control"):
+        raise ShareError("Der Geber hat dieses Thermostat nur zum Ansehen freigegeben", 403)
+    j = _http(_source(sp["src"]), "POST", "/share/v1/act", json={"ref": sp["rref"], "value": float(value)})
+    fetch(sp["src"], force=True)
+    try:
+        return float((j.get("state") or {}).get("value"))
+    except (TypeError, ValueError):
+        return float(value)
 
 
 def ac_details(d: dict) -> dict:

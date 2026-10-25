@@ -870,17 +870,23 @@ def list_setpoints_with_values(live: bool = True) -> list[dict]:
     if not live:
         return [{**s, "value": None} for s in items]
 
-    def cur(s):
-        if s.get("source") == "zigbee":
-            import zigbee
-            return zigbee.read_setpoint(s)
-        try:
-            return round(float(_get_value(s["interface"], s["address"], s["datapoint"])), 1)
-        except (HomematicError, TypeError, ValueError):
-            return None
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(items)))) as ex:
-        vals = list(ex.map(cur, items))
+        vals = list(ex.map(setpoint_value, items))
     return [{**s, "value": v} for s, v in zip(items, vals)]
+
+
+def setpoint_value(s: dict):
+    """Aktuelle Solltemperatur eines Thermostats (Homematic, Zigbee oder von einer fremden BlueNexus-Anlage geteilt) oder None."""
+    if s.get("source") == "remote":
+        import share
+        return share.read_setpoint(s)
+    if s.get("source") == "zigbee":
+        import zigbee
+        return zigbee.read_setpoint(s)
+    try:
+        return round(float(_get_value(s["interface"], s["address"], s["datapoint"])), 1)
+    except (HomematicError, TypeError, ValueError):
+        return None
 
 
 def setpoint_set_manual(sp_id: str, value) -> tuple:
@@ -903,6 +909,13 @@ def set_setpoints(ids: list[str], value: float) -> list[tuple]:
     out = []
     for s in chosen:
         v = min(float(s.get("max", 30.5)), max(float(s.get("min", 4.5)), float(value)))
+        if s.get("source") == "remote":                          # geteilt: der Geber stellt es mit seinen eigenen Zugangsdaten ein
+            import share
+            try:
+                out.append((s["name"], share.set_setpoint(s, v), None))
+            except share.ShareError as e:
+                out.append((s["name"], v, str(e)))
+            continue
         if s.get("source") == "zigbee":
             import zigbee
             try:

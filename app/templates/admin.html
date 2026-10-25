@@ -1815,7 +1815,7 @@ const I_SHARE = svgi('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"
 /* Teilen mit anderen BlueNexus-Anlagen (share.py): Knopf im Stift-Menue jedes Geraets/Sensors/Schalters + kleines Zeichen am Namen */
 let SHARE_MAP = {}, SHARE_LIST = [], SHARE_CAT = [], SHARE_SIG = '';
 const SHARE_OPEN = new Set();                                                   // aufgeklappte Personen im Reiter Teilen           // SHARE_MAP: Referenz -> [{id, name, mode}]
-const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:' }[kind] || '?:') + id;
+const shareRef = (kind, id) => ({ shelly: 'device:', sensor: 'sensor:', virtual: 'virtual:', setpoint: 'setpoint:' }[kind] || '?:') + id;
 const shareWho = ref => (SHARE_MAP[ref] || []).map(x => `${x.name} (${x.mode === 'control' ? 'bedienen' : 'nur sehen'})`).join(', ');
 const shareWrite = () => !!window.IS_ADMIN && ((window.USER_PERMS || {}).smarthome_teilen === 'write');
 const shareBtn = (kind, id, skip) => (!shareWrite() || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
@@ -2501,7 +2501,7 @@ document.getElementById('wol-add').addEventListener('click', async () => {
   loadWolAdmin();
 });
 /* --- Teilen: Personen/Anlagen (Geber) und Fremde Quellen (Empfaenger), siehe share.py --- */
-const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', virtual: 'Schalter & Knöpfe' };
+const SHARE_TYPE = { device: 'Geräte', sensor: 'Sensoren', setpoint: 'Thermostate', virtual: 'Schalter & Knöpfe' };
 async function loadShares() {
   let j; try { j = await (await fetch('/api/shares', { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(j.shares)) return;
@@ -2509,7 +2509,7 @@ async function loadShares() {
   SHARE_MAP = {};
   j.shares.forEach(sh => (sh.items || []).forEach(it => { (SHARE_MAP[it.ref] = SHARE_MAP[it.ref] || []).push({ id: sh.id, name: sh.name, mode: it.mode }); }));
   const sig = JSON.stringify(SHARE_MAP);
-  if (sig !== SHARE_SIG) { const first = SHARE_SIG === ''; SHARE_SIG = sig; if (!first || sig !== '{}') { ['shelly', 'sensor', 'virtual'].forEach(k => { try { VIS_RELOAD[k](); } catch (e) { /* Liste noch nicht da */ } }); } }
+  if (sig !== SHARE_SIG) { const first = SHARE_SIG === ''; SHARE_SIG = sig; if (!first || sig !== '{}') { ['shelly', 'sensor', 'virtual', 'setpoint'].forEach(k => { try { VIS_RELOAD[k](); } catch (e) { /* Liste noch nicht da */ } }); } }
   const box = document.getElementById('shares-list'); if (!box) return;
   const nameOf = Object.fromEntries(SHARE_CAT.map(c => [c.ref, c]));
   const I_CHEV = svgi('<polyline points="6 9 12 15 18 9"/>');
@@ -2639,7 +2639,7 @@ async function sourceItems(id, keep) {
 async function sourceImport(id) {
   const p = document.getElementById('srcp-' + id), refs = [...p.querySelectorAll('.src-cb')].filter(c => c.checked && !c.disabled).map(c => c.dataset.ref);
   if (!refs.length) { savedToast('Nichts Neues ausgewählt'); return; }
-  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); } catch (e) { uiAlert(e.message); }
+  try { const j = await shellyApi('/api/sources/' + encodeURIComponent(id) + '/import', 'POST', { refs }); savedToast(`${j.added_devices + j.added_sensors + (j.added_setpoints || 0)} geholt ✓`); sourceItems(id, true); if (typeof loadShellyAdmin === 'function') loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin(); if (typeof loadSetpointsAdmin === 'function') loadSetpointsAdmin(); } catch (e) { uiAlert(e.message); }
 }
 async function sourceDelete(id) {
   if (!await uiDialog({ title: 'Quelle entfernen?', message: 'Alle von dort geholten Geräte und Sensoren verschwinden aus deiner Anlage.', okText: 'Entfernen' })) return;
@@ -2759,10 +2759,11 @@ async function loadSetpointsAdmin(light) {
   if (!Array.isArray(list)) return;
   list.forEach(x => { x._pending = !!light; });
   const open = openEdits('spedit-'), can = spCanSet();
+  const remoteOk = s => s.source !== 'remote' || s.switchable !== false;
   document.getElementById('hm-setpoints').innerHTML = list.length ? list.map(s => { const id = escH(s.id); return `<div data-sort-id="${id}" data-sp="${id}" data-min="${Math.max(5, s.min)}" data-max="${Math.min(30, s.max)}" data-target="${s.value == null ? '' : s.value}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b><div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Bereich ${s.min}–${s.max} °C</div></div>
-      ${can ? `<div style="display:flex;align-items:center;gap:6px" title="Solltemperatur einstellen – die Änderung wird kurz nach dem letzten Tippen gesendet">
+      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b>${shareMark('setpoint', id, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Bereich ${s.min}–${s.max} °C</div></div>
+      ${can && remoteOk(s) ? `<div style="display:flex;align-items:center;gap:6px" title="Solltemperatur einstellen – die Änderung wird kurz nach dem letzten Tippen gesendet">
         <button class="ghost" style="padding:4px 12px;font-size:18px" onclick="spStep('${id}',-0.5)" ${s.value == null ? 'disabled' : ''} aria-label="Kälter">−</button>
         <b class="sp-val" style="min-width:74px;text-align:center;font-size:17px">${s.value == null ? (s._pending ? '…' : '–') : spFmt(s.value) + ' °C'}</b>
         <button class="ghost" style="padding:4px 12px;font-size:18px" onclick="spStep('${id}',0.5)" ${s.value == null ? 'disabled' : ''} aria-label="Wärmer">+</button></div>
@@ -2774,6 +2775,7 @@ async function loadSetpointsAdmin(light) {
           <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="spRenameSave('${id}')">${I_CHECK}</button></div>
         <div class="edit-row" style="margin-top:10px">
           ${visBtn('setpoint', id, s.users)}
+          ${shareBtn('setpoint', id, s.source === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="spRemove('${id}')">${I_TRASH}</button>
         </div>
       </div></div>`; }).join('')
