@@ -246,17 +246,31 @@ def tasmota_discover(subnet: ipaddress.IPv4Network | None = None, extra_networks
     return found
 
 
-def tasmota_sensor_scan(extra_networks: list[str] | None = None) -> list[dict]:
-    """Messwerte aller Tasmota-Geraete im Netz (auch ohne Relais, z. B. Selbstbau mit DS18B20) zum Anlegen als Sensoren."""
+def tasmota_sensor_scan(extra_networks: list[str] | None = None, ip: str | None = None) -> list[dict]:
+    """Messwerte aller Tasmota-Geraete im Netz (auch ohne Relais, z. B. Selbstbau mit DS18B20) zum Anlegen als Sensoren.
+    Mit `ip`: nur dieses eine Geraet, mit genauer Fehlermeldung (falls die Suche es nicht findet)."""
     import homematic
     known_ids = {s["id"] for s in homematic.load_sensors()}
     pw = {d.get("mac"): d.get("password") for d in load_devices() if d.get("kind") == "tasmota" and d.get("password")}
-    hosts = _scan_hosts(None, extra_networks)
-    for d in load_devices():                                     # bekannte Geraete auch ausserhalb der durchsuchten Netze
-        if d.get("kind") == "tasmota" and d.get("ip") and d["ip"] not in hosts:
-            hosts.append(d["ip"])
-    with ThreadPoolExecutor(max_workers=64) as ex:
-        found = [r for r in ex.map(tasmota.probe, hosts) if r]
+    if ip:
+        ip = check_ip(ip)
+        auth = None
+        info = tasmota.probe(ip, 4.0, auth)
+        if not info:
+            raise ShellyError("Unter dieser Adresse antwortet kein Tasmota-Gerät (Adresse stimmt? Gerät erreichbar?)")
+        if info.get("auth"):
+            mac_pw = next((d.get("password") for d in load_devices() if d.get("kind") == "tasmota" and d.get("ip") == ip and d.get("password")), "")
+            info = tasmota.probe(ip, 4.0, ("admin", mac_pw)) if mac_pw else None
+            if not info or info.get("auth"):
+                raise ShellyError("Das Gerät ist passwortgeschützt. Messwerte lassen sich nur lesen, wenn es auch als Schalter mit Passwort angelegt ist oder in Tasmota kein Passwort (WebPassword) gesetzt ist.")
+        found = [info]
+    else:
+        hosts = _scan_hosts(None, extra_networks)
+        for d in load_devices():                                 # bekannte Geraete auch ausserhalb der durchsuchten Netze
+            if d.get("kind") == "tasmota" and d.get("ip") and d["ip"] not in hosts:
+                hosts.append(d["ip"])
+        with ThreadPoolExecutor(max_workers=48) as ex:
+            found = [r for r in ex.map(lambda h: tasmota.probe(h, 2.0), hosts) if r]          # laenger warten als bei der Geraetesuche: Selbstbauten antworten oft langsam
     out = []
     for f in found:
         auth = ("admin", pw[f["mac"]]) if f.get("auth") and pw.get(f["mac"]) else None
@@ -265,9 +279,13 @@ def tasmota_sensor_scan(extra_networks: list[str] | None = None) -> list[dict]:
         if not f or f.get("auth"):
             continue
         try:
-            vals = tasmota.sensor_metrics(f["ip"], CALL_TIMEOUT, auth)
-        except tasmota.TasmotaError:
+            vals = tasmota.sensor_metrics(f["ip"], 4.0 if ip else CALL_TIMEOUT, auth)
+        except tasmota.TasmotaError as e:
+            if ip:
+                raise ShellyError(f"Das Gerät antwortet nicht auf die Messwert-Abfrage ({e})")
             continue
+        if ip and not vals:
+            raise ShellyError("Das Gerät meldet keine Messwerte (kein Fühler erkannt). In Tasmota unter Konfiguration → Gerät konfigurieren den Fühler (z. B. DS18B20) einem Pin zuordnen.")
         for dp in sorted(vals):
             probe_name, key = dp.rsplit(".", 1)
             kind, label, unit = tasmota._METRICS[key]

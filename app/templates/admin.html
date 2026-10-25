@@ -797,6 +797,7 @@
     <div id="cam-motion-row" class="admin-only" style="margin:0 0 8px" hidden><button id="cam-motion-scan" class="ghost">Kamera-Bewegung suchen</button>
       <span class="muted">Reolink-Erkennungen als Sensor.</span></div>
     <div id="tas-sensor-row" class="admin-only" style="margin:0 0 8px" hidden><button id="tas-sensor-scan" class="ghost">Tasmota-Messwerte suchen</button>
+      <input type="text" id="tas-sensor-ip" placeholder="oder IP, z.B. 192.168.2.55" style="width:210px;margin-left:8px" autocomplete="off" inputmode="decimal">
       <span class="muted">Temperatur, Luftfeuchte, Luftdruck, Leistung.</span></div>
     <div id="hm-sensors" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
@@ -3121,7 +3122,11 @@ function zbScanButton(btnId, url, label, busy, kind, meta) {
 zbScanButton('zb-scan', '/api/zigbee/scan', 'Lichter/Steckdosen', 'Suche läuft …', 'devices', f => f.dimmable ? 'dimmbar' : 'Schalter');
 zbScanButton('zb-sensor-scan', '/api/zigbee/sensors/scan', 'Sensoren', 'Sensor-Suche läuft …', 'sensors', f => f.binary ? 'Ja/Nein' : (f.unit || ''));
 zbScanButton('cam-motion-scan', '/api/cameras/motion/scan', 'Kamera-Sensoren', 'Suche läuft …', 'camMotion', null);
-zbScanButton('tas-sensor-scan', '/api/tasmota/sensors/scan', 'Messwerte', 'Suche läuft …', 'tasSensors', f => (f.value != null ? f.value + ' ' + f.unit : f.unit));
+document.getElementById('tas-sensor-scan').addEventListener('click', async e => {
+  const b = e.target, ip = document.getElementById('tas-sensor-ip').value.trim(); b.disabled = true; shellyMsg(ip ? 'Frage ' + ip + ' ab …' : 'Suche läuft …');
+  try { zbFoundList(await shellyApi('/api/tasmota/sensors/scan', 'POST', ip ? { ip } : undefined), 'tasSensors', 'Messwerte', f => (f.value != null ? f.value + ' ' + f.unit : f.unit)); } catch (err) { shellyMsg(err.message, true); }
+  b.disabled = false;
+});
 zbScanButton('zb-sp-scan', '/api/zigbee/setpoints/scan', 'Thermostate', 'Thermostat-Suche läuft …', 'setpoints', null);
 loadZigbeeInfo();
 

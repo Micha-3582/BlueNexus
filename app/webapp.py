@@ -5459,7 +5459,10 @@ def api_camera_motion_add():
 def api_tasmota_sensor_scan():
     """Messwerte (Temperatur, Luftfeuchte, Luftdruck, Leistung ...) aller Tasmota-Geraete als Sensoren anbieten."""
     try:
-        return jsonify(shelly.tasmota_sensor_scan(extra_networks=_scan_networks()))
+        ip = (request.get_json(silent=True) or {}).get("ip")
+        return jsonify(shelly.tasmota_sensor_scan(extra_networks=_scan_networks(), ip=ip.strip() if isinstance(ip, str) and ip.strip() else None))
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
     except Exception as e:                               # noqa: BLE001
         log.warning("Tasmota-Sensorsuche fehlgeschlagen: %s", e)
         return jsonify(error=f"Suche fehlgeschlagen: {e}"), 500
