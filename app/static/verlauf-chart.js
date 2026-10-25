@@ -81,7 +81,7 @@ window.VLChart = (function () {
       options: {
         animation: false, parsing: isBar, normalized: !isBar, maintainAspectRatio: false, interaction: { mode: stacked ? 'index' : 'nearest', axis: 'x', intersect: false },
         plugins: {
-          legend: { display: opts.legend !== false, labels: { color: LEG, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
+          legend: { display: opts.legend !== false, align: 'start', labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
           tooltip: {
             filter: function (it) { return !it.dataset._band; },
             callbacks: {
