@@ -796,6 +796,8 @@
   <div class="sub">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
     <div id="cam-motion-row" class="admin-only" style="margin:0 0 8px" hidden><button id="cam-motion-scan" class="ghost">Kamera-Bewegung suchen</button>
       <span class="muted">Reolink-Erkennungen als Sensor.</span></div>
+    <div id="tas-sensor-row" class="admin-only" style="margin:0 0 8px" hidden><button id="tas-sensor-scan" class="ghost">Tasmota-Messwerte suchen</button>
+      <span class="muted">Temperatur, Luftfeuchte, Luftdruck, Leistung.</span></div>
     <div id="hm-sensors" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
@@ -2280,7 +2282,7 @@ function applyFamilies(f) {
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
-  show('fam-sensors', f.homematic || f.zigbee || f.camera); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; show('fam-setpoints', f.homematic || f.zigbee); show('fam-locks', f.homematic); show('fam-sounds', f.homematic); show('fam-blinds', f.homematic); show('fam-wol', true);
+  show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee); show('fam-locks', f.homematic); show('fam-sounds', f.homematic); show('fam-blinds', f.homematic); show('fam-wol', true);
   show('hm-push-card', f.homematic);
   show('hint-sensoren', !(f.homematic || f.zigbee)); show('hint-thermostate', !(f.homematic || f.zigbee)); show('hint-sicherheit', !f.homematic);
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
@@ -3100,6 +3102,7 @@ const ZB_KINDS = {
   sensors: { url: '/api/zigbee/sensors/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
   setpoints: { url: '/api/zigbee/setpoints/add', icons: null, reload: () => loadSetpointsAdmin() },
   camMotion: { url: '/api/cameras/motion/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
+  tasSensors: { url: '/api/tasmota/sensors/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
 };
 function zbFoundList(found, kind, label, meta) {
   const fresh = found.filter(f => !f.known), k = ZB_KINDS[kind];
@@ -3118,6 +3121,7 @@ function zbScanButton(btnId, url, label, busy, kind, meta) {
 zbScanButton('zb-scan', '/api/zigbee/scan', 'Lichter/Steckdosen', 'Suche läuft …', 'devices', f => f.dimmable ? 'dimmbar' : 'Schalter');
 zbScanButton('zb-sensor-scan', '/api/zigbee/sensors/scan', 'Sensoren', 'Sensor-Suche läuft …', 'sensors', f => f.binary ? 'Ja/Nein' : (f.unit || ''));
 zbScanButton('cam-motion-scan', '/api/cameras/motion/scan', 'Kamera-Sensoren', 'Suche läuft …', 'camMotion', null);
+zbScanButton('tas-sensor-scan', '/api/tasmota/sensors/scan', 'Messwerte', 'Suche läuft …', 'tasSensors', f => (f.value != null ? f.value + ' ' + f.unit : f.unit));
 zbScanButton('zb-sp-scan', '/api/zigbee/setpoints/scan', 'Thermostate', 'Thermostat-Suche läuft …', 'setpoints', null);
 loadZigbeeInfo();
 

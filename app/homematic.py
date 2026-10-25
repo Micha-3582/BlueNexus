@@ -436,6 +436,7 @@ SENSOR_KINDS = {
     "humidity": ("Luftfeuchte", "%", False, ["HUMIDITY", "ACTUAL_HUMIDITY"]),
     "brightness": ("Helligkeit", "", False, ["ILLUMINATION", "BRIGHTNESS", "CURRENT_ILLUMINATION"]),
     "power": ("Leistung", "W", False, ["POWER"]),
+    "pressure": ("Luftdruck", "hPa", False, ["PRESSURE"]),                 # nur Tasmota (BME280/BMP280)
     "contact": ("Fenster/Tür", "", True, ["STATE"]),                       # wahr = offen
     "motion": ("Bewegung", "", True, ["MOTION"]),                          # wahr = Bewegung erkannt
     "presence": ("Anwesenheit", "", True, ["PRESENCE_DETECTION_STATE"]),   # wahr = jemand da
@@ -644,6 +645,11 @@ def _read_sensor_now(sen: dict):
         if sen.get("source") == "zigbee":                      # Zigbee-Sensor (Phoscon/deCONZ) im selben Register
             import zigbee
             v = zigbee.read_value(sen)
+            unreach = v is None
+        elif sen.get("source") == "tasmota":                   # Messwert eines Tasmota-Geraets (DS18B20, BME280, Stromzaehler ...)
+            import shelly, tasmota
+            pw = next((d.get("password") for d in shelly.load_devices() if d.get("kind") == "tasmota" and d.get("mac") == sen.get("address") and d.get("password")), "")
+            v = tasmota.read_metric(sen.get("ip", ""), sen["datapoint"], ("admin", pw) if pw else None)
             unreach = v is None
         elif sen.get("source") == "camera":                    # Reolink-Kamera: Bewegung/Person/Fahrzeug/Tier
             import camera

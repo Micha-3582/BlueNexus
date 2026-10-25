@@ -137,3 +137,58 @@ def set_state(d: dict, on: bool, timer_s: int | None = None) -> dict:
         else:
             _pulse_zero.pop(key, None)
     return _state_from(resp, ch, on)
+
+
+# ---------------------------------------------------------------- Messwerte (Sensoren)
+# Tasmota meldet alle Messwerte mit EINER Abfrage (`Status 10`): {"DS18B20-1": {"Temperature": 47.2}, "BME280": {...}, "ENERGY": {...}}.
+# Art -> (Anzeigename, Einheit); Datenpunkt eines Sensors ist "<Messfuehler>.<Wert>", z. B. "DS18B20-1.Temperature".
+_METRICS = {"Temperature": ("temperature", "Temperatur", "°C"), "Humidity": ("humidity", "Luftfeuchte", "%"),
+            "Pressure": ("pressure", "Luftdruck", "hPa"), "Illuminance": ("brightness", "Helligkeit", "lx"),
+            "Power": ("power", "Leistung", "W")}
+_sns_cache: dict = {}                            # IP -> (gueltig bis, StatusSNS) - mehrere Sensoren eines Geraets kosten nur eine Abfrage
+SNS_TTL_S = 4.0
+
+
+def _numbers(sns: dict) -> dict:
+    """{'DS18B20-1.Temperature': 47.2, ...} aus StatusSNS (Temperatur immer in °C)."""
+    out = {}
+    fahrenheit = str(sns.get("TempUnit") or "C").upper().startswith("F")
+    for name, vals in sns.items():
+        if not isinstance(vals, dict):
+            continue
+        for key, v in vals.items():
+            if key not in _METRICS:
+                continue
+            if isinstance(v, list):               # mehrphasig (ENERGY.Power): Summe
+                v = sum(x for x in v if isinstance(x, (int, float)))
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                continue
+            if key == "Temperature" and fahrenheit:
+                v = (v - 32.0) / 1.8
+            out[f"{name}.{key}"] = round(float(v), 1)
+    return out
+
+
+def sensor_metrics(ip: str, timeout: float = CALL_TIMEOUT, auth=None) -> dict:
+    """Alle Messwerte eines Geraets: {datapoint: Zahl}. Leer, wenn keine/nicht erreichbar (Fehler -> TasmotaError)."""
+    try:
+        data = _cmd(ip, "Status 10", timeout, auth)
+    except (requests.RequestException, ValueError) as e:
+        raise TasmotaError(f"keine Antwort: {e}")
+    sns = data.get("StatusSNS")
+    return _numbers(sns) if isinstance(sns, dict) else {}
+
+
+def read_metric(ip: str, datapoint: str, auth=None):
+    """Aktueller Wert eines Messpunkts oder None (Geraet weg/Wert nicht mehr gemeldet)."""
+    now = time.time()
+    hit = _sns_cache.get(ip)
+    if hit and hit[0] > now:
+        vals = hit[1]
+    else:
+        try:
+            vals = sensor_metrics(ip, CALL_TIMEOUT, auth)
+        except TasmotaError:
+            vals = None
+        _sns_cache[ip] = (now + SNS_TTL_S, vals)
+    return None if vals is None else vals.get(datapoint)

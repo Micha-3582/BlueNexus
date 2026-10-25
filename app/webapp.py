@@ -262,7 +262,7 @@ ENDPOINT_AREA = {
     "api_tuya_scan": "smarthome_einrichten", "api_tuya_add": "smarthome_einrichten",
     "api_device_families": "smarthome_einrichten", "api_homematic_info": "smarthome_einrichten", "api_homematic_credentials": "smarthome_einrichten", "api_homematic_push": "smarthome_einrichten", "api_rule_usage": "settings_geraete", "api_homematic_events": "smarthome_einrichten", "api_homematic_radio": "smarthome_einrichten", "api_homematic_pause": "smarthome_einrichten", "api_homematic_resume": "smarthome_einrichten",
     "api_homematic_scan": "smarthome_einrichten", "api_homematic_add": "smarthome_einrichten",
-    "api_zigbee_info": "smarthome_einrichten", "api_zigbee_credentials": "smarthome_einrichten", "api_zigbee_pair": "smarthome_einrichten", "api_zigbee_gateway_delete": "smarthome_einrichten", "api_camera_motion_scan": "smarthome_einrichten", "api_camera_motion_add": "smarthome_einrichten", "api_zigbee_gateway_rename": "smarthome_einrichten",
+    "api_zigbee_info": "smarthome_einrichten", "api_zigbee_credentials": "smarthome_einrichten", "api_zigbee_pair": "smarthome_einrichten", "api_zigbee_gateway_delete": "smarthome_einrichten", "api_camera_motion_scan": "smarthome_einrichten", "api_camera_motion_add": "smarthome_einrichten", "api_tasmota_sensor_scan": "smarthome_einrichten", "api_tasmota_sensor_add": "smarthome_einrichten", "api_zigbee_gateway_rename": "smarthome_einrichten",
     "api_zigbee_scan": "smarthome_einrichten", "api_zigbee_add": "smarthome_einrichten", "api_zigbee_sensor_scan": "smarthome_einrichten",
     "api_zigbee_sensor_add": "smarthome_einrichten", "api_zigbee_sp_scan": "smarthome_einrichten", "api_zigbee_sp_add": "smarthome_einrichten",
     "api_homematic_sensor_scan": "smarthome_einrichten", "api_homematic_sensor_add": "smarthome_einrichten",
@@ -5455,6 +5455,29 @@ def api_camera_motion_add():
         return jsonify(error=str(e)), 400
 
 
+@app.route("/api/tasmota/sensors/scan", methods=["POST"])
+def api_tasmota_sensor_scan():
+    """Messwerte (Temperatur, Luftfeuchte, Luftdruck, Leistung ...) aller Tasmota-Geraete als Sensoren anbieten."""
+    try:
+        return jsonify(shelly.tasmota_sensor_scan(extra_networks=_scan_networks()))
+    except Exception as e:                               # noqa: BLE001
+        log.warning("Tasmota-Sensorsuche fehlgeschlagen: %s", e)
+        return jsonify(error=f"Suche fehlgeschlagen: {e}"), 500
+
+
+@app.route("/api/tasmota/sensors/add", methods=["POST"])
+def api_tasmota_sensor_add():
+    ids = (request.get_json(silent=True) or {}).get("ids")
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        return jsonify(error="ids fehlt"), 400
+    try:
+        res = shelly.add_tasmota_sensors(ids)
+        _apply_edits(res, _edits(), "sensor")
+        return jsonify(added=res)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+
+
 @app.route("/api/zigbee/sensors/scan", methods=["POST"])
 def api_zigbee_sensor_scan():
     return _zb_call(zigbee.sensors_scan)
@@ -5497,7 +5520,10 @@ def api_sensors_list():
     if not store.module_on("smarthome"):
         return jsonify([])
     try:
-        return jsonify(_vis_filter(homematic.list_sensors_with_values(live=request.args.get("light") != "1")))
+        sens = _vis_filter(homematic.list_sensors_with_values(live=request.args.get("light") != "1"))
+        if not auth.has_level(g.perms, "settings_geraete", "write"):
+            sens = [{k: v for k, v in s.items() if k != "ip"} for s in sens]               # interne IP nicht ohne Schreibrecht auf Geraete-Verwaltung zeigen
+        return jsonify(sens)
     except Exception as e:                               # noqa: BLE001
         log.warning("Sensorliste: %s", e)
         return jsonify([])

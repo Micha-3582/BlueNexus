@@ -11,6 +11,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -243,6 +244,66 @@ def tasmota_discover(subnet: ipaddress.IPv4Network | None = None, extra_networks
     found += [{**w, "known": w["mac"] in known_w, "channels": 1, "wled": True} for w in wl]
     found.sort(key=lambda f: tuple(int(x) for x in f["ip"].split(".")))
     return found
+
+
+def tasmota_sensor_scan(extra_networks: list[str] | None = None) -> list[dict]:
+    """Messwerte aller Tasmota-Geraete im Netz (auch ohne Relais, z. B. Selbstbau mit DS18B20) zum Anlegen als Sensoren."""
+    import homematic
+    known_ids = {s["id"] for s in homematic.load_sensors()}
+    pw = {d.get("mac"): d.get("password") for d in load_devices() if d.get("kind") == "tasmota" and d.get("password")}
+    hosts = _scan_hosts(None, extra_networks)
+    for d in load_devices():                                     # bekannte Geraete auch ausserhalb der durchsuchten Netze
+        if d.get("kind") == "tasmota" and d.get("ip") and d["ip"] not in hosts:
+            hosts.append(d["ip"])
+    with ThreadPoolExecutor(max_workers=64) as ex:
+        found = [r for r in ex.map(tasmota.probe, hosts) if r]
+    out = []
+    for f in found:
+        auth = ("admin", pw[f["mac"]]) if f.get("auth") and pw.get(f["mac"]) else None
+        if f.get("auth"):
+            f = tasmota.probe(f["ip"], CALL_TIMEOUT, auth) if auth else None
+        if not f or f.get("auth"):
+            continue
+        try:
+            vals = tasmota.sensor_metrics(f["ip"], CALL_TIMEOUT, auth)
+        except tasmota.TasmotaError:
+            continue
+        for dp in sorted(vals):
+            probe_name, key = dp.rsplit(".", 1)
+            kind, label, unit = tasmota._METRICS[key]
+            sid = "tasS-" + f["mac"] + "-" + re.sub(r"[^A-Za-z0-9]+", "-", dp).strip("-")
+            out.append({"id": sid, "kind": kind, "address": f["mac"], "interface": "Tasmota", "datapoint": dp, "unit": unit, "binary": False,
+                        "model": f["model"] + " · " + f["ip"], "room": "", "ip": f["ip"], "source": "tasmota",
+                        "name": f["name"] + " – " + ("" if probe_name == "ENERGY" else probe_name + " ") + label,
+                        "known": sid in known_ids, "value": vals[dp]})
+    out.sort(key=lambda x: (x["model"], x["name"]))
+    _sensor_scan.clear()
+    _sensor_scan.update({x["id"]: x for x in out})
+    return out
+
+
+_sensor_scan: dict = {}
+
+
+def add_tasmota_sensors(ids: list[str]) -> list[dict]:
+    import homematic
+    if any(i not in _sensor_scan for i in ids):
+        raise ShellyError("Bitte zuerst neu suchen")
+    items = homematic.load_sensors()
+    have = {s["id"] for s in items}
+    added = []
+    for i in ids:
+        f = _sensor_scan[i]
+        if i in have:
+            continue
+        item = {k: f[k] for k in ("id", "kind", "address", "interface", "datapoint", "unit", "binary", "model", "room", "name", "source", "ip")}
+        item["model"] = item["model"].split(" · ")[0]
+        item["users"] = []                                        # neu: zunaechst nur fuer Administratoren sichtbar
+        items.append(item)
+        added.append(item)
+    if added:
+        homematic._save_sensors(items)
+    return added
 
 
 def _add_tasmota(ip: str, password: str = "", edits: dict | None = None, preview: bool = False) -> list[dict]:
@@ -577,6 +638,14 @@ def update(dev_id: str, name: str | None = None, icon: str | None = None,
                 same = [x for x in items if x is d or (d.get("mac") and x.get("mac") == d.get("mac") and x.get("kind") == d.get("kind"))]       # mehrere Kanaele eines Geraets teilen die Adresse
                 for x in same:
                     x["ip"] = new_ip
+                if d.get("kind") == "tasmota" and d.get("mac"):               # Messwert-Sensoren desselben Geraets folgen der neuen Adresse
+                    import homematic
+                    sens = homematic.load_sensors()
+                    moved = [s for s in sens if s.get("source") == "tasmota" and s.get("address") == d["mac"]]
+                    for s in moved:
+                        s["ip"] = new_ip
+                    if moved:
+                        homematic._save_sensors(sens)
             if power_w is not None:
                 d["power_w"] = _num(power_w, 0, 20000, "Leistung (W)")
             if min_on_min is not None:

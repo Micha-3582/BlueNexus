@@ -122,7 +122,7 @@ Smart Home. Die App läuft auch **ganz ohne Victron** als reines Smart-Home-Syst
 | System | Was geht | Wie |
 |---|---|---|
 | **Shelly** (Gen1–Gen3) | Schalten, Leistungsmessung | Suche im Heimnetz oder IP eintragen, lokal |
-| **Tasmota** | Schalten, Leistungsmessung | Suche oder IP eintragen, lokal |
+| **Tasmota** | Schalten, Leistungsmessung, Messwerte als Sensoren (Temperatur, Luftfeuchte, Luftdruck – auch ohne Relais) | Suche oder IP eintragen, lokal |
 | **WLED** | Ein/Aus, Helligkeit per Regler | Gemeinsame Suche mit Tasmota, lokal |
 | **Tuya / Smart Life** (z. B. Gosund) | Schalten | Die Cloud liefert nur einmalig die Geräteschlüssel, geschaltet wird **lokal** |
 | **Homematic / HomematicIP** (OpenCCU) | Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden, Soundmodule (Gong), Wandtaster | CCU-Anbindung; optional **Push von der CCU**: Reaktion in unter einer Sekunde, ohne ständiges Abfragen |
