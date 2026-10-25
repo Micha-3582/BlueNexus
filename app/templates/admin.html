@@ -804,7 +804,7 @@
 
 <div class="card fam-card msg-host" id="fam-setpoints" data-tab="thermostate">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Thermostate <span class="qhelp" role="button" tabindex="0" data-help="In Regeln der Art „Ablauf“ nutzbar, z. B. „alle Thermostate auf 25 °C“. Der Wert wird auf den Bereich des Geräts begrenzt (0 °C = aus, meist 4,5 °C).">?</span></h2>
-  <div class="sub">Solltemperatur per Regel setzen (Homematic, Zigbee).</div>
+  <div class="sub">Solltemperatur von Hand einstellen oder per Regel setzen (Homematic, Zigbee).</div>
     <div id="hm-setpoints" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
@@ -1820,8 +1820,8 @@ const shareWho = ref => (SHARE_MAP[ref] || []).map(x => `${x.name} (${x.mode ===
 const shareWrite = () => !!window.IS_ADMIN && ((window.USER_PERMS || {}).smarthome_teilen === 'write');
 const shareBtn = (kind, id, skip) => (!shareWrite() || skip) ? '' : `<button type="button" class="tgl share${(SHARE_MAP[shareRef(kind, id)] || []).length ? ' on' : ''}" onclick="pickShare('${kind}','${id}')" aria-label="Teilen" title="${escH(shareWho(shareRef(kind, id)) ? 'Geteilt mit: ' + shareWho(shareRef(kind, id)) : 'Mit einer anderen BlueNexus-Anlage teilen')}">${I_SHARE}</button>`;
 const shareMark = (kind, id, skip) => (!window.IS_ADMIN || skip || !(SHARE_MAP[shareRef(kind, id)] || []).length) ? '' : `<span class="share-mark" title="${escH('Geteilt mit: ' + shareWho(shareRef(kind, id)))}">${I_SHARE}</span>`;
-const VIS_URL = { shelly: '/api/shelly/', sensor: '/api/sensors/', virtual: '/api/virtual/', wol: '/api/wol/', sound: '/api/homematic/sounds/', blind: '/api/homematic/blinds/' };
-const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); } };
+const VIS_URL = { shelly: '/api/shelly/', sensor: '/api/sensors/', virtual: '/api/virtual/', wol: '/api/wol/', sound: '/api/homematic/sounds/', blind: '/api/homematic/blinds/', setpoint: '/api/homematic/setpoints/' };
+const VIS_RELOAD = { shelly: () => loadShellyAdmin(), sensor: () => loadSensorsAdmin(), virtual: () => loadVirtualAdmin(), wol: () => loadWolAdmin(), sound: () => { SND_SIG = ''; loadSoundsAdmin(); }, blind: () => { BL_SIG = ''; loadBlindsAdmin(); }, setpoint: () => loadSetpointsAdmin() };
 function userPickDialog(names, current) {                       // -> undefined (abgebrochen) | null (alle) | Liste
   return new Promise(resolve => {
     const ov = document.createElement('div');
@@ -2751,19 +2751,61 @@ document.getElementById('virt-add').addEventListener('click', async () => {
 loadVirtualAdmin(); setInterval(() => { const box = document.getElementById('virtual-list'); if (![...document.querySelectorAll('[id^=vicons-]')].some(e => e.style.display === 'flex') && !openEdits('vedit-').length && !(box && box.contains(document.activeElement))) loadVirtualAdmin(); }, 15000);        // nicht neu zeichnen, solange gerade ein Name getippt oder ein Bearbeiten-Bereich offen ist
 
 /* --- Homematic-Thermostate --- */
+const SP_TIMERS = {};
+const spFmt = v => String(Math.round(v * 2) / 2).replace('.', ',');
+const spCanSet = () => !!window.IS_ADMIN || ((window.USER_PERMS || {}).dashboard === 'write');
 async function loadSetpointsAdmin(light) {
   let list = []; try { list = await (await fetch('/api/homematic/setpoints' + (light ? '?light=1' : ''), { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   list.forEach(x => { x._pending = !!light; });
-  document.getElementById('hm-setpoints').innerHTML = list.length ? list.map(s => `<div data-sort-id="${escH(s.id)}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px">
-      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b><div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Soll <b>${s.value == null ? (s._pending ? '…' : '–') : String(s.value).replace('.', ',') + ' °C'}</b> · Bereich ${s.min}–${s.max} °C</div></div>
-      <button class="ghost admin-only" onclick="spRename('${escH(s.id)}', this)" data-name="${escH(s.name)}" title="Umbenennen">✎</button>
-      <button class="ghost admin-only" onclick="spRemove('${escH(s.id)}')" title="Entfernen">✕</button></div>`).join('')
+  const open = openEdits('spedit-'), can = spCanSet();
+  document.getElementById('hm-setpoints').innerHTML = list.length ? list.map(s => { const id = escH(s.id); return `<div data-sort-id="${id}" data-sp="${id}" data-min="${Math.max(5, s.min)}" data-max="${Math.min(30, s.max)}" data-target="${s.value == null ? '' : s.value}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b><div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Bereich ${s.min}–${s.max} °C</div></div>
+      ${can ? `<div style="display:flex;align-items:center;gap:6px" title="Solltemperatur einstellen – die Änderung wird kurz nach dem letzten Tippen gesendet">
+        <button class="ghost" style="padding:4px 12px;font-size:18px" onclick="spStep('${id}',-0.5)" ${s.value == null ? 'disabled' : ''} aria-label="Kälter">−</button>
+        <b class="sp-val" style="min-width:74px;text-align:center;font-size:17px">${s.value == null ? (s._pending ? '…' : '–') : spFmt(s.value) + ' °C'}</b>
+        <button class="ghost" style="padding:4px 12px;font-size:18px" onclick="spStep('${id}',0.5)" ${s.value == null ? 'disabled' : ''} aria-label="Wärmer">+</button></div>
+        <input class="sp-range" type="range" min="${Math.max(5, s.min)}" max="${Math.min(30, s.max)}" step="0.5" value="${s.value == null ? Math.max(5, s.min) : s.value}" ${s.value == null ? 'disabled' : ''} style="width:150px" title="Solltemperatur: ganz links kälteste Stufe (aus), ganz rechts wärmste" oninput="spSlide('${id}', this.value, false)" onchange="spSlide('${id}', this.value, true)">`
+        : `<div>Soll <b>${s.value == null ? (s._pending ? '…' : '–') : spFmt(s.value) + ' °C'}</b></div>`}
+      <button class="ghost admin-only" onclick="editToggle('spedit-${id}')" title="Bearbeiten: Name, Sichtbarkeit für Benutzer, Entfernen">✎</button></div>
+      <div class="edit-panel" id="spedit-${id}">
+        <div class="edit-row"><input id="spname-${id}" value="${escH(s.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')spRenameSave('${id}')">
+          <button type="button" class="tgl" title="Namen speichern" aria-label="Namen speichern" onclick="spRenameSave('${id}')">${I_CHECK}</button></div>
+        <div class="edit-row" style="margin-top:10px">
+          ${visBtn('setpoint', id, s.users)}
+          <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="spRemove('${id}')">${I_TRASH}</button>
+        </div>
+      </div></div>`; }).join('')
     : '<div class="muted">Noch keine Thermostate angelegt.</div>';
+  reopenEdits(open);
 }
-async function spRename(id, btn) {
-  const n = await uiDialog({ title: 'Thermostat umbenennen', label: 'Neuer Name', value: btn.dataset.name });
-  if (n === null) return;
+function spSlide(id, val, send) {                                   // Regler: Anzeige beim Ziehen, senden beim Loslassen
+  const row = document.querySelector(`[data-sp="${CSS.escape(id)}"]`); if (!row) return;
+  const v = Math.min(+row.dataset.max, Math.max(+row.dataset.min, Math.round(parseFloat(val) * 2) / 2)); row.dataset.target = v;
+  row.querySelector('.sp-val').textContent = spFmt(v) + ' °C';
+  if (send) spSend(id, row, v, 150);
+}
+function spSend(id, row, v, wait) {
+  clearTimeout(SP_TIMERS[id]);
+  SP_TIMERS[id] = setTimeout(async () => {
+    try {
+      const r = await shellyApi('/api/homematic/setpoints/' + encodeURIComponent(id) + '/value', 'POST', { value: v });
+      row.dataset.target = r.value; row.querySelector('.sp-val').textContent = spFmt(r.value) + ' °C'; const rg = row.querySelector('.sp-range'); if (rg) rg.value = r.value; shellyMsg(''); savedToast(`${r.name}: ${spFmt(r.value)} °C ✓`);
+    } catch (e) { shellyMsg(e.message, true); loadSetpointsAdmin(); }
+  }, wait);
+}
+function spStep(id, d) {                                          // Schritt 0,5 °C; gesendet wird erst, wenn man kurz nicht mehr tippt
+  const row = document.querySelector(`[data-sp="${CSS.escape(id)}"]`); if (!row) return;
+  const lo = +row.dataset.min, hi = +row.dataset.max;
+  let v = parseFloat(row.dataset.target); if (isNaN(v)) return;
+  v = Math.min(hi, Math.max(lo, Math.round((v + d) * 2) / 2)); row.dataset.target = v;
+  row.querySelector('.sp-val').textContent = spFmt(v) + ' °C';
+  const rg = row.querySelector('.sp-range'); if (rg) rg.value = v;
+  spSend(id, row, v, 1200);
+}
+async function spRenameSave(id) {
+  const n = document.getElementById('spname-' + id).value.trim(); if (!n) return;
   try { await shellyApi('/api/homematic/setpoints/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
   loadSetpointsAdmin();
 }

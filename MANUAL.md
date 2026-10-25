@@ -418,6 +418,8 @@ Sensoren sind in Regeln als Bedingung nutzbar („WENN Sensor wahr/falsch“ bzw
 
 Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B. „alle Thermostate auf 25 °C“. Der Einstellbereich ist **5 bis 30 °C** (kleinere oder größere Werte werden darauf begrenzt, auch in älteren Regeln); zusätzlich gilt der Bereich des Geräts.
 
+**Von Hand einstellen:** In der Liste unter *Smart Home → Thermostate* zeigt jedes Thermostat die aktuelle Solltemperatur mit **−** und **+** (Schritte von 0,5 °C) und einem **Regler** (ganz links die kälteste Stufe, ganz rechts die wärmste). Die Änderung wird kurz nach dem letzten Tippen bzw. beim Loslassen des Reglers an das Thermostat geschickt, und eine Meldung bestätigt den Wert. Das Einstellen braucht das Recht **Dashboard: Schreiben**; wer nur lesen darf, sieht die Temperatur ohne Bedienelemente. **Wer welches Thermostat sieht und einstellen darf**, legt der Administrator hinter dem **Stift ✎ → Sichtbarkeit** fest (bei Thermostaten, die du neu anlegst, zunächst nur Administratoren; schon vorhandene bleiben für alle sichtbar). Eine Regel kann den Wert später wieder überschreiben.
+
 ### Türschlösser (Homematic IP und klassisches Keymatic)
 
 Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entriegeln und Öffnen** per Ablauf wird das Schloss unter „Türschlösser“ angelegt.

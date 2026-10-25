@@ -276,7 +276,7 @@ ENDPOINT_AREA = {
     "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
     "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete", "api_virtual_url": "settings_geraete",
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
-    "api_setpoint_modify": "settings_geraete",
+    "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
     "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
@@ -3304,7 +3304,7 @@ def _scan_networks() -> list[str]:
 
 
 # --- Sichtbarkeit einzelner Geraete/Schalter/Sensoren pro Benutzer (Feld "users", siehe visibility.py) ---
-_VIS_KINDS = {"camera": camera.users_registry, "shelly": shelly.users_registry, "virtual": virtual.users_registry, "wol": wol.users_registry, "sensor": homematic.users_registry, "sound": homematic.sound_users_registry, "blind": homematic.blind_users_registry}
+_VIS_KINDS = {"camera": camera.users_registry, "shelly": shelly.users_registry, "virtual": virtual.users_registry, "wol": wol.users_registry, "sensor": homematic.users_registry, "sound": homematic.sound_users_registry, "blind": homematic.blind_users_registry, "setpoint": homematic.setpoint_users_registry}
 
 
 def _visible(item: dict) -> bool:
@@ -5328,7 +5328,7 @@ def api_blind_stop(bid):
 @app.route("/api/homematic/setpoints", methods=["GET"])
 def api_setpoint_list():
     try:
-        return jsonify(homematic.list_setpoints_with_values(live=request.args.get("light") != "1"))
+        return jsonify(_vis_filter(homematic.list_setpoints_with_values(live=request.args.get("light") != "1")))
     except Exception as e:                               # noqa: BLE001
         log.warning("Thermostatliste: %s", e)
         return jsonify([])
@@ -5360,6 +5360,9 @@ def api_setpoint_modify(sp_id):
     denied = _admin_only()
     if denied:
         return denied
+    hidden = _vis_guard("setpoint", sp_id)
+    if hidden:
+        return hidden
     if request.method == "DELETE":
         busy = _in_use("setpoint", sp_id)
         if busy:
@@ -5368,8 +5371,26 @@ def api_setpoint_modify(sp_id):
         if ok:
             rules.remove_device(sp_id)
     else:
-        ok = homematic.update_setpoint(sp_id, name=(request.get_json(silent=True) or {}).get("name"))
+        body = request.get_json(silent=True) or {}
+        err = _vis_set("setpoint", sp_id, body)
+        if err:
+            return err
+        ok = homematic.update_setpoint(sp_id, name=body.get("name"))
     return jsonify(ok=True) if ok else (jsonify(error="nicht gefunden"), 404)
+
+
+@app.route("/api/homematic/setpoints/<sp_id>/value", methods=["POST"])
+def api_setpoint_value(sp_id):
+    """Solltemperatur eines Thermostats von Hand einstellen ({value: Grad}); der Wert wird auf den Bereich des Thermostats begrenzt."""
+    hidden = _vis_guard("setpoint", sp_id)
+    if hidden:
+        return hidden
+    try:
+        name, v = homematic.setpoint_set_manual(sp_id, (request.get_json(silent=True) or {}).get("value"))
+    except homematic.HomematicError as e:
+        return jsonify(error=str(e)), 400
+    opslog.log("rules", f"Thermostat {name}: von Hand auf {v:g} °C gestellt")
+    return jsonify(ok=True, name=name, value=v)
 
 
 @app.route("/api/zigbee", methods=["GET"])

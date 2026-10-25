@@ -761,6 +761,11 @@ def _save_setpoints(items: list[dict]):
         json.dump(items, f, indent=2, ensure_ascii=False)
 
 
+def setpoint_users_registry():
+    """(laden, speichern) der Thermostate fuer die Sichtbarkeit pro Benutzer (siehe visibility.py)."""
+    return load_setpoints, _save_setpoints
+
+
 def setpoint_id(address: str) -> str:
     return "hmT-" + address.replace(":", "-")
 
@@ -831,6 +836,7 @@ def add_setpoints(ids: list[str]) -> list[dict]:
         if i in have:
             continue
         item = {k: f[k] for k in ("id", "address", "interface", "datapoint", "min", "max", "model", "room", "name")}
+        item["users"] = []                            # neu: zunaechst nur fuer Administratoren sichtbar (siehe visibility.py)
         items.append(item)
         added.append(item)
     if added:
@@ -875,6 +881,18 @@ def list_setpoints_with_values(live: bool = True) -> list[dict]:
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(items)))) as ex:
         vals = list(ex.map(cur, items))
     return [{**s, "value": v} for s, v in zip(items, vals)]
+
+
+def setpoint_set_manual(sp_id: str, value) -> tuple:
+    """Solltemperatur eines Thermostats von Hand setzen. -> (Name, gesetzter Wert). Fehler als HomematicError (verstaendlicher Text)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or abs(value) > 1000:
+        raise HomematicError("Ungültige Temperatur")
+    if not any(s["id"] == sp_id for s in load_setpoints()):
+        raise HomematicError("Thermostat nicht gefunden")
+    name, v, err = set_setpoints([sp_id], float(value))[0]
+    if err:
+        raise HomematicError(f"{name}: Temperatur setzen fehlgeschlagen ({err})")
+    return name, v
 
 
 def set_setpoints(ids: list[str], value: float) -> list[tuple]:

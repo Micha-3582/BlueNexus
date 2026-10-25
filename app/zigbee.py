@@ -577,6 +577,7 @@ def add_setpoints(ids: list[str]) -> list[dict]:
         if i in have:
             continue
         item = {k: f[k] for k in ("id", "address", "interface", "datapoint", "min", "max", "model", "room", "name", "source", "gw") if k in f}
+        item["users"] = []                           # neu: zunaechst nur fuer Administratoren sichtbar
         items.append(item)
         added.append(item)
     if added:
