@@ -432,6 +432,8 @@ def _require_login():
         if blocked or request.method in ("GET", "HEAD", "OPTIONS"):
             return blocked
         return _check_area("settings_anzeige", "read")
+    if request.endpoint == "api_hidden_items":
+        return _check_area("dashboard", "read")                    # eigene Dashboard-Ansicht: jedes Konto mit Dashboard-Zugriff, rein persoenlich
     if request.endpoint == "api_favorites":
         # Favoriten sind fuer jedes Konto da, das aufs Dashboard darf (auch nur lesend): ansehen, Sterne setzen, sortieren - rein persoenlich,
         # ohne dass ein Administrator etwas freigeben muss. Schalten laeuft weiter ueber die normalen Endpunkte mit ihren Rechten.
@@ -2207,7 +2209,7 @@ def index():
     if store.module_on("energy") and not store.is_configured():
         return redirect("/setup")
     welcome = (not store.module_on("energy") and not store.load_config().get("welcome_done") and auth.is_full_admin(_perms()))      # Begruessung fuer Installationen ohne Energie (die haben keinen Einrichtungsassistenten)
-    return render_template("index.html", welcome=welcome)
+    return render_template("index.html", welcome=welcome, hidden_items=auth.normalize_favorites((users.get(g.user) or {}).get("hidden_items")))
 
 
 @app.route("/api/welcome/done", methods=["POST"])
@@ -2465,13 +2467,13 @@ def setup():
 def admin():
     if not any(g.perms.get(x, "none") != "none" for x in SETTINGS_PAGE_AREAS):          # nichts einzustellen -> nicht auf einer leeren Seite landen
         return redirect(url_for("automation_page") if g.perms.get("automation", "none") != "none" else url_for("index"))
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), page_mode="admin")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), hidden_items=auth.normalize_favorites((users.get(g.user) or {}).get("hidden_items")), page_mode="admin")
 
 
 @app.route("/smarthome")
 def smarthome_page():
     """Smart Home: Geraete, Sensoren, Thermostate, Sicherheit, Suche, WOL - dieselbe Vorlage/Skripte wie /admin, nur andere Reiter."""
-    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), page_mode="smarthome")
+    return render_template("admin.html", cfg=store.load_config(), session_user_display=g.user_display, favorites=auth.normalize_favorites((users.get(g.user) or {}).get("favorites")), favorites_off=bool((users.get(g.user) or {}).get("hide_favorites")), hidden_items=auth.normalize_favorites((users.get(g.user) or {}).get("hidden_items")), page_mode="smarthome")
 
 
 @app.route("/solar-log")
@@ -2809,6 +2811,33 @@ def api_favorites():
             refs = [r for r in refs if r != ref]
     try:
         users.set_favorites(g.user, refs)
+    except UserError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(ok=True, refs=auth.normalize_favorites(refs))
+
+
+@app.route("/api/hidden", methods=["GET", "POST"])
+def api_hidden_items():
+    """Persoenlich ausgeblendete Dashboard-Elemente des angemeldeten Kontos. GET: Liste der Verweise ("shelly:ID" ...). POST {ref, on}: on=true blendet aus, false wieder ein.
+    Die globale Einstellung des Administrators ("auf dem Dashboard anzeigen") bleibt unberuehrt; das hier blendet nur fuer dieses Konto zusaetzlich aus."""
+    user = users.get(g.user) or {}
+    refs = auth.normalize_favorites(user.get("hidden_items"))
+    if request.method == "GET":
+        return jsonify(refs=refs)
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo wird nichts gespeichert."), 403
+    ref = (request.get_json(silent=True) or {}).get("ref")
+    if not isinstance(ref, str) or ":" not in ref or not auth.normalize_favorites([ref]):
+        return jsonify(error="ref fehlt"), 400
+    if bool((request.get_json(silent=True) or {}).get("on")):
+        if not _fav_known(ref):
+            return jsonify(error="nicht gefunden"), 404
+        if ref not in refs:
+            refs.append(ref)
+    else:
+        refs = [r for r in refs if r != ref]
+    try:
+        users.set_hidden_items(g.user, refs)
     except UserError as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(ok=True, refs=auth.normalize_favorites(refs))

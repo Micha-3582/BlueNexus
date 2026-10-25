@@ -477,6 +477,22 @@ class UserStore:
             self._write()
             return dict(user)
 
+    def set_hidden_items(self, username: str, refs) -> dict:
+        """Geraete/Sensoren/Schalter/Rechner, die dieses Konto auf SEINEM Dashboard nicht sehen will - rein persoenlich (Auge in der Geraeteliste)."""
+        key = _norm(username)
+        clean = normalize_favorites(refs)
+        with self._lock:
+            self._sync()
+            user = self._users.get(key)
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            if clean:
+                user["hidden_items"] = clean
+            else:
+                user.pop("hidden_items", None)
+            self._write()
+            return dict(user)
+
     def set_favorites(self, username: str, refs) -> dict:
         """Favoriten des Kontos (Sterne): geordnete Liste wie "shelly:ID", "sensor:ID", "virtual:ID", "wol:ID" - rein persoenlich."""
         key = _norm(username)

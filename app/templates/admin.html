@@ -1026,6 +1026,7 @@ function collectPvInverters() {
 
 window.USER_PERMS = {{ user_perms | tojson }};
 window.FAV_OFF = {{ 'true' if favorites_off else 'false' }};      // das Konto hat Favoriten abgeschaltet (Meine Ansicht)
+window.HIDDEN = new Set({{ (hidden_items or []) | tojson }});      // persoenlich ausgeblendete Dashboard-Elemente, siehe eyeBtn
 window.FAVS = new Set({{ (favorites or []) | tojson }});      // eigene Favoriten (Sterne), siehe favBtn
 window.TILE_CEILING = {{ tile_ceiling | tojson }};          // null = alle Kacheln erlaubt, sonst Liste der fuer dieses Konto erlaubten
 window.DEMO_VIEW = {{ 'true' if demo_view else 'false' }};
@@ -1856,6 +1857,16 @@ const I_CHECK = svgi('<polyline points="20 6 9 17 4 12"/>');
 const I_STAR = svgi('<polygon points="12 2.5 14.9 8.7 21.5 9.5 16.6 14 17.9 20.6 12 17.3 6.1 20.6 7.4 14 2.5 9.5 9.1 8.7"/>');
 const canFav = () => ((window.USER_PERMS || {}).dashboard || 'none') !== 'none' && !window.DEMO_VIEW && !window.FAV_OFF;      // jedes Konto mit Dashboard-Zugriff, ausser es hat Favoriten abgeschaltet
 /* Favoriten-Stern (persoenlich, pro Konto): kind = shelly | sensor | virtual | wol */
+/* Persoenliches Auge fuer Konten OHNE Stift (kein Administrator): auf dem eigenen Dashboard aus-/einblenden, aendert nichts fuer andere */
+const eyeBtn = (kind, id) => (window.IS_ADMIN || window.DEMO_VIEW || ((window.USER_PERMS || {}).dashboard || 'none') === 'none') ? '' : `<button type="button" class="tgl${window.HIDDEN.has(kind + ':' + id) ? '' : ' on'}" aria-pressed="${window.HIDDEN.has(kind + ':' + id) ? 'false' : 'true'}" title="Auf meinem Dashboard anzeigen" aria-label="Auf meinem Dashboard anzeigen" onclick="hideToggle(this,'${kind}','${id}')">${I_EYE}</button>`;
+async function hideToggle(btn, kind, id) {
+  const ref = kind + ':' + id, show = !btn.classList.contains('on');
+  try {
+    await shellyApi('/api/hidden', 'POST', { ref, on: !show });
+    if (show) window.HIDDEN.delete(ref); else window.HIDDEN.add(ref);
+    btn.classList.toggle('on', show); btn.setAttribute('aria-pressed', show ? 'true' : 'false'); savedToast('Auf meinem Dashboard: ' + (show ? 'an' : 'aus') + ' ✓');
+  } catch (e) { shellyMsg(e.message, true); }
+}
 const favBtn = (kind, id) => !canFav() ? '' : `<button type="button" class="tgl fav${window.FAVS.has(kind + ':' + id) ? ' on' : ''}" aria-pressed="${window.FAVS.has(kind + ':' + id) ? 'true' : 'false'}" title="Favorit – erscheint in der Kachel „Favoriten“ auf dem Dashboard" aria-label="Favorit" onclick="favToggle(this,'${kind}','${id}')">${I_STAR}</button>`;
 async function favToggle(btn, kind, id) {
   const ref = kind + ':' + id, on = !window.FAVS.has(ref);
@@ -1899,7 +1910,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         <div style="display:flex;gap:8px;margin-left:auto">
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
-        ${favBtn('shelly', id)}
+        ${eyeBtn('shelly', id)}${favBtn('shelly', id)}
         <button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>
         </div>
       </div>
@@ -2373,7 +2384,7 @@ async function loadSensorsAdmin(light) {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="sensorPickIcon('${sid}')">${escH(s.icon || SENSOR_ICON[s.kind] || '📡')}</button>
       <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b>${shareMark('sensor', sid, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : s.source === 'camera' ? ' · Kamera' : ''}${s.room ? ' · ' + escH(s.room) : ''} · <b>${escH(sensorValueText(s))}</b></div></div>
-      ${favBtn('sensor', sid)}
+      ${eyeBtn('sensor', sid)}${favBtn('sensor', sid)}
       <button class="ghost admin-only" onclick="editToggle('sedit-${sid}')" title="Bearbeiten: Name, Dashboard, Umkehren, Entfernen">✎</button></div>
       <div class="edit-panel" id="sedit-${sid}">
         <div class="edit-row"><input id="sname-${sid}" value="${escH(s.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')sensorRenameSave('${sid}')">
@@ -2433,7 +2444,7 @@ async function loadWolAdmin(light) {
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`wolPin('${wid}', ${w.pin_set ? 'true' : 'false'})`, !!w.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('wedit-${wid}')" title="Bearbeiten: Name, Dashboard, Sichtbarkeit, Entfernen">✎</button>
-      ${favBtn('wol', wid)}
+      ${eyeBtn('wol', wid)}${favBtn('wol', wid)}
       <button type="button" class="tgl${w.pin_set ? ' pinned' : ''}" style="opacity:1" title="Jetzt aufwecken (Wake-on-LAN-Paket senden)" aria-label="Aufwecken" onclick="wolTest('${wid}', ${w.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(w.name)}">${I_BELL}</button>
       </div></div>
       <div class="edit-panel" id="wedit-${wid}">
@@ -2662,7 +2673,7 @@ async function loadVirtualAdmin() {
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`virtPin('${vid}', ${v.pin_set ? 'true' : 'false'})`, !!v.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('vedit-${vid}')" title="Bearbeiten: Name, Dashboard, Entfernen">✎</button>
-      ${favBtn('virtual', vid)}
+      ${eyeBtn('virtual', vid)}${favBtn('virtual', vid)}
       <button type="button" class="tgl${isSw && v.on ? ' on' : ''}${v.pin_set ? ' pinned' : ''}" style="opacity:1" title="${isSw ? (v.on ? 'Ausschalten' : 'Einschalten') : 'Drücken'}" aria-label="${isSw ? 'Schalten' : 'Drücken'}" onclick="virtAct('${vid}', ${isSw ? 'true' : 'false'}, ${v.on ? 'true' : 'false'}, ${v.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(v.name)}">${isSw ? I_SWITCH : I_PLAY}</button>
       </div></div>
       <div class="edit-panel" id="vedit-${vid}">

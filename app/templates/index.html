@@ -353,6 +353,7 @@ if (DASHBOARD_LEVEL === 'read') {
 
 let sensorsDragActive = false, virtualDragActive = false, virtualCache = [], wolCache = [];
 let favCan = false, favRefs = new Set(), favCache = {}, favDragActive = false;
+window.HIDDEN = new Set({{ (hidden_items or []) | tojson }});      // vom Konto selbst ausgeblendet (Auge in der Geraeteliste)
 let favoritesEnabled = true, virtualEnabled = true, sensorsEnabled = true, shellyEnabled = true, weatherEnabled = true, plansimEnabled = true, savingsEnabled = true, verlaufEnabled = true;
 function applyTileVisibility(ui) {
   applyTileOrder(ui.tile_order);
@@ -1665,6 +1666,8 @@ async function loadShelly() {
   if (!shellyEnabled) { card.hidden = true; return; }   // waehrend des Wartens ausgeschaltet worden - sonst zeigt dieser noch "veraltete" Aufruf die Kachel doch wieder
   if (shellyDragActive) return;
   if (!Array.isArray(list) || !list.length) { card.hidden = true; return; }
+  list = list.filter(d => !window.HIDDEN.has('shelly:' + d.id));
+  if (!list.length) { card.hidden = true; return; }
   shellyCache = list;
   card.hidden = false;
   $('shelly-grid').innerHTML = list.map(d => shellyTile(d)).join('');
@@ -1677,7 +1680,7 @@ async function loadSensors() {
   if (!sensorsEnabled) { card.hidden = true; return; }
   let list;
   try { list = await (await fetch('/api/sensors', { cache: 'no-store' })).json(); } catch (e) { return; }
-  list = Array.isArray(list) ? list.filter(s => s.show !== false) : [];
+  list = Array.isArray(list) ? list.filter(s => s.show !== false && !window.HIDDEN.has('sensor:' + s.id)) : [];
   if (!sensorsEnabled || !list.length) { card.hidden = true; return; }
   card.hidden = false;
   if (sensorsDragActive) return;
@@ -1692,9 +1695,9 @@ async function loadVirtual() {
   if (!virtualEnabled) { card.hidden = true; return; }
   let list;
   try { list = await (await fetch('/api/virtual', { cache: 'no-store' })).json(); } catch (e) { return; }
-  list = Array.isArray(list) ? list.filter(v => v.show !== false) : [];
+  list = Array.isArray(list) ? list.filter(v => v.show !== false && !window.HIDDEN.has('virtual:' + v.id)) : [];
   virtualCache = list;
-  let wols = []; try { const wj = await (await fetch('/api/wol', { cache: 'no-store' })).json(); wols = Array.isArray(wj) ? wj.filter(w => w.show !== false) : []; } catch (e) { /* ohne */ }
+  let wols = []; try { const wj = await (await fetch('/api/wol', { cache: 'no-store' })).json(); wols = Array.isArray(wj) ? wj.filter(w => w.show !== false && !window.HIDDEN.has('wol:' + w.id)) : []; } catch (e) { /* ohne */ }
   wolCache = wols;
   if (!virtualEnabled || !(list.length || wols.length)) { card.hidden = true; return; }
   if (Date.now() - virtualTouched < 1200) return;                                    // gerade bedient: kurz nicht dazwischenzeichnen (der Aufruf nach dem Klick zeichnet ohnehin neu)
