@@ -26,8 +26,8 @@ log_ = logging.getLogger("devicelog")
 _DIR = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(_DIR, "devicelog.jsonl")
 MAX_BYTES = 2_000_000
-CATS = ("aktor", "sensor", "thermostat", "sicherheit")
-CAT_LABEL = {"aktor": "Aktoren", "sensor": "Sensoren", "thermostat": "Thermostate", "sicherheit": "Sicherheit"}
+CATS = ("aktor", "sensor", "thermostat", "sicherheit", "regel")
+CAT_LABEL = {"aktor": "Aktoren", "sensor": "Sensoren", "thermostat": "Thermostate", "sicherheit": "Sicherheit", "regel": "Regeln"}
 
 _lock = threading.Lock()
 _local = threading.local()

@@ -855,12 +855,14 @@ def add_setpoints(ids: list[str]) -> list[dict]:
     return added
 
 
-def update_setpoint(sp_id: str, name: str | None = None) -> bool:
+def update_setpoint(sp_id: str, name: str | None = None, icon: str | None = None) -> bool:
     items = load_setpoints()
     for s in items:
         if s["id"] == sp_id:
             if name is not None:
                 s["name"] = name.strip()[:60] or s["name"]
+            if icon is not None and 0 < len(icon.strip()) <= 12:
+                s["icon"] = icon.strip()
             _save_setpoints(items)
             return True
     return False
@@ -1044,7 +1046,7 @@ def add_locks(ids: list[str]) -> list[dict]:
     return added
 
 
-def update_lock(lid: str, name: str | None = None, allow_open: bool | None = None) -> bool:
+def update_lock(lid: str, name: str | None = None, allow_open: bool | None = None, icon: str | None = None) -> bool:
     items = load_locks()
     for x in items:
         if x["id"] == lid:
@@ -1052,6 +1054,8 @@ def update_lock(lid: str, name: str | None = None, allow_open: bool | None = Non
                 x["name"] = name.strip()[:60]
             if allow_open is not None:
                 x["allow_open"] = bool(allow_open)
+            if icon is not None and 0 < len(icon.strip()) <= 12:
+                x["icon"] = icon.strip()
             _save_locks(items)
             return True
     return False

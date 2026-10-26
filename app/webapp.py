@@ -3514,9 +3514,8 @@ def automation_log_page():
 
 @app.route("/rules-log")
 def rules_log_page():
-    """Logbuch der Regeln (eigene Seite)."""
-    return render_template("automation_log.html", module="rules", log_title="Logbuch – Regeln",
-                           log_hint="Jede Schalt-Aktion der Regeln.", back_url="/rules", back_label="zu den Regeln")
+    """Das Regel-Logbuch gibt es nicht mehr als eigene Seite: alles steht im allgemeinen Logbuch (Smart Home -> Logbuch, Kategorie Regeln). Alte Lesezeichen leiten dorthin."""
+    return redirect("/smarthome#logbuch")
 
 
 @app.route("/api/automation", methods=["POST"])
@@ -5318,6 +5317,31 @@ def api_perf():
     return jsonify(perf.snapshot())
 
 
+def _devlog_icons() -> dict:
+    """ref -> (Symbol, Art): das Symbol, das fuer das Ding eingestellt ist (nur Administratoren sehen das Logbuch); Sensoren liefern ihre Art fuer das Standardsymbol."""
+    out: dict = {}
+    try:
+        for d in shelly.load_devices():
+            out["device:" + d["id"]] = (d.get("icon"), None)
+        for s in homematic.load_sensors():
+            out["sensor:" + s["id"]] = (s.get("icon"), s.get("kind"))
+        for v in virtual.load():
+            out["virtual:" + v["id"]] = (v.get("icon"), None)
+        for w in wol.load():
+            out["wol:" + w["id"]] = (w.get("icon"), None)
+        for x in homematic.load_blinds():
+            out["blind:" + x["id"]] = (x.get("icon"), None)
+        for x in homematic.load_sounds():
+            out["sound:" + x["id"]] = (x.get("icon"), None)
+        for x in homematic.load_setpoints():
+            out["setpoint:" + x["id"]] = (x.get("icon"), None)
+        for x in homematic.load_locks():
+            out["lock:" + x["id"]] = (x.get("icon"), None)
+    except Exception as e:                                         # noqa: BLE001
+        log.warning("Logbuch-Symbole: %s", e)
+    return out
+
+
 @app.route("/api/devicelog", methods=["GET"])
 def api_devicelog():
     """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Nur Administratoren (normale Benutzer sehen nur den Zustand)."""
@@ -5332,7 +5356,12 @@ def api_devicelog():
         limit = min(500, max(1, int(request.args.get("limit", 200))))
     except ValueError:
         limit = 200
-    return jsonify(entries=devicelog.recent(limit, cat, request.args.get("q"), _devlog_allow()))
+    icons = _devlog_icons()
+    entries = []
+    for e in devicelog.recent(limit, cat, request.args.get("q"), _devlog_allow()):
+        ic, kind = icons.get(e.get("ref", ""), (None, None))
+        entries.append({**e, "icon": ic, "skind": kind})            # aktuelles Symbol des Dings (wie in den Listen eingestellt), nicht das beim Schreiben
+    return jsonify(entries=entries)
 
 
 @app.route("/api/devicelog/last", methods=["GET"])
@@ -5374,8 +5403,11 @@ def api_lock_modify(lid):
             rules.remove_device(lid)
     else:
         body = request.get_json(silent=True) or {}
+        icon = body.get("icon") if isinstance(body.get("icon"), str) else None
+        if icon is not None and icon not in shelly.ICONS:
+            return jsonify(error="Unbekanntes Symbol"), 400
         ok = homematic.update_lock(lid, name=body.get("name") if isinstance(body.get("name"), str) else None,
-                                   allow_open=body.get("allow_open") if isinstance(body.get("allow_open"), bool) else None)
+                                   allow_open=body.get("allow_open") if isinstance(body.get("allow_open"), bool) else None, icon=icon)
         if ok and body.get("allow_open") is False:                 # Freigabe entzogen: Regeln mit Entriegeln/Oeffnen fuer dieses Schloss ausschalten
             items = rules.list_rules()
             changed = False
@@ -5601,7 +5633,10 @@ def api_setpoint_modify(sp_id):
         err = _vis_set("setpoint", sp_id, body)
         if err:
             return err
-        ok = homematic.update_setpoint(sp_id, name=body.get("name"))
+        icon = body.get("icon") if isinstance(body.get("icon"), str) else None
+        if icon is not None and icon not in shelly.ICONS:
+            return jsonify(error="Unbekanntes Symbol"), 400
+        ok = homematic.update_setpoint(sp_id, name=body.get("name"), icon=icon)
     return jsonify(ok=True) if ok else (jsonify(error="nicht gefunden"), 404)
 
 

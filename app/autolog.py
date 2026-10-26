@@ -23,6 +23,12 @@ def log(module: str, text: str, dev: str = "", action: str = "", dry: bool = Fal
     if module not in PATHS:
         raise ValueError(module)
     row = {"ts": (now or datetime.now()).isoformat(timespec="milliseconds"), "dev": dev, "action": action, "text": text, "dry": bool(dry), "rule": rule}
+    if module == "rules":                                   # Regeln haben kein eigenes Logbuch mehr: ihre Ereignisse stehen im allgemeinen Geraete-Logbuch (Kategorie "Regeln")
+        try:
+            import devicelog
+            devicelog.log("regel", "rule:" + str(rule or ""), dev or "Regel", text, action != "fail", by="Regel (Trockenlauf)" if dry else "Regel")
+        except Exception:                                  # noqa: BLE001 - das Logbuch darf die Steuerung nie stoeren
+            pass
     with _lock:
         path = PATHS[module]
         try:

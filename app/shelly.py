@@ -48,6 +48,10 @@ ICONS = [
          "🪫", "🔭", "🧲", "🖲️", "🕰️", "🧪", "🪞", "🚽", "🧻", "🪠", "🚨", "🔑",
          # Post, Ton, Anzeigen, Tageszeiten
          "📪", "📬", "📊", "📈", "📉", "🔈", "🔇", "🔉", "🔕", "📢", "🆘", "🌅", "🌄", "💦"]
+# Alles, was irgendwo sonst als Vorschlag stand (Sensoren, eigene Schalter, Personen ...): JEDES Symbol steht bei JEDEM Ding zur Wahl (Aktor, Sensor, Schalter, Rechner, Thermostat, Schloss)
+ICONS += ["🏃", "🧍", "🚶", "👀", "🏷️", "⏱️", "👤", "👥", "👨", "👩", "🧑", "👴", "👵", "👧", "👦", "🏢", "📨", "🔐", "✈️", "📟", "🐕", "🐈", "🚦", "🚥", "🪑", "🛡️", "👁️", "🧭",
+          "🌤️", "⛅", "🌈", "⚙️", "🔬", "🧯", "🧱", "🪜", "🛗", "🚒", "🚑", "📞", "☎️"]
+ICONS[:] = list(dict.fromkeys(ICONS))
 DEFAULT_ICON = ICONS[0]
 
 PROBE_TIMEOUT = 0.8      # Subnetz-Scan (LAN-Antwort < 100 ms)
