@@ -193,7 +193,7 @@ Das Dashboard zeigt den Zustand der Anlage und erlaubt Eingriffe. Die Live-Kache
 | **Sensoren (Smart Home)** | Fenster/Tür, Bewegung, Temperatur usw. – grün/rot bzw. Messwert. |
 | **Ersparnis** | Was PV, Akku und Steuerung gegenüber „alles aus dem Netz“ sparen. |
 | **Ladeplan-Simulation (Test)** | Vorschlag des EMS-Planers im Vergleich – steuert nichts. |
-| **Wetter** | Vorhersage für den Standort (nur Anzeige). |
+| **Wetter** | Vorhersage für den Standort (nur Anzeige): jetzt, nächste 24 Stunden und 7 Tage – mit **UV-Index** (aktuell, stündlich ab UV 1 und als Tagesmaximum; farbig nach WHO: niedrig 0–2, mäßig 3–5, hoch 6–7, sehr hoch 8–10, extrem ab 11; ab UV 3 Sonnenschutz empfohlen). |
 
 **Kacheln bedienen**
 

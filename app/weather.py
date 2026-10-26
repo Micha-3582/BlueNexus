@@ -116,6 +116,14 @@ def _hhmm(iso: str | None) -> str:
     return iso[11:16] if iso and len(iso) >= 16 else ""
 
 
+def _uv(v) -> float | None:
+    """UV-Index (0 = keiner, ab 3 Sonnenschutz) auf eine Nachkommastelle; None, wenn nicht geliefert."""
+    try:
+        return None if v is None else round(max(0.0, float(v)), 1)
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse(raw: dict, name: str) -> dict:
     cur, hr, dy = raw.get("current") or {}, raw.get("hourly") or {}, raw.get("daily") or {}
     if "temperature_2m" not in cur:
@@ -125,10 +133,12 @@ def _parse(raw: dict, name: str) -> dict:
     current = {"temp": round(cur["temperature_2m"], 1), "feels": round(cur.get("apparent_temperature", cur["temperature_2m"]), 1),
                "text": text, "icon": icon, "humidity": cur.get("relative_humidity_2m"), "cloud": cur.get("cloud_cover"),
                "wind": round(cur.get("wind_speed_10m") or 0), "wind_dir": compass(cur.get("wind_direction_10m")),
-               "precip": cur.get("precipitation") or 0.0}
+               "precip": cur.get("precipitation") or 0.0, "uv": _uv(cur.get("uv_index"))}
     times = hr.get("time") or []
     now_h = (cur.get("time") or "")[:13]                 # "YYYY-MM-DDTHH" in der Ortszeit des Standorts
     start = next((i for i, t in enumerate(times) if t[:13] >= now_h), 0)
+    if current["uv"] is None:                            # kein aktueller Wert: UV-Index der laufenden Stunde
+        current["uv"] = _uv((hr.get("uv_index") or [None] * (start + 1))[start] if start < len(hr.get("uv_index") or []) else None)
     hourly = []
     for i in range(start, min(start + 24, len(times))):
         t = times[i]
@@ -139,6 +149,7 @@ def _parse(raw: dict, name: str) -> dict:
                        "pop": (hr.get("precipitation_probability") or [None] * len(times))[i],
                        "precip": (hr.get("precipitation") or [0] * len(times))[i],
                        "cloud": (hr.get("cloud_cover") or [None] * len(times))[i],
+                       "uv": _uv((hr.get("uv_index") or [None] * len(times))[i]),
                        "wind": round((hr.get("wind_speed_10m") or [0] * len(times))[i] or 0)})
     daily = []
     for i, d in enumerate(dy.get("time") or []):
@@ -151,7 +162,8 @@ def _parse(raw: dict, name: str) -> dict:
                       "wind": round((dy.get("wind_speed_10m_max") or [0] * (i + 1))[i] or 0),
                       "sunrise": _hhmm((dy.get("sunrise") or [None] * (i + 1))[i]),
                       "sunset": _hhmm((dy.get("sunset") or [None] * (i + 1))[i]),
-                      "sun_h": round(sun_s / 3600, 1) if sun_s is not None else None})
+                      "sun_h": round(sun_s / 3600, 1) if sun_s is not None else None,
+                      "uv": _uv((dy.get("uv_index_max") or [None] * (i + 1))[i])})
     return {"current": current, "hourly": hourly, "daily": daily, "name": name}
 
 
@@ -165,9 +177,9 @@ def forecast(force: bool = False) -> dict:
         if not force and _cache["key"] == key and time.time() < _cache["until"] and _cache["data"]:
             return _cache["data"]
     params = {"latitude": loc["lat"], "longitude": loc["lon"], "timezone": "auto", "forecast_days": 7, "wind_speed_unit": "kmh",
-              "current": "temperature_2m,apparent_temperature,relative_humidity_2m,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m",
-              "hourly": "temperature_2m,precipitation_probability,precipitation,weather_code,cloud_cover,wind_speed_10m",
-              "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,sunshine_duration"}
+              "current": "temperature_2m,apparent_temperature,relative_humidity_2m,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index",
+              "hourly": "temperature_2m,precipitation_probability,precipitation,weather_code,cloud_cover,wind_speed_10m,uv_index",
+              "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,sunshine_duration,uv_index_max"}
     try:
         r = requests.get(FORECAST_URL, params=params, timeout=TIMEOUT)
         r.raise_for_status()

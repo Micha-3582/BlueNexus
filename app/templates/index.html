@@ -1909,22 +1909,27 @@ async function loadWeather() {
   card.hidden = false;
   renderWeather();
 }
+/* UV-Index nach WHO: 0-2 niedrig, 3-5 maessig, 6-7 hoch, 8-10 sehr hoch, ab 11 extrem (ab 3 Sonnenschutz) */
+const UV_LEVELS = [[3, 'niedrig', '#35c07a'], [6, 'mäßig', '#f0b429'], [8, 'hoch', '#f48c24'], [11, 'sehr hoch', '#e5544a'], [99, 'extrem', '#b57bee']];
+const uvLevel = v => UV_LEVELS.find(l => v < l[0]);
+const uvTxt = (v, label) => { if (v == null) return ''; const l = uvLevel(v); return `<span style="color:${l[2]};font-weight:600" title="UV-Index ${String(v).replace('.', ',')} – ${l[1]}${v >= 3 ? ' (Sonnenschutz empfohlen)' : ''}">UV ${Math.round(v)}${label ? ' (' + l[1] + ')' : ''}</span>`; };
 function renderWeather() {
   const w = wxData, c = w.current;
   $('wx-place').textContent = w.name || 'Wetter';
   $('wx-temp').textContent = c.temp.toFixed(0) + ' °C';
   $('wx-text').textContent = c.text;
   $('wx-icon').textContent = c.icon;
-  $('wx-sub').textContent = `gefühlt ${c.feels.toFixed(0)} °C · Wind ${c.wind} km/h ${c.wind_dir}` + (c.humidity != null ? ` · ${c.humidity} % Luftfeuchte` : '');
+  $('wx-sub').innerHTML = escH(`gefühlt ${c.feels.toFixed(0)} °C · Wind ${c.wind} km/h ${c.wind_dir}` + (c.humidity != null ? ` · ${c.humidity} % Luftfeuchte` : '')) + (c.uv != null && c.uv > 0 ? ' · ' + uvTxt(c.uv, true).replace('UV ', 'UV-Index ') : '');
+  const anyUv = (w.hourly || []).some(h => h.uv != null && h.uv >= 1);        // UV-Zeile nur zeigen, wenn es in den naechsten 24 Stunden UV gibt (alle Kacheln gleich hoch)
   $('wx-hours').innerHTML = (w.hourly || []).map((h, i) => `<div class="h"><div class="muted">${i === 0 ? 'Jetzt' : pad(h.hour) + ' Uhr'}</div>
     <div class="i">${h.icon}</div><div class="t">${h.temp}°</div>
-    <div class="muted">${h.pop != null ? '💧' + h.pop + ' %' : ''}</div></div>`).join('');
+    <div class="muted">${h.pop != null ? '💧' + h.pop + ' %' : ''}</div>${anyUv ? `<div class="muted" style="font-size:11px;min-height:15px">${h.uv != null && h.uv >= 1 ? uvTxt(h.uv) : ''}</div>` : ''}</div>`).join('');
   const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   $('wx-days').innerHTML = (w.daily || []).map((d, i) => {
     const dt = new Date(d.date + 'T00:00');
     return `<div class="d"><div><b>${i === 0 ? 'Heute' : WD[dt.getDay()] + ' ' + pad(dt.getDate()) + '.'}</b></div><div>${d.icon}</div>
       <div><b>${d.tmax}°</b> <span class="muted">/ ${d.tmin}°</span></div>
-      <div class="m">${d.pop != null ? '💧 ' + d.pop + ' % · ' : ''}${d.precip} mm · 💨 ${d.wind} km/h${d.sun_h != null ? ' · ☀︎ ' + d.sun_h + ' h' : ''}${d.sunrise ? ' · ↑' + d.sunrise + ' ↓' + d.sunset : ''}</div></div>`;
+      <div class="m">${d.pop != null ? '💧 ' + d.pop + ' % · ' : ''}${d.precip} mm · 💨 ${d.wind} km/h${d.sun_h != null ? ' · ☀︎ ' + d.sun_h + ' h' : ''}${d.uv != null && d.uv > 0 ? ' · ' + uvTxt(d.uv) : ''}${d.sunrise ? ' · ↑' + d.sunrise + ' ↓' + d.sunset : ''}</div></div>`;
   }).join('');
   $('wx-foot').textContent = (w.error ? '⚠ ' + w.error + ' · ' : '') + 'Daten: Open-Meteo' + (w.updated ? ' · Stand ' + w.updated.slice(11, 16) + ' Uhr' : '');
 }
