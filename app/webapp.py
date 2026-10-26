@@ -36,6 +36,7 @@ import surplus
 import tuya
 import devicelog
 import homematic
+import perf
 import midea
 import verlauf
 import zigbee
@@ -2232,6 +2233,7 @@ demo_sim.activate()                                            # Demo-Modus (BLU
 demo_sim.seed_favorites(users)                                  # Demo: feste erfundene Favoriten (Kachel 'Favoriten')
 
 ctrl = Controller()
+perf.install()                                                  # Geschwindigkeits-Messung (Fehlersuche), nur im Speicher
 devicelog.install()                                            # Geraete-Logbuch: Schaltvorgaenge und Sensor-Wechsel mitschreiben
 
 
@@ -5195,6 +5197,30 @@ def _devlog_allow():
             return lock_ok
         return i in ok_ids.get("shelly" if kind == "device" else kind, set())          # Referenz "device:" = Register der Geraete ("shelly")
     return allow
+
+
+@app.before_request
+def _perf_start():
+    g._perf_t0 = time.perf_counter()
+
+
+@app.after_request
+def _perf_end(resp):
+    t0 = getattr(g, "_perf_t0", None)
+    if t0 is not None and not request.path.startswith("/static/") and not resp.direct_passthrough:        # Datenstroeme (Kamerabild) nicht mitzaehlen
+        perf.note_request(request.endpoint or "", request.path, (time.perf_counter() - t0) * 1000)
+    return resp
+
+
+@app.route("/api/perf", methods=["GET", "POST"])
+def api_perf():
+    """Messwerte zur Geschwindigkeit (nur Administratoren, da nicht in ENDPOINT_AREA): GET = Auswertung, POST = zuruecksetzen."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    if request.method == "POST":
+        perf.reset()
+    return jsonify(perf.snapshot())
 
 
 @app.route("/api/devicelog", methods=["GET"])

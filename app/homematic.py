@@ -1628,6 +1628,20 @@ def push_active() -> bool:
     return any(st.get("ok") and now - st.get("ts", 0) < 3 * PUSH_CYCLE_S for st in _push_state.values())
 
 
+_LOG_KEYS = ("STATE", "MOTION", "LOCK_STATE", "PRESENCE_DETECTION_STATE", "PRESS_SHORT", "PRESS_LONG", "PRESS_LONG_RELEASE")
+
+
+def _push_log(iface: str, address: str, key: str) -> None:
+    """Meldung der CCU zu einem Ja/Nein-Sensor: Wert lesen (kommt frisch aus dem Push-Speicher, ohne Aufruf bei der CCU), damit das Geraete-Logbuch den Wechsel gleich kennt."""
+    try:
+        for s in load_sensors():
+            if s.get("binary") and s.get("address") == address and s.get("datapoint") == key and s.get("source") not in ("zigbee", "camera", "remote"):
+                _value_cache.pop(s["id"], None)
+                read_sensor(s)
+    except Exception:                                         # noqa: BLE001
+        pass
+
+
 def _on_event(interface_id, address, key, value):
     global _events_seen, _last_wake, _edge_seq
     iface = str(interface_id)
@@ -1644,6 +1658,8 @@ def _on_event(interface_id, address, key, value):
         _recent_events.append((now, iface, address, key, value))
         del _recent_events[:-RECENT_EVENTS_MAX]
     base = address.split(":")[0]
+    if key in _LOG_KEYS:
+        threading.Thread(target=_push_log, args=(iface, address, key), daemon=True).start()          # Wechsel von Fenster/Tuer/Bewegung/Schloss gleich ins Geraete-Logbuch
     if key == "UNREACH":
         _unreach_cache[(iface, base)] = (now + PUSH_VALUE_TTL_S, _truthy(value))
     if base in _watch and key not in NOISY_KEYS:

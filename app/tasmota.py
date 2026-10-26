@@ -8,6 +8,7 @@ Passwortgeschuetzte Geraete (WebPassword) werden per HTTP-Basic-Auth (Benutzer "
 from __future__ import annotations
 
 import re
+import threading
 import time
 
 import requests
@@ -147,6 +148,8 @@ _METRICS = {"Temperature": ("temperature", "Temperatur", "°C"), "Humidity": ("h
             "Power": ("power", "Leistung", "W")}
 _sns_cache: dict = {}                            # IP -> (gueltig bis, StatusSNS) - mehrere Sensoren eines Geraets kosten nur eine Abfrage
 SNS_TTL_S = 4.0
+SNS_FAIL_TTL_S = 20.0                            # nicht erreichbar: so lange nicht neu versuchen (sonst wartet jede Abfrage der Sensorliste 3 s auf die Zeitueberschreitung)
+_sns_locks: dict = {}
 
 
 def _numbers(sns: dict) -> dict:
@@ -181,14 +184,19 @@ def sensor_metrics(ip: str, timeout: float = CALL_TIMEOUT, auth=None) -> dict:
 
 def read_metric(ip: str, datapoint: str, auth=None):
     """Aktueller Wert eines Messpunkts oder None (Geraet weg/Wert nicht mehr gemeldet)."""
-    now = time.time()
     hit = _sns_cache.get(ip)
-    if hit and hit[0] > now:
+    if hit and hit[0] > time.time():
         vals = hit[1]
     else:
-        try:
-            vals = sensor_metrics(ip, CALL_TIMEOUT, auth)
-        except TasmotaError:
-            vals = None
-        _sns_cache[ip] = (now + SNS_TTL_S, vals)
+        lk = _sns_locks.setdefault(ip, threading.Lock())
+        with lk:                                                # mehrere Fuehler/Anfragen gleichzeitig: nur EINE Abfrage ans Geraet, die anderen nehmen ihr Ergebnis
+            hit = _sns_cache.get(ip)
+            if hit and hit[0] > time.time():
+                vals = hit[1]
+            else:
+                try:
+                    vals = sensor_metrics(ip, CALL_TIMEOUT, auth)
+                except TasmotaError:
+                    vals = None
+                _sns_cache[ip] = (time.time() + (SNS_TTL_S if vals is not None else SNS_FAIL_TTL_S), vals)
     return None if vals is None else vals.get(datapoint)

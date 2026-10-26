@@ -573,7 +573,14 @@ _fetch_locks: dict[str, threading.Lock] = {}
 def fetch(source_id: str, force: bool = False) -> tuple[list[dict] | None, str | None]:
     """(Eintraege, Fehlertext) der Quelle - mit kurzem Zwischenspeicher, damit viele Geraete nur eine Abfrage ausloesen."""
     lk = _fetch_locks.setdefault(source_id, threading.Lock())
-    with lk:
+    hit = _cache.get(source_id)
+    if hit and not force and time.time() - hit[0] < (FAIL_TTL_S if hit[2] else CACHE_TTL_S):
+        return hit[1], hit[2]
+    if not lk.acquire(blocking=False):                         # eine andere Anfrage holt gerade neue Daten (kann bei langsamer Quelle Sekunden dauern):
+        if hit:                                                # nicht darauf warten, sondern den letzten Stand zeigen
+            return hit[1], hit[2]
+        lk.acquire()                                           # noch nichts da: auf die laufende Abfrage warten
+    try:
         hit = _cache.get(source_id)
         if hit and not force and time.time() - hit[0] < (FAIL_TTL_S if hit[2] else CACHE_TTL_S):
             return hit[1], hit[2]
@@ -585,6 +592,8 @@ def fetch(source_id: str, force: bool = False) -> tuple[list[dict] | None, str |
             _cache[source_id] = (time.time(), None, str(e))
         h = _cache[source_id]
         return h[1], h[2]
+    finally:
+        lk.release()
 
 
 def _item(source_id: str, ref: str) -> tuple[dict | None, str | None]:

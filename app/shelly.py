@@ -14,6 +14,7 @@ import os
 import re
 import socket
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -752,8 +753,28 @@ def _auth(d: dict):
     return (d.get("user"), d.get("password")) if d.get("password") else None
 
 
+_down: dict = {}                       # Geraete-ID -> (Ruhe bis, letzter Offline-Zustand): kurz nicht neu versuchen
+DOWN_BACKOFF_S = 12.0
+
+
 def status(d: dict) -> dict:
-    """{'online': bool, 'on': bool|None, 'power': W|None}"""
+    """{'online': bool, 'on': bool|None, 'power': W|None}. Ein Geraet, das gerade nicht geantwortet hat, wird fuer DOWN_BACKOFF_S Sekunden nicht erneut
+    abgefragt (sonst wartet JEDER Abruf - Dashboard, Geraeteliste, Regeln - jedes Mal die ganze Zeitueberschreitung ab)."""
+    key = d.get("id")
+    hit = _down.get(key)
+    if hit and hit[0] > time.time():
+        return dict(hit[1])
+    st = _status_live(d)
+    if key is not None:
+        if st.get("online") is False:
+            _down[key] = (time.time() + DOWN_BACKOFF_S, dict(st))
+        else:
+            _down.pop(key, None)
+    return st
+
+
+def _status_live(d: dict) -> dict:
+    """Fragt das Geraet wirklich ab."""
     if d.get("kind") == "remote":                          # geteiltes Geraet einer fremden BlueNexus-Instanz (share.py)
         import share
         return share.status(d)
@@ -791,6 +812,7 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     d = _find(dev_id)
     if not d:
         raise ShellyError("Gerät nicht gefunden")
+    _down.pop(dev_id, None)                                  # wer schaltet, will den echten Zustand sehen: Ruhezeit nach einem Offline-Befund aufheben
     if d.get("switchable") is False:
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
     if d.get("kind") == "remote":

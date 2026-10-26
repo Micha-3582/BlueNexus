@@ -96,23 +96,38 @@ def _trim_locked() -> None:
     os.replace(tmp, PATH)
 
 
-def _read_lines() -> list[str]:
+_cache: dict = {"key": None, "rows": []}
+
+
+def _rows() -> list[dict]:
+    """Alle Eintraege (alt -> neu), nur neu eingelesen, wenn sich die Datei geaendert hat (Abfragen der Seite kosten sonst jedes Mal das ganze Parsen)."""
     try:
-        with _lock, open(PATH, encoding="utf-8") as f:
-            return f.readlines()
+        st = os.stat(PATH)
     except OSError:
         return []
+    key = (st.st_mtime_ns, st.st_size)
+    with _lock:
+        if _cache["key"] == key:
+            return _cache["rows"]
+        rows = []
+        try:
+            with open(PATH, encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        rows.append(json.loads(line))
+                    except ValueError:
+                        continue
+        except OSError:
+            return []
+        _cache["key"], _cache["rows"] = key, rows
+        return rows
 
 
 def recent(limit: int = 200, cat: str | None = None, q: str | None = None, allow=None) -> list[dict]:
     """Neueste zuerst. allow(ref) -> bool filtert nach Sichtbarkeit fuer das Konto; cat = Kategorie; q = Suchtext (Name, Text, wer)."""
     out: list[dict] = []
     q = (q or "").strip().lower()
-    for line in reversed(_read_lines()):
-        try:
-            e = json.loads(line)
-        except ValueError:
-            continue
+    for e in reversed(_rows()):
         if cat and e.get("cat") != cat:
             continue
         if allow is not None and not allow(e.get("ref", "")):
@@ -125,21 +140,23 @@ def recent(limit: int = 200, cat: str | None = None, q: str | None = None, allow
     return out
 
 
+_last_cache: dict = {"key": None, "map": {}}
+
+
 def last_map(allow=None) -> dict:
-    """{ref: letztes Ereignis} - fuer den Hinweis "zuletzt ..." in den Listen."""
-    out: dict = {}
-    for line in reversed(_read_lines()):
-        try:
-            e = json.loads(line)
-        except ValueError:
-            continue
-        r = e.get("ref", "")
-        if not r or r in out or e.get("cat") == "sensor":
-            continue
-        if allow is not None and not allow(r):
-            continue
-        out[r] = {"ts": e.get("ts"), "text": e.get("text"), "by": e.get("by"), "ok": e.get("ok", True)}
-    return out
+    """{ref: letztes Ereignis} - fuer den Hinweis "zuletzt ..." in den Listen (je Dateistand nur einmal berechnet)."""
+    rows = _rows()
+    key = (id(rows), len(rows))
+    if _last_cache["key"] != key:
+        full: dict = {}
+        for e in reversed(rows):
+            r = e.get("ref", "")
+            if not r or r in full or e.get("cat") == "sensor":
+                continue
+            full[r] = {"ts": e.get("ts"), "text": e.get("text"), "by": e.get("by"), "ok": e.get("ok", True)}
+        _last_cache["key"], _last_cache["map"] = key, full
+    full = _last_cache["map"]
+    return {r: v for r, v in full.items() if allow is None or allow(r)}
 
 
 # ---------------------------------------------------------------- Einhaengen in die Schalt-Funktionen

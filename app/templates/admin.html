@@ -802,6 +802,13 @@
   <div id="devlog-list" style="display:flex;flex-direction:column;gap:4px"></div>
 </div>
 
+<div class="card admin-only msg-host" id="fam-perf" data-tab="sonstiges">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 12l5-5"/></svg>Geschwindigkeit (Fehlersuche) <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, wo die App Zeit verliert: welche Seitenabrufe langsam waren und welche Gegenstellen (Geräte, CCU, Cloud, andere Anlagen) langsam oder gar nicht antworten. Die Zahlen gelten seit dem letzten Start der App und liegen nur im Speicher.">?</span></h2>
+  <div class="sub">Wo hängt es? Langsame Seitenabrufe und langsame Gegenstellen seit dem letzten Start der App.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="ghost" id="perf-load">Messwerte anzeigen</button><button class="ghost" id="perf-reset">Zurücksetzen</button></div>
+  <div id="perf-out" style="margin-top:12px"></div>
+</div>
+
 <div class="card fam-card msg-host" id="fam-sensors" data-tab="sensoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Sensoren <span class="qhelp" role="button" tabindex="0" data-help="Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Helligkeit und Leistung. In <a href=&quot;/rules&quot;>Regeln</a> als Bedingung nutzbar („Sensor wahr/falsch“ bzw. „unter/über“).">?</span></h2>
   <div class="sub">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
@@ -2319,6 +2326,19 @@ function devFmtWhen(ts) {
 }
 const lastTxt = ref => { const e = window.DEVLAST[ref]; return e ? ` · zuletzt ${e.ok === false ? 'Fehler beim Schalten' : escH(e.text)} ${devFmtWhen(e.ts)}${e.by && e.by !== 'System' ? ' (' + escH(String(e.by).replace(/^Konto „(.*)“$/, '$1')) + ')' : ''}` : ''; };
 async function loadDevLast() { try { const j = await (await fetch('/api/devicelog/last', { cache: 'no-store' })).json(); if (j && !j.error) window.DEVLAST = j; } catch (e) { /* ohne Hinweis */ } }
+async function loadPerf(reset) {
+  const out = document.getElementById('perf-out'); if (!out) return;
+  let j; try { j = await shellyApi('/api/perf', reset ? 'POST' : 'GET'); } catch (e) { out.textContent = e.message; return; }
+  const ms = v => v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + ' s' : v + ' ms';
+  const tbl = (head, rows) => rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px"><tr>${head.map(h => `<th style="text-align:left;padding:4px 8px 4px 0" class="muted">${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td style="padding:3px 8px 3px 0;border-top:1px solid var(--border)">${c}</td>`).join('')}</tr>`).join('')}</table>` : '<div class="muted">Noch nichts gemessen.</div>';
+  const since = new Date(j.since * 1000).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  out.innerHTML = `<div class="muted" style="margin-bottom:8px">Messung seit ${escH(since)}</div>
+    <b>Gegenstellen (Geräte, CCU, Cloud) – langsamste zuerst</b>${tbl(['Adresse', 'Aufrufe', 'Ø', 'Max', 'Fehler', 'langsam'], j.outbound.map(o => [escH(o.host), o.count, ms(o.avg_ms), ms(o.max_ms), o.errors ? `<span style="color:#e5544a">${o.errors}</span>` : '0', o.slow]))}
+    <div style="height:10px"></div><b>Seitenabrufe der App – mit den meisten langsamen zuerst</b>${tbl(['Abruf', 'Aufrufe', 'Ø', 'Max', 'langsam (≥ 1 s)'], j.endpoints.map(o => [escH(o.name), o.count, ms(o.avg_ms), ms(o.max_ms), o.slow]))}
+    <div style="height:10px"></div><b>Letzte langsame Vorgänge</b>${tbl(['Wann', 'Art', 'Was', 'Dauer'], j.slow.map(o => [escH(new Date(o.ts * 1000).toLocaleTimeString('de-DE')), escH(o.kind), escH(o.what) + (o.ok ? '' : ' <span style="color:#e5544a">(Fehler)</span>'), ms(o.ms)]))}`;
+}
+document.getElementById('perf-load')?.addEventListener('click', () => loadPerf(false));
+document.getElementById('perf-reset')?.addEventListener('click', () => loadPerf(true));
 let devLastAt = Date.now();
 window.DEVLAST_P = loadDevLast();
 function devLastFresh() {                                               // beim Neuzeichnen einer Liste die "zuletzt"-Hinweise auffrischen (hoechstens alle 4 s)
@@ -2341,7 +2361,7 @@ document.getElementById('devlog-cat')?.addEventListener('change', loadDevLog);
 document.getElementById('devlog-reload')?.addEventListener('click', () => { loadDevLog(); loadDevLast(); });
 let devlogTimer = null;
 document.getElementById('devlog-q')?.addEventListener('input', () => { clearTimeout(devlogTimer); devlogTimer = setTimeout(loadDevLog, 350); });
-setInterval(() => { const c = document.getElementById('fam-devlog'); if (c && c.offsetParent !== null && document.activeElement !== document.getElementById('devlog-q')) loadDevLog(); }, 15000);
+setInterval(() => { const c = document.getElementById('fam-devlog'); if (c && c.offsetParent !== null && !document.hidden && document.activeElement !== document.getElementById('devlog-q')) loadDevLog(); }, 3000);
 loadDevLog();
 function applyFamilies(f) {
   const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar

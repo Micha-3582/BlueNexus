@@ -421,6 +421,12 @@ Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B.
 
 **Von Hand einstellen:** In der Liste unter *Smart Home → Thermostate* zeigt jedes Thermostat die aktuelle Solltemperatur mit **−** und **+** (Schritte von 0,5 °C) und einem **Regler** (ganz links die kälteste Stufe, ganz rechts die wärmste). Die Änderung wird kurz nach dem letzten Tippen bzw. beim Loslassen des Reglers an das Thermostat geschickt, und eine Meldung bestätigt den Wert. Das Einstellen braucht das Recht **Dashboard: Schreiben**; wer nur lesen darf, sieht die Temperatur ohne Bedienelemente. **Wer welches Thermostat sieht und einstellen darf**, legt der Administrator hinter dem **Stift ✎ → Sichtbarkeit** fest (bei Thermostaten, die du neu anlegst, zunächst nur Administratoren; schon vorhandene bleiben für alle sichtbar). Eine Regel kann den Wert später wieder überschreiben. **Teilen:** Thermostate lassen sich wie Geräte mit anderen BlueNexus-Anlagen teilen (✎ → Teilen-Symbol; „nur sehen“ oder „sehen & bedienen“). Wer sie holt, sieht sie mit Vermerk „von …“, stellt die Temperatur genauso ein und kann sie in Regeln nutzen; der Geber setzt den Wert mit seinem eigenen Zugang (die CCU braucht nur er).
 
+### Geschwindigkeit prüfen (Fehlersuche)
+
+*Smart Home → Sonstiges → „Geschwindigkeit (Fehlersuche)“, nur Administratoren.*
+
+Wirkt die App träge, zeigt **Messwerte anzeigen**, wo die Zeit bleibt: oben die **Gegenstellen** (Geräte, CCU, Cloud, andere BlueNexus-Anlagen) mit Aufrufen, Durchschnitt, Maximum und **Fehlern** – eine Adresse mit mehreren Sekunden oder vielen Fehlern ist der Bremsklotz –, darunter die **Seitenabrufe der App** und die **letzten langsamen Vorgänge**. Die Zahlen gelten seit dem letzten Start und liegen nur im Speicher; **Zurücksetzen** beginnt von vorn. Die App wartet außerdem nicht mehr auf Geräte, die gerade nicht antworten: Ein offline gemeldetes Gerät wird 12 Sekunden lang nicht erneut abgefragt, geteilte Quellen zeigen bei langsamer Antwort den letzten Stand, und gleichzeitige Abfragen desselben Tasmota-Geräts werden zu einer zusammengefasst.
+
 ### Logbuch der Geräte
 
 *Smart Home → Logbuch.*
