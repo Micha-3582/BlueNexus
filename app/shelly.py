@@ -914,6 +914,33 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     return status(d)
 
 
+def tasmota_hook_set(dev_id: str, base: str | None) -> dict:
+    """Meldung von Schaltvorgaengen (z. B. Lichtschranke, Taster am Geraet) ein-/ausschalten. base = "IP:Port" von BlueNexus im Heimnetz (None = ausschalten).
+    Gilt fuer alle Relaiskanaele desselben Geraets."""
+    import secrets
+    items = load_devices()
+    d = next((x for x in items if x["id"] == dev_id), None)
+    if not d or d.get("kind") != "tasmota":
+        raise ShellyError("Das geht nur bei Tasmota-Geräten")
+    same = [x for x in items if x.get("kind") == "tasmota" and x.get("mac") == d.get("mac")]
+    try:
+        if base is None:
+            tasmota.hook_disable(d)
+            for x in same:
+                x.pop("hook", None)
+        else:
+            token = d.get("hook_token") or secrets.token_urlsafe(12)
+            tasmota.hook_enable(d, d["mac"], sorted(int(x.get("channel") or 1) for x in same), base, token)
+            for x in same:
+                x["hook"], x["hook_token"] = True, token
+    except tasmota.TasmotaError as e:
+        raise ShellyError(f"Das Gerät hat die Einstellung abgelehnt: {e}")
+    except requests.RequestException as e:
+        raise ShellyError(f"Gerät nicht erreichbar: {e.__class__.__name__}")
+    _save(items)
+    return {"hook": base is not None}
+
+
 def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None) -> list[dict]:
     """Angelegte Geraete inkl. Live-Status (parallel abgefragt). Ohne Passwort.
     only_shown: nur die fuers Dashboard freigegebenen (Reihenfolge wie gespeichert).
@@ -931,7 +958,7 @@ def list_with_status(only_shown: bool = False, ids: set | None = None, live: boo
         states = [{} for _ in items]
     out = []
     for d, st in zip(items, states):
-        pub = {k: v for k, v in d.items() if k not in ("password", "user", "local_key", "pin_hash", "pin_salt", "token", "key", "cloud_password", "cloud_account")}
+        pub = {k: v for k, v in d.items() if k not in ("password", "user", "local_key", "pin_hash", "pin_salt", "token", "key", "cloud_password", "cloud_account", "hook_token")}
         pub["pin_set"] = bool(d.get("pin_hash"))
         pub.setdefault("icon", DEFAULT_ICON)
         pub.setdefault("show", False)

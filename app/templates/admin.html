@@ -1943,6 +1943,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
+          ${d.kind === 'tasmota' ? tglBtn(!!d.hook, I_BELL, 'Schaltvorgänge von außen im Logbuch (z. B. Lichtschranke, Taster am Gerät, eigener Timer): das Gerät meldet jedes Schalten an BlueNexus. Trägt eine Regel in das Gerät ein (Regel 3).', `tasHook('${id}', ${!!d.hook})`) : ''}
           ${visBtn('shelly', id, d.users)}
           ${shareBtn('shelly', id, d.kind === 'remote')}
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="shellyRemove('${id}')">${I_TRASH}</button>
@@ -2077,6 +2078,13 @@ async function shellySetIcon(id, icon) { try { await shellyApi('/api/shelly/' + 
 async function shellyRenameSave(id) {
   const n = (document.getElementById('dname-' + id)?.value || '').trim(); if (!n) return;
   try { await shellyApi('/api/shelly/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
+  loadShellyAdmin();
+}
+async function tasHook(id, was) {
+  try {
+    await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/hook', was ? 'DELETE' : 'POST');
+    savedToast(was ? 'Meldung von Schaltvorgängen ausgeschaltet ✓' : 'Das Gerät meldet jetzt jedes Schalten ans Logbuch ✓');
+  } catch (e) { shellyMsg(e.message, true); }
   loadShellyAdmin();
 }
 async function shellyIpSave(id) {

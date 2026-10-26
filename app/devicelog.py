@@ -169,6 +169,11 @@ def _wrap(module, attr: str, build):
     @functools.wraps(fn)
     def wrapper(*a, **k):
         try:
+            for ent in build(a, k, None, None) or []:               # Echo-Unterdrueckung: schon vor dem Befehl merken (das Geraet meldet manchmal vor der Antwort zurueck)
+                note_app_action(ent[1])
+        except Exception:                                           # noqa: BLE001
+            pass
+        try:
             res = fn(*a, **k)
         except Exception as e:                                              # noqa: BLE001
             try:
@@ -203,6 +208,28 @@ SENSOR_WORDS = {"lock": ("verriegelt", "entriegelt"), "contact": ("offen", "gesc
                 "presence": ("anwesend", "niemand da"), "input": ("aktiv", "nicht aktiv"), "key_short": ("kurz gedrückt", None),
                 "key_long": ("lang gedrückt", None), "key_long_release": ("lang losgelassen", None)}
 _sens_last: dict = {}
+_app_act: dict = {}                    # Referenz -> Zeit der letzten Bedienung DURCH DIE APP (Echo-Unterdrueckung)
+_ext_last: dict = {}
+APP_ECHO_S = 10.0                      # so lange gilt eine Meldung des Geraets nach eigener Bedienung als deren Echo
+EXTERNAL = "von außen (Gerät/Schalter)"
+
+
+def note_app_action(ref: str) -> None:
+    _app_act[ref] = time.time()
+
+
+def external(ref: str, name: str, text: str, cat: str = "aktor") -> bool:
+    """Ein Geraet hat von sich aus geschaltet (Lichtschranke, Taster am Geraet, eigener Timer): ins Logbuch, ausser es ist nur das Echo einer Bedienung durch die App.
+    True = protokolliert."""
+    now = time.time()
+    if now - _app_act.get(ref, 0.0) < APP_ECHO_S:
+        return False
+    last = _ext_last.get(ref)
+    if last and last[0] == text and now - last[1] < 1.0:           # doppelte Meldung desselben Zustands
+        return False
+    _ext_last[ref] = (text, now)
+    log(cat, ref, name, text, True, by=EXTERNAL)
+    return True
 
 
 def observe_sensor(sen: dict, val) -> None:

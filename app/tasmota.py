@@ -200,3 +200,23 @@ def read_metric(ip: str, datapoint: str, auth=None):
                     vals = None
                 _sns_cache[ip] = (time.time() + (SNS_TTL_S if vals is not None else SNS_FAIL_TTL_S), vals)
     return None if vals is None else vals.get(datapoint)
+
+
+# ---------------------------------------------------------------- Schaltvorgaenge von aussen melden (Regel im Geraet)
+HOOK_RULE = 3                                      # Regel 3 im Geraet (1 und 2 bleiben frei fuer eigene Regeln)
+
+
+def hook_rule_text(mac: str, channels: list, base: str, token: str) -> str:
+    """Tasmota-Regel: bei jedem Schalten eines Relais einen Aufruf an BlueNexus (WebSend) mit Zustand. Max. 511 Zeichen im Geraet."""
+    return " ".join(f"ON Power{ch}#State DO WebSend [{base}] /hook/tas/{mac}/{ch}/{token}/%value% ENDON" for ch in channels)
+
+
+def hook_enable(d: dict, mac: str, channels: list, base: str, token: str) -> None:
+    text = hook_rule_text(mac, channels, base, token)
+    if len(text) > 500:
+        raise TasmotaError("Zu viele Relaiskanäle für die Meldungs-Regel des Geräts (Regeln sind in Tasmota auf 511 Zeichen begrenzt)")
+    _cmd(d["ip"], f"Backlog Rule{HOOK_RULE} {text}; Rule{HOOK_RULE} 1", 8.0, _auth(d))
+
+
+def hook_disable(d: dict) -> None:
+    _cmd(d["ip"], f"Rule{HOOK_RULE} 0", 8.0, _auth(d))

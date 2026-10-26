@@ -1628,11 +1628,28 @@ def push_active() -> bool:
     return any(st.get("ok") and now - st.get("ts", 0) < 3 * PUSH_CYCLE_S for st in _push_state.values())
 
 
+_ext_state: dict = {}                                       # Geraete-ID -> letzter gemeldeter Zustand (fuer "von außen geschaltet")
 _LOG_KEYS = ("STATE", "MOTION", "LOCK_STATE", "PRESENCE_DETECTION_STATE", "PRESS_SHORT", "PRESS_LONG", "PRESS_LONG_RELEASE")
 
 
 def _push_log(iface: str, address: str, key: str) -> None:
-    """Meldung der CCU zu einem Ja/Nein-Sensor: Wert lesen (kommt frisch aus dem Push-Speicher, ohne Aufruf bei der CCU), damit das Geraete-Logbuch den Wechsel gleich kennt."""
+    """Meldung der CCU zu einem Ja/Nein-Sensor: Wert lesen (kommt frisch aus dem Push-Speicher, ohne Aufruf bei der CCU), damit das Geraete-Logbuch den Wechsel gleich kennt.
+    Meldet ein Schalt-Aktor von sich aus (Taster am Geraet, Funk-Fernbedienung, Timer) ein anderes STATE, steht das als "von außen" im Logbuch."""
+    try:
+        if key == "STATE":
+            import devicelog
+            import shelly
+            for d in shelly.load_devices():
+                if d.get("kind") == "homematic" and d.get("address") == address and d.get("datapoint", "STATE") == "STATE":
+                    v = _pushed.get((iface, address, "STATE"))
+                    if v is not None:
+                        on = _truthy(v[1])
+                        prev = _ext_state.get(d["id"])
+                        _ext_state[d["id"]] = on
+                        if prev is not None and prev != on:
+                            devicelog.external("device:" + d["id"], d.get("name") or d["id"], "eingeschaltet" if on else "ausgeschaltet")
+    except Exception:                                         # noqa: BLE001
+        pass
     try:
         for s in load_sensors():
             if s.get("binary") and s.get("address") == address and s.get("datapoint") == key and s.get("source") not in ("zigbee", "camera", "remote"):

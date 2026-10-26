@@ -12,6 +12,7 @@ Start:
   python webapp.py            # http://<host>:5005
 """
 import copy
+import hmac
 import logging
 import re
 import threading
@@ -164,7 +165,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -5210,6 +5211,52 @@ def _perf_end(resp):
     if t0 is not None and not request.path.startswith("/static/") and not resp.direct_passthrough:        # Datenstroeme (Kamerabild) nicht mitzaehlen
         perf.note_request(request.endpoint or "", request.path, (time.perf_counter() - t0) * 1000)
     return resp
+
+
+@app.route("/hook/tas/<mac>/<int:ch>/<token>/<state>", methods=["GET", "POST"])
+def tas_hook(mac, ch, token, state):
+    """Meldung eines Tasmota-Geraets, dass es von sich aus geschaltet hat (Lichtschranke, Taster, eigener Timer). Nur aus dem Heimnetz und nur mit dem
+    geheimen Schluessel des Geraets (stammt aus der Regel, die BlueNexus dem Geraet eingetragen hat); steht danach im Geraete-Logbuch."""
+    ip = client_ip()
+    if not extapi.lan_request_ok(request.headers, request.remote_addr):
+        return "", 404
+    if too_many_attempts(ip):
+        return "", 429
+    d = next((x for x in shelly.load_devices() if x.get("kind") == "tasmota" and str(x.get("mac")) == mac and int(x.get("channel") or 1) == ch), None)
+    if not d or not d.get("hook") or not hmac.compare_digest(str(d.get("hook_token") or ""), token):
+        note_failed_attempt(ip)
+        return "", 404
+    s = state.strip().lower()
+    on = True if s in ("on", "1", "true") else False if s in ("off", "0", "false") else None
+    if on is None:
+        return "", 400
+    shelly._down.pop(d["id"], None)
+    old = shelly._st_cache.get(d["id"])
+    shelly._st_cache[d["id"]] = (time.time(), {**(old[1] if old else {"online": True, "power": None}), "online": True, "on": on})        # Anzeige gleich richtig
+    devicelog.external("device:" + d["id"], d.get("name") or d["id"], "eingeschaltet" if on else "ausgeschaltet")
+    ctrl._rules_wake.set()                                  # Regeln mit dieser Bedingung gleich pruefen
+    return "", 204
+
+
+@app.route("/api/shelly/<dev_id>/hook", methods=["POST", "DELETE"])
+def api_shelly_hook(dev_id):
+    """Tasmota-Geraet so einstellen, dass es jedes Schalten von aussen (Lichtschranke, Taster, Timer) an BlueNexus meldet (POST) bzw. damit aufhoeren (DELETE)."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    if request.method == "DELETE":
+        base = None
+    else:
+        ip = extapi.lan_ip()
+        port = request.environ.get("SERVER_PORT") or ""
+        if not ip or not port:
+            return jsonify(error="Die Adresse dieses Servers im Heimnetz ist nicht ermittelbar."), 400
+        base = f"{ip}:{port}"
+    try:
+        res = shelly.tasmota_hook_set(dev_id, base)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, **res)
 
 
 @app.route("/api/perf", methods=["GET", "POST"])
