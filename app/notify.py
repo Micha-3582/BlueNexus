@@ -226,19 +226,25 @@ def _each(chat_id, to, one):
         raise NotifyError("; ".join(errs))
 
 
+def _need_setup(token, chat_id) -> None:
+    """Sagt genau, was zur Einrichtung noch fehlt (Token oder Chat-ID), statt nur "nicht eingerichtet"."""
+    if not token:
+        raise NotifyError("Telegram ist noch nicht eingerichtet: Der Bot-Token fehlt")
+    if not (chat_id or recipients()):
+        raise NotifyError("Telegram ist noch nicht eingerichtet: Die Chat-ID fehlt. Dem Bot in Telegram eine Nachricht schreiben, dann „Chat-ID ermitteln“ und „Speichern“")
+
+
 def send(text: str, token: str | None = None, chat_id=None, to=None) -> None:
     c = load_credentials()
     token = token or c.get("token")
-    if not (token and (chat_id or recipients())):
-        raise NotifyError("Telegram ist noch nicht eingerichtet")
+    _need_setup(token, chat_id)
     _each(chat_id, to, lambda cid: _api(token, "sendMessage", {"chat_id": cid, "text": text, "disable_web_page_preview": True}))
 
 
 def send_photo(jpeg: bytes, caption: str = "", token: str | None = None, chat_id=None, to=None) -> None:
     c = load_credentials()
     token = token or c.get("token")
-    if not (token and (chat_id or recipients())):
-        raise NotifyError("Telegram ist noch nicht eingerichtet")
+    _need_setup(token, chat_id)
 
     def one(cid):
         try:
@@ -257,8 +263,7 @@ def send_photo(jpeg: bytes, caption: str = "", token: str | None = None, chat_id
 def send_video(path: str, caption: str = "", token: str | None = None, chat_id=None, to=None) -> None:
     c = load_credentials()
     token = token or c.get("token")
-    if not (token and (chat_id or recipients())):
-        raise NotifyError("Telegram ist noch nicht eingerichtet")
+    _need_setup(token, chat_id)
 
     def one(cid):
         try:
