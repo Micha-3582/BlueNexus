@@ -272,7 +272,7 @@ ENDPOINT_AREA = {
     "api_sensor_modify": "settings_geraete", "api_sensors_list": "dashboard",
     "api_sensors_order": "settings_geraete", "api_virtual_order": "settings_geraete",
     "api_setpoints_order": "settings_geraete", "api_sounds_order": "settings_geraete", "api_blinds_order": "settings_geraete", "api_locks_order": "smarthome_sicherheit",
-    "api_wol_list": "smarthome_wol", "api_wol_wake": "smarthome_wol", "api_wol_add": "settings_geraete", "api_wol_modify": "settings_geraete",
+    "api_devicelog": "smarthome_logbuch", "api_wol_list": "smarthome_wol", "api_wol_wake": "smarthome_wol", "api_wol_add": "settings_geraete", "api_wol_modify": "settings_geraete",
     "api_sound_list": "dashboard", "api_sound_scan": "smarthome_einrichten", "api_sound_add": "smarthome_einrichten", "api_sound_modify": "settings_geraete", "api_sound_play": "smarthome_einrichten",
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
@@ -300,7 +300,7 @@ ENDPOINT_AREA = {
 # hier wird nicht der Endpunkt, sondern jedes einzelne Config-Feld einem Bereich zugeordnet
 # (siehe api_config: GET blendet fremde Felder nicht aus, PATCH prueft nur veraenderte Felder).
 # Seiten/Lese-Endpunkte, die fuer JEDES Konto mit mindestens einem Smart-Home-Bereich offen sind (Schreiben nutzt ENDPOINT_AREA)
-SMARTHOME_AREAS = ("settings_geraete", "smarthome_wol", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc")
+SMARTHOME_AREAS = ("settings_geraete", "smarthome_wol", "smarthome_logbuch", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc")
 ANY_READ = {"smarthome_page": SMARTHOME_AREAS, "api_device_families": SMARTHOME_AREAS, "api_automation_unread": ("automation", "rules")}
 FIELD_AREA = {}
 for _f in ("cerbo_host", "cerbo_port", "has_pv_inverter", "has_mppt", "battery_usable_kwh",
@@ -474,7 +474,7 @@ SMARTHOME_TABS = [
     ("nfc", "NFC + QR", "/smarthome#nfc", "smarthome_nfc", 3),
     ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "smarthome_wol", 3),
-    ("logbuch", "Logbuch", "/smarthome#logbuch", "user_management", 3),                         # nur Administratoren
+    ("logbuch", "Logbuch", "/smarthome#logbuch", "smarthome_logbuch", 3),
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
 ]
@@ -5475,10 +5475,7 @@ def _devlog_icons() -> dict:
 
 @app.route("/api/devicelog", methods=["GET"])
 def api_devicelog():
-    """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Nur Administratoren (normale Benutzer sehen nur den Zustand)."""
-    denied = _admin_only()
-    if denied:
-        return denied
+    """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Administratoren alles; Konten mit dem Recht Logbuch nur die Eintraege zu ihren freigegebenen Dingen."""
     if not store.module_on("smarthome"):
         return jsonify(entries=[])
     cat = request.args.get("cat")

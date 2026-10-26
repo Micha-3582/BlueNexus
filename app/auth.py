@@ -38,6 +38,8 @@ AREAS = [
      "Die Reiter Aktoren (mit den Soundmodulen und Rollläden), Sensoren, Thermostate und Wake-on-LAN. Schreiben = die Geräte bedienen (schalten, drücken, aufwecken, Sound abspielen, Rollläden fahren). Anlegen, umbenennen, Symbol, „schaltbar“/„Dashboard“, Sichtbarkeit, PIN und entfernen darf immer nur ein Administrator."),
     ("smarthome_wol", "Smart Home: Wake-on-LAN",
      "Der Reiter Wake-on-LAN und die Rechner auf dem Dashboard. Lesen = die freigegebenen Rechner ansehen, Schreiben = aufwecken. Rechner anlegen, ändern, PIN setzen und löschen darf nur ein Administrator."),
+    ("smarthome_logbuch", "Smart Home: Logbuch",
+     "Der Reiter Logbuch: wer hat wann was bedient oder gemeldet. Ein Konto sieht nur die Einträge zu den Dingen, die ihm freigegeben sind (Türschlösser nur mit dem Recht Sicherheit); Meldungen zu Regeln, NFC und Anmeldungen bleiben Administratoren vorbehalten. Es gibt nur Ansehen – Lesen und Schreiben sind gleich. Standardmäßig hat kein Konto Zugriff."),
     ("smarthome_sicherheit", "Smart Home: Sicherheit (Türschlösser)",
      "Der Reiter Sicherheit (Türschlösser ansehen). Anlegen, umbenennen, entfernen und „Regeln dürfen öffnen“ festlegen darf nur ein Administrator."),
     ("rules", "Smart Home: Regeln",
@@ -68,7 +70,7 @@ AREA_GROUPS = [
     ("dashboard", "Dashboard", ["dashboard"]),
     ("kameras", "Kameras", ["kameras"]),
     ("verlauf", "Verläufe", ["verlauf"]),
-    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_wol", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc"]),
+    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_wol", "smarthome_logbuch", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc"]),
     ("einstellungen", "Einstellungen", ["settings_anlage", "settings_tarif", "settings_vrm", "automation", "settings_wetter",
                                           "settings_meldungen", "settings_anzeige", "settings_system"]),
     ("konto", "Konto & Verwaltung", ["account", "user_management"]),
@@ -134,7 +136,7 @@ ALWAYS_TILES = {"show_favorites_card"}          # fuer jedes Konto da: die Admin
 # Bereiche fuer alle Konten als "Kein Zugriff" (gespeicherte Rechte bleiben unveraendert und wirken wieder, sobald das Modul an ist).
 MODULE_AREAS = {
     "energy": ("settings_anlage", "settings_tarif", "settings_vrm", "automation"),
-    "smarthome": ("settings_geraete", "smarthome_wol", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
+    "smarthome": ("settings_geraete", "smarthome_wol", "smarthome_logbuch", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
     "cameras": ("kameras",),
     "verlauf": ("verlauf",),
 }

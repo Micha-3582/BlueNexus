@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.11.0 – 26.10.2026
+- Neu: eigenes Recht **Logbuch** je Konto (Smart Home). Ohne das Recht bleibt es wie bisher nur für Administratoren; mit **Lesen** sieht ein Konto im Reiter Logbuch die Einträge zu den ihm freigegebenen Geräten.
+
 ## 1.10.0 – 26.10.2026
 - Neu: eigenes Recht **Wake-on-LAN** je Konto (Kein / Lesen / Schreiben) in der Benutzerverwaltung. Lesen = freigegebene Rechner ansehen, Schreiben = aufwecken. Bei „Kein“ oder ohne freigegebenen Rechner sieht das Konto den Reiter und die Rechner auf dem Dashboard nicht mehr. Bestehende Konten behalten ihr bisheriges Recht.
 

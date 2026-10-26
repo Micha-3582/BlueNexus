@@ -792,7 +792,7 @@
 </div>
 
 <div class="card msg-host" id="fam-devlog" data-tab="logbuch">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Logbuch <span class="qhelp" role="button" tabindex="0" data-help="Wer hat wann welches Gerät bedient: von Hand (mit Konto), per Regel, Überschuss-Automatik, Alexa oder Freigabe. Dazu die Zustandswechsel von Ja/Nein-Sensoren (Fenster, Tür, Bewegung, Anwesenheit, Schloss). Das Logbuch sehen nur Administratoren; normale Benutzer sehen in den Listen nur den Zustand. Auch Fremde Zugriffsversuche (unbekanntes Handy, NFC-/QR-Tag, falsche PIN, fehlgeschlagene Anmeldung) stehen hier, rot mit der Adresse. Ist die Datei voll (etwa 2 MB, rund 12.000 Einträge), fallen die ältesten 40 % automatisch weg.">?</span></h2>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Logbuch <span class="qhelp" role="button" tabindex="0" data-help="Wer hat wann welches Gerät bedient: von Hand (mit Konto), per Regel, Überschuss-Automatik, Alexa oder Freigabe. Dazu die Zustandswechsel von Ja/Nein-Sensoren (Fenster, Tür, Bewegung, Anwesenheit, Schloss). Administratoren sehen alles; ein Konto nur mit dem Recht „Logbuch“ und dann nur die Einträge zu seinen freigegebenen Geräten (ohne das Recht sieht es in den Listen nur den Zustand). Auch Fremde Zugriffsversuche (unbekanntes Handy, NFC-/QR-Tag, falsche PIN, fehlgeschlagene Anmeldung) stehen hier, rot mit der Adresse. Ist die Datei voll (etwa 2 MB, rund 12.000 Einträge), fallen die ältesten 40 % automatisch weg.">?</span></h2>
   <div class="sub">Wann wurde was bedient oder gemeldet – Aktoren, Sensoren, Thermostate, Sicherheit und Regeln.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
     <select id="devlog-cat" style="width:auto"><option value="">Alles</option><option value="aktor">Aktoren</option><option value="sensor">Sensoren</option><option value="thermostat">Thermostate</option><option value="sicherheit">Sicherheit</option><option value="regel">Regeln</option></select>
@@ -1473,6 +1473,7 @@ let GROUPS_META = [], PRESET_LABELS_META = {};
 const AREA_HINT = {          // kurze, sichtbare Zusatzzeile je Bereich (die Langfassung steht im "?")
   dashboard: ['Schreiben = Geräte schalten, Sofort-Laden, Ladetermine'],
   settings_geraete: ['Schreiben = bedienen (schalten, drücken). Anlegen, umbenennen, ändern, löschen nur Admin'],
+  smarthome_logbuch: ['Nur Ansehen: Einträge zu den freigegebenen Geräten'],
   smarthome_wol: ['Schreiben = Rechner aufwecken. Anlegen, ändern, PIN, löschen nur Admin'],
   smarthome_sicherheit: ['Schreiben = Türschlösser verriegeln, entriegeln, öffnen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
   rules: ['⚠ Regeln schalten auch PIN-Geräte ohne PIN – nur vertrauten Konten „Schreiben“ geben', true],
@@ -4265,7 +4266,7 @@ const ADMIN_TABS = [
   const TAB_AREA = { anlage: 'settings_anlage', tarif: 'settings_tarif',
     vrm: 'settings_vrm', wetter: 'settings_wetter', meldungen: 'settings_meldungen',
     aktoren: 'settings_geraete', sensoren: 'settings_geraete', thermostate: 'settings_geraete', sicherheit: 'smarthome_sicherheit',
-    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'smarthome_wol', logbuch: 'user_management', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
+    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'smarthome_wol', logbuch: 'smarthome_logbuch', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();
