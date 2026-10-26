@@ -656,6 +656,24 @@ def nfc_index():
     return resp
 
 
+_nfc_alert_last: dict = {}
+
+
+def _nfc_alert(text: str, name: str, ip: str, key: str, ref: str = "nfc:alert", label: str = "NFC / QR-Code") -> None:
+    """Abgelehnter NFC-/QR-Zugriff (fremdes Handy, unbekannter Tag, falsche PIN, zu viele Versuche): ins Geraete-Logbuch (Kategorie Sicherheit, nur Administratoren)
+    und ins Regel-Logbuch - mit der Adresse des Absenders. Gleiche Meldung derselben Adresse hoechstens alle 5 Minuten (kein Fluten bei Dauerbeschuss)."""
+    now = time.time()
+    k = (ip, key)
+    if now - _nfc_alert_last.get(k, 0) < 300:
+        return
+    _nfc_alert_last[k] = now
+    if len(_nfc_alert_last) > 500:
+        for kk in [kk for kk, v in _nfc_alert_last.items() if now - v > 300]:
+            _nfc_alert_last.pop(kk, None)
+    devicelog.log("sicherheit", ref, name or label, f"{text} (Adresse {ip})", False, by="Fremder Zugriff")
+    opslog.log("rules", f"{label} „{name or '?'}“: {text} (Adresse {ip})", dry=False)
+
+
 @app.route("/nfc/<tid>", methods=["GET", "POST"])
 def nfc_tag(tid):
     if request.method == "HEAD":
@@ -667,6 +685,7 @@ def nfc_tag(tid):
     ip = client_ip()
     as_json = request.method == "POST" and "application/json" in (request.headers.get("Accept") or "")      # PIN-Seite sendet per fetch: Antwort ohne Seitenwechsel (das Fenster laesst sich dann selbst schliessen)
     if too_many_attempts(ip):
+        _nfc_alert("Zu viele Fehlversuche – gesperrt", "", ip, "rate")
         if as_json:
             return jsonify(ok=False, error="Zu viele Versuche – bitte einige Minuten warten."), 429
         return _nfc_page(False, "Zu viele Versuche", "Bitte einige Minuten warten.", 429)
@@ -684,6 +703,7 @@ def nfc_tag(tid):
         if r["why"] == "bad_pin":
             note_failed_attempt(ip)
             opslog.log("rules", f"NFC-Tag „{r['tag']}“ von „{r['phone']}“: PIN falsch oder gesperrt", dry=False)
+            _nfc_alert(f"PIN falsch oder gesperrt (Handy „{r['phone']}“)", r["tag"], ip, "pin")
         code = 429 if "Zu viele" in r["text"] else (403 if r["why"] == "bad_pin" else 200)
         if as_json:
             return jsonify(ok=False, error=r["text"] if r["why"] == "bad_pin" else ""), code
@@ -701,6 +721,10 @@ def nfc_tag(tid):
     note_failed_attempt(ip)
     if r["why"] in ("unknown_phone", "not_allowed"):
         opslog.log("rules", f"NFC-Tag „{r.get('tag', '?')}“ abgelehnt: {r['text']}", dry=False)
+    if r["why"] in ("unknown_phone", "not_allowed", "unknown_tag", "no_target"):          # auch unbekannte/gelöschte Tags: jemand probiert Adressen durch oder nutzt einen alten Aufkleber
+        what = {"unknown_phone": "Unbekanntes Handy abgewiesen", "not_allowed": f"Handy „{r.get('phone', '?')}“ darf diesen Tag nicht nutzen",
+                "unknown_tag": f"Unbekannter oder gelöschter Tag aufgerufen ({tid[:24]})", "no_target": "Tag ohne Ziel aufgerufen"}[r["why"]]
+        _nfc_alert(what, r.get("tag", ""), ip, r["why"] + (tid[:24] if r["why"] == "unknown_tag" else ""))
     if as_json:
         return jsonify(ok=False, error=r["text"]), 403 if r["why"] != "unknown_tag" else 404
     return _nfc_page(False, "Nicht erlaubt" if r["why"] in ("unknown_phone", "not_allowed") else "Nicht möglich", r["text"], 403 if r["why"] != "unknown_tag" else 404)
@@ -842,6 +866,7 @@ def login():
 
     ip = client_ip()
     if too_many_attempts(ip):
+        _nfc_alert("Zu viele Fehlversuche – gesperrt", "Anmeldung", ip, "loginrate", "login:alert", "Anmeldung")
         return render_template(
             "login.html", error="Zu viele Fehlversuche. Bitte einige Minuten warten."
         ), 429
@@ -853,6 +878,7 @@ def login():
     user = users.verify(username, password)
     if not user:
         note_failed_attempt(ip)
+        _nfc_alert(f"Fehlgeschlagene Anmeldung als „{username[:40]}“", "Anmeldung", ip, "login", "login:alert", "Anmeldung")      # damit man sieht, ob jemand Fremdes es probiert
         return render_template("login.html", error="Benutzername oder Passwort falsch."), 401
 
     session.clear()
