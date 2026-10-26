@@ -1172,7 +1172,7 @@ def api_user_visible(username):
             if kind not in _VIS_KINDS:
                 continue
             load, _save = _VIS_KINDS[kind]()
-            items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False)} for x in load()]
+            items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False), "off_dash": x.get("show") is False} for x in load()]
             if items:
                 groups.append({"kind": kind, "label": label, "icon": icon, "items": items})
         return jsonify(groups=groups)
@@ -1195,6 +1195,9 @@ def api_user_visible(username):
                 continue
             cur = set(everyone) if it.get("users") is None else set(it["users"])
             (cur.add if want_map[it["id"]] else cur.discard)(key)
+            if want_map[it["id"]] and it.get("show") is False:
+                it["show"] = True                                           # sonst bliebe es trotz Freigabe vom Dashboard ausgeblendet (globaler Haken "auf dem Dashboard anzeigen")
+                changed = True
             if everyone <= cur:
                 if it.get("users") is not None:
                     it.pop("users", None)                                   # alle normalen Konten duerfen es: wieder "fuer alle sichtbar"
