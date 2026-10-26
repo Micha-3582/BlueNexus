@@ -3621,7 +3621,7 @@ def api_shelly_auto_order():
 
 @app.route("/api/notify", methods=["GET"])
 def api_notify_info():
-    d = {**notify.credentials_public(), **notify.settings_public(store.load_config())}
+    d = {**notify.credentials_public(), **notify.settings_public(store.load_config()), "energy": store.module_on("energy")}      # energy: Akku-/Tageszusammenfassung-Felder nur mit Modul Energie zeigen
     recs = notify.recipients()
     can_see = auth.has_level(g.perms, "settings_meldungen", "write")
     d["recipients"] = [{"id": r["id"], "name": r["name"], "system": r["system"], **({"chat_id": r["chat_id"]} if can_see else {})} for r in recs]

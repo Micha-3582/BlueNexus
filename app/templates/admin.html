@@ -596,7 +596,7 @@
     <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="nt-prefix"> Anlagenname vor jede Nachricht setzen <span class="qhelp" role="button" tabindex="0" data-help="Beispiel: „[Annas BlueNexus] …“. Sinnvoll, wenn mehrere Anlagen im selben Chat schreiben.">?</span></label><br>
     <b>Was soll gemeldet werden?</b>
     <div id="nt-events" style="display:flex;flex-direction:column;gap:10px;margin-top:10px"></div>
-    <div class="grid2" style="margin-top:14px">
+    <div class="grid2" id="nt-energy-fields" style="margin-top:14px">
       <div><label>Akku niedrig unter (%) <span class="qhelp" role="button" tabindex="0" data-help="Fällt der Akku unter diesen Ladestand (in Prozent), kommt eine Telegram-Meldung, und eine weitere, wenn er wieder 5 Punkte darüber liegt.">?</span></label><input id="nt-lowsoc" type="number" min="3" max="60" step="1"></div>
       <div><label>Tages-Zusammenfassung um (Uhr) <span class="qhelp" role="button" tabindex="0" data-help="Ab dieser Uhrzeit (0 bis 23) kommt einmal am Tag die Zusammenfassung mit Tagesbilanz und Systemcheck per Telegram.">?</span></label><input id="nt-hour" type="number" min="0" max="23" step="1"></div>
     </div>
@@ -3784,6 +3784,7 @@ async function ntLoad() {
   document.getElementById('nt-token').placeholder = n.has_token ? '(gespeichert – leer lassen = unverändert)' : '123456:ABC…';
   document.getElementById('notify-setup').open = !n.configured;
   document.getElementById('nt-lowsoc').value = n.low_soc; document.getElementById('nt-hour').value = n.summary_hour;
+  document.getElementById('nt-energy-fields').style.display = n.energy === false ? 'none' : '';        // Akku und Tages-Zusammenfassung gibt es nur mit Modul Energie
   document.getElementById('nt-prefix').checked = n.prefix !== false;
   ntRecipients(n.recipients || []);
   ntRequests();
