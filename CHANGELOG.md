@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.12.1 – 26.10.2026
+- Fix: Die Symbol-Auswahl klappt jetzt überall vollständig auf (Aktoren, Thermostate, Schlösser, Rechner, Soundmodule, Rollläden, Geräte suchen) – wie bei den Sensoren, ohne eigene Bildlaufleiste.
+
 ## 1.12.0 – 26.10.2026
 - Neu: deutlich größere **Symbol-Auswahl** (rund 340 statt 165): Haus und Werkzeug, Technik und Geräte, Wetter, Pflanzen, Fahrzeuge, Küche, Tiere, Feier und Büro, Warn- und Statuszeichen. Alle Symbole sind so gewählt, dass sie auf Android und iPhone dargestellt werden (Emoji bis Version 12).
 

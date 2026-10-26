@@ -2010,7 +2010,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="shellyRemove('${id}')">${I_TRASH}</button>
         </div>
       </div>
-      <div id="icons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:230px;overflow-y:auto">
+      <div id="icons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px">
         ${shellyIcons.map(i => `<button class="ghost" style="font-size:22px;padding:4px 8px" onclick="shellySetIcon('${id}', '${i}')">${i}</button>`).join('')}
       </div></div>`;
   };
@@ -2179,7 +2179,7 @@ async function devSensorEdit(id, sensorId) {
 /* Symbolwahl fuer Dinge ohne eigene Wahl-Oberflaeche (Thermostat, Schloss, Wake-on-LAN): Knopf zeigt das Symbol, Antippen klappt ALLE Symbole auf */
 function iconGridHtml(url, id, reload) {
   const key = 'ig' + Math.random().toString(36).slice(2, 8); window[key] = { url, id, reload };
-  return `<div class="ig-grid" data-ig="${key}" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:200px;overflow-y:auto;margin-top:8px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="iconGridSet(this,'${i}')">${i}</button>`).join('')}</div>`;
+  return `<div class="ig-grid" data-ig="${key}" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:8px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="iconGridSet(this,'${i}')">${i}</button>`).join('')}</div>`;
 }
 function iconGridToggle(btn) {
   const row = btn.closest('[data-sort-id], [data-sp], [data-sensor]') || btn.parentElement, g = row.querySelector('.ig-grid'); if (!g) return;
@@ -2286,7 +2286,7 @@ async function foundShow(ip, password, interactive) {
       <button type="button" class="ghost fi-ico" style="font-size:22px;padding:4px 10px" title="Symbol wählen" ${d.known ? 'disabled' : ''} onclick="foundIconGrid(this)">${d.icon}</button>
       <input class="fi-name" value="${escH(d.name)}" maxlength="60" style="flex:1;min-width:150px" ${d.known ? 'disabled' : ''}>
       ${d.known ? '<span class="muted">schon in der Geräteliste</span>' : ''}
-      <div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:160px;overflow-y:auto">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div></div>`).join('');
+      <div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div></div>`).join('');
   foundPut(ip, `<div style="flex:1;min-width:200px"><div class="muted">${escH((devs[0] || {}).model || '')} · ${escH(ip)}${devs.length > 1 ? ' · ' + devs.length + ' Kanäle' : ''}</div>${rows}</div>`
     + (fresh.length ? `<button onclick="foundAdd(this, '${escH(ip)}', '${escH(password || '')}')">Hinzufügen</button>` : ''));
 }
@@ -2307,7 +2307,7 @@ function foundList(fresh, spec) {
       ${icons.length ? `<button type="button" class="ghost fi-ico" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="foundIconGrid(this)">${escH(f.icon || shellyIcons[0] || '🔌')}</button>` : ''}
       <input class="fi-name" value="${escH(f.name)}" maxlength="60" style="flex:1;min-width:150px"></div>
       <div class="muted" style="margin-top:3px">${spec.sub(f)}</div>
-      ${icons.length ? `<div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:160px;overflow-y:auto;margin-top:6px">${icons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div>` : ''}</div>
+      ${icons.length ? `<div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:6px">${icons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div>` : ''}</div>
     ${spec.action ? spec.action(f, k) : `<button onclick="foundListAdd(['${escH(k)}'])">Hinzufügen</button>`}</div>`; };
   const addable = fresh.filter(f => !spec.action);
   const all = !spec.noAll && addable.length > 1 ? `<div data-all="1" style="margin-bottom:6px"><button class="ghost" onclick='foundListAdd(${JSON.stringify(addable.map(spec.key)).replace(/'/g, "&#39;")})'>Alle ${addable.length} hinzufügen</button></div>` : '';
@@ -2747,7 +2747,7 @@ async function loadShares() {
           <button class="ghost" onclick="shareToken('${id}')" title="Erzeugt einen neuen Zugangsschlüssel; der alte gilt sofort nicht mehr">Neuer Schlüssel</button>
           <button type="button" class="tgl del" title="Person und alle Freigaben löschen" aria-label="Person löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
         </div></div>
-      <div id="shicons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:230px;overflow-y:auto"></div>
+      <div id="shicons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
       <div id="shbody-${id}" style="display:${open ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:10px">${its.length ? its.map(i => { const c = nameOf[i.ref], ref = escH(i.ref);
         return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:22px;padding:4px 10px">${escH(c.icon)}</span>
@@ -3147,7 +3147,7 @@ async function loadSoundsAdmin() {
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="soundRemove('${escH(x.id)}')">${I_TRASH}</button>
         </div>
       </div>
-      <div class="snd-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:170px;overflow-y:auto;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="soundSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
+      <div class="snd-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="soundSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
     : '<div class="muted">Noch keine Soundmodule angelegt – unter „Geräte suchen“ bei Homematic „Homematic-Soundmodule suchen“.</div>';
   list.filter(x => x.source === 'remote' && x.switchable === false).forEach(x => { const row = document.querySelector(`[data-sid="${CSS.escape(x.id)}"]`); if (row) row.querySelectorAll(':scope > span.muted, .snd-track, .snd-vol, [onclick^="soundTest"]').forEach(e => { e.style.display = 'none'; }); });      // nur zum Ansehen geteilt
   famSeen('fam-sounds', null, list.length);
@@ -3221,7 +3221,7 @@ async function loadBlindsAdmin() {
           <button type="button" class="tgl del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen" onclick="blindRemove('${escH(x.id)}')">${I_TRASH}</button>
         </div>
       </div>
-      <div class="bl-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;max-height:170px;overflow-y:auto;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="blindSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
+      <div class="bl-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:4px">${shellyIcons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="blindSetIcon('${escH(x.id)}', '${i}')">${i}</button>`).join('')}</div></div>`).join('')
     : '<div class="muted">Noch keine Rollläden angelegt – unter „Geräte suchen“ bei Homematic „Homematic-Rollläden suchen“.</div>';
   list.filter(x => x.source === 'remote' && x.switchable === false).forEach(x => { const row = document.querySelector(`[data-bid="${CSS.escape(x.id)}"]`); if (row) row.querySelectorAll('[onclick^="blindDo"], .bl-range, .bl-rv').forEach(e => { e.style.display = 'none'; }); });      // nur zum Ansehen geteilt: keine Bedienung
   famSeen('fam-blinds', null, list.length);
