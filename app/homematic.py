@@ -654,13 +654,18 @@ def _read_sensor_now(sen: dict):
         elif sen.get("source") == "device":                    # Zustand eines (Schalt-)Geraets als Sensor (z. B. Torstatus-Relais): an/aus -> Wahr/Falsch
             import shelly
             dv = shelly._find(sen.get("address", ""))
-            st = shelly.status_cached(dv, 3.0) if dv else None
-            v = None if (not st or st.get("online") is False) else st.get("on")
-            if sen.get("power_min") is not None:                  # Zustand aus der Leistung (z. B. Bewegungsmelder-Lampe hinter einem Messrelais): Wahr, wenn mehr als die Schwelle fliesst
-                pw = (st or {}).get("power")
-                v = None if (v is None or not isinstance(pw, (int, float))) else float(pw) > float(sen["power_min"])
-            if v is not None and sen.get("dev_inv"):
-                v = not v                                      # Geraet AN = Sensorwert Falsch (z. B. AN = geschlossen)
+            if sen.get("metric"):                              # Messwert des Geraets (Innen-/Aussentemperatur der Klimaanlage, Leistung ...): aendert sich langsam, 30 s aus dem gemerkten Zustand genuegen
+                st = shelly.status_cached(dv, 30.0) if dv else None
+                mv = None if (not st or st.get("online") is False) else st.get(sen["metric"])
+                v = float(mv) if isinstance(mv, (int, float)) and not isinstance(mv, bool) else None
+            else:
+                st = shelly.status_cached(dv, 3.0) if dv else None
+                v = None if (not st or st.get("online") is False) else st.get("on")
+                if sen.get("power_min") is not None:           # Zustand aus der Leistung (z. B. Bewegungsmelder-Lampe hinter einem Messrelais): Wahr, wenn mehr als die Schwelle fliesst
+                    pw = (st or {}).get("power")
+                    v = None if (v is None or not isinstance(pw, (int, float))) else float(pw) > float(sen["power_min"])
+                if v is not None and sen.get("dev_inv"):
+                    v = not v                                  # Geraet AN = Sensorwert Falsch (z. B. AN = geschlossen)
             unreach = v is None
         elif sen.get("source") == "camera":                    # Reolink-Kamera: Bewegung/Person/Fahrzeug/Tier
             import camera

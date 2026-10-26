@@ -963,6 +963,53 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
     return sen
 
 
+DEVICE_METRICS = {                                                    # Schluessel im Zustand des Geraets -> (Bezeichnung, Einheit, Sensorart)
+    "indoor_c": ("Innentemperatur", "°C", "temperature"),
+    "outdoor_c": ("Außentemperatur", "°C", "temperature"),
+    "target_c": ("Solltemperatur", "°C", "temperature"),
+    "power": ("Leistung", "W", "power"),
+}
+
+
+def device_metrics(dev_id: str) -> list[dict]:
+    """Welche Messwerte dieses Geraet liefert (z. B. Klimaanlage: Innen-/Aussen-/Solltemperatur, Steckdose: Leistung) samt aktuellem Wert; schon angelegte sind markiert."""
+    import homematic
+    d = _find(dev_id)
+    if not d or d.get("kind") == "remote":
+        raise ShellyError("Gerät nicht gefunden (oder von einer anderen Anlage geteilt)")
+    st = status_cached(d, 30.0)
+    have = {s["id"] for s in homematic.load_sensors()}
+    out = []
+    for key, (label, unit, kind) in DEVICE_METRICS.items():
+        v = st.get(key)
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        out.append({"metric": key, "label": label, "unit": unit, "kind": kind, "value": round(float(v), 1), "exists": ("devM-" + dev_id + "-" + key) in have})
+    return out
+
+
+def device_metric_sensor(dev_id: str, metric: str, name: str | None = None) -> dict:
+    """Einen Messwert eines Geraets als eigenen Sensor anlegen (z. B. nur die Aussentemperatur der Klimaanlage) - der Sensor laesst sich einzeln teilen, ohne das Geraet zu teilen."""
+    import homematic
+    if metric not in DEVICE_METRICS:
+        raise ShellyError("Unbekannter Messwert")
+    items = load_devices()
+    d = next((x for x in items if x["id"] == dev_id), None)
+    if not d or d.get("kind") == "remote":
+        raise ShellyError("Gerät nicht gefunden (oder von einer anderen Anlage geteilt)")
+    label, unit, kind = DEVICE_METRICS[metric]
+    sid = "devM-" + dev_id + "-" + metric
+    sens = homematic.load_sensors()
+    if any(s["id"] == sid for s in sens):
+        raise ShellyError(f"Für „{label}“ gibt es schon einen Sensor")
+    nm = (name or "").strip()[:60] or f"{d.get('name') or dev_id} – {label}"
+    sen = {"id": sid, "kind": kind, "source": "device", "address": dev_id, "interface": "device", "datapoint": "", "metric": metric, "binary": False, "unit": unit,
+           "model": d.get("model") or "Gerät", "room": "", "name": nm, "show": True, "users": [], "dev_v2": True, "dev_fixed": True}
+    sens.append(sen)
+    homematic._save_sensors(sens)
+    return sen
+
+
 def sensor_preset_of(sen: dict) -> str:
     """Welche Auswahl (Preset) beschreibt diesen Sensor? (fuer das Aendern-Formular)"""
     kind, inv = sen.get("kind"), bool(sen.get("dev_inv"))

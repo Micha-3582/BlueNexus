@@ -5262,6 +5262,32 @@ def api_shelly_as_sensor(dev_id):
     return jsonify(ok=True, sensor=sen["id"], name=sen["name"]), 201
 
 
+@app.route("/api/shelly/<dev_id>/metrics", methods=["GET"])
+def api_shelly_metrics(dev_id):
+    """Messwerte, die dieses Geraet liefert (zum Anlegen als Sensor): Innen-/Aussen-/Solltemperatur, Leistung ..."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    try:
+        return jsonify(shelly.device_metrics(dev_id))
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.route("/api/shelly/<dev_id>/metric-sensor", methods=["POST"])
+def api_shelly_metric_sensor(dev_id):
+    """Einen Messwert des Geraets als eigenen Sensor anlegen: {metric, name?}."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    b = request.get_json(silent=True) or {}
+    try:
+        sen = shelly.device_metric_sensor(dev_id, str(b.get("metric") or ""), b.get("name") if isinstance(b.get("name"), str) else None)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, sensor=sen["id"], name=sen["name"]), 201
+
+
 @app.route("/api/shelly/<dev_id>/as-sensor", methods=["PATCH", "DELETE"])
 def api_shelly_as_sensor_edit(dev_id):
     """Den zu einem Geraet angelegten Sensor aendern ({preset?, name?}) bzw. entfernen ({unlock?}: Geraet wieder schaltbar)."""

@@ -435,6 +435,12 @@ Manche Geräte sind Relais, die nur einen **Zustand melden** und nicht von dir g
 
 **Falsch gewählt?** Das Sensor-Symbol bleibt am Gerät stehen und leuchtet blau, solange es einen Sensor gibt: Antippen öffnet ein Formular, in dem du **Bedeutung und Namen änderst** oder den **Sensor wieder entfernst** (wahlweise mit „Gerät wieder schaltbar machen“). Löschst du den Sensor in der Sensorliste, löst sich die Verknüpfung am Gerät von selbst. Alternativ dreht **Umkehren** am Sensor die Bedeutung. Meldet das Gerät Schaltvorgänge von außen (Glocken-Symbol bei Tasmota), steht der Wechsel sofort im Logbuch; sonst, sobald die App den Zustand das nächste Mal liest. Ist das Gerät nicht erreichbar, zeigt der Sensor „unbekannt“, und Regeln tun nichts.
 
+### Messwert eines Geräts als Sensor
+
+*Smart Home → Aktoren → ✎ am Gerät → Thermometer-Symbol.*
+
+Manche Geräte liefern neben dem Schalten **Messwerte**: eine **Klimaanlage** (Midea) Innen-, Außen- und Solltemperatur, eine **Steckdose mit Messung** die Leistung in Watt. Mit dem Thermometer-Symbol legst du einen **Messwert als eigenen Sensor** an – etwa nur die **Außentemperatur der Klimaanlage**. Die Auswahl zeigt, welche Messwerte das Gerät gerade meldet (mit aktuellem Wert); schon angelegte sind nicht mehr wählbar. Der Sensor erscheint in der Sensorliste und im Dashboard, hat Verlauf, lässt sich in Regeln nutzen und wie jeder Sensor **einzeln teilen** – **ohne das Gerät zu teilen**. Die Werte werden höchstens alle 30 Sekunden vom Gerät geholt. Meldet das Gerät den Wert nicht (z. B. Klimaanlage aus oder nicht erreichbar), steht der Sensor auf „nicht lesbar“. Entfernen, umbenennen und Symbol ändern geht in der Sensorliste.
+
 ### Logbuch der Geräte
 
 *Smart Home → Logbuch.*

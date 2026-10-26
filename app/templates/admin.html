@@ -1897,6 +1897,7 @@ async function pickVisibility(kind, id, btn) {
   VIS_RELOAD[kind]();
 }
 const I_SENSORDEV = svgi('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 12h3l2-3 2 6 2-3h2"/>');
+const I_METRIC = svgi('<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>');
 const I_BELL = svgi('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>');
 const I_CHECK = svgi('<polyline points="20 6 9 17 4 12"/>');
 const I_STAR = svgi('<polygon points="12 2.5 14.9 8.7 21.5 9.5 16.6 14 17.9 20.6 12 17.3 6.1 20.6 7.4 14 2.5 9.5 9.1 8.7"/>');
@@ -1971,6 +1972,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
           ${d.kind !== 'remote' ? `<button type="button" class="tgl${d.as_sensor ? ' on' : ''}" title="${d.as_sensor ? 'Es gibt einen Sensor zu diesem Gerät – hier ändern (Bedeutung, Name) oder entfernen' : 'Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)'}" aria-label="Zustand als Sensor" data-name="${escH(d.name)}" data-sensor="${escH(d.as_sensor || '')}" onclick="devAsSensor('${id}', this.dataset.name, this.dataset.sensor)">${I_SENSORDEV}</button>` : ''}
+          ${d.kind !== 'remote' ? `<button type="button" class="tgl" title="Einen Messwert dieses Geräts als eigenen Sensor anlegen (z. B. die Außentemperatur der Klimaanlage oder die Leistung) – lässt sich einzeln teilen" aria-label="Messwert als Sensor" data-name="${escH(d.name)}" onclick="devMetric('${id}', this.dataset.name)">${I_METRIC}</button>` : ''}
           ${d.kind === 'tasmota' ? tglBtn(!!d.hook, I_BELL, 'Schaltvorgänge von außen im Logbuch (z. B. Lichtschranke, Taster am Gerät, eigener Timer): das Gerät meldet jedes Schalten an BlueNexus. Trägt eine Regel in das Gerät ein (Regel 3).', `tasHook('${id}', ${!!d.hook})`) : ''}
           ${visBtn('shelly', id, d.users)}
           ${shareBtn('shelly', id, d.kind === 'remote')}
@@ -2156,6 +2158,20 @@ async function iconGridSet(btn, icon) {
   const g = btn.closest('.ig-grid'), s = window[g.dataset.ig]; if (!s) return;
   try { await shellyApi(s.url + encodeURIComponent(s.id), 'PATCH', { icon }); savedToast('Symbol geändert ✓'); } catch (e) { shellyMsg(e.message, true); return; }
   s.reload();
+}
+async function devMetric(id, name) {
+  let ms; try { ms = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/metrics', 'GET'); } catch (e) { shellyMsg(e.message, true); return; }
+  if (!ms.length) { await uiDialog({ title: 'Keine Messwerte', info: true, message: 'Dieses Gerät meldet gerade keine Messwerte (Temperaturen oder Leistung). Ist es eingeschaltet und erreichbar?', okText: 'OK' }); return; }
+  const free = ms.filter(m => !m.exists);
+  if (!free.length) { await uiDialog({ title: 'Schon alles angelegt', info: true, message: 'Für alle Messwerte dieses Geräts gibt es schon einen Sensor (Reiter Sensoren).', okText: 'OK' }); return; }
+  const fmt = v => String(v).replace('.', ',');
+  const r = await uiForm({ title: 'Messwert als Sensor', message: 'Legt einen eigenen Sensor für einen Messwert dieses Geräts an – mit Verlauf im Dashboard und in Regeln. Der Sensor lässt sich einzeln teilen, ohne das Gerät zu teilen.',
+    fields: [{ id: 'metric', label: 'Welcher Messwert?', type: 'select', value: free[0].metric, options: free.map(m => [m.metric, `${m.label} (jetzt ${fmt(m.value)} ${m.unit})`]) },
+             { id: 'name', label: 'Name des Sensors (leer = Gerät – Messwert)', type: 'text', value: '' }], okText: 'Sensor anlegen' });
+  if (!r) return;
+  try { const j = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/metric-sensor', 'POST', { metric: r.metric, name: r.name || null }); savedToast('Sensor „' + j.name + '“ angelegt ✓'); }
+  catch (e) { shellyMsg(e.message, true); }
+  if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
 }
 async function tasHook(id, was) {
   try {
