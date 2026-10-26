@@ -943,8 +943,10 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
     nm = (name or "").strip()[:60] or d.get("name") or dev_id
     sen = {"id": sid, "kind": kind, "source": "device", "address": dev_id, "interface": "device", "datapoint": "", "binary": True, "unit": "", "model": d.get("model") or "Gerät",
            "room": "", "name": nm, "show": True, "users": [], "dev_fixed": True}
+    sen["dev_v2"] = True
     if not on_true:
-        sen["dev_inv"] = True                     # Geraet AN ergibt den Sensorwert Falsch (z. B. AN = geschlossen); "Umkehren" des Sensors bleibt davon unberuehrt
+        sen["dev_inv"] = True                     # "AN" ist das ZWEITE Wort (geschlossen / entriegelt): Rohwert Falsch ...
+        sen["invert"] = True                      # ... und mit "Umkehren" (wie bei Fenstern/Tueren ueblich) gilt dann TRUE = dieses Wort, also AN = TRUE – geschlossen
     sens.append(sen)
     homematic._save_sensors(sens)
     d["as_sensor"] = sid
@@ -978,8 +980,11 @@ def device_sensor_update(dev_id: str, preset: str | None = None, name: str | Non
         kind, on_true = SENSOR_PRESETS[preset]
         sen["kind"] = kind
         sen.pop("dev_inv", None)
+        sen.pop("invert", None)
+        sen["dev_v2"] = True
         if not on_true:
             sen["dev_inv"] = True
+            sen["invert"] = True
     if name is not None and name.strip():
         sen["name"] = name.strip()[:60]
     homematic._save_sensors(sens)
@@ -1013,6 +1018,22 @@ def migrate_device_sensors() -> int:
                 s["dev_inv"] = True
             s.pop("invert", None)
             s["dev_fixed"] = True
+            n += 1
+    if n:
+        homematic._save_sensors(sens)
+    return n
+
+
+def migrate_device_sensors_v2() -> int:
+    """Zweite Korrektur: "AN = geschlossen/entriegelt" soll als TRUE gelten (Umkehren wie bei Fenstern/Tueren). Sensoren der ersten Korrektur (dev_inv, ohne dev_v2) bekommen invert."""
+    import homematic
+    sens = homematic.load_sensors()
+    n = 0
+    for s in sens:
+        if s.get("source") == "device" and not s.get("dev_v2"):
+            if s.get("dev_inv"):
+                s["invert"] = True
+            s["dev_v2"] = True
             n += 1
     if n:
         homematic._save_sensors(sens)

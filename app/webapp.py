@@ -2235,6 +2235,7 @@ demo_sim.seed_favorites(users)                                  # Demo: feste er
 
 ctrl = Controller()
 shelly.migrate_device_sensors()                                  # einmalig: Sensoren zu Geraeten der ersten Fassung richtigstellen
+shelly.migrate_device_sensors_v2()
 perf.install()                                                  # Geschwindigkeits-Messung (Fehlersuche), nur im Speicher
 devicelog.install()                                            # Geraete-Logbuch: Schaltvorgaenge und Sensor-Wechsel mitschreiben
 

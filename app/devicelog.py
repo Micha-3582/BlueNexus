@@ -208,6 +208,16 @@ SENSOR_WORDS = {"lock": ("verriegelt", "entriegelt"), "contact": ("offen", "gesc
                 "presence": ("anwesend", "niemand da"), "input": ("aktiv", "nicht aktiv"), "key_short": ("kurz gedrückt", None),
                 "key_long": ("lang gedrückt", None), "key_long_release": ("lang losgelassen", None)}
 _sens_last: dict = {}
+
+
+def sensor_word(sen: dict, val):
+    """Das Wort zum Sensorwert, wie es auch die Anzeige zeigt: bei "Umkehren" stehen die Worte vertauscht (TRUE = geschlossen statt TRUE = offen)."""
+    words = SENSOR_WORDS.get(sen.get("kind"))
+    if not words:
+        return None
+    if sen.get("invert"):
+        words = (words[1], words[0])
+    return words[0] if val else words[1]
 _app_act: dict = {}                    # Referenz -> Zeit der letzten Bedienung DURCH DIE APP (Echo-Unterdrueckung)
 _ext_last: dict = {}
 APP_ECHO_S = 10.0                      # so lange gilt eine Meldung des Geraets nach eigener Bedienung als deren Echo
@@ -231,10 +241,9 @@ def external(ref: str, name: str, text: str, cat: str = "aktor") -> bool:
         sen = next((s for s in homematic.load_sensors() if s["id"] == d.get("as_sensor")), None) if d and d.get("as_sensor") else None
         if sen:
             val = ((text == "eingeschaltet") != bool(sen.get("dev_inv"))) != bool(sen.get("invert"))      # wie die Sensor-Abfrage: erst Zuordnung zum Geraet, dann Umkehren des Sensors
-            words = SENSOR_WORDS.get(sen.get("kind"))
             if _sens_last.get(sen["id"], "?") != val:
                 _sens_last[sen["id"]] = val
-                word = words[0] if val else words[1]
+                word = sensor_word(sen, val)
                 if word:
                     log("sensor", "sensor:" + sen["id"], sen.get("name") or sen["id"], word, True, by="Sensor")
             return True
@@ -251,15 +260,14 @@ def external(ref: str, name: str, text: str, cat: str = "aktor") -> bool:
 def observe_sensor(sen: dict, val) -> None:
     """Zustandswechsel von Ja/Nein-Sensoren (Fenster, Tuer, Bewegung, Anwesenheit, Schloss, Eingang, Tasten) mitschreiben - nur beim Wechsel, nicht bei der ersten Abfrage."""
     try:
-        words = SENSOR_WORDS.get(sen.get("kind"))
-        if not words or not sen.get("binary") or sen.get("source") == "remote" or val is None:
+        if not SENSOR_WORDS.get(sen.get("kind")) or not sen.get("binary") or sen.get("source") == "remote" or val is None:
             return
         sid = sen["id"]
         prev = _sens_last.get(sid, "?")
         _sens_last[sid] = val
         if prev == "?" or prev == val:
             return
-        text = words[0] if val else words[1]
+        text = sensor_word(sen, val)
         if text:
             log("sensor", "sensor:" + sid, sen.get("name") or sid, text, True, by="Sensor")
     except Exception as e:                                                  # noqa: BLE001
