@@ -56,7 +56,7 @@ def recent(module: str, limit: int = 200, days: int | None = None, now: datetime
         except ValueError:
             continue
         if since and e.get("ts", "") < since:
-            break
+            continue                                    # nicht abbrechen: nach einem Uhrensprung (z. B. Neustart ohne Uhr) sind die Zeilen nicht der Zeit nach geordnet
         out.append(e)
         if len(out) >= limit:
             break
@@ -70,7 +70,7 @@ def counts(module: str, days: int = 7, now: datetime | None = None) -> dict:
 
 
 def clear(module: str) -> int:
-    """Logbuch leeren. Rueckgabe: Anzahl geloeschter Eintraege."""
+    """Logbuch leeren. Rueckgabe: Anzahl geloeschter Eintraege. Kann die Datei nicht beschrieben werden (Rechte, Datentraeger voll), kommt OSError."""
     if module not in PATHS:
         raise ValueError(module)
     with _lock:
@@ -81,9 +81,8 @@ def clear(module: str) -> int:
                 with open(path, encoding="utf-8") as f:
                     n = sum(1 for line in f if line.strip())
                 open(path, "w", encoding="utf-8").close()
-        except OSError:
-            pass
-        _unread_cache.pop(module, None)
+        finally:
+            _unread_cache.pop(module, None)
     return n
 
 
@@ -96,8 +95,8 @@ def _read_marks() -> dict:
         return {}
 
 
-def mark_read(module: str, now: datetime | None = None):
-    """Logbuch gilt als gelesen (alles bis jetzt)."""
+def mark_read(module: str, now: datetime | None = None) -> bool:
+    """Logbuch gilt als gelesen (alles bis jetzt). False, wenn die Lesemarke nicht gespeichert werden konnte (dann bleibt der Zaehler stehen)."""
     if module not in PATHS:
         raise ValueError(module)
     with _lock:
@@ -107,7 +106,9 @@ def mark_read(module: str, now: datetime | None = None):
             with open(READ_PATH, "w", encoding="utf-8") as f:
                 json.dump(d, f)
         except OSError:
-            pass
+            return False
+    _unread_cache.pop(module, None)
+    return True
 
 
 _unread_cache: dict = {}
@@ -124,11 +125,6 @@ def unread(module: str, now: datetime | None = None) -> int:
     hit = _unread_cache.get(module)
     if hit and hit[0] == key:
         return hit[1]
-    n = 0
-    for e in recent(module, 1000, None, now):
-        if e.get("ts", "") > since:
-            n += 1
-        else:
-            break
+    n = sum(1 for e in recent(module, 1000, None, now) if e.get("ts", "") > since)         # alle zaehlen (kein Abbruch: nach einem Uhrensprung sind die Zeilen nicht der Zeit nach geordnet)
     _unread_cache[module] = (key, n)
     return n

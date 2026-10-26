@@ -3484,7 +3484,8 @@ def api_automation_log_read():
     module = (request.get_json(silent=True) or {}).get("module", "")
     if module not in autolog.MODULES:
         return jsonify(error="module: surplus oder rules"), 400
-    autolog.mark_read(module)
+    if not autolog.mark_read(module):
+        return jsonify(error="Die Lesemarke konnte nicht gespeichert werden (Schreibrechte im App-Ordner prüfen)."), 500
     return jsonify(ok=True)
 
 
@@ -3494,7 +3495,10 @@ def api_automation_log_clear():
     module = (request.get_json(silent=True) or {}).get("module", "")
     if module not in autolog.MODULES:
         return jsonify(error="module: surplus oder rules"), 400
-    return jsonify(ok=True, deleted=autolog.clear(module))
+    try:
+        return jsonify(ok=True, deleted=autolog.clear(module))
+    except OSError as e:
+        return jsonify(error=f"Das Logbuch konnte nicht geleert werden ({e.__class__.__name__}: {e.strerror or e}). Schreibrechte im App-Ordner prüfen."), 500
 
 
 @app.route("/automation-log")
