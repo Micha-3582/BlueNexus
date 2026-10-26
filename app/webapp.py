@@ -1172,7 +1172,7 @@ def api_user_visible(username):
             if kind not in _VIS_KINDS:
                 continue
             load, _save = _VIS_KINDS[kind]()
-            items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False), "off_dash": x.get("show") is False} for x in load()]
+            items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False)} for x in load()]
             if items:
                 groups.append({"kind": kind, "label": label, "icon": icon, "items": items})
         return jsonify(groups=groups)
@@ -1195,9 +1195,6 @@ def api_user_visible(username):
                 continue
             cur = set(everyone) if it.get("users") is None else set(it["users"])
             (cur.add if want_map[it["id"]] else cur.discard)(key)
-            if want_map[it["id"]] and it.get("show") is False:
-                it["show"] = True                                           # sonst bliebe es trotz Freigabe vom Dashboard ausgeblendet (globaler Haken "auf dem Dashboard anzeigen")
-                changed = True
             if everyone <= cur:
                 if it.get("users") is not None:
                     it.pop("users", None)                                   # alle normalen Konten duerfen es: wieder "fuer alle sichtbar"
@@ -3463,6 +3460,8 @@ def _vis_filter(items: list) -> list:
     if not admin:
         for x in out:
             x.pop("users", None)
+            if x.get("show") is False:
+                x["show"] = True                   # der Dashboard-Haken des Administrators gilt nur fuer ihn; freigegeben = das Konto entscheidet selbst (Auge)
     return out
 
 
@@ -3489,10 +3488,6 @@ def _vis_set(kind: str, item_id: str, body: dict):
         return jsonify(error=str(e)), 400
     if not found:
         return jsonify(error="nicht gefunden"), 404
-    if body.get("users") is None or body.get("users"):                    # fuer Konten freigegeben: nicht zugleich global vom Dashboard ausgeblendet lassen
-        for it in items:
-            if it.get("id") == item_id and it.get("show") is False:
-                it["show"] = True
     save(items)
     return None
 
@@ -3511,7 +3506,7 @@ def api_shelly_list():
     """?dashboard=1: nur die in den Einstellungen fuers Dashboard freigegebenen."""
     if not store.module_on("smarthome"):
         return jsonify([])                                   # Modul Smart Home aus (Geraete bleiben gespeichert)
-    return jsonify(_shelly_payload(request.args.get("dashboard") == "1", request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
+    return jsonify(_shelly_payload(request.args.get("dashboard") == "1" and auth.is_full_admin(g.perms), request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
 
 
 def _shelly_payload(only_shown: bool, live: bool, ids: "set | None" = None) -> list:
