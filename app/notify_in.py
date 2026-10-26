@@ -113,8 +113,21 @@ def consume(upto: int) -> None:
         _events[:] = [e for e in _events if e["seq"] > upto]
 
 
+_stranger_logged: dict = {}
+
+
+def _devlog(cat: str, ref: str, name: str, text: str, ok: bool, by: str) -> None:
+    """Ins Geraete-Logbuch (nur Administratoren): wer hat per Telegram etwas ausgeloest bzw. wer Fremdes hat dem Bot geschrieben."""
+    try:
+        import devicelog
+        devicelog.log(cat, ref, name, text, ok, by=by)
+    except Exception:                                                  # noqa: BLE001
+        pass
+
+
 def _fire(rec: dict, word: str) -> None:
     global _seq
+    _devlog("aktor", "telegram:word", f"Telegram „{word}“", f"ausgelöst von {rec['name']}", True, "Telegram")
     with _lock:
         _seq += 1
         _events.append({"seq": _seq, "word": word, "rid": rec["id"], "name": rec["name"], "ts": time.time()})
@@ -203,6 +216,9 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
         name = _sender(msg)
         _note_request(chat, name, text)
         _log(f"Telegram: Anfrage von noch nicht freigegebenem Chat „{name}“ (ID {cid}) – unter Einstellungen → Meldungen freigeben oder ablehnen")
+        if now - _stranger_logged.get(cid, 0) > 600:                  # je Chat hoechstens alle 10 Minuten ins Logbuch
+            _stranger_logged[cid] = now
+            _devlog("sicherheit", "telegram:alert", "Telegram-Bot", f"Nicht freigegebener Chat „{name}“ (ID {cid}) hat dem Bot geschrieben: „{str(text)[:40]}“", False, "Fremder Zugriff")
         if _opt("stranger") and now - _replied.get(cid, 0) > UNKNOWN_REPLY_S:
             _replied[cid] = now
             _reply(token, cid, fill(_text("stranger"), name, ""))
