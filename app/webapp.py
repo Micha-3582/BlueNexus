@@ -3489,6 +3489,10 @@ def _vis_set(kind: str, item_id: str, body: dict):
         return jsonify(error=str(e)), 400
     if not found:
         return jsonify(error="nicht gefunden"), 404
+    if body.get("users") is None or body.get("users"):                    # fuer Konten freigegeben: nicht zugleich global vom Dashboard ausgeblendet lassen
+        for it in items:
+            if it.get("id") == item_id and it.get("show") is False:
+                it["show"] = True
     save(items)
     return None
 
