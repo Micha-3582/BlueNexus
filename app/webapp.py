@@ -3408,7 +3408,7 @@ def api_shelly_list():
 
 
 def _shelly_payload(only_shown: bool, live: bool, ids: "set | None" = None) -> list:
-    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids))        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
+    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids, max_age=4.0))        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
     ruled = {i for r in rules.list_rules() if r.get("enabled", True) for i in rules.devices_of(r)} if rules.enabled(store.load_config()) else set()
     show_ip = auth.has_level(g.perms, "settings_geraete", "write")
     for d in devs:

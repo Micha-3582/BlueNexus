@@ -753,8 +753,13 @@ def _auth(d: dict):
     return (d.get("user"), d.get("password")) if d.get("password") else None
 
 
-_down: dict = {}                       # Geraete-ID -> (Ruhe bis, letzter Offline-Zustand): kurz nicht neu versuchen
-DOWN_BACKOFF_S = 12.0
+_down: dict = {}                       # Geraete-ID -> (Ruhe bis, letzter Offline-Zustand, Fehlversuche in Folge): kurz nicht neu versuchen
+DOWN_BACKOFF_S = 12.0                  # nach dem 1. Fehlschlag; verdoppelt sich je weiterem Fehlschlag bis DOWN_BACKOFF_MAX_S
+DOWN_BACKOFF_MAX_S = 60.0
+_st_cache: dict = {}                   # Geraete-ID -> (Zeit, Zustand): letzter bekannter Zustand fuer die Oberflaeche
+_st_bg: set = set()                    # Geraete, die gerade im Hintergrund aufgefrischt werden
+_st_lock = threading.Lock()
+_st_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="shelly-status")
 
 
 def status(d: dict) -> dict:
@@ -767,10 +772,49 @@ def status(d: dict) -> dict:
     st = _status_live(d)
     if key is not None:
         if st.get("online") is False:
-            _down[key] = (time.time() + DOWN_BACKOFF_S, dict(st))
+            fails = (hit[2] if hit else 0) + 1
+            _down[key] = (time.time() + min(DOWN_BACKOFF_MAX_S, DOWN_BACKOFF_S * 2 ** (fails - 1)), dict(st), fails)
         else:
             _down.pop(key, None)
+        _st_cache[key] = (time.time(), dict(st))
     return st
+
+
+STALE_OK_S = 120.0
+
+
+def _refresh_bg(d: dict) -> None:
+    key = d.get("id")
+    with _st_lock:
+        if key in _st_bg:
+            return
+        _st_bg.add(key)
+
+    def run():
+        try:
+            status(d)
+        except Exception:                                     # noqa: BLE001
+            pass
+        finally:
+            with _st_lock:
+                _st_bg.discard(key)
+    _st_pool.submit(run)
+
+
+def status_cached(d: dict, max_age: float = 5.0) -> dict:
+    """Zustand fuer die Oberflaeche, ohne auf langsame oder ausgefallene Geraete zu warten: ist der letzte bekannte Zustand juenger als max_age,
+    wird er genommen; ist er aelter (bis STALE_OK_S), kommt er sofort und das Geraet wird im Hintergrund aufgefrischt (die naechste Anzeige ist aktuell);
+    erst ohne brauchbaren Stand wird wirklich gewartet. Regeln und Automatik fragen weiter live ab (status)."""
+    key, now = d.get("id"), time.time()
+    hit = _st_cache.get(key)
+    if hit and now - hit[0] <= max_age:
+        return dict(hit[1])
+    if hit and now - hit[0] <= STALE_OK_S:
+        _refresh_bg(d)
+        st = dict(hit[1])
+        st["stale"] = True                                    # Anzeige weiss: Aufrischung laeuft, gleich nochmal nachsehen
+        return st
+    return status(d)
 
 
 def _status_live(d: dict) -> dict:
@@ -813,6 +857,7 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     if not d:
         raise ShellyError("Gerät nicht gefunden")
     _down.pop(dev_id, None)                                  # wer schaltet, will den echten Zustand sehen: Ruhezeit nach einem Offline-Befund aufheben
+    _st_cache.pop(dev_id, None)                              # und der gemerkte Zustand gilt nicht mehr (naechste Anzeige fragt neu)
     if d.get("switchable") is False:
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
     if d.get("kind") == "remote":
@@ -869,10 +914,11 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     return status(d)
 
 
-def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True) -> list[dict]:
+def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None) -> list[dict]:
     """Angelegte Geraete inkl. Live-Status (parallel abgefragt). Ohne Passwort.
     only_shown: nur die fuers Dashboard freigegebenen (Reihenfolge wie gespeichert).
-    live=False: keine Abfrage der Geraete (nur Stammdaten - sofort da, z. B. fuer den Regel-Editor)."""
+    live=False: keine Abfrage der Geraete (nur Stammdaten - sofort da, z. B. fuer den Regel-Editor).
+    max_age: fuer die Oberflaeche - letzter bekannter Zustand (hoechstens so alt) statt auf jedes Geraet zu warten, siehe status_cached."""
     items = [d for d in load_devices() if d.get("show")] if only_shown else load_devices()
     if ids is not None:                                    # nur bestimmte Geraete abfragen (schnelle Regelrunde)
         items = [d for d in items if d["id"] in ids]
@@ -880,7 +926,7 @@ def list_with_status(only_shown: bool = False, ids: set | None = None, live: boo
         return []
     if live:
         with ThreadPoolExecutor(max_workers=min(16, len(items))) as ex:
-            states = list(ex.map(status, items))
+            states = list(ex.map(status if max_age is None else (lambda d: status_cached(d, max_age)), items))
     else:
         states = [{} for _ in items]
     out = []

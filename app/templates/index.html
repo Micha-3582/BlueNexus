@@ -1628,6 +1628,10 @@ function wolTile(w, tid) {
 /* --- Favoriten: persoenlich pro Konto; gesetzt werden sie mit dem Stern in den Smart-Home-Listen, die Kachel hier zeigt sie nur (kein Stern auf dem Dashboard) --- */
 const favItem = (kind, id) => (favCache[kind + ':' + id] || {}).item;
 let favFirst = true;
+let quickAt = 0;
+function quickRecheck(stale, fn) {                                       // war ein Zustand noch vom letzten Mal (Hintergrund-Auffrischung laeuft), nach kurzer Zeit nochmal holen - hoechstens alle 6 s
+  if (stale && Date.now() - quickAt > 6000) { quickAt = Date.now(); setTimeout(fn, 1500); }
+}
 async function loadFavorites() {
   const card = $('favorites-card');
   if (!favoritesEnabled) { card.hidden = true; return; }
@@ -1643,6 +1647,7 @@ function renderFavorites(d, card) {
   if (!favoritesEnabled) { card.hidden = true; return; }              // waehrend des Wartens ausgeschaltet worden
   if (!d || !Array.isArray(d.items)) return;
   favRefs = new Set(d.refs || []);
+  quickRecheck(d.items.some(x => x.item && x.item.stale), loadFavorites);
   favCache = {}; d.items.forEach(x => { favCache[x.ref] = x; });
   card.hidden = false;
   if (favDragActive || Date.now() - virtualTouched < 1200) return;     // beim Verschieben oder gerade bedient nicht dazwischenzeichnen
@@ -1670,6 +1675,7 @@ async function loadShelly() {
   if (!list.length) { card.hidden = true; return; }
   shellyCache = list;
   card.hidden = false;
+  quickRecheck(list.some(d => d.stale), loadShelly);          // Zustand war noch vom letzten Mal: gleich nochmal nachsehen
   $('shelly-grid').innerHTML = list.map(d => shellyTile(d)).join('');
 }
 /* Sensoren (nur lesen): Ja/Nein als Punkt - gruen = Ja, rot = Nein; Messwerte als Zahl */

@@ -83,6 +83,8 @@ def install() -> None:
         return
 
     def timed(self, method, url, *a, **k):
+        if "/getUpdates" in str(url):                       # Telegram-Long-Poll wartet planmaessig bis 20 s auf Nachrichten: keine Stoerung
+            return orig(self, method, url, *a, **k)
         t0 = time.perf_counter()
         ok = True
         try:
