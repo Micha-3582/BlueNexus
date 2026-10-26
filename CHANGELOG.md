@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.10.0 – 26.10.2026
+- Neu: eigenes Recht **Wake-on-LAN** je Konto (Kein / Lesen / Schreiben) in der Benutzerverwaltung. Lesen = freigegebene Rechner ansehen, Schreiben = aufwecken. Bei „Kein“ oder ohne freigegebenen Rechner sieht das Konto den Reiter und die Rechner auf dem Dashboard nicht mehr. Bestehende Konten behalten ihr bisheriges Recht.
+
 ## 1.9.4 – 26.10.2026
 - Fix: Die Erklärtexte unter **Aktoren** und **Sensoren** passen sich an: Konten lesen nichts von PIN-Schutz, und die Sensor-Quellen (Homematic, Zigbee, Tasmota, Kameras) stehen nur, wenn sie eingerichtet sind.
 

@@ -36,6 +36,8 @@ AREAS = [
     # --- Menue "Smart Home"
     ("settings_geraete", "Smart Home: Aktoren, Soundmodule, Rollläden, Sensoren, Thermostate & Wake-on-LAN",
      "Die Reiter Aktoren (mit den Soundmodulen und Rollläden), Sensoren, Thermostate und Wake-on-LAN. Schreiben = die Geräte bedienen (schalten, drücken, aufwecken, Sound abspielen, Rollläden fahren). Anlegen, umbenennen, Symbol, „schaltbar“/„Dashboard“, Sichtbarkeit, PIN und entfernen darf immer nur ein Administrator."),
+    ("smarthome_wol", "Smart Home: Wake-on-LAN",
+     "Der Reiter Wake-on-LAN und die Rechner auf dem Dashboard. Lesen = die freigegebenen Rechner ansehen, Schreiben = aufwecken. Rechner anlegen, ändern, PIN setzen und löschen darf nur ein Administrator."),
     ("smarthome_sicherheit", "Smart Home: Sicherheit (Türschlösser)",
      "Der Reiter Sicherheit (Türschlösser ansehen). Anlegen, umbenennen, entfernen und „Regeln dürfen öffnen“ festlegen darf nur ein Administrator."),
     ("rules", "Smart Home: Regeln",
@@ -66,7 +68,7 @@ AREA_GROUPS = [
     ("dashboard", "Dashboard", ["dashboard"]),
     ("kameras", "Kameras", ["kameras"]),
     ("verlauf", "Verläufe", ["verlauf"]),
-    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc"]),
+    ("smarthome", "Smart Home", ["settings_geraete", "smarthome_wol", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc"]),
     ("einstellungen", "Einstellungen", ["settings_anlage", "settings_tarif", "settings_vrm", "automation", "settings_wetter",
                                           "settings_meldungen", "settings_anzeige", "settings_system"]),
     ("konto", "Konto & Verwaltung", ["account", "user_management"]),
@@ -74,12 +76,12 @@ AREA_GROUPS = [
 
 # Neue Bereiche, die es frueher nicht gab: Fehlt der Eintrag in gespeicherten Rechten, gilt der Wert des alten Bereichs,
 # damit bestehende Konten nach dem Update unveraendert weiterarbeiten koennen.
-_INHERIT = {"smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "smarthome_teilen": "user_management", "verlauf": "user_management"}
+_INHERIT = {"smarthome_wol": "settings_geraete", "smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "smarthome_teilen": "user_management", "verlauf": "user_management"}
 
 PRESETS = {
     "admin": {a: "write" for a in AREA_IDS},
     "user": {a: ("write" if a in ("dashboard", "account") else "none") for a in AREA_IDS},
-    "smarthome": {a: {"dashboard": "write", "account": "write", "settings_geraete": "write", "rules": "read", "automation": "read"}.get(a, "none") for a in AREA_IDS},
+    "smarthome": {a: {"dashboard": "write", "account": "write", "settings_geraete": "write", "smarthome_wol": "write", "rules": "read", "automation": "read"}.get(a, "none") for a in AREA_IDS},
     "demo": {a: ("none" if a in ("user_management", "account", "kameras", "verlauf") else "read") for a in AREA_IDS},          # Kameras: nie standardmaessig fuer Demo-Konten
 }
 PRESET_LABELS = {
@@ -132,7 +134,7 @@ ALWAYS_TILES = {"show_favorites_card"}          # fuer jedes Konto da: die Admin
 # Bereiche fuer alle Konten als "Kein Zugriff" (gespeicherte Rechte bleiben unveraendert und wirken wieder, sobald das Modul an ist).
 MODULE_AREAS = {
     "energy": ("settings_anlage", "settings_tarif", "settings_vrm", "automation"),
-    "smarthome": ("settings_geraete", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
+    "smarthome": ("settings_geraete", "smarthome_wol", "smarthome_sicherheit", "rules", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc", "automation"),      # Ueberschuss-Automatik schaltet Geraete: braucht Energie UND Smart Home
     "cameras": ("kameras",),
     "verlauf": ("verlauf",),
 }

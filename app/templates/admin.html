@@ -1472,7 +1472,8 @@ const LV = [['none', 'Kein'], ['read', 'Lesen'], ['write', 'Schreiben']];
 let GROUPS_META = [], PRESET_LABELS_META = {};
 const AREA_HINT = {          // kurze, sichtbare Zusatzzeile je Bereich (die Langfassung steht im "?")
   dashboard: ['Schreiben = Geräte schalten, Sofort-Laden, Ladetermine'],
-  settings_geraete: ['Schreiben = bedienen (schalten, drücken, aufwecken). Anlegen, umbenennen, ändern, löschen nur Admin'],
+  settings_geraete: ['Schreiben = bedienen (schalten, drücken). Anlegen, umbenennen, ändern, löschen nur Admin'],
+  smarthome_wol: ['Schreiben = Rechner aufwecken. Anlegen, ändern, PIN, löschen nur Admin'],
   smarthome_sicherheit: ['Schreiben = Türschlösser verriegeln, entriegeln, öffnen. Anlegen, ändern, löschen, Freigabe für Regeln nur Admin'],
   rules: ['⚠ Regeln schalten auch PIN-Geräte ohne PIN – nur vertrauten Konten „Schreiben“ geben', true],
   smarthome_einrichten: ['Geräte suchen, Zugangsdaten (CCU, Tuya, Zigbee), Push'],
@@ -4264,7 +4265,7 @@ const ADMIN_TABS = [
   const TAB_AREA = { anlage: 'settings_anlage', tarif: 'settings_tarif',
     vrm: 'settings_vrm', wetter: 'settings_wetter', meldungen: 'settings_meldungen',
     aktoren: 'settings_geraete', sensoren: 'settings_geraete', thermostate: 'settings_geraete', sicherheit: 'smarthome_sicherheit',
-    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'settings_geraete', logbuch: 'user_management', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
+    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'smarthome_wol', logbuch: 'user_management', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();

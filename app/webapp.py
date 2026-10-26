@@ -272,7 +272,7 @@ ENDPOINT_AREA = {
     "api_sensor_modify": "settings_geraete", "api_sensors_list": "dashboard",
     "api_sensors_order": "settings_geraete", "api_virtual_order": "settings_geraete",
     "api_setpoints_order": "settings_geraete", "api_sounds_order": "settings_geraete", "api_blinds_order": "settings_geraete", "api_locks_order": "smarthome_sicherheit",
-    "api_wol_list": "dashboard", "api_wol_wake": "dashboard", "api_wol_add": "settings_geraete", "api_wol_modify": "settings_geraete",
+    "api_wol_list": "smarthome_wol", "api_wol_wake": "smarthome_wol", "api_wol_add": "settings_geraete", "api_wol_modify": "settings_geraete",
     "api_sound_list": "dashboard", "api_sound_scan": "smarthome_einrichten", "api_sound_add": "smarthome_einrichten", "api_sound_modify": "settings_geraete", "api_sound_play": "smarthome_einrichten",
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
@@ -300,7 +300,7 @@ ENDPOINT_AREA = {
 # hier wird nicht der Endpunkt, sondern jedes einzelne Config-Feld einem Bereich zugeordnet
 # (siehe api_config: GET blendet fremde Felder nicht aus, PATCH prueft nur veraenderte Felder).
 # Seiten/Lese-Endpunkte, die fuer JEDES Konto mit mindestens einem Smart-Home-Bereich offen sind (Schreiben nutzt ENDPOINT_AREA)
-SMARTHOME_AREAS = ("settings_geraete", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc")
+SMARTHOME_AREAS = ("settings_geraete", "smarthome_wol", "smarthome_sicherheit", "smarthome_einrichten", "smarthome_teilen", "smarthome_nfc")
 ANY_READ = {"smarthome_page": SMARTHOME_AREAS, "api_device_families": SMARTHOME_AREAS, "api_automation_unread": ("automation", "rules")}
 FIELD_AREA = {}
 for _f in ("cerbo_host", "cerbo_port", "has_pv_inverter", "has_mppt", "battery_usable_kwh",
@@ -473,7 +473,7 @@ SMARTHOME_TABS = [
     ("suchen", "Geräte suchen", "/smarthome#suchen", "smarthome_einrichten", 3),
     ("nfc", "NFC + QR", "/smarthome#nfc", "smarthome_nfc", 3),
     ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
-    ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
+    ("wol", "Wake-on-LAN", "/smarthome#wol", "smarthome_wol", 3),
     ("logbuch", "Logbuch", "/smarthome#logbuch", "user_management", 3),                         # nur Administratoren
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
@@ -499,10 +499,20 @@ def _tab_has_system(tid: str, fam: dict) -> bool:
     return True
 
 
+def _wol_tab_ok(perms: dict) -> bool:
+    """Reiter Wake-on-LAN: Administratoren immer (zum Anlegen); Konten nur, wenn ihnen mindestens ein Rechner freigegeben ist."""
+    if auth.is_full_admin(perms):
+        return True
+    try:
+        return any(visibility.can_see(x, g.user, False) for x in wol.load())
+    except Exception:                                       # noqa: BLE001
+        return True
+
+
 def _smarthome_tabs(perms: dict) -> list:
     fam = _families()
     return [{"id": i, "label": n, "href": h, "group": grp} for i, n, h, area, grp in SMARTHOME_TABS
-            if auth.has_level(perms, area, "read") and (i != "alexa" or store.module_on("alexa")) and (i not in ("nfc", "logbuch") or store.module_on("smarthome")) and _tab_has_system(i, fam)]
+            if auth.has_level(perms, area, "read") and (i != "alexa" or store.module_on("alexa")) and (i not in ("nfc", "logbuch") or store.module_on("smarthome")) and _tab_has_system(i, fam) and (i != "wol" or _wol_tab_ok(perms))]
 
 
 @app.context_processor
@@ -4686,7 +4696,7 @@ def api_camera_stream(cid):
 @app.route("/api/wol", methods=["GET"])
 def api_wol_list():
     """Wake-on-LAN-Ziele (ohne PIN-Hash), mit 'up' = per Ping erreichbar (None = unbekannt/keine IP)."""
-    if not store.module_on("smarthome"):
+    if not store.module_on("smarthome") or not auth.has_level(g.perms, "smarthome_wol", "read"):
         return jsonify([])
     items = _vis_filter([wol.public(x, request.args.get("light") != "1") for x in wol.load()])         # ?light=1: ohne Ping
     if not auth.has_level(g.perms, "settings_geraete", "write"):               # MAC/IP/Broadcast nur mit Schreibrecht im Klartext (wie bei den Geraete-IPs)
