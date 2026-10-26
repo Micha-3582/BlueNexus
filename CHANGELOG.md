@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.9.4 – 26.10.2026
+- Fix: Die Erklärtexte unter **Aktoren** und **Sensoren** passen sich an: Konten lesen nichts von PIN-Schutz, und die Sensor-Quellen (Homematic, Zigbee, Tasmota, Kameras) stehen nur, wenn sie eingerichtet sind.
+
 ## 1.9.3 – 26.10.2026
 - Änderung: Der Dashboard-Haken (Auge) eines Administrators an Geräten, Sensoren und Schaltern gilt nur noch für sein eigenes Dashboard. Was einem Konto freigegeben ist, erscheint dort; ob es auf dem eigenen Dashboard gezeigt wird, entscheidet das Konto selbst mit seinem Auge. (Ersetzt die Korrekturen aus 1.9.1/1.9.2.)
 

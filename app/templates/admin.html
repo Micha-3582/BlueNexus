@@ -637,7 +637,7 @@
 <style>.chk{display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:normal;cursor:pointer}.chk input{width:auto;margin:0}.fam-off{display:none !important}</style>
 <div class="card msg-host" id="shelly-admin" data-tab="aktoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Meine Aktoren <span class="qhelp" role="button" tabindex="0" data-help="Hier verwaltest du alle schaltbaren Geräte (Steckdosen, Lichter, Dimmer): Name, Symbol, Reihenfolge, PIN und Dashboard-Anzeige. Was ein Gerät automatisch tun soll, legst du unter <a href=&quot;/automation&quot;>Automatik</a> und <a href=&quot;/rules&quot;>Regeln</a> fest; neue Geräte findest du unter <a href=&quot;/smarthome#suchen&quot;>Geräte suchen</a>.">?</span></h2>
-  <div class="sub">Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.</div>
+  <div class="sub" id="sub-aktoren">Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.</div>
   <div id="shelly-devs" style="display:flex;flex-direction:column;gap:10px"></div>
 </div>
 
@@ -811,7 +811,7 @@
 
 <div class="card fam-card msg-host" id="fam-sensors" data-tab="sensoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Sensoren <span class="qhelp" role="button" tabindex="0" data-help="Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Helligkeit und Leistung. In <a href=&quot;/rules&quot;>Regeln</a> als Bedingung nutzbar („Sensor wahr/falsch“ bzw. „unter/über“).">?</span></h2>
-  <div class="sub">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
+  <div class="sub" id="sub-sensoren">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
     <div id="cam-motion-row" class="admin-only" style="margin:0 0 8px" hidden><button id="cam-motion-scan" class="ghost">Kamera-Bewegung suchen</button>
       <span class="muted">Reolink-Erkennungen als Sensor.</span></div>
     <div id="tas-sensor-row" class="admin-only" style="margin:0 0 8px" hidden><button id="tas-sensor-scan" class="ghost">Tasmota-Messwerte suchen</button>
@@ -2507,6 +2507,10 @@ function applyFamilies(f) {
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
   window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
+  { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
+    set('sub-aktoren', window.IS_ADMIN ? 'Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.' : 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.');
+    const src = [f.homematic && 'Homematic', f.zigbee && 'Zigbee', f.tasmota && 'Tasmota', f.camera && 'Kameras'].filter(Boolean);
+    set('sub-sensoren', 'Messwerte und Zustände' + (window.IS_ADMIN && src.length ? ' von ' + (src.length > 1 ? src.slice(0, -1).join(', ') + ' und ' + src[src.length - 1] : src[0]) : '') + ' (nur lesen).'); }
   show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !(f.homematic || famN('fam-locks')));
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
   document.getElementById('fam-hint').hidden = any;
@@ -2520,6 +2524,7 @@ document.getElementById('tasmota-add').addEventListener('click', () => {
   const ip = document.getElementById('tasmota-ip').value.trim(); if (ip) { shellyMsg('Suche …'); foundShow(ip, '', true).then(() => shellyMsg('')); }
 });
 async function loadFamilies() {
+  if (!window.IS_ADMIN) { const a = document.getElementById('sub-aktoren'), s = document.getElementById('sub-sensoren'); if (a) a.textContent = 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.'; if (s) s.textContent = 'Messwerte und Zustände (nur lesen).'; }      // auch ohne Zugriff auf die Geräte-Einstellungen
   try { const r = await (await fetch('/api/device-families', { cache: 'no-store' })).json(); if (r.families) applyFamilies(r.families); } catch (e) { /* egal */ }
 }
 document.querySelectorAll('.fam-cb').forEach(cb => cb.addEventListener('change', async () => {
