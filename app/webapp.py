@@ -5252,6 +5252,28 @@ def api_shelly_as_sensor(dev_id):
     return jsonify(ok=True, sensor=sen["id"], name=sen["name"]), 201
 
 
+@app.route("/api/shelly/<dev_id>/as-sensor", methods=["PATCH", "DELETE"])
+def api_shelly_as_sensor_edit(dev_id):
+    """Den zu einem Geraet angelegten Sensor aendern ({preset?, name?}) bzw. entfernen ({unlock?}: Geraet wieder schaltbar)."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    b = request.get_json(silent=True) or {}
+    try:
+        if request.method == "DELETE":
+            d = shelly._find(dev_id) or {}
+            sid = d.get("as_sensor")
+            busy = _in_use("sensor", sid) if sid else None
+            if busy:
+                return busy
+            shelly.device_sensor_remove(dev_id, unlock=b.get("unlock") is not False)
+            return jsonify(ok=True)
+        sen = shelly.device_sensor_update(dev_id, b.get("preset") if isinstance(b.get("preset"), str) else None, b.get("name") if isinstance(b.get("name"), str) else None)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, sensor=sen["id"], name=sen["name"], preset=shelly.sensor_preset_of(sen))
+
+
 @app.route("/api/shelly/<dev_id>/hook", methods=["POST", "DELETE"])
 def api_shelly_hook(dev_id):
     """Tasmota-Geraet so einstellen, dass es jedes Schalten von aussen (Lichtschranke, Taster, Timer) an BlueNexus meldet (POST) bzw. damit aufhoeren (DELETE)."""
@@ -5787,6 +5809,8 @@ def api_sensor_modify(sensor_id):
         if busy:
             return busy
         ok = homematic.remove_sensor(sensor_id)
+        if ok:
+            shelly.device_sensor_forget(sensor_id)                   # war es der Sensor zu einem Geraet: Verknuepfung loesen
     else:
         body = request.get_json(silent=True) or {}
         err = _vis_set("sensor", sensor_id, body)

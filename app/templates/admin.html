@@ -1965,7 +1965,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
           ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
-          ${!d.as_sensor && d.kind !== 'remote' ? `<button type="button" class="tgl" title="Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)" aria-label="Zustand als Sensor anzeigen" data-name="${escH(d.name)}" onclick="devAsSensor('${id}', this.dataset.name)">${I_SENSORDEV}</button>` : ''}
+          ${d.kind !== 'remote' ? `<button type="button" class="tgl${d.as_sensor ? ' on' : ''}" title="${d.as_sensor ? 'Es gibt einen Sensor zu diesem Gerät – hier ändern (Bedeutung, Name) oder entfernen' : 'Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)'}" aria-label="Zustand als Sensor" data-name="${escH(d.name)}" data-sensor="${escH(d.as_sensor || '')}" onclick="devAsSensor('${id}', this.dataset.name, this.dataset.sensor)">${I_SENSORDEV}</button>` : ''}
           ${d.kind === 'tasmota' ? tglBtn(!!d.hook, I_BELL, 'Schaltvorgänge von außen im Logbuch (z. B. Lichtschranke, Taster am Gerät, eigener Timer): das Gerät meldet jedes Schalten an BlueNexus. Trägt eine Regel in das Gerät ein (Regel 3).', `tasHook('${id}', ${!!d.hook})`) : ''}
           ${visBtn('shelly', id, d.users)}
           ${shareBtn('shelly', id, d.kind === 'remote')}
@@ -2106,13 +2106,31 @@ async function shellyRenameSave(id) {
 const SENSOR_PRESET_TEXT = [['contact_closed', 'Tor / Tür / Fenster: AN = geschlossen, AUS = offen'], ['contact_open', 'Tor / Tür / Fenster: AN = offen, AUS = geschlossen'],
   ['lock_locked', 'Schloss: AN = verriegelt, AUS = entriegelt'], ['lock_unlocked', 'Schloss: AN = entriegelt, AUS = verriegelt'], ['motion', 'Bewegung / Lichtschranke: AN = Bewegung erkannt'],
   ['presence', 'Anwesenheit: AN = anwesend, AUS = niemand da'], ['input', 'Eingang: AN = aktiv, AUS = nicht aktiv']];
-async function devAsSensor(id, name) {
+async function devAsSensor(id, name, sensorId) {
+  if (sensorId) return devSensorEdit(id, sensorId);
   const r = await uiForm({ title: 'Zustand als Sensor anzeigen', message: 'Legt zu diesem Gerät einen Sensor an: mit Worten wie „offen / geschlossen“ im Dashboard, in Regeln und im Logbuch. Das Gerät selbst bleibt unverändert.',
     fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: name }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: 'contact_closed', options: SENSOR_PRESET_TEXT },
       { id: 'lock_switch', label: 'Gerät danach nur noch anzeigen (nicht schaltbar)', type: 'checkbox', value: true }], okText: 'Sensor anlegen' });
   if (!r) return;
   try { const j = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'POST', { preset: r.preset, name: r.name, lock_switch: r.lock_switch }); savedToast('Sensor „' + j.name + '“ angelegt ✓'); }
   catch (e) { shellyMsg(e.message, true); }
+  loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
+}
+function sensorPresetOf(s) {
+  if (s.kind === 'contact') return s.invert ? 'contact_closed' : 'contact_open';
+  if (s.kind === 'lock') return s.invert ? 'lock_unlocked' : 'lock_locked';
+  return ['motion', 'presence', 'input'].includes(s.kind) ? s.kind : 'input';
+}
+async function devSensorEdit(id, sensorId) {
+  let sen = null; try { sen = (await (await fetch('/api/sensors?light=1', { cache: 'no-store' })).json()).find(s => s.id === sensorId); } catch (e) { /* Formular trotzdem */ }
+  const r = await uiForm({ title: 'Sensor zu diesem Gerät', message: 'Hier korrigierst du, was der Zustand bedeutet, oder entfernst den Sensor wieder. Das Gerät selbst bleibt unverändert.',
+    fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: sen ? sen.name : '' }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: sen ? sensorPresetOf(sen) : 'contact_closed', options: SENSOR_PRESET_TEXT },
+      { id: 'remove', label: 'Sensor stattdessen entfernen', type: 'checkbox', value: false }, { id: 'unlock', label: 'Beim Entfernen das Gerät wieder schaltbar machen', type: 'checkbox', value: true }], okText: 'Speichern' });
+  if (!r) return;
+  try {
+    if (r.remove) { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'DELETE', { unlock: r.unlock }); savedToast('Sensor entfernt ✓'); }
+    else { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'PATCH', { preset: r.preset, name: r.name }); savedToast('Sensor geändert ✓'); }
+  } catch (e) { shellyMsg(e.message, true); }
   loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
 }
 async function tasHook(id, was) {

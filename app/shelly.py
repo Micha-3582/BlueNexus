@@ -956,6 +956,67 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
     return sen
 
 
+def sensor_preset_of(sen: dict) -> str:
+    """Welche Auswahl (Preset) beschreibt diesen Sensor? (fuer das Aendern-Formular)"""
+    kind, inv = sen.get("kind"), bool(sen.get("invert"))
+    if kind == "contact":
+        return "contact_closed" if inv else "contact_open"
+    if kind == "lock":
+        return "lock_unlocked" if inv else "lock_locked"
+    return kind if kind in SENSOR_PRESETS else "input"
+
+
+def device_sensor_update(dev_id: str, preset: str | None = None, name: str | None = None) -> dict:
+    """Bedeutung/Name des zu einem Geraet angelegten Sensors aendern."""
+    import homematic
+    d = _find(dev_id)
+    sens = homematic.load_sensors()
+    sen = next((s for s in sens if s["id"] == (d or {}).get("as_sensor")), None)
+    if not d or not sen:
+        raise ShellyError("Zu diesem Gerät gibt es keinen Sensor")
+    if preset:
+        if preset not in SENSOR_PRESETS:
+            raise ShellyError("Unbekannte Art")
+        kind, on_true = SENSOR_PRESETS[preset]
+        sen["kind"] = kind
+        sen.pop("invert", None)
+        if kind == "contact":
+            sen["invert"] = not on_true
+        elif not on_true:
+            sen["invert"] = True
+    if name is not None and name.strip():
+        sen["name"] = name.strip()[:60]
+    homematic._save_sensors(sens)
+    homematic._value_cache.pop(sen["id"], None)
+    return sen
+
+
+def device_sensor_remove(dev_id: str, unlock: bool = True) -> None:
+    """Den zu einem Geraet angelegten Sensor entfernen; unlock: das Geraet wieder schaltbar machen."""
+    import homematic
+    items = load_devices()
+    d = next((x for x in items if x["id"] == dev_id), None)
+    if not d or not d.get("as_sensor"):
+        raise ShellyError("Zu diesem Gerät gibt es keinen Sensor")
+    homematic._save_sensors([s for s in homematic.load_sensors() if s["id"] != d["as_sensor"]])
+    d.pop("as_sensor", None)
+    if unlock:
+        d["switchable"] = True
+    _save(items)
+
+
+def device_sensor_forget(sensor_id: str) -> None:
+    """Der Sensor wurde in der Sensorliste entfernt: die Verknuepfung am Geraet loesen (das Geraet bleibt wie es ist)."""
+    items = load_devices()
+    ch = False
+    for d in items:
+        if d.get("as_sensor") == sensor_id:
+            d.pop("as_sensor", None)
+            ch = True
+    if ch:
+        _save(items)
+
+
 def tasmota_hook_set(dev_id: str, base: str | None) -> dict:
     """Meldung von Schaltvorgaengen (z. B. Lichtschranke, Taster am Geraet) ein-/ausschalten. base = "IP:Port" von BlueNexus im Heimnetz (None = ausschalten).
     Gilt fuer alle Relaiskanaele desselben Geraets."""
