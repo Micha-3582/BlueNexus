@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.12.0 – 26.10.2026
+- Neu: deutlich größere **Symbol-Auswahl** (rund 340 statt 165): Haus und Werkzeug, Technik und Geräte, Wetter, Pflanzen, Fahrzeuge, Küche, Tiere, Feier und Büro, Warn- und Statuszeichen. Alle Symbole sind so gewählt, dass sie auf Android und iPhone dargestellt werden (Emoji bis Version 12).
+
 ## 1.11.3 – 26.10.2026
 - Fix: Symbole, die ältere Android- und iPhone-Versionen nicht kennen (auf dem Handy nur ein Kästchen mit Kreuz, z. B. das Ein-/Aus-Zeichen ⏻), sind aus der Auswahl entfernt. Es stehen nur noch Symbole bis Emoji 12 zur Wahl (Android 10 / iOS 13). Bereits gespeicherte Symbole dieser Art werden beim Start durch gängige ersetzt; das Rollladen-Standardsymbol ist jetzt 🏠.
 
