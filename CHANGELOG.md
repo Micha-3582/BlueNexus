@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.11.2 – 26.10.2026
+- Fix: Administratoren haben das Logbuch und Wake-on-LAN jetzt unabhängig vom gespeicherten Stand immer. Bei einem Administrator, dessen Rechte zwischen 1.11.0 und 1.11.1 gespeichert wurden, stand dort „Kein“, und der Reiter Logbuch fehlte.
+
 ## 1.11.1 – 26.10.2026
 - Fix: Nach dem Update auf 1.11.0 fehlte Administratoren aus älteren Versionen der Reiter Logbuch (das neue Recht war bei ihnen noch nicht gesetzt). Bestehende Administratoren behalten das Logbuch jetzt automatisch, andere Konten weiterhin nicht.
 

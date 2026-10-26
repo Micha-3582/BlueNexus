@@ -103,6 +103,8 @@ def normalize_permissions(perms: dict | None) -> dict:
         if v not in LEVELS and a in _INHERIT:
             v = perms.get(_INHERIT[a])
         out[a] = v if v in LEVELS else "none"
+    if out.get("user_management") == "write":              # Administratoren: Logbuch und Wake-on-LAN gehoeren immer dazu (auch wenn beim Aendern eines Kontos "Kein" gespeichert wurde)
+        out["smarthome_logbuch"] = out["smarthome_wol"] = "write"
     return out
 
 
