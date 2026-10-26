@@ -1043,6 +1043,7 @@ function collectPvInverters() {
 }
 
 window.USER_PERMS = {{ user_perms | tojson }};
+window.MOD = {{ modules | tojson }};                    // eingeschaltete Module (Energie, Smart Home ...)
 window.FAV_OFF = {{ 'true' if favorites_off else 'false' }};      // das Konto hat Favoriten abgeschaltet (Meine Ansicht)
 window.HIDDEN = new Set({{ (hidden_items or []) | tojson }});      // persoenlich ausgeblendete Dashboard-Elemente, siehe eyeBtn
 window.FAVS = new Set({{ (favorites or []) | tojson }});      // eigene Favoriten (Sterne), siehe favBtn
@@ -1590,6 +1591,7 @@ async function loadUsers() {
         <td style="padding:6px 4px;white-space:nowrap">${locked ? '<span class="muted" title="Das Hauptkonto kann nur vom Hauptadmin selbst geändert werden">🔒 Hauptkonto</span>' : `
           <button type="button" class="ghost u-edit" data-u="${escHUsers(u.username)}" title="Rechte bearbeiten">🛠️</button>
           ${u.admin ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
+          ${u.admin ? '' : `<button type="button" class="ghost u-copy" data-u="${escHUsers(u.username)}" title="Profil kopieren: neues Konto mit denselben Rechten, Kacheln und sichtbaren Geräten">⧉</button>`}
           ${u.is_me && (window.USER_PERMS || {}).account !== 'write' ? '' : `<button type="button" class="ghost u-pw" data-u="${escHUsers(u.username)}" data-me="${u.is_me ? 1 : 0}" title="${u.is_me ? 'Eigenes Passwort ändern (unter Konto & Zugang, mit aktuellem Passwort)' : 'Neues Passwort setzen'}">🔑</button>`}
           ${u.is_me || u.owner ? '' : `<button type="button" class="danger u-del" data-u="${escHUsers(u.username)}" title="Löschen">✕</button>`}`}
         </td>`;
@@ -1604,6 +1606,7 @@ async function loadUsers() {
         <div id="${uid}-box" style="${u.admin ? 'display:none' : ''}">${presetBarHtml(uid + '-box')}${matrixHtml(uid, perms)}</div>
         ${u.admin ? '<div class="muted" style="margin:0 0 8px">Administratoren haben alle Rechte – die Rechte-Tabelle gilt für sie nicht.</div>' : ''}
         <div style="max-width:720px">${tilesHtml(uid, u.dashboard_tiles, u.dashboard_order)}</div>
+        ${u.admin ? '' : `<details class="u-vis" data-u="${escHUsers(u.username)}" style="margin-top:12px;max-width:720px"><summary style="cursor:pointer"><b>Sichtbare Geräte, Sensoren, Schalter …</b> <span class="muted">– was dieses Konto sehen und bedienen darf</span></summary><div class="u-vis-body muted" style="margin-top:8px">wird geladen …</div></details>`}
         <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="muted">Änderungen werden automatisch gespeichert.</span>
         <button type="button" class="ghost u-edit-cancel" data-u="${escHUsers(u.username)}">Schließen</button></div></td>`;
       body.appendChild(editRow);
@@ -1611,6 +1614,15 @@ async function loadUsers() {
       syncTilesVisibility(uePrefix);
       document.getElementById(uePrefix + '-dashboard')?.addEventListener('change', () => syncTilesVisibility(uePrefix));
     }
+    body.querySelectorAll('.u-vis').forEach(el => el.addEventListener('toggle', () => { if (el.open && !el.dataset.loaded) { el.dataset.loaded = '1'; loadUserVis(el.dataset.u, el.querySelector('.u-vis-body')); } }));
+    body.querySelectorAll('.u-copy').forEach(el => el.addEventListener('click', async () => {
+      const name = await uiDialog({ title: 'Profil kopieren', message: `Neues Konto mit denselben Rechten, Dashboard-Kacheln und sichtbaren Geräten wie „${el.dataset.u}“. Favoriten, eigene Ansicht und Passwort werden nicht kopiert.`, label: 'Name des neuen Kontos', okText: 'Weiter' });
+      if (name === null || !name.trim()) return;
+      const pw = await uiDialog({ title: 'Passwort für „' + name.trim() + '“', message: 'Mindestens 8 Zeichen. Der Benutzer kann es später unter Konto & Zugang ändern.', label: 'Passwort', type: 'password', okText: 'Konto anlegen' });
+      if (pw === null) return;
+      try { const r2 = await shellyApi('/api/users/' + encodeURIComponent(el.dataset.u) + '/copy', 'POST', { username: name.trim(), password: pw }); savedToast('Konto „' + r2.user.username + '“ angelegt ✓'); loadUsers(); }
+      catch (e) { msg.textContent = e.message; }
+    }));
     body.querySelectorAll('.u-preview').forEach(el => el.addEventListener('click', async () => {
       const ok = await uiDialog({ title: `Vorschau als „${el.dataset.u}“`, message: 'Zeigt die App in diesem Fenster so, wie dieses Konto sie sieht – mit seinen Rechten, Menüs und sichtbaren Geräten. Es wird nur angesehen: Schalten, Speichern und Ändern sind gesperrt. Mit „Vorschau beenden“ oben kommst du hierher zurück.\n\nHinweis: Dein Browser teilt die Anmeldung – andere offene Fenster dieser App zeigen nach dem Neuladen ebenfalls die Vorschau.', okText: 'Vorschau starten' });
       if (ok) location.href = '/preview/' + encodeURIComponent(el.dataset.u);
@@ -1661,6 +1673,23 @@ async function loadUsers() {
     }));
     renderNuMatrix('user');
   } catch (e) { msg.textContent = 'Fehler beim Laden der Benutzer.'; }
+}
+async function loadUserVis(username, box) {
+  let d; try { d = await shellyApi('/api/users/' + encodeURIComponent(username) + '/visible', 'GET'); } catch (e) { box.textContent = e.message; return; }
+  if (!d.groups.length) { box.textContent = 'Noch nichts angelegt.'; return; }
+  box.classList.remove('muted');
+  box.innerHTML = '<div class="muted" style="margin-bottom:8px">Haken = das Konto sieht und bedient es (auch auf dem Dashboard, in den passenden Kacheln). Neu angelegte Dinge sind zuerst nur für Administratoren sichtbar. Jede Änderung wird sofort gespeichert.</div>' + d.groups.map(g => `<div class="vis-grp" data-kind="${escHUsers(g.kind)}" style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>${escHUsers(g.icon)} ${escHUsers(g.label)}</b><button type="button" class="ghost vis-all" style="padding:2px 10px">alle</button><button type="button" class="ghost vis-none" style="padding:2px 10px">keine</button></div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${g.items.map(i => `<label class="chk"><input type="checkbox" class="vis-cb" data-ref="${escHUsers(g.kind + ':' + i.id)}" ${i.on ? 'checked' : ''}> ${escHUsers(i.icon)} ${escHUsers(i.name)}</label>`).join('')}</div></div>`).join('');
+  const save = async cbs => {
+    const items = {}; cbs.forEach(cb => { items[cb.dataset.ref] = cb.checked; });
+    try { await shellyApi('/api/users/' + encodeURIComponent(username) + '/visible', 'PUT', { items }); savedToast('Sichtbarkeit gespeichert ✓'); }
+    catch (e) { document.getElementById('users-msg').textContent = e.message; }
+  };
+  box.querySelectorAll('.vis-cb').forEach(cb => cb.addEventListener('change', () => save([cb])));
+  box.querySelectorAll('.vis-all, .vis-none').forEach(b => b.addEventListener('click', () => {
+    const cbs = [...b.closest('.vis-grp').querySelectorAll('.vis-cb')]; cbs.forEach(cb => { cb.checked = b.classList.contains('vis-all'); }); save(cbs);
+  }));
 }
 async function patchUser(username, body) {
   const msg = document.getElementById('users-msg');
@@ -4234,8 +4263,8 @@ const ADMIN_TABS = [
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();
-    if (heading.startsWith('Diagramme') && window.TILE_CEILING && !window.TILE_CEILING.some(k => k === 'show_energy_chart' || k === 'show_flow_chart')) {
-      c.dataset.tab = '__hidden'; c.style.display = 'none'; return;                  // Konto hat keine Diagramm-Kachel -> die Diagramm-Einstellungen sind fuer es ohne Bedeutung
+    if (heading.startsWith('Diagramme') && ((window.MOD && window.MOD.energy === false) || (window.TILE_CEILING && !window.TILE_CEILING.some(k => k === 'show_energy_chart' || k === 'show_flow_chart')))) {
+      c.dataset.tab = '__hidden'; c.style.display = 'none'; return;                  // Konto hat keine Diagramm-Kachel bzw. die Anlage hat kein Energie-Modul -> die Diagramm-Einstellungen sind ohne Bedeutung
     }
     if (c.dataset.area === 'personal') {                 // "Meine Ansicht": gehoert zu "Einstellungen: Dashboard" - Kein = ausgeblendet
       if (((window.USER_PERMS || {}).settings_anzeige || 'none') === 'none') { c.dataset.tab = '__hidden'; c.style.display = 'none'; }

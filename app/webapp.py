@@ -294,7 +294,7 @@ ENDPOINT_AREA = {
     # lesen darf, soll die Seite oeffnen koennen; welche Karten er darin sieht, entscheidet
     # admin.html pro Karte anhand von user_perms. Siehe Sonderfall in _require_login.
     # Benutzerverwaltung
-    "api_users": "user_management", "api_users_item": "user_management",
+    "api_users": "user_management", "api_users_item": "user_management", "api_user_visible": "user_management", "api_user_copy": "user_management",
 }
 # /api/config ist ein einziger Sammel-Endpunkt fuer fast alle Einstellungsbereiche -
 # hier wird nicht der Endpunkt, sondern jedes einzelne Config-Feld einem Bereich zugeordnet
@@ -1145,6 +1145,99 @@ def api_users_item(username):
     if not u:
         return jsonify(error="Benutzer nicht gefunden."), 404
     return jsonify(ok=True, user=_user_out(u))
+
+
+VIS_GROUPS = (("shelly", "Geräte (Aktoren)", "🔌"), ("sensor", "Sensoren", "📟"), ("virtual", "Eigene Schalter & Knöpfe", "🔘"), ("wol", "Wake-on-LAN", "💻"),
+              ("setpoint", "Thermostate", "🌡️"), ("blind", "Rollläden", "🪟"), ("sound", "Soundmodule", "🔔"), ("camera", "Kameras", "📷"))
+
+
+def _normal_users() -> list:
+    """Kleingeschriebene Namen aller normalen (nicht-administrativen) Konten."""
+    return [u["username"].strip().lower() for u in users.list() if not auth.is_full_admin(auth.normalize_permissions(u.get("permissions")))]
+
+
+@app.route("/api/users/<username>/visible", methods=["GET", "PUT"])
+def api_user_visible(username):
+    """Was ein normales Konto sehen darf: GET = alle Geraete/Sensoren/Schalter/Rechner/... mit Haken; PUT {items: {"art:id": true|false}} setzt die Haken
+    (Sammelstelle fuer die Sichtbarkeit je Eintrag, die sonst nur einzeln am Eintrag steht). Administratoren sehen immer alles."""
+    key = (username or "").strip().lower()
+    u = users.get(username)
+    if not u:
+        return jsonify(error="Benutzer nicht gefunden."), 404
+    if auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))):
+        return jsonify(error="Administratoren sehen immer alles."), 400
+    if request.method == "GET":
+        groups = []
+        for kind, label, icon in VIS_GROUPS:
+            if kind not in _VIS_KINDS:
+                continue
+            load, _save = _VIS_KINDS[kind]()
+            items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False)} for x in load()]
+            if items:
+                groups.append({"kind": kind, "label": label, "icon": icon, "items": items})
+        return jsonify(groups=groups)
+    changes = (request.get_json(silent=True) or {}).get("items")
+    if not isinstance(changes, dict) or not all(isinstance(k, str) and isinstance(v, bool) for k, v in changes.items()):
+        return jsonify(error="items: {\"art:id\": true/false} erwartet"), 400
+    everyone = set(_normal_users())
+    by_kind: dict = {}
+    for ref, want in changes.items():
+        kind, _, item_id = ref.partition(":")
+        if kind in _VIS_KINDS and item_id:
+            by_kind.setdefault(kind, {})[item_id] = want
+    done = 0
+    for kind, want_map in by_kind.items():
+        load, save = _VIS_KINDS[kind]()
+        items = load()
+        changed = False
+        for it in items:
+            if it.get("id") not in want_map:
+                continue
+            cur = set(everyone) if it.get("users") is None else set(it["users"])
+            (cur.add if want_map[it["id"]] else cur.discard)(key)
+            if everyone <= cur:
+                if it.get("users") is not None:
+                    it.pop("users", None)                                   # alle normalen Konten duerfen es: wieder "fuer alle sichtbar"
+                    changed = True
+            else:
+                new = sorted(cur)
+                if it.get("users") != new:
+                    it["users"] = new
+                    changed = True
+            done += 1
+        if changed:
+            save(items)
+    return jsonify(ok=True, changed=done)
+
+
+@app.route("/api/users/<username>/copy", methods=["POST"])
+def api_user_copy(username):
+    """Profil kopieren: neues normales Konto mit denselben Rechten, Dashboard-Kacheln und derselben Sichtbarkeit (Geraete, Sensoren, Schalter ...) wie dieses.
+    Body {username, password}. Persoenliches (Favoriten, eigene Ansicht, Passwort) wird nicht kopiert."""
+    src = users.get(username)
+    if not src:
+        return jsonify(error="Benutzer nicht gefunden."), 404
+    perms = auth.normalize_permissions(src.get("permissions"))
+    if auth.is_full_admin(perms):
+        return jsonify(error="Administratoren lassen sich nicht kopieren – im neuen Konto den Haken „Administrator“ selbst setzen."), 400
+    body = request.get_json(silent=True) or {}
+    try:
+        new = users.create(body.get("username") or "", body.get("password") or "", permissions=perms, expires=src.get("expires"),
+                           dashboard_tiles=src.get("dashboard_tiles"), dashboard_order=src.get("dashboard_order"), admin=False)
+    except UserError as exc:
+        return jsonify(error=str(exc)), 400
+    old_key, new_key = (src["username"] or "").strip().lower(), new["username"].strip().lower()
+    for fn in _VIS_KINDS.values():                                           # wo das Vorbild eingetragen ist, kommt das neue Konto dazu
+        load, save = fn()
+        items = load()
+        ch = False
+        for it in items:
+            if isinstance(it.get("users"), list) and old_key in it["users"] and new_key not in it["users"]:
+                it["users"] = sorted(set(it["users"]) | {new_key})
+                ch = True
+        if ch:
+            save(items)
+    return jsonify(ok=True, user=_user_out(new))
 
 
 ESS_TEXT = {ESS_CHARGE: "Netzladen", ESS_IDLE: "Normal / Warten"}
