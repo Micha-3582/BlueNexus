@@ -450,6 +450,10 @@ def _require_login():
         return _deny("Kein Zugriff auf Smart Home mit diesem Konto.")
     if request.endpoint == "api_automation_save":                    # Speichern von Regeln UND/ODER Ueberschuss-Automatik: je nach Inhalt das jeweilige Recht (Regeln gehen auch ohne Energie-Modul)
         return _gate_automation_save()
+    if request.endpoint in ("api_automation_log", "api_automation_log_read", "api_automation_log_clear"):
+        # Das Regel-Logbuch gehoert zu den Regeln (geht auch ohne Energie-Modul), nur das der Ueberschuss-Automatik zum Bereich "Automatik" (braucht Energie UND Smart Home)
+        mod = request.args.get("module") or (request.get_json(silent=True) or {}).get("module")
+        return _check_area("rules" if mod == "rules" else "automation", "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
         if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info")):      # Demo: Schnittstellen-Karte nur ansehen
