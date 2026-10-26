@@ -427,6 +427,12 @@ Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B.
 
 Wirkt die App träge, zeigt **Messwerte anzeigen**, wo die Zeit bleibt: oben die **Gegenstellen** (Geräte, CCU, Cloud, andere BlueNexus-Anlagen) mit Aufrufen, Durchschnitt, Maximum und **Fehlern** – eine Adresse mit mehreren Sekunden oder vielen Fehlern ist der Bremsklotz –, darunter die **Seitenabrufe der App** und die **letzten langsamen Vorgänge**. Die Zahlen gelten seit dem letzten Start und liegen nur im Speicher; **Zurücksetzen** beginnt von vorn. Die App wartet außerdem nicht mehr auf Geräte, die gerade nicht antworten: Ein offline gemeldetes Gerät wird 12 Sekunden lang nicht erneut abgefragt, geteilte Quellen zeigen bei langsamer Antwort den letzten Stand, und gleichzeitige Abfragen desselben Tasmota-Geräts werden zu einer zusammengefasst. **Dashboard, Favoriten und Geräteliste** warten nicht mehr auf langsame Geräte: Sie zeigen sofort den zuletzt bekannten Zustand, das Gerät wird im Hintergrund aufgefrischt, und die Anzeige holt kurz danach den aktuellen Wert. Ein Gerät, das mehrmals hintereinander nicht antwortet, wird immer seltener versucht (12, 24, 48, bis 60 Sekunden Pause). **Regeln und Automatik** fragen die Geräte weiter direkt ab und sehen immer den echten Zustand.
 
+### Zustand eines Geräts als Sensor anzeigen
+
+*Smart Home → Aktoren → ✎ am Gerät → Sensor-Symbol (Kurve).*
+
+Manche Geräte sind Relais, die nur einen **Zustand melden** und nicht von dir geschaltet werden sollen – zum Beispiel ein Tasmota-Relais, das den Zustand eines Rolltors anzeigt (AN = zu, AUS = offen); das Tor selbst steuert die Hofautomatik. Mit **„Zustand als Sensor anzeigen“** wählst du, was der Zustand bedeutet (z. B. *Tor / Tür / Fenster: AN = geschlossen*, Schloss, Bewegung/Lichtschranke, Anwesenheit, Eingang) und gibst dem Sensor einen Namen. BlueNexus legt dann **einen Sensor** an: mit Worten wie „offen / geschlossen“ auf dem Dashboard (Kachel Sensoren), in **Regeln** als Bedingung („Sensor wahr/falsch“) und im **Logbuch** (z. B. „Hoftor Zustand – geschlossen“). Wahlweise wird das Gerät dabei **auf „nur Anzeige“** gestellt, damit niemand das Relais aus Versehen schaltet. Die Bedeutung lässt sich später am Sensor mit **Umkehren** drehen. Meldet das Gerät Schaltvorgänge von außen (Glocken-Symbol bei Tasmota), steht der Wechsel sofort im Logbuch; sonst, sobald die App den Zustand das nächste Mal liest. Ist das Gerät nicht erreichbar, zeigt der Sensor „unbekannt“, und Regeln tun nichts.
+
 ### Logbuch der Geräte
 
 *Smart Home → Logbuch.*

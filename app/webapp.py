@@ -5238,6 +5238,20 @@ def tas_hook(mac, ch, token, state):
     return "", 204
 
 
+@app.route("/api/shelly/<dev_id>/as-sensor", methods=["POST"])
+def api_shelly_as_sensor(dev_id):
+    """Zustand eines Geraets zusaetzlich als Sensor anlegen: {preset, name?, lock_switch?} (z. B. Relais, das den Torzustand meldet)."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    b = request.get_json(silent=True) or {}
+    try:
+        sen = shelly.device_as_sensor(dev_id, str(b.get("preset") or ""), b.get("name") if isinstance(b.get("name"), str) else None, b.get("lock_switch") is not False)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, sensor=sen["id"], name=sen["name"]), 201
+
+
 @app.route("/api/shelly/<dev_id>/hook", methods=["POST", "DELETE"])
 def api_shelly_hook(dev_id):
     """Tasmota-Geraet so einstellen, dass es jedes Schalten von aussen (Lichtschranke, Taster, Timer) an BlueNexus meldet (POST) bzw. damit aufhoeren (DELETE)."""

@@ -610,7 +610,7 @@ def read_sensor(sen: dict, latch: bool = False):
     latch=True (nur fuer die Regeln): Ein sehr kurzer Impuls (Lichtschranke: TRUE und gleich wieder FALSE) wird den Regeln trotzdem EINMAL als TRUE gemeldet,
     auch wenn er schon wieder vorbei ist, bevor die Regelschleife nachschaut. Die Anzeige (latch=False) bleibt unberuehrt."""
     val = _read_sensor_now(sen)
-    if latch and sen.get("binary") and sen.get("source") not in ("zigbee", "camera", "remote") and not str(sen.get("kind", "")).startswith("key_") \
+    if latch and sen.get("binary") and sen.get("source") not in ("zigbee", "camera", "remote", "device") and not str(sen.get("kind", "")).startswith("key_") \
             and sen.get("datapoint") != "LOCK_STATE":
         now, sid = time.time(), sen["id"]
         if val is True or sid not in _latch_used:
@@ -650,6 +650,12 @@ def _read_sensor_now(sen: dict):
             import shelly, tasmota
             pw = next((d.get("password") for d in shelly.load_devices() if d.get("kind") == "tasmota" and d.get("mac") == sen.get("address") and d.get("password")), "")
             v = tasmota.read_metric(sen.get("ip", ""), sen["datapoint"], ("admin", pw) if pw else None)
+            unreach = v is None
+        elif sen.get("source") == "device":                    # Zustand eines (Schalt-)Geraets als Sensor (z. B. Torstatus-Relais): an/aus -> Wahr/Falsch
+            import shelly
+            dv = shelly._find(sen.get("address", ""))
+            st = shelly.status_cached(dv, 3.0) if dv else None
+            v = None if (not st or st.get("online") is False) else st.get("on")
             unreach = v is None
         elif sen.get("source") == "camera":                    # Reolink-Kamera: Bewegung/Person/Fahrzeug/Tier
             import camera

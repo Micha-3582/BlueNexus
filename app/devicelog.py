@@ -224,6 +224,22 @@ def external(ref: str, name: str, text: str, cat: str = "aktor") -> bool:
     now = time.time()
     if now - _app_act.get(ref, 0.0) < APP_ECHO_S:
         return False
+    try:                                                           # Geraet, dessen Zustand auch als Sensor angelegt ist: mit den Worten des Sensors (offen/geschlossen ...)
+        import homematic
+        import shelly
+        d = shelly._find(ref.split(":", 1)[1]) if ref.startswith("device:") else None
+        sen = next((s for s in homematic.load_sensors() if s["id"] == d.get("as_sensor")), None) if d and d.get("as_sensor") else None
+        if sen:
+            val = (text == "eingeschaltet") != bool(sen.get("invert"))
+            words = SENSOR_WORDS.get(sen.get("kind"))
+            if _sens_last.get(sen["id"], "?") != val:
+                _sens_last[sen["id"]] = val
+                word = words[0] if val else words[1]
+                if word:
+                    log("sensor", "sensor:" + sen["id"], sen.get("name") or sen["id"], word, True, by="Sensor")
+            return True
+    except Exception:                                              # noqa: BLE001
+        pass
     last = _ext_last.get(ref)
     if last and last[0] == text and now - last[1] < 1.0:           # doppelte Meldung desselben Zustands
         return False

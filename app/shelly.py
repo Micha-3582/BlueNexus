@@ -914,6 +914,48 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     return status(d)
 
 
+SENSOR_PRESETS = {                                                    # Schluessel -> (Sensorart, "an" bedeutet Wahr?)
+    "contact_closed": ("contact", False),      # an = geschlossen (Wahr = offen, deshalb umgekehrt)
+    "contact_open": ("contact", True),
+    "lock_locked": ("lock", True),
+    "lock_unlocked": ("lock", False),
+    "motion": ("motion", True),
+    "presence": ("presence", True),
+    "input": ("input", True),
+}
+
+
+def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_switch: bool = True) -> dict:
+    """Zustand eines Geraets (z. B. Tasmota-Relais, das nur den Torzustand meldet) zusaetzlich als Sensor anlegen: erscheint bei den Sensoren
+    (Dashboard, Regeln, Logbuch) mit passenden Worten (offen/geschlossen ...). lock_switch: das Geraet danach nicht mehr schaltbar (nur Anzeige)."""
+    import homematic
+    if preset not in SENSOR_PRESETS:
+        raise ShellyError("Unbekannte Art")
+    items = load_devices()
+    d = next((x for x in items if x["id"] == dev_id), None)
+    if not d or d.get("kind") == "remote":
+        raise ShellyError("Gerät nicht gefunden (oder von einer anderen Anlage geteilt)")
+    sid = "devS-" + dev_id
+    sens = homematic.load_sensors()
+    if any(s["id"] == sid for s in sens):
+        raise ShellyError("Für dieses Gerät gibt es schon einen Sensor")
+    kind, on_true = SENSOR_PRESETS[preset]
+    nm = (name or "").strip()[:60] or d.get("name") or dev_id
+    sen = {"id": sid, "kind": kind, "source": "device", "address": dev_id, "interface": "device", "datapoint": "", "binary": True, "unit": "", "model": d.get("model") or "Gerät",
+           "room": "", "name": nm, "show": True, "users": []}
+    if kind == "contact":
+        sen["invert"] = not on_true               # Wahr bedeutet "offen"; "an = geschlossen" heisst: Zustand an -> Sensor "geschlossen" = umkehren
+    elif not on_true:
+        sen["invert"] = True
+    sens.append(sen)
+    homematic._save_sensors(sens)
+    d["as_sensor"] = sid
+    if lock_switch:
+        d["switchable"] = False
+    _save(items)
+    return sen
+
+
 def tasmota_hook_set(dev_id: str, base: str | None) -> dict:
     """Meldung von Schaltvorgaengen (z. B. Lichtschranke, Taster am Geraet) ein-/ausschalten. base = "IP:Port" von BlueNexus im Heimnetz (None = ausschalten).
     Gilt fuer alle Relaiskanaele desselben Geraets."""
