@@ -668,7 +668,7 @@ def seed_favorites(users) -> None:
         refs.append("virtual:" + v["id"] if v else None)
         t = next((x for x in sens if "wohnzimmer" in str(x.get("name") or "").lower() and "temperatur" in str(x.get("name") or "").lower()), None)
         refs.append("sensor:" + t["id"] if t else None)
-        refs.append(dev("Pool-Waermepumpe", "Poolhaus"))
+        refs.append(dev("Pool-Wärmepumpe", "Poolhaus"))
         refs = [r for r in refs if r]
         if not refs:
             return
@@ -748,7 +748,7 @@ def seed_devicelog() -> None:
     kueche = dev("Küchenlicht", "Kuechenlicht")
     haustuer = dev("Haustürbeleuchtung", "Haustuerbeleuchtung")
     garage = dev("Garagentor")
-    pool = dev("Pool-Waermepumpe", "Pool")
+    pool = dev("Pool-Wärmepumpe", "Pool")
     huehner = dev("Hühnerstall", "Huehnerstall")
     fenster = sen("Küchentür", "Kuechentuer", "Küche", "Fenster")
     therm = one(sets, "setpoint", "Kinderzimmer Ben", "Schlafzimmer")
