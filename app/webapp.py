@@ -2234,6 +2234,7 @@ demo_sim.activate()                                            # Demo-Modus (BLU
 demo_sim.seed_favorites(users)                                  # Demo: feste erfundene Favoriten (Kachel 'Favoriten')
 
 ctrl = Controller()
+shelly.migrate_device_sensors()                                  # einmalig: Sensoren zu Geraeten der ersten Fassung richtigstellen
 perf.install()                                                  # Geschwindigkeits-Messung (Fehlersuche), nur im Speicher
 devicelog.install()                                            # Geraete-Logbuch: Schaltvorgaenge und Sensor-Wechsel mitschreiben
 

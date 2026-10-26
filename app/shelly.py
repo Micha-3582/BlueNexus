@@ -914,7 +914,7 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     return status(d)
 
 
-SENSOR_PRESETS = {                                                    # Schluessel -> (Sensorart, "an" bedeutet Wahr?)
+SENSOR_PRESETS = {                                                    # Schluessel -> (Sensorart, Geraet AN = Sensorwert Wahr?)  [Wahr = erstes Wort: offen / verriegelt / Bewegung ...]
     "contact_closed": ("contact", False),      # an = geschlossen (Wahr = offen, deshalb umgekehrt)
     "contact_open": ("contact", True),
     "lock_locked": ("lock", True),
@@ -942,11 +942,9 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
     kind, on_true = SENSOR_PRESETS[preset]
     nm = (name or "").strip()[:60] or d.get("name") or dev_id
     sen = {"id": sid, "kind": kind, "source": "device", "address": dev_id, "interface": "device", "datapoint": "", "binary": True, "unit": "", "model": d.get("model") or "Gerät",
-           "room": "", "name": nm, "show": True, "users": []}
-    if kind == "contact":
-        sen["invert"] = not on_true               # Wahr bedeutet "offen"; "an = geschlossen" heisst: Zustand an -> Sensor "geschlossen" = umkehren
-    elif not on_true:
-        sen["invert"] = True
+           "room": "", "name": nm, "show": True, "users": [], "dev_fixed": True}
+    if not on_true:
+        sen["dev_inv"] = True                     # Geraet AN ergibt den Sensorwert Falsch (z. B. AN = geschlossen); "Umkehren" des Sensors bleibt davon unberuehrt
     sens.append(sen)
     homematic._save_sensors(sens)
     d["as_sensor"] = sid
@@ -958,7 +956,7 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
 
 def sensor_preset_of(sen: dict) -> str:
     """Welche Auswahl (Preset) beschreibt diesen Sensor? (fuer das Aendern-Formular)"""
-    kind, inv = sen.get("kind"), bool(sen.get("invert"))
+    kind, inv = sen.get("kind"), bool(sen.get("dev_inv"))
     if kind == "contact":
         return "contact_closed" if inv else "contact_open"
     if kind == "lock":
@@ -979,11 +977,9 @@ def device_sensor_update(dev_id: str, preset: str | None = None, name: str | Non
             raise ShellyError("Unbekannte Art")
         kind, on_true = SENSOR_PRESETS[preset]
         sen["kind"] = kind
-        sen.pop("invert", None)
-        if kind == "contact":
-            sen["invert"] = not on_true
-        elif not on_true:
-            sen["invert"] = True
+        sen.pop("dev_inv", None)
+        if not on_true:
+            sen["dev_inv"] = True
     if name is not None and name.strip():
         sen["name"] = name.strip()[:60]
     homematic._save_sensors(sens)
@@ -1003,6 +999,24 @@ def device_sensor_remove(dev_id: str, unlock: bool = True) -> None:
     if unlock:
         d["switchable"] = True
     _save(items)
+
+
+def migrate_device_sensors() -> int:
+    """Einmalig: die erste Fassung hat "AN = geschlossen" ueber das Umkehren des Sensors geloest (falsch: kehrte auch die Worte um). Alte Sensoren zu Geraeten
+    bekommen stattdessen die eigene Zuordnung dev_inv."""
+    import homematic
+    sens = homematic.load_sensors()
+    n = 0
+    for s in sens:
+        if s.get("source") == "device" and "dev_inv" not in s and not s.get("dev_fixed"):
+            if s.get("invert"):
+                s["dev_inv"] = True
+            s.pop("invert", None)
+            s["dev_fixed"] = True
+            n += 1
+    if n:
+        homematic._save_sensors(sens)
+    return n
 
 
 def device_sensor_forget(sensor_id: str) -> None:

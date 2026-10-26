@@ -230,7 +230,7 @@ def external(ref: str, name: str, text: str, cat: str = "aktor") -> bool:
         d = shelly._find(ref.split(":", 1)[1]) if ref.startswith("device:") else None
         sen = next((s for s in homematic.load_sensors() if s["id"] == d.get("as_sensor")), None) if d and d.get("as_sensor") else None
         if sen:
-            val = (text == "eingeschaltet") != bool(sen.get("invert"))
+            val = ((text == "eingeschaltet") != bool(sen.get("dev_inv"))) != bool(sen.get("invert"))      # wie die Sensor-Abfrage: erst Zuordnung zum Geraet, dann Umkehren des Sensors
             words = SENSOR_WORDS.get(sen.get("kind"))
             if _sens_last.get(sen["id"], "?") != val:
                 _sens_last[sen["id"]] = val

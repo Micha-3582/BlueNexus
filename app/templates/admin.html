@@ -2117,8 +2117,8 @@ async function devAsSensor(id, name, sensorId) {
   loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
 }
 function sensorPresetOf(s) {
-  if (s.kind === 'contact') return s.invert ? 'contact_closed' : 'contact_open';
-  if (s.kind === 'lock') return s.invert ? 'lock_unlocked' : 'lock_locked';
+  if (s.kind === 'contact') return s.dev_inv ? 'contact_closed' : 'contact_open';
+  if (s.kind === 'lock') return s.dev_inv ? 'lock_unlocked' : 'lock_locked';
   return ['motion', 'presence', 'input'].includes(s.kind) ? s.kind : 'input';
 }
 async function devSensorEdit(id, sensorId) {

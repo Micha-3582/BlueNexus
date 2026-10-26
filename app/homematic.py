@@ -656,6 +656,8 @@ def _read_sensor_now(sen: dict):
             dv = shelly._find(sen.get("address", ""))
             st = shelly.status_cached(dv, 3.0) if dv else None
             v = None if (not st or st.get("online") is False) else st.get("on")
+            if v is not None and sen.get("dev_inv"):
+                v = not v                                      # Geraet AN = Sensorwert Falsch (z. B. AN = geschlossen)
             unreach = v is None
         elif sen.get("source") == "camera":                    # Reolink-Kamera: Bewegung/Person/Fahrzeug/Tier
             import camera
