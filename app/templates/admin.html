@@ -3936,7 +3936,7 @@ document.getElementById('nt-detect').addEventListener('click', async () => {
   const box = document.getElementById('nt-found'); box.innerHTML = ''; ntMsg('Suche …');
   try {
     const res = await shellyApi('/api/notify/detect', 'POST', { token: document.getElementById('nt-token').value });
-    ntMsg(res.length ? 'Treffer anklicken:' : 'Keine Nachricht gefunden – bitte dem Bot in Telegram zuerst eine Nachricht schreiben und nochmal versuchen.', !res.length);
+    ntMsg(res.length ? 'Treffer anklicken:' : 'Keine Nachricht gefunden. In Telegram den Chat mit DIESEM Bot öffnen, auf „Start“ tippen oder „hallo“ schreiben und nochmal versuchen. Wird der Bot schon woanders abgefragt (z. B. ioBroker), kommt hier nichts an – dann die Chat-ID von Hand eintragen (@userinfobot nennt sie).', !res.length);
     res.forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.style.textAlign = 'left';
       b.textContent = `${c.name} (${c.type || 'Chat'}) – ${c.id}`;
       b.onclick = () => { document.getElementById('nt-chat').value = c.id; box.innerHTML = ''; ntMsg('Übernommen – jetzt „Speichern“.'); };
@@ -3951,7 +3951,8 @@ document.getElementById('nt-save').addEventListener('click', async () => {
 });
 document.getElementById('nt-test').addEventListener('click', async () => {
   ntMsg('Sende …');
-  try { await shellyApi('/api/notify/test', 'POST'); ntMsg('Testnachricht gesendet ✓ – sie sollte gleich in Telegram erscheinen.'); }
+  const tok = document.getElementById('nt-token').value.trim(), chat = document.getElementById('nt-chat').value.trim();
+  try { await shellyApi('/api/notify/test', 'POST', (tok || chat) ? { token: tok, chat_id: chat } : undefined); ntMsg('Testnachricht gesendet ✓ – sie sollte gleich in Telegram erscheinen.' + ((tok || chat) ? ' Danach noch „Speichern“ drücken.' : '')); }
   catch (e) { ntMsg(e.message, true); }
 });
 ntLoad();

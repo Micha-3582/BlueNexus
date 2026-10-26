@@ -3840,9 +3840,14 @@ def api_notify_settings():
 @app.route("/api/notify/test", methods=["POST"])
 def api_notify_test():
     cfg = store.load_config()
-    rid = (request.get_json(silent=True) or {}).get("id")
+    body = request.get_json(silent=True) or {}
+    rid = body.get("id")
+    tok = str(body.get("token") or "").strip() or None                 # eingetippte, noch nicht gespeicherte Werte gleich ausprobieren
+    cid = str(body.get("chat_id") or "").strip() or None
+    if cid and not cid.lstrip("-").isdigit():
+        return jsonify(error="Die Chat-ID besteht nur aus Ziffern (ggf. mit Minus bei Gruppen und Kanälen)"), 400
     try:
-        notify.send(f"{notify._prefix(cfg)}✅ Testnachricht – die Benachrichtigungen funktionieren.", to=[rid] if rid else None)
+        notify.send(f"{notify._prefix(cfg)}✅ Testnachricht – die Benachrichtigungen funktionieren.", token=tok, chat_id=cid, to=[rid] if rid else None)
     except notify.NotifyError as e:
         return jsonify(error=str(e)), 400
     return jsonify(ok=True)
