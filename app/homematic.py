@@ -656,6 +656,9 @@ def _read_sensor_now(sen: dict):
             dv = shelly._find(sen.get("address", ""))
             st = shelly.status_cached(dv, 3.0) if dv else None
             v = None if (not st or st.get("online") is False) else st.get("on")
+            if sen.get("power_min") is not None:                  # Zustand aus der Leistung (z. B. Bewegungsmelder-Lampe hinter einem Messrelais): Wahr, wenn mehr als die Schwelle fliesst
+                pw = (st or {}).get("power")
+                v = None if (v is None or not isinstance(pw, (int, float))) else float(pw) > float(sen["power_min"])
             if v is not None and sen.get("dev_inv"):
                 v = not v                                      # Geraet AN = Sensorwert Falsch (z. B. AN = geschlossen)
             unreach = v is None

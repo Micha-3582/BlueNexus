@@ -5248,7 +5248,8 @@ def api_shelly_as_sensor(dev_id):
         return denied
     b = request.get_json(silent=True) or {}
     try:
-        sen = shelly.device_as_sensor(dev_id, str(b.get("preset") or ""), b.get("name") if isinstance(b.get("name"), str) else None, b.get("lock_switch") is not False)
+        sen = shelly.device_as_sensor(dev_id, str(b.get("preset") or ""), b.get("name") if isinstance(b.get("name"), str) else None, b.get("lock_switch") is not False,
+                                      shelly.parse_power_min(b.get("power_min")))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
     return jsonify(ok=True, sensor=sen["id"], name=sen["name"]), 201
@@ -5270,7 +5271,8 @@ def api_shelly_as_sensor_edit(dev_id):
                 return busy
             shelly.device_sensor_remove(dev_id, unlock=b.get("unlock") is not False)
             return jsonify(ok=True)
-        sen = shelly.device_sensor_update(dev_id, b.get("preset") if isinstance(b.get("preset"), str) else None, b.get("name") if isinstance(b.get("name"), str) else None)
+        sen = shelly.device_sensor_update(dev_id, b.get("preset") if isinstance(b.get("preset"), str) else None, b.get("name") if isinstance(b.get("name"), str) else None,
+                                          shelly.parse_power_min(b.get("power_min")) if "power_min" in b else "keep")
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
     return jsonify(ok=True, sensor=sen["id"], name=sen["name"], preset=shelly.sensor_preset_of(sen))

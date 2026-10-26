@@ -218,7 +218,7 @@ const COND_DEFAULT = {
   weekday: { type: 'weekday', days: [0, 1, 2, 3, 4] }, at: { type: 'at', time: '23:30', days: [] }, sun: { type: 'sun', event: 'sunset', offset: 0, days: [] }, sunwin: { type: 'sunwin', phase: 'night', start: 0, end: 0 }, time: { type: 'time', from: '09:00', to: '16:00', days: [] }, price: { type: 'price', op: 'below', ct: 25 },
   budget: { type: 'budget', minutes: 120, from: '06:00', to: '22:00' }, soc: { type: 'soc', op: 'above', pct: 50 }, sun_tomorrow: { type: 'sun_tomorrow', op: 'above', kwh: 15 },
 };
-const BIN_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+const BIN_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
 const SENSOR_DEFAULT_VALUE = { temperature: 20, humidity: 60, brightness: 100, power: 100 };
 function sensorDefault(sid) {                      // neue Sensor-Bedingung: Ja/Nein-Sensor -> TRUE, Messwert -> "ueber" Standardwert
   const s = (S.sensors || []).find(x => x.id === sid) || (S.sensors || [])[0];

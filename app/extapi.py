@@ -280,6 +280,7 @@ _SENSOR_WORDS = {
     "motion": ("motion", "none", "Bewegung", "keine Bewegung"),
     "presence": ("present", "absent", "anwesend", "niemand da"),
     "input": ("active", "inactive", "aktiv", "nicht aktiv"),
+    "running": ("on", "off", "an", "aus"),
     "key_short": ("pressed", "idle", "kurz gedrückt", "nicht gedrückt"),
     "key_long": ("pressed", "idle", "lang gedrückt", "nicht gedrückt"),
     "key_long_release": ("released", "idle", "lang losgelassen", "nicht losgelassen"),

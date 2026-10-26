@@ -1679,8 +1679,8 @@ async function loadShelly() {
   $('shelly-grid').innerHTML = list.map(d => shellyTile(d)).join('');
 }
 /* Sensoren (nur lesen): Ja/Nein als Punkt - gruen = Ja, rot = Nein; Messwerte als Zahl */
-const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
-const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung', 'keine Bewegung'], presence: ['anwesend', 'niemand da'], input: ['aktiv', 'nicht aktiv'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
+const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung', 'keine Bewegung'], presence: ['anwesend', 'niemand da'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
 async function loadSensors() {
   const card = $('sensors-card');
   if (!sensorsEnabled) { card.hidden = true; return; }

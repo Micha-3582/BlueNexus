@@ -2105,14 +2105,17 @@ async function shellyRenameSave(id) {
 }
 const SENSOR_PRESET_TEXT = [['contact_closed', 'Tor / Tür / Fenster: AN = geschlossen, AUS = offen'], ['contact_open', 'Tor / Tür / Fenster: AN = offen, AUS = geschlossen'],
   ['lock_locked', 'Schloss: AN = verriegelt, AUS = entriegelt'], ['lock_unlocked', 'Schloss: AN = entriegelt, AUS = verriegelt'], ['motion', 'Bewegung / Lichtschranke: AN = Bewegung erkannt'],
-  ['presence', 'Anwesenheit: AN = anwesend, AUS = niemand da'], ['input', 'Eingang: AN = aktiv, AUS = nicht aktiv']];
+  ['presence', 'Anwesenheit: AN = anwesend, AUS = niemand da'], ['input', 'Eingang: AN = aktiv, AUS = nicht aktiv'], ['running', 'Licht / Gerät: AN = läuft (an), AUS = aus']];
+const DETECT_OPTS = [['state', 'am Schaltzustand des Geräts (an / aus)'], ['power', 'an der Leistung: AN, wenn mehr Watt fließen als die Schwelle']];
 async function devAsSensor(id, name, sensorId) {
   if (sensorId) return devSensorEdit(id, sensorId);
   const r = await uiForm({ title: 'Zustand als Sensor anzeigen', message: 'Legt zu diesem Gerät einen Sensor an: mit Worten wie „offen / geschlossen“ im Dashboard, in Regeln und im Logbuch. Das Gerät selbst bleibt unverändert.',
     fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: name }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: 'contact_closed', options: SENSOR_PRESET_TEXT },
+      { id: 'detect', label: 'Woran erkennt BlueNexus den Zustand?', type: 'select', value: 'state', options: DETECT_OPTS },
+      { id: 'power_min', label: 'Schwelle in Watt (nur bei „an der Leistung“)', type: 'text', value: '5' },
       { id: 'lock_switch', label: 'Gerät danach nur noch anzeigen (nicht schaltbar)', type: 'checkbox', value: true }], okText: 'Sensor anlegen' });
   if (!r) return;
-  try { const j = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'POST', { preset: r.preset, name: r.name, lock_switch: r.lock_switch }); savedToast('Sensor „' + j.name + '“ angelegt ✓'); }
+  try { const j = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'POST', { preset: r.preset, name: r.name, lock_switch: r.lock_switch, power_min: r.detect === 'power' ? r.power_min : null }); savedToast('Sensor „' + j.name + '“ angelegt ✓'); }
   catch (e) { shellyMsg(e.message, true); }
   loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
 }
@@ -2125,11 +2128,13 @@ async function devSensorEdit(id, sensorId) {
   let sen = null; try { sen = (await (await fetch('/api/sensors?light=1', { cache: 'no-store' })).json()).find(s => s.id === sensorId); } catch (e) { /* Formular trotzdem */ }
   const r = await uiForm({ title: 'Sensor zu diesem Gerät', message: 'Hier korrigierst du, was der Zustand bedeutet, oder entfernst den Sensor wieder. Das Gerät selbst bleibt unverändert.',
     fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: sen ? sen.name : '' }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: sen ? sensorPresetOf(sen) : 'contact_closed', options: SENSOR_PRESET_TEXT },
+      { id: 'detect', label: 'Woran erkennt BlueNexus den Zustand?', type: 'select', value: sen && sen.power_min != null ? 'power' : 'state', options: DETECT_OPTS },
+      { id: 'power_min', label: 'Schwelle in Watt (nur bei „an der Leistung“)', type: 'text', value: sen && sen.power_min != null ? String(sen.power_min) : '5' },
       { id: 'remove', label: 'Sensor stattdessen entfernen', type: 'checkbox', value: false }, { id: 'unlock', label: 'Beim Entfernen das Gerät wieder schaltbar machen', type: 'checkbox', value: true }], okText: 'Speichern' });
   if (!r) return;
   try {
     if (r.remove) { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'DELETE', { unlock: r.unlock }); savedToast('Sensor entfernt ✓'); }
-    else { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'PATCH', { preset: r.preset, name: r.name }); savedToast('Sensor geändert ✓'); }
+    else { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'PATCH', { preset: r.preset, name: r.name, power_min: r.detect === 'power' ? r.power_min : null }); savedToast('Sensor geändert ✓'); }
   } catch (e) { shellyMsg(e.message, true); }
   loadShellyAdmin(); if (typeof loadSensorsAdmin === 'function') loadSensorsAdmin();
 }
@@ -2499,7 +2504,7 @@ document.getElementById('hm-scan').addEventListener('click', async e => {
 });
 loadHomematicInfo();
 /* Sensoren */
-const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
 const INV_LABEL = { lock: 'TRUE = entriegelt', contact: 'TRUE = geschlossen', motion: 'TRUE = keine Bewegung', presence: 'TRUE = niemand da', input: 'TRUE = nicht aktiv' };
 const INV_ON = { lock: 'TRUE = entriegelt, FALSE = verriegelt', contact: 'TRUE = geschlossen, FALSE = offen', motion: 'TRUE = keine Bewegung', presence: 'TRUE = niemand anwesend', input: 'TRUE = nicht aktiv, FALSE = aktiv' };
 const INV_OFF = { lock: 'TRUE = verriegelt, FALSE = entriegelt', contact: 'TRUE = offen, FALSE = geschlossen', motion: 'TRUE = Bewegung erkannt', presence: 'TRUE = jemand anwesend', input: 'TRUE = aktiv, FALSE = nicht aktiv' };
@@ -2543,7 +2548,7 @@ async function sensorRenameSave(id) {
   try { await shellyApi('/api/sensors/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
   loadSensorsAdmin();
 }
-const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
+const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
 const SENSOR_EXTRA_ICONS = ['🚪', '🪟', '🏃', '🧍', '🚶', '👀', '🔑', '🚨', '📬', '🚗', '🚲', '🐕', '🐈', '🔥', '💦', '🌡️', '☀️', '⚡'];
 function sensorPickIcon(id) { const el = document.getElementById('sicons-' + id); el.style.display = el.style.display === 'none' ? 'flex' : 'none'; }
 async function sensorSetIcon(id, icon) {

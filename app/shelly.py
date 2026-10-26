@@ -922,10 +922,11 @@ SENSOR_PRESETS = {                                                    # Schluess
     "motion": ("motion", True),
     "presence": ("presence", True),
     "input": ("input", True),
+    "running": ("running", True),             # Licht / Geraet: AN = laeuft (meist zusammen mit Leistungs-Schwelle)
 }
 
 
-def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_switch: bool = True) -> dict:
+def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_switch: bool = True, power_min: float | None = None) -> dict:
     """Zustand eines Geraets (z. B. Tasmota-Relais, das nur den Torzustand meldet) zusaetzlich als Sensor anlegen: erscheint bei den Sensoren
     (Dashboard, Regeln, Logbuch) mit passenden Worten (offen/geschlossen ...). lock_switch: das Geraet danach nicht mehr schaltbar (nur Anzeige)."""
     import homematic
@@ -944,6 +945,8 @@ def device_as_sensor(dev_id: str, preset: str, name: str | None = None, lock_swi
     sen = {"id": sid, "kind": kind, "source": "device", "address": dev_id, "interface": "device", "datapoint": "", "binary": True, "unit": "", "model": d.get("model") or "Gerät",
            "room": "", "name": nm, "show": True, "users": [], "dev_fixed": True}
     sen["dev_v2"] = True
+    if power_min is not None:
+        sen["power_min"] = power_min               # Zustand aus der Leistung: Wahr, wenn mehr als so viele Watt fliessen
     if not on_true:
         sen["dev_inv"] = True                     # "AN" ist das ZWEITE Wort (geschlossen / entriegelt): Rohwert Falsch ...
         sen["invert"] = True                      # ... und mit "Umkehren" (wie bei Fenstern/Tueren ueblich) gilt dann TRUE = dieses Wort, also AN = TRUE – geschlossen
@@ -966,7 +969,7 @@ def sensor_preset_of(sen: dict) -> str:
     return kind if kind in SENSOR_PRESETS else "input"
 
 
-def device_sensor_update(dev_id: str, preset: str | None = None, name: str | None = None) -> dict:
+def device_sensor_update(dev_id: str, preset: str | None = None, name: str | None = None, power_min="keep") -> dict:
     """Bedeutung/Name des zu einem Geraet angelegten Sensors aendern."""
     import homematic
     d = _find(dev_id)
@@ -987,9 +990,27 @@ def device_sensor_update(dev_id: str, preset: str | None = None, name: str | Non
             sen["invert"] = True
     if name is not None and name.strip():
         sen["name"] = name.strip()[:60]
+    if power_min != "keep":                         # None = Erkennung wieder am Schaltzustand (an/aus), Zahl = Leistungs-Schwelle in Watt
+        if power_min is None:
+            sen.pop("power_min", None)
+        else:
+            sen["power_min"] = power_min
     homematic._save_sensors(sens)
     homematic._value_cache.pop(sen["id"], None)
     return sen
+
+
+def parse_power_min(value) -> float | None:
+    """Schwelle in Watt aus der Eingabe: leer/None = keine (Schaltzustand zaehlt); sonst Zahl >= 0 (ShellyError bei Unsinn)."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        v = float(str(value).replace(",", "."))
+    except ValueError:
+        raise ShellyError("Die Schwelle muss eine Zahl in Watt sein (z. B. 5)")
+    if v != v or v < 0 or v > 100000:
+        raise ShellyError("Die Schwelle muss zwischen 0 und 100000 Watt liegen")
+    return round(v, 1)
 
 
 def device_sensor_remove(dev_id: str, unlock: bool = True) -> None:
