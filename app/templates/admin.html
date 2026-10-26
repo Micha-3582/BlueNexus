@@ -1778,12 +1778,17 @@ function uiForm({ title, message, fields, okText = 'OK' }) {
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
       <h3 style="margin:0 0 10px;font-size:17px">${esc(title)}</h3>${message ? `<div class="muted" style="margin-bottom:12px">${esc(message)}</div>` : ''}
-      ${fields.map(f => f.type === 'checkbox' ? `<label class="chk" style="margin:10px 0"><input type="checkbox" data-f="${esc(f.id)}"${f.value ? ' checked' : ''}> ${esc(f.label)}</label>`
-        : `<div style="margin:10px 0"><label>${esc(f.label)}</label>${f.type === 'select' ? `<select data-f="${esc(f.id)}">${f.options.map(o => `<option value="${esc(o[0])}"${o[0] === f.value ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select>` : `<input data-f="${esc(f.id)}" value="${esc(f.value)}" maxlength="60" autocomplete="off">`}</div>`).join('')}
+      ${fields.map(f => f.type === 'checkbox' ? `<label class="chk" style="margin:10px 0" ${f.showIf ? `data-showif="${esc(f.showIf.join('='))}"` : ''}><input type="checkbox" data-f="${esc(f.id)}"${f.value ? ' checked' : ''}> ${esc(f.label)}</label>`
+        : `<div style="margin:10px 0" ${f.showIf ? `data-showif="${esc(f.showIf.join('='))}"` : ''}><label>${esc(f.label)}</label>${f.type === 'select' ? `<select data-f="${esc(f.id)}">${f.options.map(o => `<option value="${esc(o[0])}"${o[0] === f.value ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select>` : `<input data-f="${esc(f.id)}" value="${esc(f.value)}" maxlength="60" autocomplete="off">`}</div>`).join('')}
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button class="ghost dlg-no">Abbrechen</button><button class="dlg-ok">${esc(okText)}</button></div></div>`;
     const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
     const ok = () => { const out = {}; ov.querySelectorAll('[data-f]').forEach(e => { out[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value; }); close(out); };
     const onKey = e => { if (e.key === 'Escape') close(null); };
+    const sync = () => ov.querySelectorAll('[data-showif]').forEach(w => {          // Feld nur zeigen, wenn ein anderes Feld einen bestimmten Wert hat (showIf: [feld, wert])
+      const [k, v] = w.dataset.showif.split('='), c = ov.querySelector(`[data-f="${k}"]`);
+      w.style.display = c && String(c.type === 'checkbox' ? c.checked : c.value) === v ? '' : 'none';
+    });
+    ov.querySelectorAll('select, input[type=checkbox]').forEach(e => e.addEventListener('change', sync)); sync();
     ov.querySelector('.dlg-ok').onclick = ok; ov.querySelector('.dlg-no').onclick = () => close(null);
     ov.addEventListener('mousedown', e => { if (e.target === ov) close(null); });
     document.addEventListener('keydown', onKey); document.body.appendChild(ov);
@@ -2106,13 +2111,13 @@ async function shellyRenameSave(id) {
 const SENSOR_PRESET_TEXT = [['contact_closed', 'Tor / Tür / Fenster: AN = geschlossen, AUS = offen'], ['contact_open', 'Tor / Tür / Fenster: AN = offen, AUS = geschlossen'],
   ['lock_locked', 'Schloss: AN = verriegelt, AUS = entriegelt'], ['lock_unlocked', 'Schloss: AN = entriegelt, AUS = verriegelt'], ['motion', 'Bewegung / Lichtschranke: AN = Bewegung erkannt'],
   ['presence', 'Anwesenheit: AN = anwesend, AUS = niemand da'], ['input', 'Eingang: AN = aktiv, AUS = nicht aktiv'], ['running', 'Licht / Gerät: AN = läuft (an), AUS = aus']];
-const DETECT_OPTS = [['state', 'am Schaltzustand des Geräts (an / aus)'], ['power', 'an der Leistung: AN, wenn mehr Watt fließen als die Schwelle']];
+const DETECT_OPTS = [['state', 'am Schaltzustand des Geräts (an / aus)'], ['power', 'an der Leistung (Watt-Schwelle)']];
 async function devAsSensor(id, name, sensorId) {
   if (sensorId) return devSensorEdit(id, sensorId);
   const r = await uiForm({ title: 'Zustand als Sensor anzeigen', message: 'Legt zu diesem Gerät einen Sensor an: mit Worten wie „offen / geschlossen“ im Dashboard, in Regeln und im Logbuch. Das Gerät selbst bleibt unverändert.',
     fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: name }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: 'contact_closed', options: SENSOR_PRESET_TEXT },
       { id: 'detect', label: 'Woran erkennt BlueNexus den Zustand?', type: 'select', value: 'state', options: DETECT_OPTS },
-      { id: 'power_min', label: 'Schwelle in Watt (nur bei „an der Leistung“)', type: 'text', value: '5' },
+      { id: 'power_min', label: 'Schwelle in Watt – AN, wenn mehr fließt', type: 'text', value: '5', showIf: ['detect', 'power'] },
       { id: 'lock_switch', label: 'Gerät danach nur noch anzeigen (nicht schaltbar)', type: 'checkbox', value: true }], okText: 'Sensor anlegen' });
   if (!r) return;
   try { const j = await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/as-sensor', 'POST', { preset: r.preset, name: r.name, lock_switch: r.lock_switch, power_min: r.detect === 'power' ? r.power_min : null }); savedToast('Sensor „' + j.name + '“ angelegt ✓'); }
@@ -2129,7 +2134,7 @@ async function devSensorEdit(id, sensorId) {
   const r = await uiForm({ title: 'Sensor zu diesem Gerät', message: 'Hier korrigierst du, was der Zustand bedeutet, oder entfernst den Sensor wieder. Das Gerät selbst bleibt unverändert.',
     fields: [{ id: 'name', label: 'Name des Sensors', type: 'text', value: sen ? sen.name : '' }, { id: 'preset', label: 'Was bedeutet der Zustand?', type: 'select', value: sen ? sensorPresetOf(sen) : 'contact_closed', options: SENSOR_PRESET_TEXT },
       { id: 'detect', label: 'Woran erkennt BlueNexus den Zustand?', type: 'select', value: sen && sen.power_min != null ? 'power' : 'state', options: DETECT_OPTS },
-      { id: 'power_min', label: 'Schwelle in Watt (nur bei „an der Leistung“)', type: 'text', value: sen && sen.power_min != null ? String(sen.power_min) : '5' },
+      { id: 'power_min', label: 'Schwelle in Watt – AN, wenn mehr fließt', type: 'text', value: sen && sen.power_min != null ? String(sen.power_min) : '5', showIf: ['detect', 'power'] },
       { id: 'remove', label: 'Sensor stattdessen entfernen', type: 'checkbox', value: false }, { id: 'unlock', label: 'Beim Entfernen das Gerät wieder schaltbar machen', type: 'checkbox', value: true }], okText: 'Speichern' });
   if (!r) return;
   try {
