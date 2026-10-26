@@ -78,7 +78,7 @@ AREA_GROUPS = [
 
 # Neue Bereiche, die es frueher nicht gab: Fehlt der Eintrag in gespeicherten Rechten, gilt der Wert des alten Bereichs,
 # damit bestehende Konten nach dem Update unveraendert weiterarbeiten koennen.
-_INHERIT = {"smarthome_wol": "settings_geraete", "smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "smarthome_teilen": "user_management", "verlauf": "user_management"}
+_INHERIT = {"smarthome_logbuch": "user_management", "smarthome_wol": "settings_geraete", "smarthome_sicherheit": "settings_geraete", "smarthome_einrichten": "settings_geraete", "smarthome_nfc": "user_management", "smarthome_teilen": "user_management", "verlauf": "user_management"}
 
 PRESETS = {
     "admin": {a: "write" for a in AREA_IDS},
