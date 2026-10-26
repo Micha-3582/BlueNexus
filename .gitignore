@@ -75,3 +75,4 @@ app/midea_login.json
 app/midea_session.json
 app/midea_device_id.txt
 app/telegram_requests.json
+app/devicelog.jsonl

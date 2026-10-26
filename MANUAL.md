@@ -54,7 +54,7 @@ Die Software besteht aus drei Teilen, die zusammenarbeiten:
 | **Dashboard** | Ein Dashboard für alles: Energie, Preise, Geräte, Schalter und Sensoren. |
 | **Verläufe** | Diagramme aufgezeichneter Messwerte (siehe [Kapitel 3b](#3b-verläufe-diagramme-der-messwerte)); nur mit dem Recht „Verläufe“. |
 | **Kameras** | Standbilder und Live-Ansicht der Reolink-Kameras (nur sichtbar, wenn das Konto das Recht „Kameras“ hat). |
-| **Smart Home** | Alles rund ums Haus. Unter-Reiter: **Aktoren · Sensoren · Thermostate · Sicherheit · Regeln · Geräte suchen · NFC + QR · Teilen · Wake-on-LAN · Sonstiges**. Es öffnet immer bei „Aktoren“. |
+| **Smart Home** | Alles rund ums Haus. Unter-Reiter: **Aktoren · Sensoren · Thermostate · Sicherheit · Regeln · Geräte suchen · NFC + QR · Teilen · Wake-on-LAN · Logbuch · Sonstiges**. Es öffnet immer bei „Aktoren“. |
 | **Einstellungen** | Die Energiesteuerung und die App selbst: Anlage, Tarif & Laden, VRM, **Automatik** (Überschuss-Schaltung), Wetter, Meldungen, Dashboard, System, **Konto & Benutzer**. |
 
 So bleiben Energiesteuerung (Einstellungen) und Smart Home (eigener Bereich) getrennt, und trotzdem siehst du alles zusammen auf **einem** Dashboard.
@@ -332,6 +332,7 @@ Admin legt fest, welche Kacheln global sichtbar sind und in welcher Reihenfolge.
 | **Sensoren** | Sensoren von Homematic und Zigbee. |
 | **Thermostate** | Thermostate von Homematic und Zigbee. |
 | **Sicherheit** | Türschlösser (sicherheitsrelevante Geräte). |
+| **Logbuch** | Wer hat wann welches Gerät bedient (siehe „Logbuch der Geräte“ unten). |
 | **Regeln** | Regel-Editor (Kapitel 10). |
 | **Geräte suchen** | „Welche Systeme hast du?“ (Häkchen) und je System ein Fenster zum Suchen und Einrichten. |
 | **Wake-on-LAN** | Rechner zum Aufwecken (Kapitel 11). |
@@ -419,6 +420,14 @@ Sensoren sind in Regeln als Bedingung nutzbar („WENN Sensor wahr/falsch“ bzw
 Homematic und Zigbee. In Abläufen kann man die **Solltemperatur setzen**, z. B. „alle Thermostate auf 25 °C“. Der Einstellbereich ist **5 bis 30 °C** (kleinere oder größere Werte werden darauf begrenzt, auch in älteren Regeln); zusätzlich gilt der Bereich des Geräts.
 
 **Von Hand einstellen:** In der Liste unter *Smart Home → Thermostate* zeigt jedes Thermostat die aktuelle Solltemperatur mit **−** und **+** (Schritte von 0,5 °C) und einem **Regler** (ganz links die kälteste Stufe, ganz rechts die wärmste). Die Änderung wird kurz nach dem letzten Tippen bzw. beim Loslassen des Reglers an das Thermostat geschickt, und eine Meldung bestätigt den Wert. Das Einstellen braucht das Recht **Dashboard: Schreiben**; wer nur lesen darf, sieht die Temperatur ohne Bedienelemente. **Wer welches Thermostat sieht und einstellen darf**, legt der Administrator hinter dem **Stift ✎ → Sichtbarkeit** fest (bei Thermostaten, die du neu anlegst, zunächst nur Administratoren; schon vorhandene bleiben für alle sichtbar). Eine Regel kann den Wert später wieder überschreiben. **Teilen:** Thermostate lassen sich wie Geräte mit anderen BlueNexus-Anlagen teilen (✎ → Teilen-Symbol; „nur sehen“ oder „sehen & bedienen“). Wer sie holt, sieht sie mit Vermerk „von …“, stellt die Temperatur genauso ein und kann sie in Regeln nutzen; der Geber setzt den Wert mit seinem eigenen Zugang (die CCU braucht nur er).
+
+### Logbuch der Geräte
+
+*Smart Home → Logbuch.*
+
+Hier steht, **wann welches Gerät bedient wurde und von wem**: von Hand (mit dem Konto), per **Regel** (mit Regelname), durch die **Überschuss-Automatik**, per **Alexa** oder über eine **Freigabe** an eine andere Anlage (Telegram-Wörter und NFC laufen über Regeln und stehen mit dem Regelnamen da). Erfasst werden Geräte und Schalter, Klimaanlagen, Rollläden, Soundmodule, Wake-on-LAN, **Thermostate** (Solltemperatur) und **Türschlösser** (verriegelt/entriegelt/geöffnet), auch fehlgeschlagene Versuche (rot). Dazu kommen die **Wechsel von Ja/Nein-Sensoren** (Fenster/Tür offen oder geschlossen, Bewegung erkannt, Anwesenheit, Schloss, Eingang, Taste) – gemerkt, sobald die App den Sensor liest (Dashboard, Regeln oder Schnittstelle); ein Sensor, den nie jemand abfragt, meldet nichts.
+
+Oben filterst du nach **Aktoren · Sensoren · Thermostate · Sicherheit** und suchst nach Gerät, Text oder Konto. In den Listen (Aktoren, Thermostate, Schlösser, Rollläden, Wake-on-LAN) steht hinter jedem Eintrag ein Hinweis **„zuletzt … heute 14:03 (Name)“**. **Jeder sieht nur, was er auch sehen darf**: Geräte nach der Sichtbarkeit, Türschlösser nur mit dem Recht „Sicherheit: Lesen“. Das Logbuch gehört zum Reiter *Geräte* (Recht „Geräte: Lesen“). Es wird auf etwa 2 MB begrenzt, die ältesten Einträge verschwinden von selbst. Außerdem hat die App weiter das **Regel-Logbuch** (nur Regeln) und das Betriebsprotokoll für Administratoren.
 
 ### Türschlösser (Homematic IP und klassisches Keymatic)
 

@@ -34,6 +34,7 @@ import shelly
 import store
 import surplus
 import tuya
+import devicelog
 import homematic
 import midea
 import verlauf
@@ -273,7 +274,7 @@ ENDPOINT_AREA = {
     "api_sound_list": "dashboard", "api_sound_scan": "smarthome_einrichten", "api_sound_add": "smarthome_einrichten", "api_sound_modify": "settings_geraete", "api_sound_play": "smarthome_einrichten",
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
-    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_lock_action": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
+    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_lock_action": "smarthome_sicherheit", "api_devicelog": "settings_geraete", "api_devicelog_last": "settings_geraete", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
     "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete", "api_virtual_url": "settings_geraete",
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
@@ -467,6 +468,7 @@ SMARTHOME_TABS = [
     ("nfc", "NFC + QR", "/smarthome#nfc", "smarthome_nfc", 3),
     ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
+    ("logbuch", "Logbuch", "/smarthome#logbuch", "settings_geraete", 3),
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
 ]
@@ -1785,6 +1787,7 @@ class Controller:
                 log.warning("Ueberschuss-Automatik: %s", e)
             self._stop.wait(10)
 
+    @devicelog.as_actor(lambda self, act, dry, cfg: "Überschuss-Automatik")
     def _apply_surplus(self, act, dry: bool, cfg: dict):
         action, dev, why = act
         on = action == "on"
@@ -1899,6 +1902,7 @@ class Controller:
         opslog.log("rules", text, dry=dry)
         autolog.log("rules", text, dev=rule.get("name", ""), action=kind, dry=dry, rule=rule.get("id"))
 
+    @devicelog.as_actor(lambda self, act, dry, cfg: f"Regel „{act['rule'].get('name', '')}“")
     def _apply_flow(self, act, dry: bool, cfg: dict):
         """Ein Schritt eines Ablaufs: Geraet schalten, Sollwert setzen, Nachricht senden, eigenen Schalter setzen."""
         st, rule = act["step"], act["rule"]
@@ -2125,6 +2129,7 @@ class Controller:
             opslog.log("rules", full, dry=dry)
             autolog.log("rules", full, dev=dev, action=("fail" if err else action), dry=dry, rule=act["rule_id"])
 
+    @devicelog.as_actor(lambda self, act, dry, cfg: "Regel „" + str(next((r.get('name') for r in rules.list_rules() if r.get('id') == act[3]), '')) + "“")
     def _apply_rule(self, act, dry: bool, cfg: dict):
         action, dev, why, rule_id = act
         if action in ("adopt", "manual", "paused"):      # nur ins Logbuch: nichts wird geschaltet
@@ -2201,6 +2206,7 @@ demo_sim.activate()                                            # Demo-Modus (BLU
 demo_sim.seed_favorites(users)                                  # Demo: feste erfundene Favoriten (Kachel 'Favoriten')
 
 ctrl = Controller()
+devicelog.install()                                            # Geraete-Logbuch: Schaltvorgaenge und Sensor-Wechsel mitschreiben
 
 
 # --- Routen ---------------------------------------------------------------
@@ -2261,6 +2267,7 @@ def _alexa_states(devs: list) -> dict:
     return out
 
 
+@devicelog.as_actor(lambda *a, **k: "Alexa")
 def _alexa_set(dev: dict, on: bool) -> bool:
     """Schalten per Sprache. Geraete mit PIN werden NIE per Sprache geschaltet (Sicherheit)."""
     if dev["kind"] == "virtual":
@@ -5141,6 +5148,49 @@ def api_lock_add():
         return jsonify(added=res)
     except homematic.HomematicError as e:
         return jsonify(error=str(e)), 400
+
+
+def _devlog_allow():
+    """Funktion ref -> darf dieses Konto den Eintrag sehen? (Administratoren alles; sonst nur, was ihnen freigegeben ist; Schloesser nur mit Recht Sicherheit)"""
+    if auth.is_full_admin(g.perms):
+        return lambda ref: True
+    ok_ids = {}
+    for kind, reg in _VIS_KINDS.items():
+        try:
+            load, _save = reg()
+            ok_ids[kind] = {x.get("id") for x in load() if _visible(x)}
+        except Exception:                                    # noqa: BLE001
+            ok_ids[kind] = set()
+    lock_ok = auth.has_level(g.perms, "smarthome_sicherheit", "read")
+
+    def allow(ref: str) -> bool:
+        kind, _, i = ref.partition(":")
+        if kind == "lock":
+            return lock_ok
+        return i in ok_ids.get("shelly" if kind == "device" else kind, set())          # Referenz "device:" = Register der Geraete ("shelly")
+    return allow
+
+
+@app.route("/api/devicelog", methods=["GET"])
+def api_devicelog():
+    """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Nur, was das Konto sehen darf."""
+    if not store.module_on("smarthome"):
+        return jsonify(entries=[])
+    cat = request.args.get("cat")
+    cat = cat if cat in devicelog.CATS else None
+    try:
+        limit = min(500, max(1, int(request.args.get("limit", 200))))
+    except ValueError:
+        limit = 200
+    return jsonify(entries=devicelog.recent(limit, cat, request.args.get("q"), _devlog_allow()))
+
+
+@app.route("/api/devicelog/last", methods=["GET"])
+def api_devicelog_last():
+    """Letzte Bedienung je Geraet (Hinweis "zuletzt ..." in den Listen)."""
+    if not store.module_on("smarthome"):
+        return jsonify({})
+    return jsonify(devicelog.last_map(_devlog_allow()))
 
 
 @app.route("/api/homematic/locks/<lid>/action", methods=["POST"])

@@ -179,6 +179,7 @@ Kamera-Standbild** · **Telegram mit Video zum Ereignis** (aus der SD-Karten-Auf
 
 - **Trockenlauf:** Regeln werden nur protokolliert, nichts wird geschaltet – ideal zum Ausprobieren.
 - **Logbuch** zeigt, was wann und warum geschaltet wurde.
+- **Logbuch der Geräte** (Smart Home → Logbuch): wer hat wann welches Gerät, Thermostat oder Schloss bedient – von Hand, per Regel, Automatik, Alexa oder Freigabe – plus Wechsel von Fenster-, Tür- und Bewegungssensoren; in den Listen steht je Gerät „zuletzt …“.
 - **Gruppen:** Regeln lassen sich in frei benennbare Gruppen sortieren (auf- und zuklappbar, per Ziehen sortierbar).
 - **Regeln steuern Regeln:** Ein Schritt „Regel ein-/ausschalten“ und die Bedingung „Regel (an/aus)“ – z. B. schaltet eine Zeit-Regel das Bewegungslicht zu bestimmten Zeiten ab.
   Änderungen in der Regelliste (Gruppen, Reihenfolge, Ein/Aus, Löschen) gelten **sofort**; eine Regel im Regel-Editor

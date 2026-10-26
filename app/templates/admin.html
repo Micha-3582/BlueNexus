@@ -791,6 +791,17 @@
   <div class="admin-only" style="margin-top:10px"><button id="wol-add" class="ghost">Anlegen</button></div>
 </div>
 
+<div class="card msg-host" id="fam-devlog" data-tab="logbuch">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Logbuch <span class="qhelp" role="button" tabindex="0" data-help="Wer hat wann welches Gerät bedient: von Hand (mit Konto), per Regel, Überschuss-Automatik, Alexa oder Freigabe. Dazu die Zustandswechsel von Ja/Nein-Sensoren (Fenster, Tür, Bewegung, Anwesenheit, Schloss). Jeder sieht nur, was er auch sehen darf. Die ältesten Einträge werden automatisch entfernt.">?</span></h2>
+  <div class="sub">Wann wurde was bedient oder gemeldet – Aktoren, Sensoren, Thermostate, Sicherheit.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <select id="devlog-cat" style="width:auto"><option value="">Alles</option><option value="aktor">Aktoren</option><option value="sensor">Sensoren</option><option value="thermostat">Thermostate</option><option value="sicherheit">Sicherheit</option></select>
+    <input id="devlog-q" type="search" placeholder="Suchen (Gerät, Text, Wer)" style="flex:1;min-width:180px" autocomplete="off">
+    <button class="ghost" id="devlog-reload" title="Neu laden">↻</button>
+  </div>
+  <div id="devlog-list" style="display:flex;flex-direction:column;gap:4px"></div>
+</div>
+
 <div class="card fam-card msg-host" id="fam-sensors" data-tab="sensoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Sensoren <span class="qhelp" role="button" tabindex="0" data-help="Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Helligkeit und Leistung. In <a href=&quot;/rules&quot;>Regeln</a> als Bedingung nutzbar („Sensor wahr/falsch“ bzw. „unter/über“).">?</span></h2>
   <div class="sub">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
@@ -1889,6 +1900,7 @@ async function tglField(btn, kind, id, field, label) {            // kind: 'shel
   } catch (e) { shellyMsg(e.message, true); }
 }
 async function loadShellyAdmin(light) {              // light: nur Stammdaten, sofort da (Live-Status kommt per refreshShellyStatus)
+  await devLastFresh();
   if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (e) { /* egal */ } }
   let list = [];
   try { list = await (await fetch('/api/shelly' + (light ? '?light=1' : ''))).json(); } catch (e) { return; }
@@ -1900,7 +1912,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="shellyPickIcon('${id}')">${escH(d.icon)}</button>
         <div style="flex:1;min-width:150px"><b>${escH(d.name)}</b>${shareMark('shelly', id, d.kind === 'remote')}
-          <div class="muted">${escH([d.model, d.ip].filter(Boolean).join(' · '))} · <span class="dev-stat">${escH(shellyStatText(d))}</span></div></div>
+          <div class="muted">${escH([d.model, d.ip].filter(Boolean).join(' · '))} · <span class="dev-stat">${escH(shellyStatText(d))}</span><span class="dev-last">${lastTxt('device:' + d.id)}</span></div></div>
         ${d.kind === 'wled' && d.switchable !== false ? `<input type="range" min="0" max="100" step="1" value="${d.on ? (d.brightness || 100) : 0}" style="width:140px" title="Helligkeit in Prozent: ganz links 0 % = aus, ganz rechts 100 % – beim Loslassen übernommen" oninput="this.nextElementSibling.textContent = this.value + ' %'" onchange="wledBrightness('${id}', this.value)"><b class="rng-val" style="min-width:44px;text-align:right">${d.on ? (d.brightness || 100) : 0} %</b>
           <button class="ghost" onclick="wledPanel('${id}')" title="Farbe, Effekt und Voreinstellung einstellen">🎨</button>` : ''}
         ${isAc(d) && d.switchable !== false ? `<button class="ghost" onclick="mideaPanel('${id}')" title="Modus, Temperatur, Lüfter einstellen">❄ Klima</button>` : ''}
@@ -2295,6 +2307,42 @@ function famSeen(cardId, hintId, n) {
   window.FAM_N[cardId] = n; const c = document.getElementById(cardId), h = hintId && document.getElementById(hintId);
   if (n) { if (c) c.classList.remove('fam-off'); if (h) h.classList.add('fam-off'); }
 }
+/* --- Geraete-Logbuch + "zuletzt ..." in den Listen --- */
+window.DEVLAST = {};
+const DEVLOG_ICON = { aktor: '🔌', sensor: '📟', thermostat: '🌡️', sicherheit: '🔒' };
+function devFmtWhen(ts) {
+  const d = new Date(ts); if (isNaN(d)) return '';
+  const t = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }), now = new Date();
+  const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  return same(d, now) ? 'heute ' + t : same(d, y) ? 'gestern ' + t : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + '. ' + t;
+}
+const lastTxt = ref => { const e = window.DEVLAST[ref]; return e ? ` · zuletzt ${e.ok === false ? 'Fehler beim Schalten' : escH(e.text)} ${devFmtWhen(e.ts)}${e.by && e.by !== 'System' ? ' (' + escH(String(e.by).replace(/^Konto „(.*)“$/, '$1')) + ')' : ''}` : ''; };
+async function loadDevLast() { try { const j = await (await fetch('/api/devicelog/last', { cache: 'no-store' })).json(); if (j && !j.error) window.DEVLAST = j; } catch (e) { /* ohne Hinweis */ } }
+let devLastAt = Date.now();
+window.DEVLAST_P = loadDevLast();
+function devLastFresh() {                                               // beim Neuzeichnen einer Liste die "zuletzt"-Hinweise auffrischen (hoechstens alle 4 s)
+  if (Date.now() - devLastAt > 4000) { devLastAt = Date.now(); window.DEVLAST_P = loadDevLast(); }
+  return window.DEVLAST_P;
+}
+async function loadDevLog() {
+  const box = document.getElementById('devlog-list'); if (!box) return;
+  const cat = document.getElementById('devlog-cat').value, q = document.getElementById('devlog-q').value.trim();
+  let j; try { j = await (await fetch('/api/devicelog?limit=300' + (cat ? '&cat=' + cat : '') + (q ? '&q=' + encodeURIComponent(q) : ''), { cache: 'no-store' })).json(); } catch (e) { return; }
+  const list = (j && j.entries) || [];
+  box.innerHTML = list.length ? list.map(e => `<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:6px 2px">
+      <span class="muted" style="min-width:104px;font-variant-numeric:tabular-nums">${escH(devFmtWhen(e.ts))}</span>
+      <span style="min-width:22px">${DEVLOG_ICON[e.cat] || '•'}</span>
+      <span style="flex:1;min-width:200px"><b>${escH(e.name)}</b> – <span${e.ok === false ? ' style="color:#e5544a"' : ''}>${escH(e.text)}</span></span>
+      <span class="muted">${escH(String(e.by || '').replace(/^Konto „(.*)“$/, '$1'))}</span></div>`).join('')
+    : '<div class="muted">Noch keine Einträge' + (cat || q ? ' für diese Auswahl' : '') + '.</div>';
+}
+document.getElementById('devlog-cat')?.addEventListener('change', loadDevLog);
+document.getElementById('devlog-reload')?.addEventListener('click', () => { loadDevLog(); loadDevLast(); });
+let devlogTimer = null;
+document.getElementById('devlog-q')?.addEventListener('input', () => { clearTimeout(devlogTimer); devlogTimer = setTimeout(loadDevLog, 350); });
+setInterval(() => { const c = document.getElementById('fam-devlog'); if (c && c.offsetParent !== null && document.activeElement !== document.getElementById('devlog-q')) loadDevLog(); }, 15000);
+loadDevLog();
 function applyFamilies(f) {
   const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
@@ -2442,13 +2490,14 @@ loadSensorsAdmin(true).then(() => loadSensorsAdmin()); setInterval(() => { if (!
 
 /* --- Wake-on-LAN --- */
 async function loadWolAdmin(light) {
+  await devLastFresh();
   let list = []; try { list = await (await fetch('/api/wol' + (light ? '?light=1' : ''), { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   const wasOpen = openEdits('wedit-');
   document.getElementById('wol-list').innerHTML = list.length ? list.map(w => { const wid = escH(w.id); return `<div data-sort-id="${wid}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:22px">${escH(w.icon)}</span>
-      <div style="flex:1;min-width:150px"><b>${escH(w.name)}</b>${shareMark('wol', wid, w.source === 'remote')}<div class="muted">${w.source === 'remote' ? escH(w.model || 'geteilt') : escH(w.mac) + (w.ip ? ' · ' + escH(w.ip) : '')}${w.up === true ? ' · 🟢 erreichbar' : w.up === false ? ' · ⚪ nicht erreichbar' : ''}</div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(w.name)}</b>${shareMark('wol', wid, w.source === 'remote')}<div class="muted">${w.source === 'remote' ? escH(w.model || 'geteilt') : escH(w.mac) + (w.ip ? ' · ' + escH(w.ip) : '')}${w.up === true ? ' · 🟢 erreichbar' : w.up === false ? ' · ⚪ nicht erreichbar' : ''}${lastTxt('wol:' + w.id)}</div></div>
       <div style="display:flex;gap:8px;margin-left:auto">
       ${window.IS_ADMIN ? pinBtn(`wolPin('${wid}', ${w.pin_set ? 'true' : 'false'})`, !!w.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('wedit-${wid}')" title="Bearbeiten: Name, Dashboard, Sichtbarkeit, Entfernen">✎</button>
@@ -2764,6 +2813,7 @@ const SP_TIMERS = {};
 const spFmt = v => String(Math.round(v * 2) / 2).replace('.', ',');
 const spCanSet = () => !!window.IS_ADMIN || ((window.USER_PERMS || {}).dashboard === 'write');
 async function loadSetpointsAdmin(light) {
+  await devLastFresh();
   let list = []; try { list = await (await fetch('/api/homematic/setpoints' + (light ? '?light=1' : ''), { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   list.forEach(x => { x._pending = !!light; });
@@ -2771,7 +2821,7 @@ async function loadSetpointsAdmin(light) {
   const remoteOk = s => s.source !== 'remote' || s.switchable !== false;
   document.getElementById('hm-setpoints').innerHTML = list.length ? list.map(s => { const id = escH(s.id); return `<div data-sort-id="${id}" data-sp="${id}" data-min="${Math.max(5, s.min)}" data-max="${Math.min(30, s.max)}" data-target="${s.value == null ? '' : s.value}" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b>${shareMark('setpoint', id, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Bereich ${s.min}–${s.max} °C</div></div>
+      <div style="flex:1;min-width:150px"><b>🌡 ${escH(s.name)}</b>${shareMark('setpoint', id, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : ''}${s.room ? ' · ' + escH(s.room) : ''} · Bereich ${s.min}–${s.max} °C${lastTxt('setpoint:' + s.id)}</div></div>
       ${can && remoteOk(s) ? `<div style="display:flex;align-items:center;gap:6px" title="Solltemperatur einstellen – die Änderung wird kurz nach dem letzten Tippen gesendet">
         <button class="ghost" style="padding:4px 12px;font-size:18px" onclick="spStep('${id}',-0.5)" ${s.value == null ? 'disabled' : ''} aria-label="Kälter">−</button>
         <b class="sp-val" style="min-width:74px;text-align:center;font-size:17px">${s.value == null ? (s._pending ? '…' : '–') : spFmt(s.value) + ' °C'}</b>
@@ -2843,11 +2893,12 @@ loadSetpointsAdmin(true).then(() => loadSetpointsAdmin());
 
 /* --- Homematic-Tuerschloesser (Aktion fuer Regeln) --- */
 async function loadLocksAdmin(light) {
+  await devLastFresh();
   let list = []; try { list = await (await fetch('/api/homematic/locks' + (light ? '?light=1' : ''), { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   list.forEach(x => { x._pending = !!light; });
   document.getElementById('hm-locks').innerHTML = list.length ? list.map(x => `<div data-sort-id="${escH(x.id)}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px">
-      <div style="flex:1;min-width:150px"><b>🔒 ${escH(x.name)}</b>${shareMark('lock', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b>${x._pending ? 'wird gelesen …' : x.locked === true ? 'verriegelt' : x.locked === false ? 'entriegelt' : 'unbekannt'}</b></div></div>
+      <div style="flex:1;min-width:150px"><b>🔒 ${escH(x.name)}</b>${shareMark('lock', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b>${x._pending ? 'wird gelesen …' : x.locked === true ? 'verriegelt' : x.locked === false ? 'entriegelt' : 'unbekannt'}</b>${lastTxt('lock:' + x.id)}</div></div>
       <label class="chk admin-only"><input type="checkbox" ${x.allow_open ? 'checked' : ''} onchange="lockAllow('${escH(x.id)}', this.checked)"> Regeln dürfen entriegeln / öffnen <span class="qhelp" role="button" tabindex="0" data-help="Aus: Regeln dürfen dieses Schloss nur verriegeln. An: Regeln dürfen es auch entriegeln und die Tür öffnen.">?</span></label>
       ${lockCtl(x)}
       ${shareBtn('lock', escH(x.id), x.source === 'remote')}
@@ -2971,6 +3022,7 @@ loadSoundsAdmin(); setInterval(loadSoundsAdmin, 30000);
 let BL_SIG = '';
 const blPos = v => v == null ? 'Position unbekannt' : (v >= 100 ? 'ganz auf' : v <= 0 ? 'ganz zu' : v + ' % auf');
 async function loadBlindsAdmin() {
+  await devLastFresh();
   let list = []; try { list = await (await fetch('/api/homematic/blinds', { cache: 'no-store' })).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (e) { /* egal */ } }
@@ -2985,7 +3037,7 @@ async function loadBlindsAdmin() {
   BL_SIG = sig; const bOpen = openEdits('bedit-');
   document.getElementById('hm-blinds').innerHTML = list.length ? list.map(x => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px" data-bid="${escH(x.id)}" data-sort-id="${escH(x.id)}">
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="blindIconGrid(this)">${escH(x.icon || '🪟')}</button>
-      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b>${shareMark('blind', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b class="bl-pos">${escH(blPos(x.level))}</b></div></div>
+      <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b>${shareMark('blind', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b class="bl-pos">${escH(blPos(x.level))}</b>${lastTxt('blind:' + x.id)}</div></div>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','level',100)" title="Ganz auf">▲ Auf</button>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','stop')" title="Anhalten">■ Stopp</button>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','level',0)" title="Ganz zu">▼ Zu</button>
@@ -3999,7 +4051,7 @@ if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
   seg.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; HNTheme.set(b.dataset.t); mark(); });
   mark();
 })();
-const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'teilen', 'wol', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
+const SH_TABS = ['aktoren', 'sensoren', 'thermostate', 'sicherheit', 'suchen', 'nfc', 'teilen', 'wol', 'logbuch', 'alexa', 'sonstiges'];   // Smart Home (Seite /smarthome)
 const IS_SH = window.PAGE_MODE === 'smarthome';
 const ADMIN_TABS = [
   { id: 'anlage', label: 'Anlage', match: ['Victron Cerbo', 'Ladesteuerung', 'Anlage', 'Batterie-Watchdog', 'Netz-Zähler', 'Periodische Vollladung'] },
@@ -4045,7 +4097,7 @@ const ADMIN_TABS = [
   const TAB_AREA = { anlage: 'settings_anlage', tarif: 'settings_tarif',
     vrm: 'settings_vrm', wetter: 'settings_wetter', meldungen: 'settings_meldungen',
     aktoren: 'settings_geraete', sensoren: 'settings_geraete', thermostate: 'settings_geraete', sicherheit: 'smarthome_sicherheit',
-    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
+    suchen: 'smarthome_einrichten', nfc: 'smarthome_nfc', teilen: 'smarthome_teilen', alexa: 'smarthome_einrichten', wol: 'settings_geraete', logbuch: 'settings_geraete', sonstiges: 'smarthome_einrichten', anzeige: 'settings_anzeige', system: 'settings_system' };
   cards.forEach(c => {
     if (c.dataset.tab === '*') return;
     const heading = (c.querySelector('h2')?.textContent || '').trim();

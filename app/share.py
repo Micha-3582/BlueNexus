@@ -30,6 +30,8 @@ from urllib.parse import urlparse
 
 import requests
 
+import devicelog
+
 _DIR = os.path.dirname(os.path.abspath(__file__))
 SHARES_PATH = os.path.join(_DIR, "shares.json")            # Geber: Freigaben
 SOURCES_PATH = os.path.join(_DIR, "sources.json")          # Empfaenger: Fremde Quellen (mit Schluessel!)
@@ -318,6 +320,11 @@ def _granted(share: dict, ref: str, need_control: bool) -> tuple[str, str]:
     return t, i
 
 
+def _share_label(share: dict, *a, **k) -> str:
+    return f"Freigabe „{share.get('name', '?')}“"
+
+
+@devicelog.as_actor(_share_label)
 def provider_act(share: dict, ref: str, body: dict) -> dict:
     """Schalten / Druecken. Gibt den neuen Zustand zurueck ({online, on, ...}) und den Namen fuers Logbuch."""
     import shelly
@@ -390,6 +397,7 @@ def _act_more(t: str, i: str, body: dict) -> dict:
         raise ShareError(str(e), 400)
 
 
+@devicelog.as_actor(_share_label)
 def provider_ac(share: dict, ref: str, body: dict | None) -> dict:
     """Klimaanlage: body=None -> Moeglichkeiten + Zustand, sonst setzen {power, mode, target, fan, swing, eco}."""
     import shelly
