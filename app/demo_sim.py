@@ -499,7 +499,7 @@ DEMO_SOURCE_ITEMS = [
     {"ref": "device:oma-heizung", "type": "device", "name": "Heizungspumpe", "icon": "♨️", "kind": "shelly", "control": True, "already": False},
     {"ref": "device:oma-licht", "type": "device", "name": "Flurlicht", "icon": "💡", "kind": "shelly", "control": True, "already": False},
     {"ref": "device:oma-klima", "type": "device", "name": "Klimaanlage Wohnzimmer", "icon": "❄️", "kind": "midea", "control": True, "already": False},
-    {"ref": "sensor:oma-fenster", "type": "sensor", "name": "Fenster Küche", "icon": "🪟", "kind": "contact", "control": False, "already": False},
+    {"ref": "sensor:oma-fenster", "type": "sensor", "name": "Fenster Küche", "icon": "🏠", "kind": "contact", "control": False, "already": False},
     {"ref": "sensor:oma-temp", "type": "sensor", "name": "Temperatur Wohnzimmer", "icon": "🌡️", "kind": "temperature", "control": False, "already": True},
 ]
 

@@ -404,9 +404,9 @@ function actRow(a, branch, flow) {
       ${mode === 'preset' ? psel : `<input class="a-wcol" type="color" value="${escH(a.color || '#ffa000')}" style="width:54px;height:34px;padding:0;border:0;background:transparent" oninput="ruleEdited(this)"> <span class="muted">Helligkeit</span> <input class="a-wbri" type="number" min="1" max="100" step="1" value="${escH(a.brightness ?? '')}" placeholder="–" style="width:70px" oninput="ruleEdited(this)"> <span class="muted">% (leer = unverändert)</span>`}
       ${list.length ? '' : '<span class="muted">Noch keine WLED-Lampe angelegt – Smart Home → Geräte suchen → Tasmota / WLED.</span>'}`;
   } else if (t === 'blind') {
-    const list = S.blinds || [], opts = list.map(x => [escH(x.id), escH(x.icon || '🪟') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rollladen fehlt)']);
+    const list = S.blinds || [], opts = list.map(x => [escH(x.id), escH(x.icon || '🏠') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rollladen fehlt)']);
     const stop = a.action === 'stop';
-    body = `<b>🪟 Rollladen</b> ${sel('a-bid', a.id, opts)} ${sel('a-bact', stop ? 'stop' : 'set', [['set', 'fahren auf'], ['stop', 'anhalten']])}
+    body = `<b>🏠 Rollladen</b> ${sel('a-bid', a.id, opts)} ${sel('a-bact', stop ? 'stop' : 'set', [['set', 'fahren auf'], ['stop', 'anhalten']])}
       <span class="a-blv"><input class="a-blvl" type="number" min="0" max="100" step="1" value="${escH(a.level ?? 0)}" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">% (0 = zu, 100 = auf; bei „anhalten“ egal)</span></span>${list.length ? '' : '<span class="muted">Noch kein Rollladen angelegt – Smart Home → Geräte suchen → Homematic-Rollläden suchen.</span>'}`;
   } else if (t === 'photo') {
     const list = S.cameras || [], opts = list.map(x => [escH(x.id), '📷 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Kamera fehlt)']);

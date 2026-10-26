@@ -123,7 +123,7 @@ def _more_registries() -> list:
     import homematic
     import wol
     return [("setpoint", homematic.load_setpoints, "Thermostat", "🌡️"), ("lock", homematic.load_locks, "Türschloss", "🔒"),
-            ("blind", homematic.load_blinds, "Rollladen", "🪟"), ("sound", homematic.load_sounds, "Soundmodul", "🔔"), ("wol", wol.load, "Wake-on-LAN", "💻")]
+            ("blind", homematic.load_blinds, "Rollladen", "🏠"), ("sound", homematic.load_sounds, "Soundmodul", "🔔"), ("wol", wol.load, "Wake-on-LAN", "💻")]
 
 
 def _more_saves() -> dict:
@@ -649,7 +649,7 @@ def import_items(source_id: str, refs: list[str]) -> dict:
             elif kind == "wol":
                 base.update({"icon": x.get("icon") or "💻", "mac": "00:00:00:00:00:00", "ip": "", "show": True})
             else:
-                base.update({"icon": x.get("icon") or ("🪟" if kind == "blind" else "🔔")})
+                base.update({"icon": x.get("icon") or ("🏠" if kind == "blind" else "🔔")})
             regs[kind].append(base)
             new_o.append((kind, base))
         elif x.get("type") == "setpoint":

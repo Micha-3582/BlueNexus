@@ -1298,7 +1298,7 @@ def sound_play(sid: str, track, volume=100, repeats=1) -> str:
 # Eigenes Register. Position = Datenpunkt LEVEL (CCU: 0.0 = ganz zu ... 1.0 = ganz auf; hier immer in Prozent: 0 % zu, 100 % auf), Anhalten = STOP.
 # Bedienen auf der Seite (Smart Home -> Aktoren) und als Schritt "Rollladen" in Regeln der Art "Ablauf" (nie im Trockenlauf).
 BLINDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "homematic_blinds.json")
-BLIND_ICON = "🪟"
+BLIND_ICON = "🏠"
 _blind_scan: dict[str, dict] = {}
 _blind_scan_ts = 0.0
 

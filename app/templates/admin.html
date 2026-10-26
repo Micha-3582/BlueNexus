@@ -2627,7 +2627,7 @@ async function sensorRenameSave(id) {
   loadSensorsAdmin();
 }
 const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
-const SENSOR_EXTRA_ICONS = ['🚪', '🪟', '🏃', '🧍', '🚶', '👀', '🔑', '🚨', '📬', '🚗', '🚲', '🐕', '🐈', '🔥', '💦', '🌡️', '☀️', '⚡'];
+const SENSOR_EXTRA_ICONS = ['🚪', '🏠', '🏃', '🧍', '🚶', '👀', '🔑', '🚨', '📬', '🚗', '🚲', '🐕', '🐈', '🔥', '💦', '🌡️', '☀️', '⚡'];
 function sensorPickIcon(id) { const el = document.getElementById('sicons-' + id); el.style.display = el.style.display === 'none' ? 'flex' : 'none'; }
 async function sensorSetIcon(id, icon) {
   try { await shellyApi('/api/sensors/' + encodeURIComponent(id), 'PATCH', { icon }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
@@ -3205,7 +3205,7 @@ async function loadBlindsAdmin() {
   }
   BL_SIG = sig; const bOpen = openEdits('bedit-');
   document.getElementById('hm-blinds').innerHTML = list.length ? list.map(x => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 10px" data-bid="${escH(x.id)}" data-sort-id="${escH(x.id)}">
-      <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="blindIconGrid(this)">${escH(x.icon || '🪟')}</button>
+      <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="blindIconGrid(this)">${escH(x.icon || '🏠')}</button>
       <div style="flex:1;min-width:150px"><b>${escH(x.name)}</b>${shareMark('blind', escH(x.id), x.source === 'remote')}<div class="muted">${escH(x.model)}${x.room ? ' · ' + escH(x.room) : ''} · <b class="bl-pos">${escH(blPos(x.level))}</b>${lastTxt('blind:' + x.id)}</div></div>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','level',100)" title="Ganz auf">▲ Auf</button>
       <button class="ghost" onclick="blindDo('${escH(x.id)}','stop')" title="Anhalten">■ Stopp</button>

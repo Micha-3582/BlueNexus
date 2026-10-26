@@ -1158,7 +1158,7 @@ def api_users_item(username):
 
 
 VIS_GROUPS = (("shelly", "Geräte (Aktoren)", "🔌"), ("sensor", "Sensoren", "📟"), ("virtual", "Eigene Schalter & Knöpfe", "🔘"), ("wol", "Wake-on-LAN", "💻"),
-              ("setpoint", "Thermostate", "🌡️"), ("blind", "Rollläden", "🪟"), ("sound", "Soundmodule", "🔔"), ("camera", "Kameras", "📷"))
+              ("setpoint", "Thermostate", "🌡️"), ("blind", "Rollläden", "🏠"), ("sound", "Soundmodule", "🔔"), ("camera", "Kameras", "📷"))
 
 
 def _normal_users() -> list:
@@ -1288,7 +1288,7 @@ class Controller:
         current_ess = cerbo.read_ess_mode()
         thr = int(cfg.get("notify_low_soc", notify.DEFAULT_LOW_SOC))
         notify.event("low_soc", soc < thr or (notify.is_active("low_soc") and soc < thr + 5),
-                     f"🪫 Akku niedrig: {soc:.0f} % (Schwelle {thr} %).", f"🔋 Akku wieder bei {soc:.0f} %.", cfg=cfg)
+                     f"🔋 Akku niedrig: {soc:.0f} % (Schwelle {thr} %).", f"🔋 Akku wieder bei {soc:.0f} %.", cfg=cfg)
         notify.daily_summary(cfg, datetime.now(), extra=self._report_line)
         try:
             system = cerbo.read_system(has_pv_inverter=cfg.get("has_pv_inverter", True),
@@ -3509,6 +3509,30 @@ def _vis_users_changed(old, new):
         items = load()
         if (visibility.rename_user(items, old, new) if new else visibility.drop_user(items, old)):
             save(items)
+
+
+_ICON_SWAP = {"\U0001fa9f": "🏠", "\U0001faab": "🔋", "\U000023fb": "🔌", "\U0001fae7": "💧", "\U0001fab4": "🌱", "\U0001fad6": "☕", "\U0001f6dc": "📡", "\U0001fa9e": "🔆", "\U0001faa0": "🚿", "\U0001fa9c": "🏠", "\U0001f6d7": "🏢"}      # Symbole, die aeltere Android-/iPhone-Versionen nicht kennen (Kaestchen mit Kreuz)
+
+
+def _migrate_icons() -> None:
+    """Gespeicherte Symbole, die auf Handys nur als Kaestchen erscheinen, einmalig durch gaengige ersetzen."""
+    for fn in _VIS_KINDS.values():
+        try:
+            load, save = fn()
+            items = load()
+            hit = False
+            for x in items:
+                ic = x.get("icon")
+                if isinstance(ic, str) and ic in _ICON_SWAP:
+                    x["icon"] = _ICON_SWAP[ic]
+                    hit = True
+            if hit:
+                save(items)
+        except Exception as e:                                         # noqa: BLE001
+            log.warning("Symbole ersetzen: %s", e)
+
+
+_migrate_icons()
 
 
 @app.route("/api/shelly", methods=["GET"])
