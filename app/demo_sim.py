@@ -350,6 +350,10 @@ def activate() -> None:
     shelly.set_state = _device_set
     neutral_names()                                         # private Vornamen in den Demo-Daten neutral benennen
     try:
+        seed_devicelog()                                    # Geraete-Logbuch (erfunden)
+    except Exception:                                       # noqa: BLE001
+        pass
+    try:
         seed_notify()                                       # Telegram/Pushover/Regel mit Telegram-Wort (erfunden)
     except Exception:                                       # noqa: BLE001
         pass
@@ -700,3 +704,86 @@ def demo_apikeys() -> list:
         {"id": "k-demo0002", "name": "Auswertung (Node-RED)", "prefix": "bnx_Nr7q", "created": now - 5 * 86400, "last_used": now - 90, "last_ip": "192.168.1.31",
          "all": True, "items": [], "allow": []},
     ]
+
+
+def seed_devicelog() -> None:
+    """Erfundenes Geraete-Logbuch (Smart Home -> Logbuch): wer hat wann was bedient. Wird bei jedem Demo-Start frisch mit aktuellen Zeiten geschrieben."""
+    import json
+    import shelly
+    import homematic
+    import virtual
+    from datetime import datetime, timedelta
+    devs = shelly.load_devices()
+    sens = homematic.load_sensors()
+    sets = list(homematic.load_setpoints())
+    locks = list(homematic.load_locks())
+    rules_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules.json")
+    try:
+        with open(rules_path, encoding="utf-8") as f:
+            rules = json.load(f).get("rules") or []
+    except (OSError, ValueError):
+        rules = []
+
+    def dev(*names):
+        for n in names:
+            for d in devs:
+                if n.lower() in str(d.get("name") or "").lower():
+                    return "device:" + d["id"], d.get("name")
+        return None
+
+    def sen(*names):
+        for n in names:
+            for d in sens:
+                if n.lower() in str(d.get("name") or "").lower():
+                    return "sensor:" + d["id"], d.get("name")
+        return None
+
+    def one(lst, kind, *names):
+        for n in names:
+            for d in lst:
+                if n.lower() in str(d.get("name") or "").lower():
+                    return kind + ":" + d["id"], d.get("name")
+        return None
+
+    kueche = dev("Küchenlicht", "Kuechenlicht")
+    haustuer = dev("Haustürbeleuchtung", "Haustuerbeleuchtung")
+    garage = dev("Garagentor")
+    pool = dev("Pool-Waermepumpe", "Pool")
+    huehner = dev("Hühnerstall", "Huehnerstall")
+    fenster = sen("Küchentür", "Kuechentuer", "Küche", "Fenster")
+    therm = one(sets, "setpoint", "Kinderzimmer Ben", "Schlafzimmer")
+    schloss = one(locks, "lock", "Anna", "Gast", "")
+    regel = next((r for r in rules if "Türlicht" in str(r.get("name"))), None)
+
+    E = []                                                  # (Minuten her, Kategorie, (ref, name), Text, ok, von)
+    E.append((6, "aktor", kueche, "eingeschaltet", True, "Anna"))
+    E.append((19, "sensor", fenster, "offen", True, "Sensor"))
+    E.append((24, "aktor", haustuer, "eingeschaltet", True, "Regel „Haustüre Türlicht“"))
+    E.append((55, "thermostat", therm, "auf 21 °C gestellt", True, "Ben"))
+    E.append((95, "aktor", pool, "ausgeschaltet", True, "Überschuss-Automatik"))
+    E.append((130, "sicherheit", schloss, "geöffnet", True, "Anna"))
+    E.append((131, "sicherheit", schloss, "Öffnen abgelehnt: PIN falsch", False, "Fremder Zugriff"))
+    E.append((240, "aktor", garage, "eingeschaltet", True, "Telegram: Ben"))
+    E.append((241, "aktor", garage, "ausgeschaltet", True, "Telegram: Ben"))
+    E.append((330, "aktor", huehner, "eingeschaltet", True, "Regel „Hühnerstall Licht“"))
+    E.append((470, "aktor", kueche, "ausgeschaltet", True, "Alexa"))
+    E.append((600, "thermostat", therm, "auf 18 °C gestellt", True, "Anna"))
+    E.append((700, "sensor", fenster, "geschlossen", True, "Sensor"))
+    E.append((1010, "aktor", pool, "eingeschaltet", True, "Überschuss-Automatik"))
+    E.append((1200, "aktor", haustuer, "ausgeschaltet", True, "Regel „Haustüre Türlicht“"))
+    E.append((1330, "sicherheit", schloss, "verriegelt", True, "Ben"))
+    E.append((1500, "aktor", huehner, "ausgeschaltet", True, "Regel „Hühnerstall Licht“"))
+    E.append((1700, "aktor", kueche, "eingeschaltet", True, "Freigabe „Anna“"))
+    if regel:
+        E.append((45, "regel", ("rule:" + str(regel.get("id")), regel.get("name")), "ausgelöst", True, "Regel"))
+    now = datetime.now()
+    rows = []
+    for mins, cat, ref, text, ok, by in E:
+        if not ref:
+            continue
+        rows.append({"ts": (now - timedelta(minutes=mins)).isoformat(timespec="seconds"), "cat": cat, "ref": ref[0], "name": ref[1],
+                     "text": text, "by": by, "ok": ok})
+    rows.sort(key=lambda r: r["ts"])
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "devicelog.jsonl"), "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + chr(10))

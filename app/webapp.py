@@ -456,7 +456,7 @@ def _require_login():
         return _check_area("rules" if mod == "rules" else "automation", "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
-        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info")):      # Demo: Schnittstellen-Karte nur ansehen
+        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last")):      # Demo: Schnittstellen-Karte nur ansehen
             return _deny("Kein Zugriff mit diesem Konto.")
         return None
     need = "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write"
@@ -5190,7 +5190,7 @@ def api_lock_add():
 
 def _devlog_allow():
     """Funktion ref -> darf dieses Konto den Eintrag sehen? (Administratoren alles; sonst nur, was ihnen freigegeben ist; Schloesser nur mit Recht Sicherheit)"""
-    if auth.is_full_admin(g.perms):
+    if auth.is_full_admin(g.perms) or demo.ACTIVE:                      # Demo: das erfundene Logbuch ist fuer das Demo-Konto komplett sichtbar
         return lambda ref: True
     ok_ids = {}
     for kind, reg in _VIS_KINDS.items():
