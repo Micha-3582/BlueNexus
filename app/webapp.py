@@ -275,7 +275,7 @@ ENDPOINT_AREA = {
     "api_sound_list": "dashboard", "api_sound_scan": "smarthome_einrichten", "api_sound_add": "smarthome_einrichten", "api_sound_modify": "settings_geraete", "api_sound_play": "smarthome_einrichten",
     "api_blind_list": "dashboard", "api_blind_scan": "smarthome_einrichten", "api_blind_add": "smarthome_einrichten", "api_blind_modify": "settings_geraete",
     "api_blind_level": "settings_geraete", "api_blind_stop": "settings_geraete",
-    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_lock_action": "smarthome_sicherheit", "api_devicelog": "settings_geraete", "api_devicelog_last": "settings_geraete", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
+    "api_lock_list": "dashboard", "api_lock_scan": "smarthome_sicherheit", "api_lock_add": "smarthome_sicherheit", "api_lock_modify": "smarthome_sicherheit", "api_lock_action": "smarthome_sicherheit", "api_virtual_list": "dashboard", "api_virtual_press": "dashboard", "api_virtual_set": "dashboard",
     "api_virtual_add": "settings_geraete", "api_virtual_modify": "settings_geraete", "api_virtual_url": "settings_geraete",
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
@@ -469,7 +469,7 @@ SMARTHOME_TABS = [
     ("nfc", "NFC + QR", "/smarthome#nfc", "smarthome_nfc", 3),
     ("teilen", "Teilen", "/smarthome#teilen", "smarthome_teilen", 3),
     ("wol", "Wake-on-LAN", "/smarthome#wol", "settings_geraete", 3),
-    ("logbuch", "Logbuch", "/smarthome#logbuch", "settings_geraete", 3),
+    ("logbuch", "Logbuch", "/smarthome#logbuch", "user_management", 3),                         # nur Administratoren
     ("alexa", "Alexa", "/smarthome#alexa", "smarthome_einrichten", 3),
     ("sonstiges", "Sonstiges", "/smarthome#sonstiges", "smarthome_einrichten", 3),
 ]
@@ -497,7 +497,7 @@ def _tab_has_system(tid: str, fam: dict) -> bool:
 def _smarthome_tabs(perms: dict) -> list:
     fam = _families()
     return [{"id": i, "label": n, "href": h, "group": grp} for i, n, h, area, grp in SMARTHOME_TABS
-            if auth.has_level(perms, area, "read") and (i != "alexa" or store.module_on("alexa")) and (i != "nfc" or store.module_on("smarthome")) and _tab_has_system(i, fam)]
+            if auth.has_level(perms, area, "read") and (i != "alexa" or store.module_on("alexa")) and (i not in ("nfc", "logbuch") or store.module_on("smarthome")) and _tab_has_system(i, fam)]
 
 
 @app.context_processor
@@ -5225,7 +5225,10 @@ def api_perf():
 
 @app.route("/api/devicelog", methods=["GET"])
 def api_devicelog():
-    """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Nur, was das Konto sehen darf."""
+    """Geraete-Logbuch (neueste zuerst): ?cat=aktor|sensor|thermostat|sicherheit, ?q=Suchtext, ?limit=. Nur Administratoren (normale Benutzer sehen nur den Zustand)."""
+    denied = _admin_only()
+    if denied:
+        return denied
     if not store.module_on("smarthome"):
         return jsonify(entries=[])
     cat = request.args.get("cat")
@@ -5239,7 +5242,10 @@ def api_devicelog():
 
 @app.route("/api/devicelog/last", methods=["GET"])
 def api_devicelog_last():
-    """Letzte Bedienung je Geraet (Hinweis "zuletzt ..." in den Listen)."""
+    """Letzte Bedienung je Geraet (Hinweis "zuletzt ..." in den Listen, nur fuer Administratoren)."""
+    denied = _admin_only()
+    if denied:
+        return denied
     if not store.module_on("smarthome"):
         return jsonify({})
     return jsonify(devicelog.last_map(_devlog_allow()))
