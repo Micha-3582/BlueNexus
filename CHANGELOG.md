@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.12.4 – 27.10.2026
+- Änderung: **Dunkel** ist jetzt die Standard-Darstellung. Wer bisher auf „Automatisch“ stand (nie umgestellt), sieht dunkel; Hell und Automatisch bleiben unter *Einstellungen → Dashboard → Darstellung* wählbar.
+
 ## 1.12.3 – 27.10.2026
 - Fix: Die **Nulllinie** in den Diagrammen wird jetzt immer gezeichnet, auch wenn die Achse bei 0 keine Beschriftung hat (z. B. −500 / 500 / 1.500).
 

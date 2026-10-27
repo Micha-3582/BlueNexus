@@ -1,7 +1,7 @@
 /* Darstellung: dunkel / hell / automatisch (nach Geraet). Wird im <head> geladen, damit die Seite nicht kurz im falschen Stil aufblitzt. */
 (function () {
   var KEY = 'hn_theme', root = document.documentElement, mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
-  function get() { try { return localStorage.getItem(KEY) || 'auto'; } catch (e) { return 'auto'; } }
+  function get() { try { return localStorage.getItem(KEY) || 'dark'; } catch (e) { return 'dark'; } }   // Standard: dunkel (wer hell oder automatisch will, stellt es um)
   function effective(c) { return c === 'light' || c === 'dark' ? c : (mq && mq.matches ? 'light' : 'dark'); }
   function apply() {
     var e = effective(get());
@@ -11,7 +11,7 @@
   }
   window.HNTheme = {
     get: get, effective: function () { return effective(get()); },
-    set: function (t) { try { if (t === 'light' || t === 'dark') localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) { /* Komfort */ } apply(); }
+    set: function (t) { try { if (t === 'light' || t === 'dark' || t === 'auto') localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) { /* Komfort */ } apply(); }
   };
   apply();
   document.addEventListener('DOMContentLoaded', apply);
