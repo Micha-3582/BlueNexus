@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.17.3 – 27.10.2026
+- Änderung: Beim Funkthermometer entfallen die automatischen Neustart-Versuche nach dem Flashen (am echten Board wirkte keiner: RTS-, Soft- und Hard-Reset). Das Fenster fordert sofort zum Druck auf die **RESET-Taste** auf, wartet bis 90 Sekunden und weist nach 30 Sekunden darauf hin, die Taste noch einmal zu drücken.
+
 ## 1.17.2 – 27.10.2026
 - Verbesserung: Nach dem Flashen probiert das Funkthermometer-Fenster mehrere **Neustart-Verfahren** nacheinander (RTS-Reset, Soft-Reset, Hard-Reset) und prüft nach jedem, ob sich das Thermometer meldet; das erste, das wirkt, steht im Fenster. Wirkt keins, kommt die Aufforderung zur **RESET-Taste** am Board sofort.
 

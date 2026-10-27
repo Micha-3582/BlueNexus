@@ -161,14 +161,10 @@
         });
       });
     }).then(function () {
-      steps(3, 'ok'); steps(4, 'ok'); steps(5, 'run');
-      return autoRestart(session, created.device.id);
-    }).then(function (r) {
-      steps(5, 'ok', r.device ? 'automatisch (' + r.how + ')' : 'nicht automatisch – bitte jetzt die RESET-Taste am Board drücken');
-      return session.transport.disconnect().catch(function () {}).then(function () { return r; });
-    }).then(function (r) {
-      if (r.device) { steps(6, 'ok'); return r.device; }
-      steps(6, 'run', 'bitte jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden'); return waitFirst(created.device.id, 60);
+      steps(3, 'ok'); steps(4, 'ok'); steps(5, 'ok', 'fertig geschrieben');
+      return session.transport.disconnect().catch(function () {});               /* ein automatischer Neustart wirkt bei diesem Board nicht (getestet: RTS-, Soft- und Hard-Reset) - die RESET-Taste startet es */
+    }).then(function () {
+      steps(6, 'run', 'jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden'); return waitFirst(created.device.id, 90);
     }).then(function (dev) {
       steps(6, 'ok');
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
@@ -184,36 +180,10 @@
         if (k === 6) why = dev && dev.attempt
           ? 'Eine Anfrage ist bei BlueNexus angekommen, wurde aber abgelehnt: ' + dev.attempt.why + ' (von ' + dev.attempt.ip + ').'
           : 'Bei BlueNexus ist keine Anfrage angekommen. Häufige Ursachen: Der Chip ist nach dem Flashen nicht neu gestartet (RESET-Taste drücken oder USB-C kurz abziehen und wieder anstecken – er meldet sich dann innerhalb von etwa 20 Sekunden), WLAN-Name oder -Passwort stimmen nicht (nur 2,4 GHz), oder die Adresse unter „Erweitert“ ist von dort aus nicht erreichbar.';
-        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 60 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
+        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
         setBusy(false); load();
       });
     });
-  }
-  /* Neustart ins Programm nach dem Flashen. Beim eingebauten USB-Anschluss des ESP32-C3 (USB-Serial/JTAG) bleibt der Chip je nach Board und Treiber im Download-Modus stehen;
-     deshalb mehrere Verfahren nacheinander, nach jedem prueft BlueNexus, ob sich das Thermometer meldet (es meldet sich 1-20 s nach dem Start). Das erste, das wirkt, wird angezeigt.
-     Klappt keins, bleibt die RESET-Taste am Board. */
-  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function seen(id) { return api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) { return j.device && j.device.last_seen != null ? j.device : null; }).catch(function () { return null; }); }
-  function pollSeen(id, secs) {
-    var t0 = Date.now();
-    return (function next() {
-      return seen(id).then(function (d) { if (d) return d; if (Date.now() - t0 > secs * 1000) return null; return sleep(1500).then(next); });
-    })();
-  }
-  function autoRestart(session, id) {
-    var tr = session.transport, ld = session.loader;
-    var tries = [
-      ['RTS-Reset', function () { return tr.setDTR(false).then(function () { return tr.setRTS(true); }).then(function () { return sleep(200); }).then(function () { return tr.setRTS(false); }); }],
-      ['Soft-Reset', function () { return ld.softReset(false); }],
-      ['Hard-Reset (Bibliothek)', function () { return ld.after('hard_reset'); }]
-    ];
-    return (function run(i) {
-      if (i >= tries.length) return Promise.resolve({ device: null, how: '' });
-      steps(5, 'run', 'Verfahren ' + (i + 1) + ' von ' + tries.length + ': ' + tries[i][0] + ' – bitte noch nichts drücken (das Thermometer meldet sich 1 bis 20 s nach dem Start)');
-      return Promise.race([Promise.resolve().then(tries[i][1]).catch(function () {}), sleep(4000)]).then(function () { return pollSeen(id, 18); })      /* haengt ein Verfahren (Chip startet mitten im Befehl neu), nach 4 s weiter */.then(function (d) {
-        return d ? { device: d, how: tries[i][0] } : run(i + 1);
-      });
-    })(0);
   }
   function waitFirst(id, secs) {
     var t0 = Date.now(), hinted = false;
@@ -222,7 +192,7 @@
         api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) {
           if (j.device && j.device.last_seen != null) return resolve(j.device);
           if (Date.now() - t0 > secs * 1000) return reject(new Error('timeout'));
-          if (Date.now() - t0 > 20000 && !hinted) { hinted = true; steps(6, 'run', 'noch nichts angekommen – RESET-Taste am Board drücken (ca. 20 Sekunden warten)'); }
+          if (Date.now() - t0 > 30000 && !hinted) { hinted = true; steps(6, 'run', 'noch nichts angekommen – die RESET-Taste am Board noch einmal drücken (manchmal braucht es zwei Anläufe)'); }
           setTimeout(poll, 2000);
         }).catch(reject);
       })();
