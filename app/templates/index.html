@@ -1733,7 +1733,7 @@ async function virtualCall(url, body, el, name, needsPin) {
   for (;;) {
     if (needsPin) {
       if (sw) el.checked = !body.on;                                                // bis zur PIN bleibt der Schalter in der alten Stellung
-      const pin = await askPin(hint);
+      const pin = await askPin(hint, true);
       if (pin === null) { virtualTouched = 0; loadVirtual(); return false; }         // abgebrochen: Schalter springt zurueck
       body.pin = pin;
       if (sw) el.checked = body.on;                                                 // PIN eingegeben: jetzt umlegen
@@ -1741,11 +1741,11 @@ async function virtualCall(url, body, el, name, needsPin) {
     el.disabled = true; virtualTouched = Date.now();
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (r.ok) { virtualLastCall = await r.json().catch(() => null); virtualTouched = 0; loadVirtual(); loadFavorites(); return true; }
+      if (r.ok) { virtualLastCall = await r.json().catch(() => null); virtualTouched = 0; if (needsPin) askPinDone(true, 'Befehl angenommen'); loadVirtual(); loadFavorites(); return true; }
       const j = await r.json().catch(() => ({}));
       if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; if (sw) el.checked = !body.on; hint = 'Falsche PIN – bitte erneut'; needsPin = true; continue; }
-      showToast(j.error || `Fehlgeschlagen (Server-Antwort ${r.status})`, true);
-    } catch (e) { showToast('Server nicht erreichbar', true); }
+      showToast(j.error || `Fehlgeschlagen (Server-Antwort ${r.status})`, true); if (needsPin) askPinDone(false, j.error || 'Fehlgeschlagen');
+    } catch (e) { showToast('Server nicht erreichbar', true); if (needsPin) askPinDone(false, 'Server nicht erreichbar'); }
     break;
   }
   virtualTouched = 0; loadVirtual();
@@ -1780,7 +1780,7 @@ async function shellySwitch(id, on, el) {
   for (;;) {
     if (needsPin) {
       el.checked = !on;                                                     // bis zur PIN bleibt der Schalter in der alten Stellung
-      const pin = await askPin(hint);
+      const pin = await askPin(hint, true);
       if (pin === null) { loadShelly(); return; }                           // abgebrochen: Schalter springt zurueck
       body.pin = pin;
       el.checked = on;                                                      // PIN eingegeben: jetzt umlegen
@@ -1789,11 +1789,11 @@ async function shellySwitch(id, on, el) {
     try {
       const r = await fetch('/api/shelly/' + encodeURIComponent(id) + '/switch', { method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (r.ok) break;
+      if (r.ok) { if (needsPin) askPinDone(true, 'Befehl angenommen'); break; }
       const j = await r.json().catch(() => ({}));
       if (j.pin_required && !j.locked) { showToast(j.error || 'PIN falsch', true); el.disabled = false; el.checked = !on; hint = 'Falsche PIN – bitte erneut'; continue; }
-      showToast(j.error || `Schalten fehlgeschlagen (Server-Antwort ${r.status})`, true);
-    } catch (e) { showToast('Schalten fehlgeschlagen – Server nicht erreichbar', true); }
+      showToast(j.error || `Schalten fehlgeschlagen (Server-Antwort ${r.status})`, true); if (needsPin) askPinDone(false, j.error || 'Schalten fehlgeschlagen');
+    } catch (e) { showToast('Schalten fehlgeschlagen – Server nicht erreichbar', true); if (needsPin) askPinDone(false, 'Server nicht erreichbar'); }
     break;
   }
   loadShelly(); loadFavorites();

@@ -488,7 +488,7 @@ Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entr
 Jedes schaltbare Ding kann mit einer **4-stelligen PIN** geschützt werden: Geräte (Shelly, Tasmota, Tuya, Homematic, Zigbee), eigene Schalter/Knöpfe und Wake-on-LAN-Ziele.
 
 - **Setzen/Ändern/Entfernen:** nur durch **Administratoren**, in der Aktorenliste unter Smart Home (🔑). Das Auge-Symbol zeigt die Eingabe.
-- **Benutzen:** Beim Tippen auf die Kachel erscheint ein Ziffernblock. Auch Admins geben die PIN ein.
+- **Benutzen:** Beim Tippen auf die Kachel erscheint ein Ziffernblock. Auch Admins geben die PIN ein. Nach der vierten Ziffer bleibt das Feld kurz offen: „Wird gesendet …“, dann ein **grüner Haken** („Befehl angenommen“) – bei einem Fehler ein rotes Kreuz mit der Meldung. Danach verschwindet es von selbst.
 - **Schutz gegen Raten:** Nach 5 falschen PIN-Eingaben ist das Gerät 5 Minuten gesperrt. Bei der **Anmeldung** gilt: nach 10 falschen Versuchen von derselben Adresse innerhalb von 5 Minuten ist diese Adresse 5 Minuten gesperrt.
 - Die PIN wird nur als Hash gespeichert, nie im Klartext.
 - **Regeln und Abläufe sind von der PIN nicht betroffen** – die PIN schützt nur das Schalten von Hand am Dashboard.

@@ -2234,12 +2234,12 @@ async function shellyTest(id, btn) {
   const dev = (await (await fetch('/api/shelly')).json().catch(() => [])).find?.(x => x.id === id) || {};
   let body = { on };
   if (dev.pin_set) {                                                       // geschuetztes Geraet: PIN fragen
-    const pin = await askPin(dev.name);
+    const pin = await askPin(dev.name, true);
     if (pin === null) return;
     body.pin = pin;
   }
-  try { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/switch', 'POST', body); shellyMsg(''); }
-  catch (e) { shellyMsg(e.message, true); }
+  try { await shellyApi('/api/shelly/' + encodeURIComponent(id) + '/switch', 'POST', body); shellyMsg(''); if (dev.pin_set) askPinDone(true, 'Befehl angenommen'); }
+  catch (e) { shellyMsg(e.message, true); if (dev.pin_set) askPinDone(false, e.message); }
   refreshShellyStatus();
   // Der Leistungsmesser des Shelly braucht einen Moment - Anzeige kurz danach nachziehen
   setTimeout(refreshShellyStatus, 1500); setTimeout(refreshShellyStatus, 4000);
@@ -2700,9 +2700,9 @@ async function wolPin(id, has) {
 }
 async function wolTest(id, hasPin, name) {
   const body = {};
-  if (hasPin) { const pin = await askPin(name); if (pin === null) return; body.pin = pin; }
-  try { const r = await shellyApi('/api/wol/' + encodeURIComponent(id) + '/wake', 'POST', body); shellyMsg('Magic Packet gesendet an ' + (r.sent || []).join(', ')); savedToast('Gesendet ✓'); }
-  catch (e) { shellyMsg(e.message, true); }
+  if (hasPin) { const pin = await askPin(name, true); if (pin === null) return; body.pin = pin; }
+  try { const r = await shellyApi('/api/wol/' + encodeURIComponent(id) + '/wake', 'POST', body); shellyMsg('Magic Packet gesendet an ' + (r.sent || []).join(', ')); savedToast('Gesendet ✓'); if (hasPin) askPinDone(true, 'Befehl angenommen'); }
+  catch (e) { shellyMsg(e.message, true); if (hasPin) askPinDone(false, e.message); }
 }
 async function wolRenameSave(id) {
   const n = (document.getElementById('wname-' + id)?.value || '').trim();
@@ -2947,12 +2947,12 @@ async function virtRenameSave(id) {
 async function virtAct(id, isSwitch, isOn, hasPin, name) {                // Schalter umschalten bzw. Knopf druecken (wie am Dashboard, ggf. mit PIN)
   const body = isSwitch ? { on: !isOn } : {};
   if (hasPin) {
-    const pin = await askPin(name);
+    const pin = await askPin(name, true);
     if (pin === null) return;
     body.pin = pin;
   }
-  try { await shellyApi('/api/virtual/' + encodeURIComponent(id) + (isSwitch ? '/set' : '/press'), 'POST', body); shellyMsg(''); savedToast(isSwitch ? (isOn ? 'Ausgeschaltet ✓' : 'Eingeschaltet ✓') : 'Gedrückt ✓'); }
-  catch (e) { shellyMsg(e.message, true); }
+  try { await shellyApi('/api/virtual/' + encodeURIComponent(id) + (isSwitch ? '/set' : '/press'), 'POST', body); shellyMsg(''); savedToast(isSwitch ? (isOn ? 'Ausgeschaltet ✓' : 'Eingeschaltet ✓') : 'Gedrückt ✓'); if (hasPin) askPinDone(true, 'Befehl angenommen'); }
+  catch (e) { shellyMsg(e.message, true); if (hasPin) askPinDone(false, e.message); }
   loadVirtualAdmin();
 }
 async function virtRemove(id) {

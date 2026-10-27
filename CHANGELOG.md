@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.13.1 – 27.10.2026
+- Verbesserung: Das **PIN-Feld** bleibt nach der vierten Ziffer kurz offen und zeigt das Ergebnis: „Wird gesendet …“, dann ein **grüner Haken** mit „Befehl angenommen“ bzw. ein rotes Kreuz mit der Fehlermeldung; danach blendet es sich selbst aus. Gilt für Geräte, eigene Schalter/Knöpfe und Wake-on-LAN (Dashboard, Favoriten, Smart Home).
+
 ## 1.13.0 – 27.10.2026
 - Neu: In Regeln lässt sich festlegen, **wer** etwas bedient hat. Geräte und Schalter in der Bedingung WENN haben die Option **„bedient von“** (Konten ankreuzen), und im Text einer Telegram- oder Pushover-Nachricht ersetzt der Platzhalter **[WER]** den Namen des Kontos, das den Auslöser zuletzt bedient hat (z. B. „Toröffner betätigt von [WER]“).
 - Das Geräte-Logbuch merkt sich dazu den Anmeldenamen des Kontos.
