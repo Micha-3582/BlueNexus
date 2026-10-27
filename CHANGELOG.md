@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.21.0 – 27.10.2026
+- Neu: **Messintervall** pro Funkthermometer einstellbar (Knopf „Intervall“, 1 bis 60 Minuten) – zum Testen oder Abgleichen kurz, sonst 15 Minuten. Bis das Thermometer den neuen Wert geholt hat, gilt für „meldet sich nicht mehr“ das bisher gemeldete Intervall.
+
 ## 1.20.0 – 27.10.2026
 - Neu: **Etikett fürs Thermometer-Gehäuse.** Der Knopf „Etikett“ am Funkthermometer druckt auf dem Niimbot-Drucker ein Etikett mit Namen, Geräte-ID und QR-Code (Android-Handy, Chrome, https – wie bei den NFC-Tags). Der QR-Code öffnet das Thermometer in BlueNexus (Zeile wird hervorgehoben).
 - Das Etikettenfenster unterstützt eine kleine zweite Zeile unter dem Namen sowie eigene Titel und Erklärtexte (für weitere Verwendungen).

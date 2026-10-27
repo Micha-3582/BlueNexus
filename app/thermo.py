@@ -176,6 +176,7 @@ def public(dev: dict) -> dict:
     now = time.time()
     ls = dev.get("last_seen")
     iv = int(dev.get("interval") or DEFAULT_INTERVAL_MIN)
+    run_iv = max(iv, int(dev.get("interval_ack") or 0))                  # Das Geraet laeuft noch mit dem zuletzt gemeldeten Intervall, bis es den neuen Wert geholt hat
     cal = dev.get("calib") or {}
     raw = dict(dev.get("last") or {})
     cor = dict(raw)
@@ -186,7 +187,7 @@ def public(dev: dict) -> dict:
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
     return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
-            "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= iv * 60 * MISSED_INTERVALS + 120,
+            "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
             "last": cor, "raw": raw, "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
 
@@ -299,8 +300,9 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
         fw = str(body.get("fw") or "")[:20]
         if fw:
             d["fw"] = fw
-        _save(items)
         interval = int(d.get("interval") or DEFAULT_INTERVAL_MIN)
+        d["interval_ack"] = interval                                    # so schlaeft das Geraet ab jetzt (Grundlage fuer "meldet sich nicht mehr")
+        _save(items)
     return 200, {"ok": True, "interval": interval}
 
 
@@ -309,7 +311,7 @@ def read_value(sen: dict):
     d = get(str(sen.get("address") or ""))
     if not d or d.get("last_seen") is None:
         return None
-    iv = int(d.get("interval") or DEFAULT_INTERVAL_MIN)
+    iv = max(int(d.get("interval") or DEFAULT_INTERVAL_MIN), int(d.get("interval_ack") or 0))
     if time.time() - d["last_seen"] > iv * 60 * MISSED_INTERVALS + 120:
         return None
     v = (d.get("last") or {}).get(sen.get("datapoint"))

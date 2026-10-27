@@ -49,6 +49,7 @@
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + calTxt(d) + '</div></div>'
         + (etk.kind === 'other' ? '' : '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot, am Android-Handy)">Etikett</button>')
+        + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
@@ -288,6 +289,18 @@
     el.textContent = state.devices.length && es ? (es.ok ? '🏷 Etikett mit Namen, ID und QR-Code für das Gehäuse: „Etikett“ am Thermometer (Niimbot-Drucker, per Bluetooth).' : 'ℹ Etiketten für das Gehäuse drucken geht am Android-Handy (Chrome, https): BlueNexus dort öffnen und „Etikett“ am Thermometer drücken.') : '';
   }
 
+  /* ---------------- Messintervall ---------------- */
+  function setInterval_(d) {
+    var opts = [[1, '1 Minute (nur zum Testen)'], [2, '2 Minuten'], [5, '5 Minuten'], [10, '10 Minuten'], [15, '15 Minuten (Standard)'], [30, '30 Minuten'], [60, '60 Minuten']];
+    if (!opts.some(function (o) { return o[0] === d.interval; })) opts.push([d.interval, d.interval + ' Minuten (aktuell)']);
+    uiForm({ title: 'Messintervall: ' + d.name, okText: 'Speichern',
+      message: 'Wie oft das Thermometer misst und sendet. Kurze Intervalle kosten viel Batterie – 1 bis 5 Minuten nur zum Testen oder Abgleichen, danach wieder auf 15 Minuten. Das Thermometer übernimmt den neuen Wert bei seiner nächsten Meldung (nach einem Druck auf RESET sofort) und wendet ihn nach der Wachzeit von 5 Minuten an.',
+      fields: [{ id: 'iv', label: 'Messung alle', type: 'select', value: String(d.interval), options: opts.map(function (o) { return [String(o[0]), o[1]]; }) }] }).then(function (r) {
+      if (!r) return;
+      api('/api/thermo/' + encodeURIComponent(d.id), 'PATCH', { interval: parseInt(r.iv, 10) }).then(function () { savedToast('Gespeichert ✓'); return load(); }).catch(function (e) { msg(e.message, true); });
+    });
+  }
+
   /* ---------------- Abgleich (Kalibrieren) ---------------- */
   function calibrate(d) {
     var raw = d.raw || {}, age = d.age_s;
@@ -314,6 +327,8 @@
         if (!r || !String(r.name || '').trim()) return;
         api('/api/thermo/' + encodeURIComponent(id), 'PATCH', { name: r.name }).then(load).catch(function (e) { msg(e.message, true); });
       });
+    } else if (b.dataset.act === 'interval') {
+      setInterval_(d);
     } else if (b.dataset.act === 'calib') {
       calibrate(d);
     } else if (b.dataset.act === 'label') {
