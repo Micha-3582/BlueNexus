@@ -4172,12 +4172,15 @@ def api_thermo_status(tid):
 def api_thermo_ingest(tid):
     """Messwerte des Funkthermometers. Nur aus dem lokalen Netz, nur mit dem Schluessel des Geraets (Kopfzeile Authorization: Bearer ...)."""
     if not extapi.lan_request_ok(request.headers, request.remote_addr):
+        thermo.note_attempt(tid, request.remote_addr or "?", "von außerhalb des lokalen Netzes (abgewiesen)")
         return "", 404
     ip = client_ip()
     if too_many_attempts("thermo:" + ip):
         return jsonify(error="too many attempts"), 429
     h = request.headers.get("Authorization", "")
-    code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True))
+    code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True), ip)
+    if code == 401:
+        log.warning("Funkthermometer %s: Anfrage von %s abgelehnt (Schlüssel falsch oder Gerät unbekannt)", tid, ip)
     if code == 401:
         note_failed_attempt("thermo:" + ip)
     else:

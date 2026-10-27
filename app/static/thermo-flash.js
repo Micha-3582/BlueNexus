@@ -34,7 +34,7 @@
       return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
-        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? 'wartet auf die erste Meldung' : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min</div></div>'
+        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min</div></div>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
         + '<button type="button" class="ghost" data-act="key" data-id="' + esc(d.id) + '" title="Neuer Schlüssel / Zugangsdaten zum Abtippen">🔑</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
@@ -145,7 +145,7 @@
     }).then(function () {
       steps(5, 'ok'); return session.transport.disconnect().catch(function () {});
     }).then(function () {
-      steps(6, 'run', 'bis zu 90 Sekunden'); return waitFirst(created.device.id, 90);
+      steps(6, 'run', 'bis zu 90 Sekunden – tut sich nichts, die RESET-Taste am Board drücken'); return waitFirst(created.device.id, 90);
     }).then(function (dev) {
       steps(6, 'ok');
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
@@ -155,8 +155,13 @@
       var ours = created && k >= 0 && k <= 5;
       var cleanup = (ours ? api('/api/thermo/' + created.device.id, 'DELETE').catch(function () {}) : Promise.resolve());
       var closer = session ? session.transport.disconnect().catch(function () {}) : Promise.resolve();
-      Promise.all([cleanup, closer]).then(function () {
-        msg((k === 6 ? 'Das Thermometer hat sich in 90 Sekunden nicht gemeldet. Prüfe WLAN-Name und Passwort (nur 2,4 GHz) und die Adresse unter „Erweitert“. Der Chip ist geflasht; mit „Ohne PC einrichten“ oder erneutem Flashen geht es weiter.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
+      var diag = (k === 6 && created) ? api('/api/thermo/' + encodeURIComponent(created.device.id) + '/status').then(function (j) { return j.device; }).catch(function () { return null; }) : Promise.resolve(null);
+      Promise.all([cleanup, closer, diag]).then(function (r) {
+        var dev = r[2], why = '';
+        if (k === 6) why = dev && dev.attempt
+          ? 'Eine Anfrage ist bei BlueNexus angekommen, wurde aber abgelehnt: ' + dev.attempt.why + ' (von ' + dev.attempt.ip + ').'
+          : 'Bei BlueNexus ist keine Anfrage angekommen. Häufige Ursachen: Der Chip ist nach dem Flashen nicht neu gestartet (RESET-Taste drücken oder USB-C kurz abziehen und wieder anstecken – er meldet sich dann innerhalb von etwa 20 Sekunden), WLAN-Name oder -Passwort stimmen nicht (nur 2,4 GHz), oder die Adresse unter „Erweitert“ ist von dort aus nicht erreichbar.';
+        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
         setBusy(false); load();
       });
     });

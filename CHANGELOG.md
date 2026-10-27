@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.16.1 – 27.10.2026
+- Neu: **Diagnose beim Funkthermometer.** Meldet sich ein frisch geflashtes Thermometer nicht, sagt das Fenster, ob überhaupt eine Anfrage angekommen ist (und warum sie abgelehnt wurde: falscher Schlüssel, außerhalb des lokalen Netzes, ungültige Daten) oder ob nichts ankam (Chip nicht neu gestartet, WLAN, Adresse). Die Liste zeigt den letzten abgelehnten Versuch; während des Wartens steht der Hinweis auf die RESET-Taste.
+
 ## 1.16.0 – 27.10.2026
 - Neu: **Funkthermometer (ESP32-C3) einrichten und flashen** unter *Einstellungen → System*: WLAN-Name und -Passwort eintragen, **Einrichten und flashen** – BlueNexus legt das Thermometer an (ID + Schlüssel), spielt die Firmware per USB (Web Serial, Chrome/Edge) auf die Platine, schreibt die Konfiguration und wartet auf die erste Messung. Das WLAN-Passwort verlässt den Browser nicht.
 - Neu: Das Thermometer erscheint mit vier **Sensoren** (Temperatur, Luftfeuchte, Batterie, Funkstärke) unter Smart Home → Sensoren; nach 3 verpassten Meldungen gelten sie als „nicht erreichbar“. Annahme der Messwerte unter `POST /api/sensor/<ID>` (nur lokales Netz, Schlüssel-Hash, Bremse).

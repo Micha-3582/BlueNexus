@@ -126,7 +126,9 @@ def public(dev: dict) -> dict:
     now = time.time()
     ls = dev.get("last_seen")
     iv = int(dev.get("interval") or DEFAULT_INTERVAL_MIN)
-    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"),
+    at = dev.get("attempt") or {}
+    attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
+    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= iv * 60 * MISSED_INTERVALS + 120,
             "last": dict(dev.get("last") or {}), "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
@@ -197,16 +199,37 @@ def _num(v, lo: float, hi: float):
     return round(f, 2) if lo <= f <= hi and f == f else None
 
 
-def ingest(tid: str, token: str, body: dict) -> tuple[int, dict]:
+def note_attempt(tid: str, ip: str, why: str) -> None:
+    """Merkt sich den letzten gescheiterten Versuch eines BEKANNTEN Geraets (Diagnose: kommt die Anfrage an, und warum wurde sie abgelehnt?). Nur in der Anzeige, nie als Antwort an den Absender."""
+    if not ID_RE.match(tid or ""):
+        return
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if not d:
+            return
+        d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": why}
+        _save(items)
+
+
+def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
     """Messung annehmen. -> (HTTP-Status, Antwort). 401 = Schluessel falsch/Geraet unbekannt (gleiche Antwort, damit man IDs nicht abklopfen kann)."""
-    if not ID_RE.match(tid or "") or not token:
+    if not ID_RE.match(tid or ""):
+        return 401, {"error": "unauthorized"}
+    if not token:
+        note_attempt(tid, ip, "ohne Schlüssel")
         return 401, {"error": "unauthorized"}
     with _lock:
         items = _load()
         d = next((x for x in items if x.get("id") == tid), None)
         if not d or not hmac.compare_digest(str(d.get("token_hash") or ""), _hash(token)):
+            if d:
+                d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "falscher Schlüssel"}
+                _save(items)
             return 401, {"error": "unauthorized"}
         if not isinstance(body, dict):
+            d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "keine gültigen Daten"}
+            _save(items)
             return 400, {"error": "json erwartet"}
         last = dict(d.get("last") or {})
         got = False
@@ -225,8 +248,11 @@ def ingest(tid: str, token: str, body: dict) -> tuple[int, dict]:
         if r is not None:
             last["rssi"] = r
         if not got:
+            d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "keine gültigen Messwerte"}
+            _save(items)
             return 400, {"error": "keine gueltigen Messwerte"}
         d["last"], d["last_seen"] = last, time.time()
+        d.pop("attempt", None)
         fw = str(body.get("fw") or "")[:20]
         if fw:
             d["fw"] = fw

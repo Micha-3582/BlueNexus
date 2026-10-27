@@ -465,6 +465,8 @@ Für das selbstgebaute **Batterie-Thermometer** (ESP32-C3 mit Temperatur-/Feucht
 
 **Verhalten:** Das Gerät misst beim Einschalten sofort, bleibt **5 Minuten wach** (USB bleibt sichtbar) und schläft dann bis zur nächsten Messung. Meldet es sich **3 Intervalle lang nicht**, zeigen seine Sensoren „nicht erreichbar“. Die **Batterie** (zwei Lithium-AA) gilt über **3,1 V als in Ordnung**, unter **3,0 V als „bald wechseln“**; bei 2,75 V schaltet sich die Firmware selbst ab. Solange das Gerät am USB hängt und keine Batteriemessung verdrahtet ist, sind Werte unter 1 V ohne Bedeutung und werden nicht angezeigt.
 
+**Meldet sich das Thermometer nach dem Flashen nicht?** Das Fenster sagt, warum: *„Keine Anfrage angekommen“* – meist ist der Chip nach dem Flashen nicht neu gestartet (**RESET-Taste drücken** oder USB-C kurz abziehen und wieder anstecken; nach etwa 20 Sekunden meldet er sich) oder WLAN-Name/-Passwort stimmen nicht (nur 2,4 GHz) oder die Adresse unter *Erweitert* ist vom WLAN aus nicht erreichbar. *„Anfrage angekommen, aber abgelehnt“* nennt den Grund (z. B. falscher Schlüssel nach „Neuer Schlüssel“, oder die Anfrage kam von außerhalb des lokalen Netzes). Das angelegte Thermometer bleibt in der Liste und füllt sich, sobald es sich meldet.
+
 **Technik (für Bastler):** Das Gerät sendet alle paar Minuten `POST /api/sensor/<ID>` (Kopfzeile `Authorization: Bearer <Schlüssel>`, JSON `{"temp","hum","bat","rssi","fw"}`) an die lokale Adresse; BlueNexus nimmt das **nur aus dem lokalen Netz** an (Bremse gegen Raten) und antwortet `{"ok":true,"interval":15}` – das Intervall lässt sich so zentral ändern. Die mitgelieferte Firmware liegt unter `app/static/firmware/thermo/<Version>/`.
 
 ### Logbuch der Geräte
