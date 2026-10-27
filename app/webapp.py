@@ -232,7 +232,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4193,6 +4193,20 @@ def api_thermo_item(tid):
     b = request.get_json(silent=True) or {}
     ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"))
     return (jsonify(ok=True), 200) if ok else (jsonify(error="Thermometer nicht gefunden"), 404)
+
+
+@app.route("/api/thermo/<tid>/calibrate", methods=["POST"])
+def api_thermo_calibrate(tid):
+    """Abgleich auf Referenzwerte: {ref_temp?, ref_hum?} (oder {reset: true}); rechnet mit der letzten, frischen Messung."""
+    b = request.get_json(silent=True) or {}
+    try:
+        res = thermo.calibrate(tid, b.get("ref_temp"), b.get("ref_hum"), bool(b.get("reset")))
+    except thermo.ThermoError as e:
+        return jsonify(error=str(e)), 400
+    homematic._value_cache.clear()                                       # Anzeige gleich mit dem neuen Abgleich
+    d = thermo.get(tid)
+    opslog.log("thermo", f"Funkthermometer „{d.get('name') if d else tid}“: Abgleich " + ("gelöscht" if b.get("reset") else f"Temperatur {res['calib']['temp']}, Feuchte {res['calib']['hum']}"), dry=False)
+    return jsonify(ok=True, device=thermo.public(d), **res)
 
 
 @app.route("/api/thermo/<tid>/status", methods=["GET"])

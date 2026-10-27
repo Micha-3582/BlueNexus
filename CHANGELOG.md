@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.19.0 – 27.10.2026
+- Neu: **Abgleichen (Kalibrieren)** beim Funkthermometer: Referenz-Temperatur und/oder -Luftfeuchte eintragen, BlueNexus rechnet den Korrekturwert aus und wendet ihn auf alle künftigen Messungen an (Sensoren, Regeln, Diagramme). Nur mit frischer Messung (höchstens 5 Minuten; RESET-Taste am Thermometer misst sofort neu), mit Plausibilitätsgrenzen (±10 °C, ±30 %) und „Abgleich löschen“. Die Liste zeigt den Korrekturwert.
+
 ## 1.18.0 – 27.10.2026
 - Änderung: Nach dem Flashen erscheint ein **großes Fenster „Jetzt die RESET-Taste am Thermometer drücken“** (pulsierende Taste, Zähler, nach 30 Sekunden der Hinweis „noch einmal drücken“, Abbrechen), damit der Schritt nicht zu übersehen ist. Es schließt sich mit „Thermometer verbunden“ von selbst.
 - Änderung: Das Funkthermometer wird **nur noch am PC** eingerichtet (anstecken, einmalig anlernen). Die Einrichtung ohne PC (Zugangsdaten zum Abtippen, Hotspot am Handy) und „Neuer Schlüssel“ entfallen; das Anlegen ohne WLAN-Angaben wird abgelehnt.

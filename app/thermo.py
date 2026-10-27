@@ -34,6 +34,9 @@ DEFAULT_INTERVAL_MIN = 15
 MISSED_INTERVALS = 3                # so viele Intervalle ohne Meldung: Geraet gilt als offline (Sensorwert = "nicht erreichbar")
 BAT_NO_MEASURE_V = 1.0              # darunter ist keine Batteriemessung verdrahtet (USB-Betrieb liefert Zufallswerte, siehe Uebergabe-Notiz)
 LIMITS = {"temp": (-60.0, 80.0), "hum": (0.0, 100.0)}
+CAL_MAX_AGE_S = 300                 # Abgleich nur mit frischer Messung (das Geraet misst nach RESET sofort neu)
+CAL_MAX_OFF = {"temp": 10.0, "hum": 30.0}   # groessere Abweichungen sind kein Messfehler des Sensors, sondern ein Hinweis auf eine falsche Referenz
+
 ID_RE = re.compile(r"^t-[a-z0-9]{6,12}$")
 # metric -> (Schluessel im Zustand, Sensorart, Bezeichnung, Einheit)
 METRICS = {
@@ -72,6 +75,48 @@ def load() -> list[dict]:
 
 def get(tid: str) -> dict | None:
     return next((x for x in load() if x.get("id") == tid), None)
+
+
+def calibrate(tid: str, ref_temp=None, ref_hum=None, reset: bool = False) -> dict:
+    """Abgleich auf Referenzwerte: Korrekturwert = Referenz - Rohwert der letzten Messung (nur wenn frisch). reset=True loescht den Abgleich.
+    -> {"calib": {...}, "age_s": ...}; wirft ThermoError mit deutscher Meldung."""
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if not d:
+            raise ThermoError("Thermometer nicht gefunden")
+        if reset:
+            d.pop("calib", None)
+            _save(items)
+            return {"calib": {"temp": None, "hum": None}, "age_s": None}
+        last = d.get("last") or {}
+        ls = d.get("last_seen")
+        if ls is None or not last:
+            raise ThermoError("Das Thermometer hat noch keine Messung gemeldet.")
+        age = int(time.time() - ls)
+        if age > CAL_MAX_AGE_S:
+            raise ThermoError(f"Der letzte Messwert ist {age // 60} Minuten alt. Zum Abgleichen die RESET-Taste am Thermometer drücken (es misst sofort neu), warten bis es sich meldet und dann erneut versuchen.")
+        cal = dict(d.get("calib") or {})
+        given = False
+        for key, ref, label, unit in (("temp", ref_temp, "Temperatur", "°C"), ("hum", ref_hum, "Luftfeuchte", "%")):
+            if ref is None or ref == "":
+                continue
+            try:
+                r = float(str(ref).replace(",", "."))
+            except ValueError:
+                raise ThermoError(f"{label}: bitte eine Zahl eintragen.")
+            if key not in last:
+                raise ThermoError(f"Für {label} liegt keine Messung vor.")
+            off = round(r - float(last[key]), 2)
+            if abs(off) > CAL_MAX_OFF[key]:
+                raise ThermoError(f"{label}: Abweichung {off:+.1f} {unit} ist zu groß für einen Messfehler. Stimmt die Referenz, und hat das Thermometer lange genug neben der Referenz gelegen?")
+            cal[key] = off
+            given = True
+        if not given:
+            raise ThermoError("Bitte mindestens einen Referenzwert eintragen.")
+        d["calib"] = cal
+        _save(items)
+    return {"calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "age_s": age}
 
 
 def new_token() -> str:
@@ -131,11 +176,18 @@ def public(dev: dict) -> dict:
     now = time.time()
     ls = dev.get("last_seen")
     iv = int(dev.get("interval") or DEFAULT_INTERVAL_MIN)
+    cal = dev.get("calib") or {}
+    raw = dict(dev.get("last") or {})
+    cor = dict(raw)
+    if "temp" in cor:
+        cor["temp"] = round(cor["temp"] + float(cal.get("temp") or 0), 2)
+    if "hum" in cor:
+        cor["hum"] = round(min(100.0, max(0.0, cor["hum"] + float(cal.get("hum") or 0))), 2)
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
     return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= iv * 60 * MISSED_INTERVALS + 120,
-            "last": dict(dev.get("last") or {}), "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
+            "last": cor, "raw": raw, "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
 
 def listing() -> list[dict]:
@@ -265,6 +317,11 @@ def read_value(sen: dict):
         return None
     if sen.get("datapoint") == "bat" and v < BAT_NO_MEASURE_V:
         return None
+    off = float((d.get("calib") or {}).get(sen.get("datapoint")) or 0)             # Abgleich (nur Temperatur/Feuchte)
+    if off and sen.get("datapoint") in ("temp", "hum"):
+        v = v + off
+        if sen.get("datapoint") == "hum":
+            v = min(100.0, max(0.0, v))
     return v
 
 

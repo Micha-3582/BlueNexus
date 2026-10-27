@@ -46,10 +46,17 @@
       return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
-        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min</div></div>'
+        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + calTxt(d) + '</div></div>'
+        + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
     }).join('');
+  }
+  function calTxt(d) {
+    var c = d.calib || {}, p = [];
+    if (c.temp != null) p.push((c.temp > 0 ? '+' : '') + dec(c.temp, 2) + ' °C');
+    if (c.hum != null) p.push((c.hum > 0 ? '+' : '') + dec(c.hum, 1) + ' %');
+    return p.length ? ' · Abgleich ' + p.join(' / ') : '';
   }
   function load() {
     return api('/api/thermo').then(function (j) {
@@ -253,6 +260,23 @@
     return o;
   }
 
+  /* ---------------- Abgleich (Kalibrieren) ---------------- */
+  function calibrate(d) {
+    var raw = d.raw || {}, age = d.age_s;
+    var intro = 'Lege das Thermometer neben dein Referenzgerät und warte, bis beide sich angeglichen haben (etwa 15 Minuten, nicht anfassen). Drücke dann die RESET-Taste am Thermometer: Es misst sofort neu und meldet sich nach 1 bis 20 Sekunden. Danach hier die Referenzwerte eintragen – BlueNexus rechnet den Korrekturwert aus und wendet ihn auf alle Messungen an (auch in Regeln und Diagrammen; ältere Verlaufswerte bleiben unverändert).';
+    var cur = 'Letzte Messung' + (age == null ? '' : ' (vor ' + (age < 90 ? age + ' s' : Math.round(age / 60) + ' min') + ')') + ': ' + dec(raw.temp, 2) + ' °C, ' + dec(raw.hum, 1) + ' % (unkorrigiert).' + calTxt(d).replace(' · ', ' Aktuell:');
+    uiForm({ title: 'Thermometer abgleichen: ' + d.name, message: intro + '  ' + cur, okText: 'Abgleichen', fields: [
+      { id: 'ref_temp', label: 'Referenz-Temperatur (°C)', type: 'text', value: '' },
+      { id: 'ref_hum', label: 'Referenz-Luftfeuchte (%)', type: 'text', value: '' },
+      { id: 'reset', label: 'Abgleich löschen (Rohwerte verwenden)', type: 'checkbox', value: false }] }).then(function (r) {
+      if (!r) return;
+      var body = r.reset ? { reset: true } : { ref_temp: r.ref_temp, ref_hum: r.ref_hum };
+      api('/api/thermo/' + encodeURIComponent(d.id) + '/calibrate', 'POST', body).then(function (j) {
+        savedToast(r.reset ? 'Abgleich gelöscht ✓' : 'Abgeglichen ✓'); return load();
+      }).catch(function (e) { uiDialog({ title: 'Abgleich nicht möglich', info: true, okText: 'OK', message: e.message }); });
+    });
+  }
+
   /* ---------------- Liste: Umbenennen, Entfernen ---------------- */
   $('th-list').addEventListener('click', function (ev) {
     var b = ev.target.closest('button[data-act]'); if (!b) return;
@@ -262,6 +286,8 @@
         if (!r || !String(r.name || '').trim()) return;
         api('/api/thermo/' + encodeURIComponent(id), 'PATCH', { name: r.name }).then(load).catch(function (e) { msg(e.message, true); });
       });
+    } else if (b.dataset.act === 'calib') {
+      calibrate(d);
     } else if (b.dataset.act === 'del') {
       uiDialog({ title: 'Thermometer entfernen?', okText: 'Entfernen', message: '„' + (d.name || id) + '“ und seine Sensoren werden aus BlueNexus entfernt (Regeln und Diagramme, die sie benutzen, verlieren den Sensor). Am Chip selbst ändert sich nichts – dafür „ESP32 löschen“.' }).then(function (ok) {
         if (!ok) return;
