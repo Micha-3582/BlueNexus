@@ -457,7 +457,7 @@ Für das selbstgebaute **Batterie-Thermometer** (ESP32-C3 mit Temperatur-/Feucht
 
 **Voraussetzungen:** **Chrome oder Edge am PC** (Web Serial; nicht Firefox, Safari oder Handy) und eine **gesicherte Adresse** (https oder `localhost`). Fehlt eine Voraussetzung, steht das im Fenster; dann geht „Ohne PC einrichten“.
 
-**Datenschutz:** Das WLAN-Passwort verlässt den Browser nicht – es wird nur in die Konfiguration des Chips geschrieben und **nie auf dem Server gespeichert**. Auf dem Server liegt vom Schlüssel nur ein **Hash**.
+**WLAN merken:** Mit dem Haken **„WLAN für weitere Thermometer merken“** speichert BlueNexus Name und Passwort deines WLANs (nur auf diesem Server, nur für Administratoren, Teil der Sicherung). Bei jedem weiteren Thermometer ist das WLAN dann vorbelegt, das Passwortfeld zeigt „gemerkt – leer lassen“. **Gemerktes WLAN vergessen** löscht beides wieder. Ohne den Haken wird das Passwort nur zum Erzeugen der Konfiguration benutzt und nicht gespeichert; das Passwort wird nie an die Oberfläche zurückgegeben. Trägst du kein Passwort ein, fragt das Fenster nach (nur bei einem offenen WLAN richtig). Vom Schlüssel des Thermometers liegt auf dem Server nur ein **Hash**.
 
 **Ohne PC einrichten:** Erzeugt Geräte-ID und Schlüssel zum **Abtippen** (der Schlüssel wird nur einmal angezeigt). Das Thermometer öffnet ohne Konfiguration ein eigenes WLAN **„BlueNexus-Thermo-XXXX“** (am Handy); dort Name, ID, Schlüssel, Adresse und dein WLAN eintragen.
 

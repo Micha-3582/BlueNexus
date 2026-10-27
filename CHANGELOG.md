@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.17.0 – 27.10.2026
+- Neu: **WLAN merken** beim Funkthermometer. Mit dem Haken „WLAN für weitere Thermometer merken“ speichert BlueNexus Name und Passwort des WLANs auf dem Server (nur Administratoren, Teil der Sicherung); bei weiteren Thermometern ist es vorbelegt und das Passwortfeld bleibt leer. „Gemerktes WLAN vergessen“ löscht es wieder. Das Passwort wird nie an die Oberfläche zurückgegeben.
+- Die Konfiguration des Geräts (cfg.bin) baut jetzt der **Server** (bytegleich zur Referenz des Thermometer-Projekts); Eingabefehler werden geprüft, bevor ein Thermometer angelegt wird.
+- Rückfrage, wenn weder ein Passwort eingetragen noch eins gemerkt ist (ein offenes WLAN ist selten; sonst kann sich das Thermometer nicht verbinden).
+- Das Passwortfeld wird nach dem Flashen nicht mehr geleert; die Wartezeit auf die erste Messung ist auf 60 Sekunden verkürzt, nach 20 Sekunden erscheint der Hinweis auf die RESET-Taste.
+
 ## 1.16.2 – 27.10.2026
 - Fix: Das Funkthermometer startet nach dem Flashen jetzt **von allein neu** (vorher blieb der Chip im Download-Modus stehen, bis man das USB-Kabel zog). Der Neustart zieht den Chip jetzt zuerst in den Reset und lässt ihn dann los.
 

@@ -13,16 +13,21 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
+import struct
 import threading
 import time
+import zlib
 
 import store
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 THERMO_PATH = os.path.join(_DIR, "thermo.json")
+WIFI_PATH = os.path.join(_DIR, "thermo_wifi.json")          # gemerktes WLAN fuer weitere Thermometer (Name + Passwort), nur auf Wunsch des Administrators
+CFG_SIZE, CFG_MAGIC, CFG_VER = 4096, b"BNXC", 1             # Konfigurations-Partition des Geraets (Format: src/config_store.h im Thermometer-Projekt)
 _lock = threading.RLock()
 
 DEFAULT_INTERVAL_MIN = 15
@@ -275,6 +280,65 @@ def read_value(sen: dict):
     if sen.get("datapoint") == "bat" and v < BAT_NO_MEASURE_V:
         return None
     return v
+
+
+IPV4_RE = re.compile(r"^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$")
+
+
+def wifi_get() -> dict:
+    d = store._load_json_recovering(WIFI_PATH, lambda: {})
+    return d if isinstance(d, dict) and d.get("ssid") else {}
+
+
+def wifi_set(ssid: str, password: str) -> None:
+    store._dump_json(WIFI_PATH, {"ssid": ssid, "pass": password}, indent=1)
+
+
+def wifi_clear() -> bool:
+    try:
+        os.remove(WIFI_PATH)
+        return True
+    except OSError:
+        return False
+
+
+def wifi_public() -> dict:
+    """Fuer die Oberflaeche: Name des gemerkten WLANs - das Passwort verlaesst den Server nie."""
+    w = wifi_get()
+    return {"saved": bool(w), "ssid": w.get("ssid", ""), "has_pass": bool(w.get("pass"))}
+
+
+def build_cfg(cfg: dict) -> bytes:
+    """Konfigurations-Partition (4096 Byte): "BNXC", Version, Laenge, JSON, CRC32 - bytegleich zur Referenz make_cfg.py des Thermometer-Projekts."""
+    payload = json.dumps(cfg, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if len(payload) > CFG_SIZE - 12:
+        raise ThermoError("Konfiguration zu groß")
+    blob = CFG_MAGIC + struct.pack("<BBH", CFG_VER, 0, len(payload)) + payload + struct.pack("<I", zlib.crc32(payload))
+    return blob + b"\xff" * (CFG_SIZE - len(blob))
+
+
+def check_wifi_input(ssid, password, server, ip) -> tuple:
+    """Eingaben fuer die Konfiguration pruefen -> (ssid, passwort, server, ip oder None). Wirft ThermoError mit deutscher Meldung."""
+    ssid = str(ssid or "")
+    if not ssid.strip():
+        raise ThermoError("Bitte den WLAN-Namen eintragen.")
+    if len(ssid.encode("utf-8")) > 32:
+        raise ThermoError("Der WLAN-Name ist zu lang (höchstens 32 Zeichen).")
+    password = str(password or "")
+    if password and not 8 <= len(password) <= 63:
+        raise ThermoError("Das WLAN-Passwort muss 8 bis 63 Zeichen haben (oder leer bei einem offenen WLAN).")
+    server = str(server or "").strip().rstrip("/")
+    if not re.match(r"^http://[^/\s]+$", server):
+        raise ThermoError("Die Adresse von BlueNexus muss so aussehen: http://192.168.x.x:5005 (nur http, ohne Pfad).")
+    fixed = None
+    if isinstance(ip, dict) and ip.get("addr"):
+        a, g = str(ip.get("addr", "")).strip(), str(ip.get("gw", "")).strip()
+        m = str(ip.get("mask") or "255.255.255.0").strip()
+        d = str(ip.get("dns") or g).strip()
+        if not all(IPV4_RE.match(x) for x in (a, g, m, d)):
+            raise ThermoError("Feste IP: bitte gültige Adressen eintragen (z. B. 192.168.2.60).")
+        fixed = {"addr": a, "gw": g, "mask": m, "dns": d}
+    return ssid, password, server, fixed
 
 
 def battery_state(v) -> str:

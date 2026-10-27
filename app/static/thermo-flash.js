@@ -6,7 +6,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var card = $('thermo-card'); if (!card) return;
   var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-  var state = { fw: null, server: '', secure: false, devices: [], busy: false };
+  var state = { fw: null, server: '', secure: false, devices: [], busy: false, wifi: { saved: false, ssid: '', has_pass: false } };
   var USB_FILTER = [{ usbVendorId: 0x303A, usbProductId: 0x1001 }];       // ESP32-C3: "USB JTAG/serial debug unit"
   var IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
@@ -23,6 +23,18 @@
     return s < 172800 ? 'vor ' + Math.round(s / 3600) + ' h' : 'vor ' + Math.round(s / 86400) + ' Tagen';
   }
   var dec = function (v, d) { return v == null ? '–' : Number(v).toFixed(d == null ? 1 : d).replace('.', ','); };
+
+  /* ---------------- Gemerktes WLAN ---------------- */
+  function applyWifi() {
+    var w = state.wifi, ss = $('th-ssid'), pw = $('th-pass');
+    if (w.saved) {
+      if (!ss.value || ss.dataset.auto === '1') { ss.value = w.ssid; ss.dataset.auto = '1'; }
+      pw.placeholder = w.has_pass ? 'gemerkt – leer lassen' : 'Passwort';
+      $('th-saved').textContent = 'WLAN „' + w.ssid + '“ ist gemerkt' + (w.has_pass ? ' (mit Passwort)' : '') + '.';
+    } else { pw.placeholder = 'Passwort'; $('th-saved').textContent = ''; }
+    $('th-forget').style.display = w.saved ? '' : 'none';
+  }
+  $('th-ssid').addEventListener('input', function () { $('th-ssid').dataset.auto = '0'; });
 
   /* ---------------- Liste ---------------- */
   function renderList() {
@@ -42,7 +54,7 @@
   }
   function load() {
     return api('/api/thermo').then(function (j) {
-      state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure;
+      state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure; state.wifi = j.wifi || state.wifi; applyWifi();
       if (!$('th-server').value) $('th-server').value = state.server;
       renderList(); checkEnv();
     }).catch(function (e) { msg(e.message, true); });
@@ -67,6 +79,7 @@
     if (!ssid) throw new Error('Bitte den WLAN-Namen eintragen.');
     if (new TextEncoder().encode(ssid).length > 32) throw new Error('Der WLAN-Name ist zu lang (höchstens 32 Zeichen).');
     if (pass && (pass.length < 8 || pass.length > 63)) throw new Error('Das WLAN-Passwort muss 8 bis 63 Zeichen haben (oder leer bei einem offenen WLAN).');
+    var useSaved = !pass && state.wifi.saved && state.wifi.ssid === ssid && state.wifi.has_pass;
     if (!/^http:\/\/[^\/\s]+$/.test(server)) throw new Error('Die Adresse von BlueNexus muss so aussehen: http://192.168.x.x:5005 (nur http, ohne Pfad).');
     var ip = null;
     if ($('th-fixed').checked) {
@@ -74,7 +87,7 @@
       [a, g, m, d].forEach(function (x) { if (!IPV4.test(x)) throw new Error('Feste IP: bitte gültige Adressen eintragen (z. B. 192.168.2.60).'); });
       ip = { addr: a, gw: g, mask: m, dns: d };
     }
-    return { name: name, ssid: ssid, pass: pass, server: server, interval: parseInt($('th-int').value, 10) || 15, ip: ip };
+    return { name: name, ssid: ssid, pass: pass, useSaved: useSaved, server: server, interval: parseInt($('th-int').value, 10) || 15, ip: ip };
   }
 
   /* ---------------- Fortschritt ---------------- */
@@ -113,14 +126,22 @@
   function setBusy(b) { state.busy = b; $('th-flash').disabled = b; $('th-reset').disabled = b; $('th-manual').disabled = b; checkEnv(); }
 
   function flash() {
-    var f, fwUrl = state.fw && state.fw.url, created = null, lib = null, session = null, logLines = [];
+    var f;
     try { f = readForm(); } catch (e) { msg(e.message, true); return; }
+    if (!f.pass && !f.useSaved) {                              // kein Passwort eingetragen und keins gemerkt: nachfragen (haeufiger Tippfehler: Chip kaeme sonst nicht ins WLAN)
+      uiDialog({ title: 'Kein WLAN-Passwort?', okText: 'Ja, das WLAN ist offen', message: 'Es ist kein Passwort eingetragen. Nur bei einem offenen WLAN ohne Passwort ist das richtig – sonst kann sich das Thermometer nicht verbinden.' }).then(function (ok) { if (ok) doFlash(f); });
+      return;
+    }
+    doFlash(f);
+  }
+  function doFlash(f) {
+    var fwUrl = state.fw && state.fw.url, created = null, lib = null, session = null, logLines = [];
     msg(''); resetSteps(); setBusy(true);
     var log = function (s) { logLines.push(String(s)); if (logLines.length > 40) logLines.shift(); };
     steps(0, 'run');
-    api('/api/thermo', 'POST', { name: f.name, interval: f.interval }).then(function (j) {
-      created = j; steps(0, 'ok', j.device.id);
-      var cfgBytes = BNXC.buildCfg({ name: f.name, ssid: f.ssid, pass: f.pass, server: f.server, id: j.device.id, token: j.token, interval: f.interval, ip: f.ip });
+    api('/api/thermo', 'POST', { name: f.name, interval: f.interval, remember: $('th-remember').checked, wifi: { ssid: f.ssid, pass: f.pass, server: f.server, ip: f.ip } }).then(function (j) {
+      created = j; steps(0, 'ok', j.device.id); if (j.wifi) { state.wifi = j.wifi; applyWifi(); }
+      var cfgBytes = Uint8Array.from(atob(j.cfg), function (c) { return c.charCodeAt(0); });       // vom Server gebaut (ID, Schluessel, WLAN) - 4096 Byte
       steps(1, 'run');
       return Promise.all([loadLib(), fetch(fwUrl).then(function (r) { if (!r.ok) throw new Error('Firmware nicht ladbar'); return r.arrayBuffer(); })]).then(function (r) {
         return sha256hex(r[1]).then(function (h) {
@@ -145,11 +166,11 @@
     }).then(function () {
       steps(5, 'ok'); return session.transport.disconnect().catch(function () {});
     }).then(function () {
-      steps(6, 'run', 'bis zu 90 Sekunden – tut sich nichts, die RESET-Taste am Board drücken'); return waitFirst(created.device.id, 90);
+      steps(6, 'run', 'bis zu 60 Sekunden – tut sich nichts, die RESET-Taste am Board drücken'); return waitFirst(created.device.id, 60);
     }).then(function (dev) {
       steps(6, 'ok');
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
-      $('th-pass').value = ''; setBusy(false); return load();
+      setBusy(false); return load();
     }).catch(function (e) {
       var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
       var ours = created && k >= 0 && k <= 5;
@@ -161,7 +182,7 @@
         if (k === 6) why = dev && dev.attempt
           ? 'Eine Anfrage ist bei BlueNexus angekommen, wurde aber abgelehnt: ' + dev.attempt.why + ' (von ' + dev.attempt.ip + ').'
           : 'Bei BlueNexus ist keine Anfrage angekommen. Häufige Ursachen: Der Chip ist nach dem Flashen nicht neu gestartet (RESET-Taste drücken oder USB-C kurz abziehen und wieder anstecken – er meldet sich dann innerhalb von etwa 20 Sekunden), WLAN-Name oder -Passwort stimmen nicht (nur 2,4 GHz), oder die Adresse unter „Erweitert“ ist von dort aus nicht erreichbar.';
-        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
+        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 60 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
         setBusy(false); load();
       });
     });
@@ -176,12 +197,13 @@
       .catch(function () {}).then(function () { return session.loader.after('hard_reset').catch(function () {}); });
   }
   function waitFirst(id, secs) {
-    var t0 = Date.now();
+    var t0 = Date.now(), hinted = false;
     return new Promise(function (resolve, reject) {
       (function poll() {
         api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) {
           if (j.device && j.device.last_seen != null) return resolve(j.device);
           if (Date.now() - t0 > secs * 1000) return reject(new Error('timeout'));
+          if (Date.now() - t0 > 20000 && !hinted) { hinted = true; steps(6, 'run', 'noch nichts angekommen – RESET-Taste am Board drücken (ca. 20 Sekunden warten)'); }
           setTimeout(poll, 2000);
         }).catch(reject);
       })();
@@ -247,6 +269,12 @@
   });
   $('th-fixed').addEventListener('change', function () { card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = $('th-fixed').checked ? '' : 'none'; }); });
   card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = 'none'; });
+  $('th-forget').addEventListener('click', function () {
+    uiDialog({ title: 'Gemerktes WLAN vergessen?', okText: 'Vergessen', message: 'Name und Passwort werden vom Server gelöscht. Bereits eingerichtete Thermometer behalten ihre Einstellungen.' }).then(function (ok) {
+      if (!ok) return;
+      api('/api/thermo_wifi', 'DELETE').then(function (j) { state.wifi = j.wifi; $('th-pass').value = ''; applyWifi(); savedToast('Vergessen ✓'); }).catch(function (e) { msg(e.message, true); });
+    });
+  });
   $('th-flash').addEventListener('click', flash);
   $('th-reset').addEventListener('click', resetChip);
   $('th-manual').addEventListener('click', manual);

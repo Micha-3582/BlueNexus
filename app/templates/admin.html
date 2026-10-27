@@ -150,8 +150,9 @@
   <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
     <div><label for="th-name">Name</label><input id="th-name" maxlength="40" value="Außen" placeholder="z. B. Außen"></div>
-    <div><label for="th-ssid">WLAN-Name <span class="qhelp" role="button" tabindex="0" data-help="Nur 2,4-GHz-WLAN: Der Chip kann kein 5 GHz. Das WLAN-Passwort wird nicht auf dem Server gespeichert, es geht nur in den Chip.">?</span></label><input id="th-ssid" maxlength="32" autocomplete="off" placeholder="Name deines WLANs"></div>
+    <div><label for="th-ssid">WLAN-Name <span class="qhelp" role="button" tabindex="0" data-help="Nur 2,4-GHz-WLAN: Der Chip kann kein 5 GHz. Das Passwort wird nur gespeichert, wenn „WLAN merken“ angekreuzt ist (nur auf diesem Server, nur für Administratoren) – so gibst du es bei weiteren Thermometern nicht noch einmal ein.">?</span></label><input id="th-ssid" maxlength="32" autocomplete="off" placeholder="Name deines WLANs"></div>
     <div><label for="th-pass">WLAN-Passwort</label><div class="pw-wrap"><input id="th-pass" type="password" maxlength="63" autocomplete="new-password" placeholder="Passwort"><button type="button" class="pw-toggle" data-for="th-pass" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div style="grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label class="chk" style="margin:0"><input type="checkbox" id="th-remember" checked> WLAN für weitere Thermometer merken</label><span id="th-saved" class="muted"></span><button type="button" id="th-forget" class="ghost" style="display:none">Gemerktes WLAN vergessen</button></div>
     <div><label for="th-int">Messung alle <span class="qhelp" role="button" tabindex="0" data-help="Wie oft das Thermometer misst und sendet. Seltener = Batterie hält länger. Standard: 15 Minuten.">?</span></label><select id="th-int"><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="15" selected>15 Minuten</option><option value="30">30 Minuten</option><option value="60">60 Minuten</option></select></div>
   </div>
   <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Erweitert (Server-Adresse, feste IP)</summary>
@@ -1056,8 +1057,7 @@
 
 {% endblock %}
 {% block scripts %}
-{% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-cfg.js') }}"></script>
-<script src="{{ url_for('static', filename='thermo-flash.js') }}" defer></script>{% endif %}
+{% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-flash.js') }}" defer></script>{% endif %}
 <script>
 let cfg = {};
 function pvInverterRow(p = {}) {

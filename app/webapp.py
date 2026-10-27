@@ -14,6 +14,7 @@ Start:
 import copy
 import hmac
 import logging
+import base64
 import re
 import threading
 import subprocess
@@ -231,7 +232,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_item": "settings_system", "api_thermo_key": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_key": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4136,11 +4137,37 @@ def _thermo_server_hint() -> str:
 def api_thermo_list():
     """GET: Thermometer + Firmware + Adressvorschlag. POST {name, interval}: neues Thermometer anlegen (Schluessel kommt EINMAL im Klartext zurueck)."""
     if request.method == "GET":
-        return jsonify(devices=thermo.listing(), firmware=_thermo_firmware(), server=_thermo_server_hint(), secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
+        return jsonify(devices=thermo.listing(), firmware=_thermo_firmware(), server=_thermo_server_hint(), wifi=thermo.wifi_public(),
+                       secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
     b = request.get_json(silent=True) or {}
-    dev, token = thermo.create(str(b.get("name") or ""), b.get("interval", thermo.DEFAULT_INTERVAL_MIN))
+    interval = b.get("interval", thermo.DEFAULT_INTERVAL_MIN)
+    w = b.get("wifi")
+    cfg_b64 = None
+    if isinstance(w, dict):                                # Flash-Fenster: den Server die Konfiguration des Geraets bauen lassen (WLAN aus der Eingabe oder das gemerkte)
+        saved = thermo.wifi_get()
+        ssid = str(w.get("ssid") or "")
+        pw = w.get("pass")
+        if (pw is None or pw == "") and saved and saved.get("ssid") == ssid:
+            pw = saved.get("pass", "")                     # Passwortfeld leer: gemerktes Passwort dieses WLANs benutzen
+        try:
+            ssid, pw, server, fixed = thermo.check_wifi_input(ssid, pw, w.get("server") or _thermo_server_hint(), w.get("ip"))
+        except thermo.ThermoError as e:
+            return jsonify(error=str(e)), 400              # nichts angelegt
+    dev, token = thermo.create(str(b.get("name") or ""), interval)
+    if isinstance(w, dict):
+        cfg_b64 = base64.b64encode(thermo.build_cfg({"v": 1, "name": dev["name"], "ssid": ssid, "pass": pw, "ip": fixed, "server": server,
+                                                     "id": dev["id"], "token": token, "interval": dev["interval"]})).decode("ascii")
+        if b.get("remember"):
+            thermo.wifi_set(ssid, pw)
     opslog.log("thermo", f"Funkthermometer „{dev['name']}“ angelegt ({dev['id']})", dry=False)
-    return jsonify(device=dev, token=token, server=_thermo_server_hint()), 201
+    return jsonify(device=dev, token=token, server=_thermo_server_hint(), cfg=cfg_b64, wifi=thermo.wifi_public()), 201
+
+
+@app.route("/api/thermo_wifi", methods=["DELETE"])
+def api_thermo_wifi():
+    """Gemerktes WLAN (Name + Passwort) vergessen."""
+    thermo.wifi_clear()
+    return jsonify(ok=True, wifi=thermo.wifi_public())
 
 
 @app.route("/api/thermo/<tid>", methods=["PATCH", "DELETE"])
