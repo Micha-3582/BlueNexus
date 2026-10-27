@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.24.0 – 27.10.2026
+- Neu: **Farbwähler mit „Übernehmen“** im Diagramm-Dialog der Verläufe (PC und Handy): Palette, eigene Farbe über Regler oder Hex-Wert, „Standard“, „Abbrechen“. Der Farbwähler des Browsers ließ sich nicht bestätigen, und ein Klick daneben hakte versehentlich eine andere Reihe an.
+
 ## 1.23.2 – 27.10.2026
 - Änderung: In den Verläufen heißt „⚙ Datenreihen“ jetzt **„⚙ Messwerte“** („Neuen Messwert hinzufügen“), und der Knopf steht **vor** „＋ Diagramm“ (erst die Messwerte festlegen, dann das Diagramm anlegen).
 
