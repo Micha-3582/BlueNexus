@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.15.1 – 27.10.2026
+- Fix: **[WER]** und „bedient von“ funktionieren jetzt auch über **Regel-Ketten**: Löst ein Konto einen Knopf aus, schaltet daraufhin eine Regel einen Taster, und eine zweite Regel meldet „Taster ist an“, wird das Konto am Anfang der Kette genannt (vorher „unbekannt“).
+- Fix: Schritte eines **Ablaufs** (z. B. Taster einschalten) stehen im Geräte-Logbuch jetzt als **Regel „Name“** statt „System“.
+
 ## 1.15.0 – 27.10.2026
 - Verbesserung: Der **Hardware-Monitor** läuft jetzt **live** (alle 3 Sekunden, solange der Betriebsbericht offen ist) und zeigt kleine Verlaufslinien der letzten Minuten.
 - Neu: echte **Prozessor-Auslastung** in % der zugewiesenen Kerne, dazu der Anteil von BlueNexus selbst. In Containern (z. B. Proxmox) war die „Last“ der Wert des ganzen Servers und wirkte deshalb zu hoch; sie steht jetzt als „Systemlast“ mit Erklärung und wird im Container nicht mehr bewertet.

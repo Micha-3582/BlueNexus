@@ -856,12 +856,50 @@ def _by_field(c: dict) -> dict:
     return {"by": names[:30]} if names else {}
 
 
+def trigger_refs(conds) -> list:
+    """Logbuch-Referenzen aller Geraete/Schalter in WENN-Bedingungen (auch in Gruppen) - daran haengt die Frage "wer hat bedient"."""
+    out: list = []
+    for c in conds or []:
+        if not isinstance(c, dict):
+            continue
+        if c.get("type") == "device" and c.get("device_id"):
+            out.append("device:" + str(c["device_id"]))
+        elif c.get("type") == "virtual" and c.get("id"):
+            out.append("virtual:" + str(c["id"]))
+        elif c.get("type") == "group":
+            out += trigger_refs(c.get("conds"))
+    return out
+
+
+def resolve_who(refs, depth: int = 3, seen=None):
+    """Wer steckt hinter der juengsten Bedienung dieser Dinge? Hat eine REGEL geschaltet, wird ihr Ausloeser verfolgt (Kette: Konto drueckt Knopf -> Regel A
+    schaltet Taster -> Regel B meldet "Taster ist an"): gesucht wird das Konto (oder die Quelle) am Anfang der Kette. -> {"by", "user", "age"} oder None."""
+    import devicelog
+    seen = seen or set()
+    best = None
+    for ref in refs if not isinstance(refs, str) else [refs]:
+        w = devicelog.who_last(ref)
+        if not w:
+            continue
+        by = str(w.get("by") or "")
+        if by.startswith("Regel „") and depth > 0:
+            name = by[len("Regel „"):].rstrip("“").replace("“", "")
+            r = next((x for x in list_rules() if str(x.get("name") or "") == name and x.get("id") not in seen), None)
+            if r:
+                up = resolve_who(trigger_refs((r.get("when") or {}).get("conds")), depth - 1, seen | {r.get("id")})
+                if up and (up.get("user") or up["by"] != "System"):
+                    w = {**up, "age": w["age"]}                                  # Alter der letzten Bedienung bleibt massgeblich
+        if best is None or w["age"] < best["age"] or (w["age"] == best["age"] and w.get("user") and not best.get("user")):
+            best = w
+    return best
+
+
 def _by_check(c: dict, ref: str, ok, txt: str):
     """Hat die Bedingung ein "bedient von", muss das Ding zuletzt (binnen 2 Minuten) von einem dieser Konten bedient worden sein."""
     if not c.get("by") or ok is not True:
         return ok, txt
     import devicelog
-    w = devicelog.who_last(ref)
+    w = resolve_who(ref)
     if w and w.get("user") in c["by"]:
         return True, f"{txt} (bedient von {devicelog.who_name(w)})"
     return False, f"{txt} (nur wenn bedient von {', '.join(c['by'])} – war: {devicelog.who_name(w) if w else 'niemand/außen'})"

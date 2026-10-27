@@ -1162,32 +1162,11 @@ VIS_GROUPS = (("shelly", "Geräte (Aktoren)", "🔌"), ("sensor", "Sensoren", "�
               ("setpoint", "Thermostate", "🌡️"), ("blind", "Rollläden", "🏠"), ("sound", "Soundmodule", "🔔"), ("camera", "Kameras", "📷"))
 
 
-def _trigger_refs(conds) -> list:
-    """Logbuch-Referenzen aller Geraete/Schalter in den WENN-Bedingungen (auch in Gruppen) - daran haengt die Frage "wer hat bedient"."""
-    out: list = []
-    for c in conds or []:
-        if not isinstance(c, dict):
-            continue
-        if c.get("type") == "device" and c.get("device_id"):
-            out.append("device:" + str(c["device_id"]))
-        elif c.get("type") == "virtual" and c.get("id"):
-            out.append("virtual:" + str(c["id"]))
-        elif c.get("type") == "group":
-            out += _trigger_refs(c.get("conds"))
-    return out
-
-
 def _fill_who(text: str, rule) -> str:
-    """[WER] im Nachrichtentext durch den Namen ersetzen, der den Ausloeser der Regel zuletzt bedient hat (Konto, Alexa, Regel ...); sonst "unbekannt"."""
+    """[WER] im Nachrichtentext durch den Namen ersetzen, der den Ausloeser der Regel zuletzt bedient hat (Konto, Alexa, Regel ...; bei Regel-Ketten das Konto am Anfang); sonst "unbekannt"."""
     if not isinstance(rule, dict):
         return text.replace("[WER]", "unbekannt")
-    best = None
-    for ref in _trigger_refs((rule.get("when") or {}).get("conds")):
-        w = devicelog.who_last(ref)
-        key = (round(w["age"]), 0 if w and w.get("user") else 1) if w else None          # ein Konto gewinnt bei Gleichstand (Logbuch rechnet auf die Sekunde)
-        if w and (best is None or key < (round(best["age"]), 0 if best.get("user") else 1)):
-            best = w
-    return text.replace("[WER]", devicelog.who_name(best))
+    return text.replace("[WER]", devicelog.who_name(rules.resolve_who(rules.trigger_refs((rule.get("when") or {}).get("conds")))))
 
 
 @app.route("/api/rules/accounts", methods=["GET"])
@@ -2072,14 +2051,15 @@ class Controller:
         opslog.log("rules", text, dry=dry)
         autolog.log("rules", text, dev=rule.get("name", ""), action=kind, dry=dry, rule=rule.get("id"))
 
-    @devicelog.as_actor(lambda self, act, dry, cfg: f"Regel „{act['rule'].get('name', '')}“")
+    @devicelog.as_actor(lambda self, act, dry, cfg: f"Regel „{act['rule'] if isinstance(act['rule'], str) else act['rule'].get('name', '')}“")
     def _apply_flow(self, act, dry: bool, cfg: dict):
         """Ein Schritt eines Ablaufs: Geraet schalten, Sollwert setzen, Nachricht senden, eigenen Schalter setzen."""
         st, rule = act["step"], act["rule"]
         after = f" (nach {int(act['after_s'] // 60)} min {int(act['after_s'] % 60)} s)" if dry and act.get("after_s") else ""
         t = st.get("type", "switch")
         if t in ("notify", "pushover") and ("[WER]" in str(st.get("text") or "") or "[WER]" in str(st.get("title") or "")):
-            st = {**st, **{k: _fill_who(st[k], rule) for k in ("text", "title") if isinstance(st.get(k), str)}}      # [WER] = Konto, das den Ausloeser bedient hat
+            rdef = next((x for x in rules.list_rules() if x.get("id") == act.get("rule_id")), None)
+            st = {**st, **{k: _fill_who(st[k], rdef) for k in ("text", "title") if isinstance(st.get(k), str)}}      # [WER] = Konto, das den Ausloeser bedient hat (auch ueber Regel-Ketten)
         jobs = []                                         # (aktion-fuers-logbuch, geraet, text, ok, fehler)
         names = {d["id"]: d["name"] for d in shelly.load_devices()}
         if t in ("switch", "toggle"):
