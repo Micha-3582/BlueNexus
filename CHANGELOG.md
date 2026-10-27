@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.22.0 – 27.10.2026
+- Fix (Firmware 1.1.0, im Flash-Fenster mitgeliefert): Das Thermometer legte sich nach der ersten Meldung teils für **6 Stunden** schlafen, ohne zu senden, weil ein nicht verdrahteter Batterie-Messeingang Zufallswerte liefert und die Firmware sie für eine leere Batterie hielt. Jetzt zählt „Batterie leer“ nur bei glaubhaften Werten (1,8 bis 2,75 V) und erst nach drei Aufwachen in Folge (bzw. zwei Brownouts).
+- Firmware 1.1.0: **keine 5 Minuten Wachzeit** und **kein Einrichtungs-WLAN** mehr (eingerichtet wird nur am PC); nach RESET zeigt die blaue LED das Ergebnis (3× kurz = gesendet, 1× lang = Fehler). Ohne gültige Konfiguration blinkt sie eine Minute schnell und schläft.
+- Neu: Die Liste zeigt „Aufwachen Nr. … (Zeitgeber / RESET-Taste / …)“ (ab Firmware 1.1) – daran sieht man, ob der Zeitgeber ankommt.
+- Thermometer mit Firmware 1.0.x bitte einmal neu flashen („Einrichten und flashen“; ein vorhandener Eintrag kann vorher mit ✕ entfernt werden).
+
 ## 1.21.0 – 27.10.2026
 - Neu: **Messintervall** pro Funkthermometer einstellbar (Knopf „Intervall“, 1 bis 60 Minuten) – zum Testen oder Abgleichen kurz, sonst 15 Minuten. Bis das Thermometer den neuen Wert geholt hat, gilt für „meldet sich nicht mehr“ das bisher gemeldete Intervall.
 

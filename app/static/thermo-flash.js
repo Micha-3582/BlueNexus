@@ -47,13 +47,18 @@
       return '<div data-row="' + esc(d.id) + '" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
-        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + calTxt(d) + '</div></div>'
+        + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
         + (etk.kind === 'other' ? '' : '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot, am Android-Handy)">Etikett</button>')
         + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
     }).join('');
+  }
+  var RR = { 1: 'Einschalten', 2: 'RESET-Taste', 3: 'Software-Neustart', 4: 'Absturz', 5: 'Watchdog', 6: 'Watchdog', 7: 'Watchdog', 8: 'Zeitgeber', 9: 'Batterie schwach (Brownout)', 11: 'USB', 12: 'JTAG' };
+  function metaTxt(d) {                                   // ab Firmware 1.1: Aufwachen Nr. und Grund des letzten Starts
+    var m = d.meta || {};
+    return m.n != null ? ' · Aufwachen Nr. ' + m.n + (m.rr != null && RR[m.rr] ? ' (' + RR[m.rr] + ')' : '') : '';
   }
   function calTxt(d) {
     var c = d.calib || {}, p = [];
@@ -255,7 +260,7 @@
     ov.innerHTML = '<div class="th-ovcard" style="background:var(--card);border:2px solid #f0a63c;border-radius:18px;padding:26px 24px;width:100%;max-width:520px;text-align:center;box-shadow:0 12px 50px rgba(0,0,0,.6)">'
       + '<div style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;background:#f0a63c;color:#1b1f24;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;letter-spacing:1px;animation:thPulse 1.4s infinite">RESET</div>'
       + '<div style="font-size:23px;font-weight:800;line-height:1.25;margin-bottom:10px">Jetzt die RESET-Taste am Thermometer drücken</div>'
-      + '<div style="font-size:16px;line-height:1.55">Das Flashen ist <b>fertig</b>. Damit das Thermometer startet, auf der Platine die kleine Taste <b>RESET</b> (RST) <b>einmal</b> drücken – <b>nicht</b> die Taste BOOT.</div>'
+      + '<div style="font-size:16px;line-height:1.55">Das Flashen ist <b>fertig</b>. Damit das Thermometer startet, auf der Platine die kleine Taste <b>RESET</b> (RST) <b>einmal</b> drücken – <b>nicht</b> die Taste BOOT. Die blaue LED blitzt dann <b>3× kurz</b> auf, wenn die Meldung gesendet wurde.</div>'
       + '<div class="th-ovstat muted" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:18px;height:18px;border:3px solid var(--border);border-top-color:#f0a63c;border-radius:50%;animation:thSpin .9s linear infinite"></span><span class="th-ovtxt">Warte auf das Thermometer …</span></div>'
       + '<div class="th-ovhint" style="display:none;margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(240,166,60,.16);color:#f0a63c;font-weight:700">Noch nichts angekommen? Die RESET-Taste <b>noch einmal</b> drücken – manchmal braucht es zwei Anläufe.</div>'
       + '<div style="margin-top:20px"><button type="button" class="ghost th-ovcancel">Abbrechen</button></div></div>';
@@ -294,7 +299,7 @@
     var opts = [[1, '1 Minute (nur zum Testen)'], [2, '2 Minuten'], [5, '5 Minuten'], [10, '10 Minuten'], [15, '15 Minuten (Standard)'], [30, '30 Minuten'], [60, '60 Minuten']];
     if (!opts.some(function (o) { return o[0] === d.interval; })) opts.push([d.interval, d.interval + ' Minuten (aktuell)']);
     uiForm({ title: 'Messintervall: ' + d.name, okText: 'Speichern',
-      message: 'Wie oft das Thermometer misst und sendet. Kurze Intervalle kosten viel Batterie – 1 bis 5 Minuten nur zum Testen oder Abgleichen, danach wieder auf 15 Minuten. Das Thermometer übernimmt den neuen Wert bei seiner nächsten Meldung (nach einem Druck auf RESET sofort) und wendet ihn nach der Wachzeit von 5 Minuten an.',
+      message: 'Wie oft das Thermometer misst und sendet. Kurze Intervalle kosten viel Batterie – 1 bis 5 Minuten nur zum Testen oder Abgleichen, danach wieder auf 15 Minuten. Das Thermometer übernimmt den neuen Wert bei seiner nächsten Meldung (nach einem Druck auf RESET sofort).',
       fields: [{ id: 'iv', label: 'Messung alle', type: 'select', value: String(d.interval), options: opts.map(function (o) { return [String(o[0]), o[1]]; }) }] }).then(function (r) {
       if (!r) return;
       api('/api/thermo/' + encodeURIComponent(d.id), 'PATCH', { interval: parseInt(r.iv, 10) }).then(function () { savedToast('Gespeichert ✓'); return load(); }).catch(function (e) { msg(e.message, true); });

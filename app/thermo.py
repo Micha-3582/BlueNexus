@@ -188,7 +188,7 @@ def public(dev: dict) -> dict:
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
     return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
-            "last": cor, "raw": raw, "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
+            "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
 
 def listing() -> list[dict]:
@@ -297,6 +297,15 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
             return 400, {"error": "keine gueltigen Messwerte"}
         d["last"], d["last_seen"] = last, time.time()
         d.pop("attempt", None)
+        meta = dict(d.get("meta") or {})                                      # Diagnose ab Firmware 1.1: laufende Nummer der Aufwachen und Grund des Starts
+        n = _num(body.get("n"), 0, 4294967295)
+        rr = _num(body.get("rr"), 0, 20)
+        if n is not None:
+            meta["n"] = int(n)
+        if rr is not None:
+            meta["rr"] = int(rr)
+        if meta:
+            d["meta"] = meta
         fw = str(body.get("fw") or "")[:20]
         if fw:
             d["fw"] = fw
