@@ -1057,7 +1057,7 @@
 
 {% endblock %}
 {% block scripts %}
-{% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-flash.js') }}" defer></script>{% endif %}
+{% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-flash.js') }}?v={{ asset_v }}" defer></script>{% endif %}
 <script>
 let cfg = {};
 function pvInverterRow(p = {}) {

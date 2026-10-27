@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.17.1 – 27.10.2026
+- Fix: Nach einem Update zeigte die installierte Web-App teils noch die **alte Skriptdatei** aus dem Zwischenspeicher („BNXC is not defined“ im Funkthermometer-Fenster). Das Skript wird jetzt mit der Versionsnummer angefordert (`?v=…`), sodass der Browser nach jedem Update die neue Datei holt; der Zwischenspeicher der App wurde dafür einmal geleert.
+
 ## 1.17.0 – 27.10.2026
 - Neu: **WLAN merken** beim Funkthermometer. Mit dem Haken „WLAN für weitere Thermometer merken“ speichert BlueNexus Name und Passwort des WLANs auf dem Server (nur Administratoren, Teil der Sicherung); bei weiteren Thermometern ist es vorbelegt und das Passwortfeld bleibt leer. „Gemerktes WLAN vergessen“ löscht es wieder. Das Passwort wird nie an die Oberfläche zurückgegeben.
 - Die Konfiguration des Geräts (cfg.bin) baut jetzt der **Server** (bytegleich zur Referenz des Thermometer-Projekts); Eingabefehler werden geprüft, bevor ein Thermometer angelegt wird.

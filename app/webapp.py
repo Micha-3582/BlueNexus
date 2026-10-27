@@ -518,6 +518,20 @@ def _smarthome_tabs(perms: dict) -> list:
             if auth.has_level(perms, area, "read") and (i != "alexa" or store.module_on("alexa")) and (i not in ("nfc", "logbuch") or store.module_on("smarthome")) and _tab_has_system(i, fam) and (i != "wol" or _wol_tab_ok(perms))]
 
 
+_ASSET_V: list = []
+
+
+def _asset_version() -> str:
+    """Versionsnummer als Anhang an Skriptadressen (?v=...): Nach einem Update holt sich der Browser die neue Datei, statt die alte aus dem Zwischenspeicher der installierten App zu nehmen."""
+    if not _ASSET_V:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
+                _ASSET_V.append(f.read().strip() or "0")
+        except OSError:
+            _ASSET_V.append("0")
+    return _ASSET_V[0]
+
+
 @app.context_processor
 def inject_role():
     perms = _perms()
@@ -531,7 +545,7 @@ def inject_role():
     can_save_settings = any(perms.get(a) == "write" for a in settings_areas)
     tabs = _smarthome_tabs(perms)
     admin_page = any(perms.get(a, "none") != "none" for a in SETTINGS_PAGE_AREAS)       # irgendein Reiter auf /admin sichtbar?
-    return {"modules": store.modules(), "settings_visible": admin_page or perms.get("automation", "none") != "none",
+    return {"asset_v": _asset_version(), "modules": store.modules(), "settings_visible": admin_page or perms.get("automation", "none") != "none",
             "settings_home": "/admin" if admin_page else "/automation",
             "user_role": "admin" if auth.is_full_admin(perms) else "custom", "user_perms": perms, "demo_view": demo_view,
             "can_save_settings": can_save_settings, "sh_tabs": tabs, "tile_ceiling": getattr(g, "dashboard_tiles", None),
