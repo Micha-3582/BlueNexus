@@ -26,7 +26,7 @@ MAX_UNPACKED = 2 * 1024 ** 3                      # Schutz vor ZIP-Bomben
 SETTINGS_FILES = [
     "config.json", "users.json", "secret.key",
     "shelly_devices.json", "tuya_cloud.json", "homematic.json", "homematic_sensors.json", "homematic_setpoints.json",
-    "homematic_locks.json", "homematic_sounds.json", "homematic_blinds.json", "zigbee.json", "wol.json", "cameras.json",
+    "thermo.json", "homematic_locks.json", "homematic_sounds.json", "homematic_blinds.json", "zigbee.json", "wol.json", "cameras.json",
     "virtual.json", "shares.json", "sources.json", "api_keys.json", "alexa.json", "nfc.json", "rules.json", "telegram.json", "pushover.json", "cloudflare_tunnel.json", "vrm_cloud.json",
     "ev_schedules.json", "contract_periods.json", "verlauf_series.json", "verlauf_charts.json",
 ]

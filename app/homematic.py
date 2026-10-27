@@ -445,6 +445,8 @@ SENSOR_KINDS = {
     "key_long_release": ("Taste lang losgelassen", "", True, ["PRESS_LONG_RELEASE"]),     # manche Taster melden bei langem Druck nur das Loslassen
     "input": ("Eingang", "", True, ["STATE"]),                             # Eingangsmodule (z. B. HM-MOD-EM-8 mit Lichtschranke/Kontakt): wahr = Eingang aktiv
     "lock": ("Türschloss", "", True, ["LOCK_STATE"]),                      # wahr = verriegelt (HmIP-DLD: LOCK_STATE 1 = verriegelt, 2 = entriegelt)
+    "voltage": ("Spannung", "V", False, []),                               # nur Funkthermometer (Batterie)
+    "signal": ("Funkstärke", "dBm", False, []),                            # nur Funkthermometer (WLAN-Empfang)
 }
 # Welche kanaltypen zu welchen Sensorarten gehoeren koennen (Teilstrings des channelType)
 _SENSOR_HINTS = [
@@ -646,6 +648,10 @@ def _read_sensor_now(sen: dict):
             import zigbee
             v = zigbee.read_value(sen)
             unreach = v is None
+        elif sen.get("source") == "thermo":                    # Funkthermometer (ESP32): letzter gemeldeter Wert, nach 3 verpassten Meldungen "nicht erreichbar"
+            import thermo
+            v = thermo.read_value(sen)
+            unreach = v is None
         elif sen.get("source") == "tasmota":                   # Messwert eines Tasmota-Geraets (DS18B20, BME280, Stromzaehler ...)
             import shelly, tasmota
             pw = next((d.get("password") for d in shelly.load_devices() if d.get("kind") == "tasmota" and d.get("mac") == sen.get("address") and d.get("password")), "")
@@ -685,7 +691,7 @@ def _read_sensor_now(sen: dict):
             if val is not None and sen.get("invert"):
                 val = not val                              # Sensor andersherum verschaltet: Bedeutung von TRUE/FALSE vertauschen
         else:
-            val = round(float(v), 1)
+            val = round(float(v), 2 if sen.get("kind") == "voltage" else 1)          # Batteriespannung: zwei Stellen (3,02 V)
     except (HomematicError, KeyError, TypeError, ValueError):
         val = None
     _value_cache[sen["id"]] = (now + VALUE_TTL_S, val)
@@ -1784,7 +1790,7 @@ def _local_ip(ccu_ip: str) -> str:
 def _known_interfaces() -> set[str]:
     import shelly
     out = {d.get("interface") for d in shelly.load_devices() if d.get("kind") == "homematic"}
-    out |= {s.get("interface") for s in load_sensors() if s.get("source") not in ("zigbee", "camera")}
+    out |= {s.get("interface") for s in load_sensors() if s.get("source") not in ("zigbee", "camera", "thermo")}
     return {i for i in out if i}
 
 

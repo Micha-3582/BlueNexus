@@ -141,6 +141,39 @@
   <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="mod-save" class="ghost">Speichern</button><span class="muted" id="mod-msg"></span></div>
 </div>
 
+{% if modules.smarthome %}
+<div class="card" id="thermo-card" data-tab="system" data-area="settings_system">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Funkthermometer (ESP32) <span class="qhelp" role="button" tabindex="0" data-help="Selbstgebautes Batterie-Thermometer mit ESP32-C3. Hier gibst du das WLAN ein, BlueNexus spielt die Firmware per USB auf die Platine und verbindet sie – danach erscheinen Temperatur, Luftfeuchte, Batterie und Funkstärke bei den Sensoren.">?</span></h2>
+  <div class="sub">Thermometer einrichten, flashen und zurücksetzen.</div>
+  <div id="th-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+  <div id="th-warn" class="muted" style="display:none;border:1px solid #f0a030;border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
+  <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+    <div><label for="th-name">Name</label><input id="th-name" maxlength="40" value="Außen" placeholder="z. B. Außen"></div>
+    <div><label for="th-ssid">WLAN-Name <span class="qhelp" role="button" tabindex="0" data-help="Nur 2,4-GHz-WLAN: Der Chip kann kein 5 GHz. Das WLAN-Passwort wird nicht auf dem Server gespeichert, es geht nur in den Chip.">?</span></label><input id="th-ssid" maxlength="32" autocomplete="off" placeholder="Name deines WLANs"></div>
+    <div><label for="th-pass">WLAN-Passwort</label><div class="pw-wrap"><input id="th-pass" type="password" maxlength="63" autocomplete="new-password" placeholder="Passwort"><button type="button" class="pw-toggle" data-for="th-pass" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div><label for="th-int">Messung alle <span class="qhelp" role="button" tabindex="0" data-help="Wie oft das Thermometer misst und sendet. Seltener = Batterie hält länger. Standard: 15 Minuten.">?</span></label><select id="th-int"><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="15" selected>15 Minuten</option><option value="30">30 Minuten</option><option value="60">60 Minuten</option></select></div>
+  </div>
+  <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Erweitert (Server-Adresse, feste IP)</summary>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:8px">
+      <div style="grid-column:1/-1"><label for="th-server">Adresse von BlueNexus im WLAN <span class="qhelp" role="button" tabindex="0" data-help="Unter dieser Adresse erreicht das Thermometer BlueNexus: nur http, mit der lokalen Adresse und dem Port, ohne Domain und ohne Tunnel (spart Batterie). Wird vorgeschlagen und lässt sich ändern.">?</span></label><input id="th-server" placeholder="http://192.168.x.x:5005"></div>
+      <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="th-fixed"> Feste IP-Adresse statt automatisch (DHCP) <span class="qhelp" role="button" tabindex="0" data-help="Spart dem Thermometer etwa eine Sekunde Wachzeit je Messung. Nimm eine freie Adresse im Netz des WLANs.">?</span></label>
+      <div class="th-ip"><label for="th-ip">IP-Adresse</label><input id="th-ip" placeholder="192.168.x.60"></div>
+      <div class="th-ip"><label for="th-gw">Gateway</label><input id="th-gw" placeholder="192.168.x.1"></div>
+      <div class="th-ip"><label for="th-mask">Netzmaske</label><input id="th-mask" value="255.255.255.0"></div>
+      <div class="th-ip"><label for="th-dns">DNS</label><input id="th-dns" placeholder="wie Gateway"></div>
+    </div>
+  </details>
+  <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button type="button" id="th-flash">⚡ Einrichten und flashen</button>
+    <button type="button" id="th-manual" class="ghost" title="Für das Einrichtungs-WLAN der Firmware am Handy: ID, Schlüssel und Adresse zum Abtippen">Ohne PC einrichten</button>
+    <button type="button" id="th-reset" class="ghost" title="Chip komplett löschen (Auslieferungszustand)">Zurücksetzen …</button>
+  </div>
+  <div id="th-steps" style="margin-top:12px"></div>
+  <div id="th-msg" class="muted" style="margin-top:8px"></div>
+</div>
+{% endif %}
+
 <div class="card" id="tunnel-card" data-tab="system" data-area="settings_system">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 1 0 5 14.5"/><path d="M12 12v9M9 18l3 3 3-3"/></svg>Fernzugriff (Cloudflare Tunnel) <span class="qhelp" role="button" tabindex="0" data-help="Die App baut selbst eine gesicherte Verbindung zu Cloudflare auf. Voraussetzung: ein kostenloses Cloudflare-Konto und eine Domain bei Cloudflare.">?</span></h2>
   <div class="sub">Zugriff von unterwegs – ohne Portfreigabe im Router.</div>
@@ -1023,6 +1056,8 @@
 
 {% endblock %}
 {% block scripts %}
+{% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-cfg.js') }}"></script>
+<script src="{{ url_for('static', filename='thermo-flash.js') }}" defer></script>{% endif %}
 <script>
 let cfg = {};
 function pvInverterRow(p = {}) {
@@ -2626,7 +2661,7 @@ async function sensorRenameSave(id) {
   try { await shellyApi('/api/sensors/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
   loadSensorsAdmin();
 }
-const SENSOR_ICON = { lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
+const SENSOR_ICON = { voltage: '🔋', signal: '📶', lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
 const SENSOR_EXTRA_ICONS = ['🚪', '🏠', '🏃', '🧍', '🚶', '👀', '🔑', '🚨', '📬', '🚗', '🚲', '🐕', '🐈', '🔥', '💦', '🌡️', '☀️', '⚡'];
 function sensorPickIcon(id) { const el = document.getElementById('sicons-' + id); el.style.display = el.style.display === 'none' ? 'flex' : 'none'; }
 async function sensorSetIcon(id, icon) {

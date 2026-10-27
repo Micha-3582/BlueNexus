@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.16.0 – 27.10.2026
+- Neu: **Funkthermometer (ESP32-C3) einrichten und flashen** unter *Einstellungen → System*: WLAN-Name und -Passwort eintragen, **Einrichten und flashen** – BlueNexus legt das Thermometer an (ID + Schlüssel), spielt die Firmware per USB (Web Serial, Chrome/Edge) auf die Platine, schreibt die Konfiguration und wartet auf die erste Messung. Das WLAN-Passwort verlässt den Browser nicht.
+- Neu: Das Thermometer erscheint mit vier **Sensoren** (Temperatur, Luftfeuchte, Batterie, Funkstärke) unter Smart Home → Sensoren; nach 3 verpassten Meldungen gelten sie als „nicht erreichbar“. Annahme der Messwerte unter `POST /api/sensor/<ID>` (nur lokales Netz, Schlüssel-Hash, Bremse).
+- Neu: **Ohne PC einrichten** (ID und Schlüssel zum Abtippen), **Zurücksetzen** (Chip löschen), Umbenennen, neuer Schlüssel, Entfernen.
+- Neu: Sensorarten „Spannung“ (V) und „Funkstärke“ (dBm); Batteriespannung mit zwei Nachkommastellen.
+
 ## 1.15.1 – 27.10.2026
 - Fix: **[WER]** und „bedient von“ funktionieren jetzt auch über **Regel-Ketten**: Löst ein Konto einen Knopf aus, schaltet daraufhin eine Regel einen Taster, und eine zweite Regel meldet „Taster ist an“, wird das Konto am Anfang der Kette genannt (vorher „unbekannt“).
 - Fix: Schritte eines **Ablaufs** (z. B. Taster einschalten) stehen im Geräte-Logbuch jetzt als **Regel „Name“** statt „System“.

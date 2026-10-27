@@ -128,6 +128,7 @@ Smart Home. Die App läuft auch **ganz ohne Victron** als reines Smart-Home-Syst
 | **Homematic / HomematicIP** (OpenCCU) | Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden, Soundmodule (Gong), Wandtaster | CCU-Anbindung; optional **Push von der CCU**: Reaktion in unter einer Sekunde, ohne ständiges Abfragen |
 | **Zigbee** (Phoscon / deCONZ) | Aktoren, Sensoren, Thermostate | **Mehrere Gateways** (z. B. eins pro Haus) möglich |
 | **Klimaanlagen** (Midea, MSmartHome/NetHome Plus; auch Comfee, Inventor, Pioneer u. a.) | Ein/Aus, Modus, Solltemperatur, Lüfter, Schwenken, Temperaturen | Lokal im Heimnetz, ohne Cloud; Schlüssel einmalig über das MSmartHome-Konto (wird nicht gespeichert) |
+| **Funkthermometer** (ESP32-C3, Eigenbau) | Temperatur, Luftfeuchte, Batterie, Funkstärke | Einrichten und Flashen direkt im Browser (Einstellungen → System, Chrome/Edge); das WLAN-Passwort bleibt im Browser |
 | **Wake-on-LAN** | PC, NAS, Server aufwecken | Magic Packet, mit Erreichbarkeitsanzeige |
 | **Eigene Schalter und Knöpfe** | Merker, Auslöser, **Nachlauf-Timer**, Knopf mit **geheimem Web-Aufruf** | Software-Schalter ohne Gerät dahinter, zum Verketten von Regeln |
 | **Kameras** | Standbild, Live-Bild, Bewegung, Klingel | Reolink und RTSP (siehe unten) |

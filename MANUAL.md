@@ -445,6 +445,28 @@ Manche Geräte sind Relais, die nur einen **Zustand melden** und nicht von dir g
 
 Manche Geräte liefern neben dem Schalten **Messwerte**: eine **Klimaanlage** (Midea) Innen-, Außen- und Solltemperatur, eine **Steckdose mit Messung** die Leistung in Watt. Mit dem Thermometer-Symbol legst du einen **Messwert als eigenen Sensor** an – etwa nur die **Außentemperatur der Klimaanlage**. Die Auswahl zeigt, welche Messwerte das Gerät gerade meldet (mit aktuellem Wert); schon angelegte sind nicht mehr wählbar. Der Sensor erscheint in der Sensorliste und im Dashboard, hat Verlauf, lässt sich in Regeln nutzen und wie jeder Sensor **einzeln teilen** – **ohne das Gerät zu teilen**. Die Werte werden höchstens alle 30 Sekunden vom Gerät geholt. Meldet das Gerät den Wert nicht (z. B. Klimaanlage aus oder nicht erreichbar), steht der Sensor auf „nicht lesbar“. Entfernen, umbenennen und Symbol ändern geht in der Sensorliste.
 
+### Funkthermometer (ESP32) einrichten
+
+Für das selbstgebaute **Batterie-Thermometer** (ESP32-C3 mit Temperatur-/Feuchtesensor, Projekt „BlueNexus Außenthermometer“) gibt es unter **Einstellungen → System → Funkthermometer** ein Einrichtungs-Fenster (nur Administratoren, nur mit Modul Smart Home).
+
+**Einrichten und flashen (am PC):**
+1. Platine per **USB-C-Datenkabel** an den PC stecken. Ein fabrikneues Board erscheint von selbst; ein schon eingerichtetes schläft und ist am PC nicht zu sehen – dann **BOOT-Taste halten, USB-C anstecken (oder RESET drücken), BOOT loslassen**.
+2. Name, **WLAN-Name** und **WLAN-Passwort** eintragen (nur **2,4 GHz**), Messintervall wählen (Standard 15 Minuten). Unter *Erweitert* steht die Adresse von BlueNexus im WLAN (wird vorgeschlagen, nur `http://` mit lokaler IP und Port, ohne Tunnel – spart Batterie) und optional eine feste IP.
+3. **Einrichten und flashen** klicken und im Browser-Fenster den Eintrag „USB JTAG/serial debug unit“ wählen. BlueNexus legt das Thermometer an (Geräte-ID + Zufallsschlüssel), löscht den Chip, spielt die Firmware und die Konfiguration auf, startet neu und wartet auf die **erste Messung** (bis 90 Sekunden). Dann steht dort „Thermometer verbunden“ mit den ersten Werten.
+4. Das Thermometer erscheint in der Liste und mit **vier Sensoren** (Temperatur, Luftfeuchte, Batterie, Funkstärke) unter Smart Home → Sensoren – zunächst nur für Administratoren sichtbar, wie alles Neue (Sichtbarkeit pro Konto: siehe Kapitel 2). Sie sind in Diagrammen und Regeln nutzbar.
+
+**Voraussetzungen:** **Chrome oder Edge am PC** (Web Serial; nicht Firefox, Safari oder Handy) und eine **gesicherte Adresse** (https oder `localhost`). Fehlt eine Voraussetzung, steht das im Fenster; dann geht „Ohne PC einrichten“.
+
+**Datenschutz:** Das WLAN-Passwort verlässt den Browser nicht – es wird nur in die Konfiguration des Chips geschrieben und **nie auf dem Server gespeichert**. Auf dem Server liegt vom Schlüssel nur ein **Hash**.
+
+**Ohne PC einrichten:** Erzeugt Geräte-ID und Schlüssel zum **Abtippen** (der Schlüssel wird nur einmal angezeigt). Das Thermometer öffnet ohne Konfiguration ein eigenes WLAN **„BlueNexus-Thermo-XXXX“** (am Handy); dort Name, ID, Schlüssel, Adresse und dein WLAN eintragen.
+
+**Zurücksetzen (Auslieferungszustand):** Der Knopf **Zurücksetzen …** löscht den Chip komplett (Download-Modus wie oben). Ein Thermometer in der Liste entfernst du mit ✕ (dabei verschwinden auch seine Sensoren). **✎** benennt um, **🔑** erzeugt einen neuen Schlüssel (der alte wird ungültig, das Gerät muss neu eingerichtet werden). Ohne PC: Batterie einlegen oder RESET, dann **innerhalb von 5 Minuten BOOT 5 Sekunden halten** – danach ist die Konfiguration gelöscht und das Einrichtungs-WLAN erscheint.
+
+**Verhalten:** Das Gerät misst beim Einschalten sofort, bleibt **5 Minuten wach** (USB bleibt sichtbar) und schläft dann bis zur nächsten Messung. Meldet es sich **3 Intervalle lang nicht**, zeigen seine Sensoren „nicht erreichbar“. Die **Batterie** (zwei Lithium-AA) gilt über **3,1 V als in Ordnung**, unter **3,0 V als „bald wechseln“**; bei 2,75 V schaltet sich die Firmware selbst ab. Solange das Gerät am USB hängt und keine Batteriemessung verdrahtet ist, sind Werte unter 1 V ohne Bedeutung und werden nicht angezeigt.
+
+**Technik (für Bastler):** Das Gerät sendet alle paar Minuten `POST /api/sensor/<ID>` (Kopfzeile `Authorization: Bearer <Schlüssel>`, JSON `{"temp","hum","bat","rssi","fw"}`) an die lokale Adresse; BlueNexus nimmt das **nur aus dem lokalen Netz** an (Bremse gegen Raten) und antwortet `{"ok":true,"interval":15}` – das Intervall lässt sich so zentral ändern. Die mitgelieferte Firmware liegt unter `app/static/firmware/thermo/<Version>/`.
+
 ### Logbuch der Geräte
 
 *Smart Home → Logbuch.*

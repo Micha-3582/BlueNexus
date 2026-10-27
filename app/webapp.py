@@ -37,6 +37,7 @@ import surplus
 import tuya
 import devicelog
 import hardware
+import thermo
 import homematic
 import perf
 import midea
@@ -166,7 +167,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"api_thermo_ingest", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -230,7 +231,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_item": "settings_system", "api_thermo_key": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4100,6 +4101,88 @@ def api_report():
     if request.args.get("format") == "md":
         return app.response_class(report.to_markdown(rep_), mimetype="text/plain; charset=utf-8")
     return jsonify(rep_)
+
+
+# ---- Funkthermometer (ESP32): Einrichten (Administrator) und Messwerte annehmen (das Geraet, nur aus dem lokalen Netz) ----
+THERMO_FW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "firmware", "thermo")
+
+
+def _thermo_firmware():
+    """Neueste mitgelieferte Firmware (static/firmware/thermo/<Version>/release.json) mit Adressen fuer den Browser."""
+    try:
+        vers = sorted((d for d in os.listdir(THERMO_FW_DIR) if os.path.isfile(os.path.join(THERMO_FW_DIR, d, "release.json"))),
+                      key=lambda v: [int(x) if x.isdigit() else 0 for x in re.split(r"[.\-]", v)])
+        if not vers:
+            return None
+        ver = vers[-1]
+        with open(os.path.join(THERMO_FW_DIR, ver, "release.json"), encoding="utf-8") as f:
+            rel = json.load(f)
+        base = f"/static/firmware/thermo/{ver}/"
+        m = rel.get("merged") or {}
+        return {"version": rel.get("version", ver), "chip": rel.get("chip"), "url": base + str(m.get("file")), "offset": int(m.get("offset", 0)), "size": m.get("size"),
+                "sha256": m.get("sha256"), "cfg_offset": int(rel.get("cfg_offset", 0x1F0000)), "cfg_size": int(rel.get("cfg_size", 4096))}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _thermo_server_hint() -> str:
+    """Lokale Adresse, unter der das Geraet BlueNexus im WLAN erreicht (nur http, kein Tunnel: spart Batterie)."""
+    ip = extapi.lan_ip()
+    port = int(os.environ.get("PORT", store.load_config().get("web_port", 5005)) or 5005)
+    return f"http://{ip}:{port}" if ip else ""
+
+
+@app.route("/api/thermo", methods=["GET", "POST"])
+def api_thermo_list():
+    """GET: Thermometer + Firmware + Adressvorschlag. POST {name, interval}: neues Thermometer anlegen (Schluessel kommt EINMAL im Klartext zurueck)."""
+    if request.method == "GET":
+        return jsonify(devices=thermo.listing(), firmware=_thermo_firmware(), server=_thermo_server_hint(), secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
+    b = request.get_json(silent=True) or {}
+    dev, token = thermo.create(str(b.get("name") or ""), b.get("interval", thermo.DEFAULT_INTERVAL_MIN))
+    opslog.log("thermo", f"Funkthermometer „{dev['name']}“ angelegt ({dev['id']})", dry=False)
+    return jsonify(device=dev, token=token, server=_thermo_server_hint()), 201
+
+
+@app.route("/api/thermo/<tid>", methods=["PATCH", "DELETE"])
+def api_thermo_item(tid):
+    if request.method == "DELETE":
+        return (jsonify(ok=True), 200) if thermo.remove(tid) else (jsonify(error="Thermometer nicht gefunden"), 404)
+    b = request.get_json(silent=True) or {}
+    ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"))
+    return (jsonify(ok=True), 200) if ok else (jsonify(error="Thermometer nicht gefunden"), 404)
+
+
+@app.route("/api/thermo/<tid>/key", methods=["POST"])
+def api_thermo_key(tid):
+    """Neuer Schluessel (das Geraet muss danach neu eingerichtet werden)."""
+    token = thermo.new_key(tid)
+    if token is None:
+        return jsonify(error="Thermometer nicht gefunden"), 404
+    return jsonify(token=token, device=thermo.public(thermo.get(tid)), server=_thermo_server_hint())
+
+
+@app.route("/api/thermo/<tid>/status", methods=["GET"])
+def api_thermo_status(tid):
+    """Zustand eines Thermometers (die Seite fragt nach dem Flashen, bis die erste Messung eingetroffen ist)."""
+    d = thermo.get(tid)
+    return (jsonify(device=thermo.public(d)), 200) if d else (jsonify(error="Thermometer nicht gefunden"), 404)
+
+
+@app.route("/api/sensor/<tid>", methods=["POST"])
+def api_thermo_ingest(tid):
+    """Messwerte des Funkthermometers. Nur aus dem lokalen Netz, nur mit dem Schluessel des Geraets (Kopfzeile Authorization: Bearer ...)."""
+    if not extapi.lan_request_ok(request.headers, request.remote_addr):
+        return "", 404
+    ip = client_ip()
+    if too_many_attempts("thermo:" + ip):
+        return jsonify(error="too many attempts"), 429
+    h = request.headers.get("Authorization", "")
+    code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True))
+    if code == 401:
+        note_failed_attempt("thermo:" + ip)
+    else:
+        ctrl._rules_wake.set()                                          # Regeln mit diesem Sensor gleich pruefen
+    return jsonify(body), code
 
 
 @app.route("/api/hardware", methods=["GET"])
