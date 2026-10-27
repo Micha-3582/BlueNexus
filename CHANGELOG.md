@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.23.0 – 27.10.2026
+- Neu: **Meldungen für Funkthermometer** per Telegram/Pushover: „meldet sich nicht mehr“ (nach 3 verpassten Meldungen, mit Meldung beim Wiederkommen) und „Batterie bald wechseln“ (zweimal in Folge unter 3,0 V, nur mit verdrahteter Batteriemessung). Beides in den Einstellungen unter Meldungen einzeln abschaltbar.
+- Der Knopf „Etikett“ ist jetzt auch am PC zu sehen und erklärt dort, dass das Drucken am Android-Handy geht (vorher war er am PC ausgeblendet).
+
 ## 1.22.0 – 27.10.2026
 - Fix (Firmware 1.1.0, im Flash-Fenster mitgeliefert): Das Thermometer legte sich nach der ersten Meldung teils für **6 Stunden** schlafen, ohne zu senden, weil ein nicht verdrahteter Batterie-Messeingang Zufallswerte liefert und die Firmware sie für eine leere Batterie hielt. Jetzt zählt „Batterie leer“ nur bei glaubhaften Werten (1,8 bis 2,75 V) und erst nach drei Aufwachen in Folge (bzw. zwei Brownouts).
 - Firmware 1.1.0: **keine 5 Minuten Wachzeit** und **kein Einrichtungs-WLAN** mehr (eingerichtet wird nur am PC); nach RESET zeigt die blaue LED das Ergebnis (3× kurz = gesendet, 1× lang = Fehler). Ohne gültige Konfiguration blinkt sie eine Minute schnell und schläft.

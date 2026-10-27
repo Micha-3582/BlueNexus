@@ -41,6 +41,8 @@ EVENTS = {
     "rules": ("Regeln schalten ein Gerät (auch im Trockenlauf)", False),
     "summary": ("Tages-Zusammenfassung am Abend", False),
     "startup": ("App wurde gestartet / neu gestartet", False),
+    "thermo_offline": ("Funkthermometer meldet sich nicht mehr (nach 3 verpassten Meldungen)", True),
+    "thermo_battery": ("Funkthermometer: Batterie bald wechseln", True),
 }
 DEFAULT_LOW_SOC = 15
 DEFAULT_SUMMARY_HOUR = 21
@@ -324,7 +326,7 @@ BOT_TEXTS = {"unknown": "tg_text_unknown", "stranger": "tg_text_stranger"}      
 
 def settings_public(cfg: dict) -> dict:
     energy, smart = store.module_on("energy", cfg), store.module_on("smarthome", cfg)
-    shown = lambda k: (energy or k not in ENERGY_EVENTS) and (smart or k not in ("rules", "surplus"))        # Regeln/Ueberschuss schalten Geraete (Smart Home)  # noqa: E731
+    shown = lambda k: (energy or k not in ENERGY_EVENTS) and (smart or k not in ("rules", "surplus", "thermo_offline", "thermo_battery"))        # Regeln/Ueberschuss schalten Geraete (Smart Home)  # noqa: E731
     return {"events": [{"key": k, "label": lab, "enabled": enabled(k, cfg), "default": dflt} for k, (lab, dflt) in EVENTS.items() if shown(k)],
             "prefix": bool(cfg.get("notify_prefix", True)),
             "low_soc": int(cfg.get("notify_low_soc", DEFAULT_LOW_SOC)),

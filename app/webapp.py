@@ -2354,6 +2354,7 @@ class Controller:
         notify_in.start(_telegram_words, self._rules_wake.set, lambda: not (demo.ACTIVE or sandbox.ACTIVE))        # Telegram-Befehle (Triggerworte)
         homematic.push_start()
         tunnel.startup()                                           # Cloudflare-Tunnel (Fernzugriff) wieder verbinden, falls eingeschaltet
+        thermo.start_monitor(lambda: store.module_on("smarthome") and not (demo.ACTIVE or sandbox.ACTIVE))        # Funkthermometer: Meldungen "meldet sich nicht mehr" / "Batterie bald wechseln"
         extapi.start_sampler(lambda: not (demo.ACTIVE or sandbox.ACTIVE))       # Schnittstelle: Zeitpunkt der letzten Aenderung festhalten
         _alexa_sync()                                              # Alexa-Anbindung (Hue-Emulation), nur wenn das Modul an ist
 

@@ -227,6 +227,12 @@ def remove(tid: str) -> bool:
         if len(keep) == len(items):
             return False
         _save(keep)
+    try:                                                                  # offene Meldungen dieses Geraets abschliessen (sonst blieben sie im Meldungs-Zustand haengen)
+        import notify
+        notify.event("thermo_off:" + tid, False, "", None, flag="thermo_offline")
+        notify.event("thermo_bat:" + tid, False, "", None, flag="thermo_battery")
+    except Exception:                                                     # noqa: BLE001
+        pass
     import homematic
     sens = homematic.load_sensors()
     left = [s for s in sens if not (s.get("source") == "thermo" and s.get("address") == tid)]
@@ -288,6 +294,7 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
         b = _num(body.get("bat"), 0.0, 10.0)
         if b is not None:
             last["bat"] = b
+            d["low_n"] = (int(d.get("low_n") or 0) + 1) if battery_state(b) == "low" else 0       # Meldung "Batterie bald wechseln" erst nach 2 Meldungen in Folge
         r = _num(body.get("rssi"), -127.0, 0.0)
         if r is not None:
             last["rssi"] = r
@@ -400,3 +407,51 @@ def battery_state(v) -> str:
     if not isinstance(v, (int, float)) or v < BAT_NO_MEASURE_V:
         return ""
     return "ok" if v > 3.1 else ("low" if v < 3.0 else "warn")
+
+
+# ---------------------------------------------------------------- Ueberwachung: Telegram/Pushover-Meldungen
+BAT_LOW_CONFIRM = 2                 # so viele Meldungen in Folge mit Batterie unter 3,0 V, dann "bald wechseln"
+
+
+def check_all(now: float | None = None) -> None:
+    """Meldet per Telegram/Pushover (Einstellungen -> Meldungen): Thermometer meldet sich nicht mehr (3 Intervalle) bzw. wieder; Batterie bald wechseln (< 3,0 V, zweimal in Folge)."""
+    import notify
+    now = now or time.time()
+    for d in load():
+        iv = max(int(d.get("interval") or DEFAULT_INTERVAL_MIN), int(d.get("interval_ack") or 0))
+        ls = d.get("last_seen")
+        name = d.get("name") or d["id"]
+        if ls is not None:                                      # frisch angelegte Thermometer ohne erste Meldung melden nichts
+            silent_min = (now - ls) / 60.0
+            offline = now - ls > iv * 60 * MISSED_INTERVALS + 120
+            notify.event("thermo_off:" + d["id"], offline,
+                         f"🌡️ Thermometer „{name}“ meldet sich seit {int(silent_min)} min nicht mehr (erwartet alle {iv} min). Batterie, WLAN oder Gerät prüfen.",
+                         f"🌡️ Thermometer „{name}“ meldet sich wieder.", flag="thermo_offline")
+        bat = (d.get("last") or {}).get("bat")
+        low = int(d.get("low_n") or 0) >= BAT_LOW_CONFIRM and battery_state(bat) == "low"
+        notify.event("thermo_bat:" + d["id"], low,
+                     f"🔋 Thermometer „{name}“: Batterie bald wechseln ({str(round(bat, 2)).replace('.', ',') if isinstance(bat, (int, float)) else '?'} V).",
+                     f"🔋 Thermometer „{name}“: Batterie wieder in Ordnung.", flag="thermo_battery")
+
+
+_mon: dict = {"t": None}
+
+
+def start_monitor(active=lambda: True, every_s: float = 60.0) -> None:
+    """Hintergrundprozess: prueft jede Minute, ob ein Thermometer sich nicht mehr meldet oder die Batterie schwach ist."""
+    if _mon["t"] is not None:
+        return
+
+    def loop():
+        time.sleep(30)                                          # nach dem Start erst einmal Ruhe (Geraete melden sich erst wieder)
+        while True:
+            try:
+                if active():
+                    check_all()
+            except Exception as e:                              # noqa: BLE001
+                import logging
+                logging.getLogger("thermo").warning("Thermometer-Überwachung: %s", e)
+            time.sleep(every_s)
+
+    _mon["t"] = threading.Thread(target=loop, name="thermo-monitor", daemon=True)
+    _mon["t"].start()

@@ -48,7 +48,7 @@
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
-        + (etk.kind === 'other' ? '' : '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot, am Android-Handy)">Etikett</button>')
+        + '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot-Drucker, nur am Android-Handy)">Etikett</button>'
         + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
@@ -281,7 +281,7 @@
   /* ---------------- Etikett fuers Gehaeuse (Niimbot, Code in /static/etikett/) ---------------- */
   function printLabel(d) {
     var es = etikettState();
-    if (!es.ok) { uiAlert(es.text, 'Drucken hier nicht möglich'); return; }
+    if (!es.ok) { uiAlert(es.kind === 'other' ? 'Etiketten drucken geht am Android-Handy (Chrome, über https): Öffne BlueNexus dort und drücke bei dem Thermometer „Etikett“.' : es.text, 'Drucken hier nicht möglich'); return; }
     etikettLoad().then(function () {
       var base = (typeof nfcBase === 'function' ? nfcBase() : location.origin).replace(/\/$/, '');
       EtikettDruck.open({ title: '🏷 Thermometer-Etikett drucken', intro: 'Name, ID und QR-Code für „' + d.name + '“ – zum Aufkleben auf das Gehäuse. Der QR-Code öffnet dieses Thermometer in BlueNexus (nur für Administratoren).',
