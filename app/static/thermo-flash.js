@@ -141,7 +141,7 @@
       });
     }).then(function () {
       steps(3, 'ok'); steps(4, 'ok'); steps(5, 'run');
-      return session.loader.after('hard_reset').catch(function () {});
+      return runApp(session);
     }).then(function () {
       steps(5, 'ok'); return session.transport.disconnect().catch(function () {});
     }).then(function () {
@@ -165,6 +165,15 @@
         setBusy(false); load();
       });
     });
+  }
+  /* Neustart ins Programm: Beim eingebauten USB-Anschluss des ESP32-C3 (USB-Serial/JTAG) reicht "RTS loslassen" nicht - der Chip muss zuerst mit RTS=an in den Reset gezogen werden
+     (DTR=aus haelt den Boot-Pin hoch = normaler Start) und wird danach losgelassen. Ohne das bleibt er nach dem Flashen im Download-Modus stehen, bis man das USB-Kabel zieht. */
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function runApp(session) {
+    var tr = session.transport;
+    return tr.setDTR(false).then(function () { return tr.setRTS(true); }).then(function () { return sleep(200); })
+      .then(function () { return tr.setRTS(false); }).then(function () { return sleep(150); })
+      .catch(function () {}).then(function () { return session.loader.after('hard_reset').catch(function () {}); });
   }
   function waitFirst(id, secs) {
     var t0 = Date.now();

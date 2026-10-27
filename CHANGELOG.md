@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.16.2 – 27.10.2026
+- Fix: Das Funkthermometer startet nach dem Flashen jetzt **von allein neu** (vorher blieb der Chip im Download-Modus stehen, bis man das USB-Kabel zog). Der Neustart zieht den Chip jetzt zuerst in den Reset und lässt ihn dann los.
+
 ## 1.16.1 – 27.10.2026
 - Neu: **Diagnose beim Funkthermometer.** Meldet sich ein frisch geflashtes Thermometer nicht, sagt das Fenster, ob überhaupt eine Anfrage angekommen ist (und warum sie abgelehnt wurde: falscher Schlüssel, außerhalb des lokalen Netzes, ungültige Daten) oder ob nichts ankam (Chip nicht neu gestartet, WLAN, Adresse). Die Liste zeigt den letzten abgelehnten Versuch; während des Wartens steht der Hinweis auf die RESET-Taste.
 
