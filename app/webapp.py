@@ -250,7 +250,7 @@ ENDPOINT_AREA = {
     "api_notify_info": "settings_meldungen", "api_notify_credentials": "settings_meldungen",
     "api_notify_detect": "settings_meldungen", "api_notify_settings": "settings_meldungen",
     "api_notify_test": "settings_meldungen", "api_notify_recipient_add": "settings_meldungen", "api_notify_recipient_modify": "settings_meldungen",
-    "api_notify_recipients": "rules", "api_notify_requests": "settings_meldungen", "api_notify_request": "settings_meldungen", "api_tibber_token_delete": "settings_tarif",
+    "api_notify_recipients": "rules", "api_rules_accounts": "rules", "api_notify_requests": "settings_meldungen", "api_notify_request": "settings_meldungen", "api_tibber_token_delete": "settings_tarif",
     "api_tunnel_info": "settings_system", "api_tunnel_log": "settings_system", "api_tunnel_token": "settings_system", "api_tunnel_enable": "settings_system",
     "api_tunnel_install": "settings_system", "api_tunnel_check": "settings_system", "api_tunnel_update": "settings_system",
     "api_pushover_info": "settings_meldungen", "api_pushover_credentials": "settings_meldungen", "api_pushover_recipient_add": "settings_meldungen",
@@ -1161,6 +1161,40 @@ VIS_GROUPS = (("shelly", "Geräte (Aktoren)", "🔌"), ("sensor", "Sensoren", "�
               ("setpoint", "Thermostate", "🌡️"), ("blind", "Rollläden", "🏠"), ("sound", "Soundmodule", "🔔"), ("camera", "Kameras", "📷"))
 
 
+def _trigger_refs(conds) -> list:
+    """Logbuch-Referenzen aller Geraete/Schalter in den WENN-Bedingungen (auch in Gruppen) - daran haengt die Frage "wer hat bedient"."""
+    out: list = []
+    for c in conds or []:
+        if not isinstance(c, dict):
+            continue
+        if c.get("type") == "device" and c.get("device_id"):
+            out.append("device:" + str(c["device_id"]))
+        elif c.get("type") == "virtual" and c.get("id"):
+            out.append("virtual:" + str(c["id"]))
+        elif c.get("type") == "group":
+            out += _trigger_refs(c.get("conds"))
+    return out
+
+
+def _fill_who(text: str, rule) -> str:
+    """[WER] im Nachrichtentext durch den Namen ersetzen, der den Ausloeser der Regel zuletzt bedient hat (Konto, Alexa, Regel ...); sonst "unbekannt"."""
+    if not isinstance(rule, dict):
+        return text.replace("[WER]", "unbekannt")
+    best = None
+    for ref in _trigger_refs((rule.get("when") or {}).get("conds")):
+        w = devicelog.who_last(ref)
+        key = (round(w["age"]), 0 if w and w.get("user") else 1) if w else None          # ein Konto gewinnt bei Gleichstand (Logbuch rechnet auf die Sekunde)
+        if w and (best is None or key < (round(best["age"]), 0 if best.get("user") else 1)):
+            best = w
+    return text.replace("[WER]", devicelog.who_name(best))
+
+
+@app.route("/api/rules/accounts", methods=["GET"])
+def api_rules_accounts():
+    """Konten fuer den Regel-Editor ("bedient von"): Anmeldename (klein) und Anzeigename."""
+    return jsonify([{"user": u["username"].strip().lower(), "name": u["username"]} for u in users.list()])
+
+
 def _normal_users() -> list:
     """Kleingeschriebene Namen aller normalen (nicht-administrativen) Konten."""
     return [u["username"].strip().lower() for u in users.list() if not auth.is_full_admin(auth.normalize_permissions(u.get("permissions")))]
@@ -2043,6 +2077,8 @@ class Controller:
         st, rule = act["step"], act["rule"]
         after = f" (nach {int(act['after_s'] // 60)} min {int(act['after_s'] % 60)} s)" if dry and act.get("after_s") else ""
         t = st.get("type", "switch")
+        if t in ("notify", "pushover") and ("[WER]" in str(st.get("text") or "") or "[WER]" in str(st.get("title") or "")):
+            st = {**st, **{k: _fill_who(st[k], rule) for k in ("text", "title") if isinstance(st.get(k), str)}}      # [WER] = Konto, das den Ausloeser bedient hat
         jobs = []                                         # (aktion-fuers-logbuch, geraet, text, ok, fehler)
         names = {d["id"]: d["name"] for d in shelly.load_devices()}
         if t in ("switch", "toggle"):

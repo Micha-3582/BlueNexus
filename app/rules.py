@@ -223,14 +223,14 @@ def normalize_condition(c: dict) -> dict:
         st = str(c.get("is", "on")).strip().lower()
         if st not in ("pressed", "on", "off"):
             raise RuleError("Eigener Schalter: gedrückt, an oder aus")
-        return {"type": t, "id": vid, "is": st}
+        return {"type": t, "id": vid, "is": st, **_by_field(c)}
     if t == "device":                                # Zustand/Leistung eines anderen Geraets
         did = str(c.get("device_id") or "").strip()
         if not did:
             raise RuleError("Gerät wählen")
         if c.get("op") in ("below", "above"):
             return {"type": t, "device_id": did, "op": c["op"], "value": _num(c.get("value"), 0, 100000, "Leistung (W)")}
-        return {"type": t, "device_id": did, "is": "on" if str(c.get("is", "on")).strip().lower() in ("on", "1", "true", "an") else "off"}
+        return {"type": t, "device_id": did, "is": "on" if str(c.get("is", "on")).strip().lower() in ("on", "1", "true", "an") else "off", **_by_field(c)}
     if t == "sensor":
         sid = str(c.get("sensor_id") or "").strip()
         if not sid:
@@ -845,6 +845,28 @@ SENSOR_WORDS = {"lock": ("verriegelt", "entriegelt"), "contact": ("offen", "gesc
                "key_long_release": ("lang losgelassen", "nicht losgelassen")}
 
 
+def _by_field(c: dict) -> dict:
+    """Optional "bedient von": Anmeldenamen (klein) der Konten, von denen die Bedienung ausgegangen sein muss (leer/fehlt = egal von wem)."""
+    raw = c.get("by")
+    names = []
+    for x in (raw if isinstance(raw, list) else []):
+        n = str(x or "").strip().lower()[:60]
+        if n and n not in names:
+            names.append(n)
+    return {"by": names[:30]} if names else {}
+
+
+def _by_check(c: dict, ref: str, ok, txt: str):
+    """Hat die Bedingung ein "bedient von", muss das Ding zuletzt (binnen 2 Minuten) von einem dieser Konten bedient worden sein."""
+    if not c.get("by") or ok is not True:
+        return ok, txt
+    import devicelog
+    w = devicelog.who_last(ref)
+    if w and w.get("user") in c["by"]:
+        return True, f"{txt} (bedient von {devicelog.who_name(w)})"
+    return False, f"{txt} (nur wenn bedient von {', '.join(c['by'])} – war: {devicelog.who_name(w) if w else 'niemand/außen'})"
+
+
 def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool = False, side: str = "on") -> tuple[bool | None, str]:
     """(erfuellt?, Klartext). None = fehlende Daten (zaehlt als nicht erfuellt)."""
     now = ctx["now"]
@@ -878,8 +900,8 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
             return None, f"Eigener Schalter {c.get('id')} (nicht mehr vorhanden)"
         name = info.get("name") or c["id"]
         if c["is"] == "pressed":
-            return bool(info.get("pressed")), f"{name} wird gedrückt"
-        return bool(info.get("on")) == (c["is"] == "on"), f"{name} ist {'an' if c['is'] == 'on' else 'aus'}"
+            return _by_check(c, "virtual:" + str(c.get("id")), bool(info.get("pressed")), f"{name} wird gedrückt")
+        return _by_check(c, "virtual:" + str(c.get("id")), bool(info.get("on")) == (c["is"] == "on"), f"{name} ist {'an' if c['is'] == 'on' else 'aus'}")
     if t == "device":
         info = (ctx.get("devices") or {}).get(c.get("device_id"))
         if not info:
@@ -887,7 +909,7 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
         name = info.get("name") or info["id"]
         if "is" in c:
             txt = f"{name} ist {'an' if c['is'] == 'on' else 'aus'}"
-            return (None if not info.get("online") or info.get("on") is None else bool(info["on"]) == (c["is"] == "on")), txt
+            return _by_check(c, "device:" + str(c.get("device_id")), (None if not info.get("online") or info.get("on") is None else bool(info["on"]) == (c["is"] == "on")), txt)
         p = info.get("power")
         txt = f"{name} Leistung {'unter' if c['op'] == 'below' else 'über'} {c['value']:g} W"
         return (None if p is None or not info.get("online") else (p < c["value"] if c["op"] == "below" else p >= c["value"])), txt

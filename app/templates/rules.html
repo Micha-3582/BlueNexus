@@ -285,7 +285,7 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
     const list = S.virtual || [], v = list.find(x => x.id === c.id);
     const opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!v) opts.unshift([escH(c.id), '(Schalter fehlt)']);
     const pick = sel('c-virt', c.id, opts).replace('onchange="ruleEdited(this)"', 'onchange="virtChanged(this)"');
-    body = (c.is === 'pressed' || (v && v.kind === 'button')) ? `${pick} wird gedrückt` : `${pick} ${v && v.kind === 'timer' ? sel('c-vis', c.is, [['on', 'läuft'], ['off', 'läuft nicht']]) : 'ist ' + sel('c-vis', c.is, [['on', 'an'], ['off', 'aus']])}`;
+    body = ((c.is === 'pressed' || (v && v.kind === 'button')) ? `${pick} wird gedrückt` : `${pick} ${v && v.kind === 'timer' ? sel('c-vis', c.is, [['on', 'läuft'], ['off', 'läuft nicht']]) : 'ist ' + sel('c-vis', c.is, [['on', 'an'], ['off', 'aus']])}`) + byPick(c);
   } else if (c.type === 'telegram') {
     const rs = S.recipients || [], who = c.who || [];
     body = `Wort <input class="c-tgw" value="${escH(c.shown || c.word || '')}" maxlength="40" placeholder="Triggerwort" title="Groß-/Kleinschreibung zählt: „Wort“ ist nicht „wort“" style="width:130px" oninput="ruleEdited(this)"> wird dem Bot geschrieben`
@@ -300,13 +300,19 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
     const kind = 'is' in c ? c.is : 'power';
     const pick = sel('c-dev', c.device_id, opts);
     const k = `<select class="c-dk" style="width:auto" onchange="deviceCondKind(this)">${optHtml([['on', 'ist an'], ['off', 'ist aus'], ['power', 'Leistung …']], kind)}</select>`;
-    body = `${pick} ${k}` + (kind === 'power' ? ` ${cmp('c-op', c.op || 'above')} ${num('c-val', c.value ?? 50, 70)} W` : '');
+    body = `${pick} ${k}` + (kind === 'power' ? ` ${cmp('c-op', c.op || 'above')} ${num('c-val', c.value ?? 50, 70)} W` : byPick(c));
   }
   return `<div class="cond" data-type="${c.type}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg,rgba(255,255,255,.04));border-radius:8px;padding:6px 8px;margin-top:6px">
     <select class="c-type" style="width:auto" onchange="condTypeChanged(this)">${optHtml(allowed(FIXED, c.type), c.type)}</select>
     <span style="flex:1;min-width:160px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${body}</span>
     <button class="ghost" style="padding:2px 9px" title="Bedingung entfernen" onclick="condDel(this)">✕</button></div>`;
 }
+function byPick(c) {                                   // "bedient von": nur wenn eines der angehakten Konten den Auslöser bedient hat (nichts angehakt = egal von wem)
+  const as = S.accounts || [], by = c.by || []; if (as.length < 2) return '';
+  return ` <span class="muted">· bedient von</span> ${as.map(x => `<label class="chk" style="font-weight:normal"><input type="checkbox" class="c-by" value="${escH(x.user)}" ${by.includes(x.user) ? 'checked' : ''} onchange="ruleEdited(this)"> ${escH(x.name)}</label>`).join(' ')} <span class="muted">(nichts angehakt = jeder)</span><span class="qhelp" role="button" tabindex="0" data-help="Die Bedingung gilt nur, wenn das Gerät bzw. der Schalter in den letzten 2 Minuten von einem der angehakten Konten bedient wurde (in der App von Hand). Gedacht für Abläufe, z. B. „Toröffner wurde von Anna betätigt“ per Telegram.">?</span>`;
+}
+const byOf = row => [...row.querySelectorAll('.c-by:checked')].map(x => x.value);
+const byText = c => (c.by || []).length ? ' · bedient von ' + c.by.map(u => ((S.accounts || []).find(x => x.user === u) || {}).name || u).join(', ') : '';
 function collectCond(row) {
   const t = row.dataset.type, v = c => {
     const e = row.querySelector('.' + c); if (e) return e.value;
@@ -323,10 +329,10 @@ function collectCond(row) {
   if (t === 'soc') return { type: t, op: v('c-op'), pct: v('c-pct') };
   if (t === 'sensor') return row.querySelector('.c-is') ? { type: t, sensor_id: v('c-sensor'), is: v('c-is') === '1' }
                                                           : { type: t, sensor_id: v('c-sensor'), op: v('c-op'), value: v('c-val') };
-  if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed' };
+  if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed', by: byOf(row) };
   if (t === 'telegram') return { type: t, word: v('c-tgw'), shown: v('c-tgw'), who: [...row.querySelectorAll('.c-tgwho:checked')].map(x => x.value), confirm: !!row.querySelector('.c-tgc:checked'), reply: v('c-tgr') };
   if (t === 'rule') return { type: t, id: v('c-rule'), is: v('c-rst') };
-  if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk') };
+  if (t === 'device') return v('c-dk') === 'power' ? { type: t, device_id: v('c-dev'), op: v('c-op'), value: v('c-val') } : { type: t, device_id: v('c-dev'), is: v('c-dk'), by: byOf(row) };
   return { type: 'sun_tomorrow', op: v('c-op'), kwh: v('c-kwh') };
 }
 const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)'], ['chime', 'Chime läuten (Türklingel-Gong, Reolink)'], ['rule', 'Regel ein-/ausschalten']];
@@ -381,7 +387,7 @@ function actRow(a, branch, flow) {
         ${list.map(x => `<label class="chk"><input type="checkbox" class="a-sp" value="${escH(x.id)}" ${all || (a.device_ids || []).includes(x.id) ? 'checked' : ''} ${all ? 'disabled' : ''} onchange="ruleEdited(this)"> ${escH(x.name)}</label>`).join('')}
         ${list.length ? '' : '<span class="muted">Noch keine Thermostate – unter Smart Home → Geräte suchen → Homematic „Thermostate suchen“.</span>'}</div>`;
   } else if (t === 'notify') {
-    body = `<b>✉ Telegram</b> <input class="a-text" placeholder="Nachricht, z.B. Warmwasser ist fertig" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)">${toRow(a)}`;
+    body = `<b>✉ Telegram</b> <input class="a-text" placeholder="Nachricht, z.B. Warmwasser ist fertig" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)"><span class="qhelp" role="button" tabindex="0" data-help="Platzhalter: <b>[WER]</b> wird durch den Namen ersetzt, der den Auslöser zuletzt bedient hat – bei einem Konto der Kontoname (z. B. „Toröffner betätigt von [WER]“). Gilt für Geräte und Schalter in der Bedingung WENN; wurde nichts von Hand bedient, steht dort die Quelle (z. B. Regel oder Alexa) bzw. „unbekannt“.">?</span>${toRow(a)}`;
   } else if (t === 'sound') {
     const list = S.sounds || [], opts = list.map(x => [escH(x.id), escH(x.icon || '🔔') + ' ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Soundmodul fehlt)']);
     const nin = (cls, v, min, max, w) => `<input class="${cls}" type="number" min="${min}" max="${max}" step="1" value="${escH(v)}" style="width:${w}px" oninput="ruleEdited(this)">`;
@@ -647,10 +653,10 @@ function condSummary(c) {
     const sen = (S.sensors || []).find(x => x.id === c.sensor_id), n = sen ? sen.name : '(Sensor fehlt)';
     return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
   }
-  if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
+  if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return (c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`) + byText(c); }
   if (c.type === 'telegram') return `Telegram „${c.shown || c.word}“${(c.who || []).length ? ' von ' + c.who.map(i => ((S.recipients || []).find(r => r.id === i) || {}).name || '?').join(', ') : ''}${c.confirm ? ' (mit Rückfrage)' : ''}`;
   if (c.type === 'rule') { const k = R.find(x => x.id === c.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
-  if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
+  if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}${byText(c)}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
   return c.type;
 }
 const LOCK_WORD = { open: 'öffnen', unlock: 'entriegeln', lock: 'verriegeln' };
@@ -800,12 +806,12 @@ function renderMain() { $('rules_enabled').checked = CFG.enabled; $('rules_dry')
 function renderAll() { renderMain(); renderSettings(); renderRules(); }
 async function loadServer() {                    // alles gleichzeitig und ohne Live-Abfragen der Geraete (?light=1) - die Seite steht sofort
   const get = async (url, fallback) => { try { const r = await fetch(url); if (!r.ok) return fallback; const j = await r.json(); return j == null ? fallback : j; } catch (e) { return fallback; } };
-  const [devs, A, sensors, virt, sps, lks, wols, camj, snds, blds, recs, prec] = await Promise.all([
+  const [devs, A, sensors, virt, sps, lks, wols, camj, snds, blds, recs, prec, accs] = await Promise.all([
     fetch('/api/shelly?light=1').then(r => r.json()), fetch('/api/rules').then(r => r.json()),
     get('/api/sensors?light=1', []), get('/api/virtual', []), get('/api/homematic/setpoints?light=1', []), get('/api/homematic/locks?light=1', []),
-    get('/api/wol?light=1', []), get('/api/cameras', {}), get('/api/homematic/sounds', []), get('/api/homematic/blinds?light=1', []), get('/api/notify/recipients', []), get('/api/pushover/recipients', [])]);
+    get('/api/wol?light=1', []), get('/api/cameras', {}), get('/api/homematic/sounds', []), get('/api/homematic/blinds?light=1', []), get('/api/notify/recipients', []), get('/api/pushover/recipients', []), get('/api/rules/accounts', [])]);
   const arr = v => Array.isArray(v) ? v : [];
-  S = { devs: arr(devs), A, sensors: arr(sensors), virtual: arr(virt), setpoints: arr(sps), locks: arr(lks), wol: arr(wols), cameras: arr(camj.cameras), sounds: arr(snds), blinds: arr(blds), recipients: arr(recs), prec: arr(prec) };
+  S = { devs: arr(devs), A, sensors: arr(sensors), virtual: arr(virt), setpoints: arr(sps), locks: arr(lks), wol: arr(wols), cameras: arr(camj.cameras), sounds: arr(snds), blinds: arr(blds), recipients: arr(recs), prec: arr(prec), accounts: arr(accs) };
 }
 async function refresh() {                        // alle 10 s: Status auffrischen, den Entwurf nie anfassen
   try { await loadServer(); } catch (e) { return; }

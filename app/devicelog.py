@@ -72,11 +72,28 @@ def current_actor() -> str:
     return "System"
 
 
+def current_user() -> str:
+    """Anmeldename (klein geschrieben) des Kontos, das gerade per Browser bedient - sonst leer (Regel, Automatik, Alexa ...)."""
+    if getattr(_local, "who", None):
+        return ""
+    try:
+        from flask import g, has_request_context
+        if has_request_context() and getattr(g, "user", None):
+            return str(g.user).strip().lower()
+    except Exception:                                                       # noqa: BLE001
+        pass
+    return ""
+
+
 # ---------------------------------------------------------------- Schreiben / Lesen
 def log(cat: str, ref: str, name: str, text: str, ok: bool = True, by: str | None = None) -> None:
     try:
-        line = json.dumps({"ts": datetime.now().isoformat(timespec="seconds"), "cat": cat, "ref": ref, "name": name, "text": text,
-                           "by": by or current_actor(), "ok": bool(ok)}, ensure_ascii=False)
+        row = {"ts": datetime.now().isoformat(timespec="seconds"), "cat": cat, "ref": ref, "name": name, "text": text,
+               "by": by or current_actor(), "ok": bool(ok)}
+        usr = "" if by else current_user()
+        if usr:
+            row["user"] = usr                                               # Anmeldename: damit Regeln "bedient von Konto X" pruefen koennen
+        line = json.dumps(row, ensure_ascii=False)
         with _lock:
             with open(PATH, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
@@ -140,6 +157,43 @@ def recent(limit: int = 200, cat: str | None = None, q: str | None = None, allow
     return out
 
 
+_pre: dict = {}                        # Referenz -> (wer, Konto, Zeit): schon VOR dem Schaltbefehl gemerkt, damit eine Regel den Bediener auch dann kennt, wenn sie schneller ist als der Logbucheintrag
+WHO_MAX_AGE_S = 120.0
+
+
+def who_last(ref: str, max_age: float = WHO_MAX_AGE_S) -> dict | None:
+    """Wer hat dieses Ding zuletzt bedient (innerhalb von max_age Sekunden)? -> {"by": Text, "user": Anmeldename oder "", "age": Sekunden} oder None."""
+    now = time.time()
+    best = None
+    p = _pre.get(ref)
+    if p and now - p[2] <= max_age:
+        best = {"by": p[0], "user": p[1], "age": now - p[2]}
+    try:
+        for e in reversed(_rows()[-3000:]):
+            if e.get("ref") != ref:
+                continue
+            try:
+                age = now - datetime.fromisoformat(e.get("ts", "")).timestamp()
+            except ValueError:
+                break
+            if age <= max_age and (best is None or age < best["age"]):
+                best = {"by": e.get("by") or "", "user": e.get("user") or "", "age": age}
+            break
+    except Exception:                                                       # noqa: BLE001
+        pass
+    return best
+
+
+def who_name(w: dict | None) -> str:
+    """Kurzer Name fuer Texte: bei einem Konto der Kontoname, sonst die Quelle (Regel, Alexa, System ...)."""
+    if not w:
+        return "unbekannt"
+    by = str(w.get("by") or "").strip()
+    if by.startswith("Konto „") and by.endswith("“"):
+        return by[len("Konto „"):-1]
+    return by or "unbekannt"
+
+
 _last_cache: dict = {"key": None, "map": {}}
 
 
@@ -171,6 +225,7 @@ def _wrap(module, attr: str, build):
         try:
             for ent in build(a, k, None, None) or []:               # Echo-Unterdrueckung: schon vor dem Befehl merken (das Geraet meldet manchmal vor der Antwort zurueck)
                 note_app_action(ent[1])
+                _pre[ent[1]] = (current_actor(), current_user(), time.time())
         except Exception:                                           # noqa: BLE001
             pass
         try:

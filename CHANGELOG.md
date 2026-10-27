@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.13.0 – 27.10.2026
+- Neu: In Regeln lässt sich festlegen, **wer** etwas bedient hat. Geräte und Schalter in der Bedingung WENN haben die Option **„bedient von“** (Konten ankreuzen), und im Text einer Telegram- oder Pushover-Nachricht ersetzt der Platzhalter **[WER]** den Namen des Kontos, das den Auslöser zuletzt bedient hat (z. B. „Toröffner betätigt von [WER]“).
+- Das Geräte-Logbuch merkt sich dazu den Anmeldenamen des Kontos.
+
 ## 1.12.4 – 27.10.2026
 - Änderung: **Dunkel** ist jetzt die Standard-Darstellung. Wer bisher auf „Automatisch“ stand (nie umgestellt), sieht dunkel; Hell und Automatisch bleiben unter *Einstellungen → Dashboard → Darstellung* wählbar.
 
