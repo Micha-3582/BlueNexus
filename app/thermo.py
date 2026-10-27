@@ -167,20 +167,6 @@ def rename(tid: str, name: str | None = None, interval=None) -> bool:
     return True
 
 
-def new_key(tid: str) -> str | None:
-    """Neuer Schluessel (das Geraet muss neu eingerichtet werden). -> Klartext oder None."""
-    with _lock:
-        items = _load()
-        d = next((x for x in items if x.get("id") == tid), None)
-        if not d:
-            return None
-        token = new_token()
-        d["token_hash"] = _hash(token)
-        d["last_seen"] = None
-        _save(items)
-    return token
-
-
 def remove(tid: str) -> bool:
     with _lock:
         items = _load()

@@ -232,7 +232,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_key": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4156,6 +4156,8 @@ def api_thermo_list():
     b = request.get_json(silent=True) or {}
     interval = b.get("interval", thermo.DEFAULT_INTERVAL_MIN)
     w = b.get("wifi")
+    if not isinstance(w, dict):
+        return jsonify(error="WLAN-Angaben fehlen"), 400
     cfg_b64 = None
     if isinstance(w, dict):                                # Flash-Fenster: den Server die Konfiguration des Geraets bauen lassen (WLAN aus der Eingabe oder das gemerkte)
         saved = thermo.wifi_get()
@@ -4191,15 +4193,6 @@ def api_thermo_item(tid):
     b = request.get_json(silent=True) or {}
     ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"))
     return (jsonify(ok=True), 200) if ok else (jsonify(error="Thermometer nicht gefunden"), 404)
-
-
-@app.route("/api/thermo/<tid>/key", methods=["POST"])
-def api_thermo_key(tid):
-    """Neuer Schluessel (das Geraet muss danach neu eingerichtet werden)."""
-    token = thermo.new_key(tid)
-    if token is None:
-        return jsonify(error="Thermometer nicht gefunden"), 404
-    return jsonify(token=token, device=thermo.public(thermo.get(tid)), server=_thermo_server_hint())
 
 
 @app.route("/api/thermo/<tid>/status", methods=["GET"])

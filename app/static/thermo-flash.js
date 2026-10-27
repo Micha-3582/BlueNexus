@@ -48,7 +48,6 @@
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min</div></div>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
-        + '<button type="button" class="ghost" data-act="key" data-id="' + esc(d.id) + '" title="Neuer Schlüssel / Zugangsdaten zum Abtippen">🔑</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
     }).join('');
   }
@@ -123,7 +122,7 @@
     if (/busy|already open|InvalidStateError/i.test(t)) return 'Der Anschluss ist belegt (anderes Programm oder Browser-Fenster nutzt ihn). Bitte schließen und erneut versuchen.';
     return t;
   }
-  function setBusy(b) { state.busy = b; $('th-flash').disabled = b; $('th-reset').disabled = b; $('th-manual').disabled = b; checkEnv(); }
+  function setBusy(b) { state.busy = b; $('th-flash').disabled = b; $('th-reset').disabled = b; checkEnv(); }
 
   function flash() {
     var f;
@@ -135,7 +134,7 @@
     doFlash(f);
   }
   function doFlash(f) {
-    var fwUrl = state.fw && state.fw.url, created = null, lib = null, session = null, logLines = [];
+    var fwUrl = state.fw && state.fw.url, created = null, lib = null, session = null, logLines = [], ov = null;
     msg(''); resetSteps(); setBusy(true);
     var log = function (s) { logLines.push(String(s)); if (logLines.length > 40) logLines.shift(); };
     steps(0, 'run');
@@ -164,12 +163,15 @@
       steps(3, 'ok'); steps(4, 'ok'); steps(5, 'ok', 'fertig geschrieben');
       return session.transport.disconnect().catch(function () {});               /* ein automatischer Neustart wirkt bei diesem Board nicht (getestet: RTS-, Soft- und Hard-Reset) - die RESET-Taste startet es */
     }).then(function () {
-      steps(6, 'run', 'jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden'); return waitFirst(created.device.id, 90);
+      steps(6, 'run', 'jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden');
+      ov = resetOverlay();                                                         // grosser Hinweis ueber der Seite: nicht zu uebersehen
+      return waitFirst(created.device.id, 90, ov);
     }).then(function (dev) {
-      steps(6, 'ok');
+      steps(6, 'ok'); if (ov) ov.close(true);
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
       setBusy(false); return load();
     }).catch(function (e) {
+      if (ov) ov.close(false);
       var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
       var ours = created && k >= 0 && k <= 5;
       var cleanup = (ours ? api('/api/thermo/' + created.device.id, 'DELETE').catch(function () {}) : Promise.resolve());
@@ -180,17 +182,19 @@
         if (k === 6) why = dev && dev.attempt
           ? 'Eine Anfrage ist bei BlueNexus angekommen, wurde aber abgelehnt: ' + dev.attempt.why + ' (von ' + dev.attempt.ip + ').'
           : 'Bei BlueNexus ist keine Anfrage angekommen. Häufige Ursachen: Der Chip ist nach dem Flashen nicht neu gestartet (RESET-Taste drücken oder USB-C kurz abziehen und wieder anstecken – er meldet sich dann innerhalb von etwa 20 Sekunden), WLAN-Name oder -Passwort stimmen nicht (nur 2,4 GHz), oder die Adresse unter „Erweitert“ ist von dort aus nicht erreichbar.';
-        msg((k === 6 ? 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.' : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
+        msg((k === 6 ? (e && e.message === 'Abgebrochen' ? 'Abgebrochen. Der Chip ist geflasht – nach dem Druck auf die RESET-Taste meldet er sich und erscheint in der Liste.' : 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.') : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
         setBusy(false); load();
       });
     });
   }
-  function waitFirst(id, secs) {
+  function waitFirst(id, secs, ov) {
     var t0 = Date.now(), hinted = false;
     return new Promise(function (resolve, reject) {
       (function poll() {
         api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) {
           if (j.device && j.device.last_seen != null) return resolve(j.device);
+          if (ov && ov.cancelled) return reject(new Error('Abgebrochen'));
+          if (ov) ov.tick(Math.round((Date.now() - t0) / 1000));
           if (Date.now() - t0 > secs * 1000) return reject(new Error('timeout'));
           if (Date.now() - t0 > 30000 && !hinted) { hinted = true; steps(6, 'run', 'noch nichts angekommen – die RESET-Taste am Board noch einmal drücken (manchmal braucht es zwei Anläufe)'); }
           setTimeout(poll, 2000);
@@ -199,11 +203,11 @@
     });
   }
 
-  /* ---------------- Zuruecksetzen ---------------- */
+  /* ---------------- ESP32 loeschen ---------------- */
   function resetChip() {
     var err = !navigator.serial ? 'Zum Löschen braucht der Browser „Web Serial“ (Chrome oder Edge am PC).' : (!window.isSecureContext ? 'Das geht nur über https oder localhost.' : '');
     if (err) { msg(err, true); return; }
-    uiDialog({ title: 'Thermometer zurücksetzen', okText: 'Weiter',
+    uiDialog({ title: 'ESP32 löschen', okText: 'Weiter',
       html: '<div style="text-align:left;line-height:1.5">Der Chip wird <b>komplett gelöscht</b> (Auslieferungszustand). Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li>USB-C-Kabel an den PC anstecken.</li><li><b>BOOT-Taste halten</b>, dann USB-C anstecken (oder RESET drücken), danach BOOT loslassen.</li><li>Auf „Weiter“ klicken und den Eintrag „USB JTAG/serial debug unit“ wählen.</li></ol></div>' }).then(function (ok) {
       if (!ok) return;
       resetSteps(); msg(''); setBusy(true);
@@ -211,7 +215,7 @@
       loadLib().then(function (lib) { return openChip(lib, log); }).then(function (s) { session = s; steps(1, 'ok', s.chip); steps(2, 'run'); return s.loader.eraseFlash(); }).then(function () {
         steps(2, 'ok'); return session.transport.disconnect().catch(function () {});
       }).then(function () {
-        msg('Chip gelöscht. Er ist jetzt im Auslieferungszustand und lässt sich über „Einrichten und flashen“ neu einrichten. Ein dazugehöriges Thermometer in der Liste kannst du mit ✕ entfernen.'); setBusy(false);
+        msg('ESP32 gelöscht. Er ist jetzt im Auslieferungszustand und lässt sich über „Einrichten und flashen“ neu einrichten. Ein dazugehöriges Thermometer in der Liste kannst du mit ✕ entfernen.'); setBusy(false);
       }).catch(function (e) {
         var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
         (session ? session.transport.disconnect().catch(function () {}) : Promise.resolve()).then(function () { msg(friendly(e), true); setBusy(false); });
@@ -219,23 +223,37 @@
     });
   }
 
-  /* ---------------- Ohne PC (Einrichtungs-WLAN am Handy) ---------------- */
-  function creds(j, intro) {
-    var rows = [['Name', j.device.name], ['Geräte-ID', j.device.id], ['Schlüssel', j.token], ['Server', j.server || $('th-server').value || '']];
-    return uiDialog({ title: 'Zugangsdaten', info: true, okText: 'Fertig',
-      html: '<div style="text-align:left;line-height:1.5">' + intro + '<div style="margin-top:8px">' + rows.map(function (r) {
-        return '<div style="margin:6px 0"><span class="muted">' + esc(r[0]) + '</span><br><code style="user-select:all;word-break:break-all">' + esc(r[1]) + '</code></div>';
-      }).join('') + '</div><div class="muted" style="margin-top:8px">Der Schlüssel wird nur jetzt angezeigt. Das Thermometer öffnet ohne Einrichtung ein eigenes WLAN „BlueNexus-Thermo-XXXX“; dort die Werte und dein WLAN eintragen.</div></div>' });
-  }
-  function manual() {
-    msg(''); setBusy(true);
-    var name = $('th-name').value.trim() || 'Thermometer';
-    api('/api/thermo', 'POST', { name: name, interval: parseInt($('th-int').value, 10) || 15 }).then(function (j) {
-      return creds(j, 'Trage diese Werte im Einrichtungs-Formular des Thermometers ein.').then(function () { setBusy(false); return load(); });
-    }).catch(function (e) { msg(e.message, true); setBusy(false); });
+  /* ---------------- Grosser Hinweis: jetzt RESET druecken ---------------- */
+  function resetOverlay() {
+    if (!document.getElementById('th-css')) {
+      var st = document.createElement('style'); st.id = 'th-css';
+      st.textContent = '@keyframes thPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,166,60,.65)}50%{box-shadow:0 0 0 22px rgba(240,166,60,0)}}@keyframes thSpin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(st);
+    }
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:1300;padding:16px';
+    ov.innerHTML = '<div class="th-ovcard" style="background:var(--card);border:2px solid #f0a63c;border-radius:18px;padding:26px 24px;width:100%;max-width:520px;text-align:center;box-shadow:0 12px 50px rgba(0,0,0,.6)">'
+      + '<div style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;background:#f0a63c;color:#1b1f24;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;letter-spacing:1px;animation:thPulse 1.4s infinite">RESET</div>'
+      + '<div style="font-size:23px;font-weight:800;line-height:1.25;margin-bottom:10px">Jetzt die RESET-Taste am Thermometer drücken</div>'
+      + '<div style="font-size:16px;line-height:1.55">Das Flashen ist <b>fertig</b>. Damit das Thermometer startet, auf der Platine die kleine Taste <b>RESET</b> (RST) <b>einmal</b> drücken – <b>nicht</b> die Taste BOOT.</div>'
+      + '<div class="th-ovstat muted" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:18px;height:18px;border:3px solid var(--border);border-top-color:#f0a63c;border-radius:50%;animation:thSpin .9s linear infinite"></span><span class="th-ovtxt">Warte auf das Thermometer …</span></div>'
+      + '<div class="th-ovhint" style="display:none;margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(240,166,60,.16);color:#f0a63c;font-weight:700">Noch nichts angekommen? Die RESET-Taste <b>noch einmal</b> drücken – manchmal braucht es zwei Anläufe.</div>'
+      + '<div style="margin-top:20px"><button type="button" class="ghost th-ovcancel">Abbrechen</button></div></div>';
+    document.body.appendChild(ov);
+    var o = { cancelled: false, tick: function (sec) {
+      ov.querySelector('.th-ovtxt').textContent = 'Warte auf das Thermometer … ' + sec + ' s';
+      if (sec >= 30) ov.querySelector('.th-ovhint').style.display = '';
+    }, close: function (ok) {
+      if (!ov.parentNode) return;
+      if (!ok) { ov.remove(); return; }
+      ov.querySelector('.th-ovcard').innerHTML = '<div style="font-size:64px;color:#35c07a;line-height:1">✓</div><div style="font-size:22px;font-weight:800;margin-top:8px">Thermometer verbunden</div>';
+      setTimeout(function () { ov.remove(); }, 1400);
+    } };
+    ov.querySelector('.th-ovcancel').addEventListener('click', function () { o.cancelled = true; });
+    return o;
   }
 
-  /* ---------------- Liste: Umbenennen, Schluessel, Entfernen ---------------- */
+  /* ---------------- Liste: Umbenennen, Entfernen ---------------- */
   $('th-list').addEventListener('click', function (ev) {
     var b = ev.target.closest('button[data-act]'); if (!b) return;
     var id = b.dataset.id, d = state.devices.find(function (x) { return x.id === id; }) || {};
@@ -244,13 +262,8 @@
         if (!r || !String(r.name || '').trim()) return;
         api('/api/thermo/' + encodeURIComponent(id), 'PATCH', { name: r.name }).then(load).catch(function (e) { msg(e.message, true); });
       });
-    } else if (b.dataset.act === 'key') {
-      uiDialog({ title: 'Neuer Schlüssel?', okText: 'Neuen Schlüssel erzeugen', message: 'Der alte Schlüssel wird ungültig; das Thermometer muss danach neu eingerichtet werden (flashen oder am Handy eintragen). Die Sensoren bleiben bestehen.' }).then(function (ok) {
-        if (!ok) return;
-        api('/api/thermo/' + encodeURIComponent(id) + '/key', 'POST').then(function (j) { return creds({ device: j.device, token: j.token, server: j.server }, 'Neuer Schlüssel für dieses Thermometer.'); }).then(load).catch(function (e) { msg(e.message, true); });
-      });
     } else if (b.dataset.act === 'del') {
-      uiDialog({ title: 'Thermometer entfernen?', okText: 'Entfernen', message: '„' + (d.name || id) + '“ und seine Sensoren werden aus BlueNexus entfernt (Regeln und Diagramme, die sie benutzen, verlieren den Sensor). Am Chip selbst ändert sich nichts – dafür „Zurücksetzen“.' }).then(function (ok) {
+      uiDialog({ title: 'Thermometer entfernen?', okText: 'Entfernen', message: '„' + (d.name || id) + '“ und seine Sensoren werden aus BlueNexus entfernt (Regeln und Diagramme, die sie benutzen, verlieren den Sensor). Am Chip selbst ändert sich nichts – dafür „ESP32 löschen“.' }).then(function (ok) {
         if (!ok) return;
         api('/api/thermo/' + encodeURIComponent(id), 'DELETE').then(function () { savedToast('Entfernt ✓'); return load(); }).catch(function (e) { msg(e.message, true); });
       });
@@ -266,7 +279,6 @@
   });
   $('th-flash').addEventListener('click', flash);
   $('th-reset').addEventListener('click', resetChip);
-  $('th-manual').addEventListener('click', manual);
   load();
   setInterval(function () { if (!document.hidden && !state.busy) load(); }, 20000);        // Liste (zuletzt gesehen, Werte) auffrischen
 })();
