@@ -311,6 +311,9 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
             meta["n"] = int(n)
         if rr is not None:
             meta["rr"] = int(rr)
+        ap = str(body.get("ap") or "").strip().lower()                        # Access Point (BSSID) ab Firmware 1.1.1
+        if re.match(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$", ap):
+            meta["ap"] = ap
         if meta:
             d["meta"] = meta
         fw = str(body.get("fw") or "")[:20]

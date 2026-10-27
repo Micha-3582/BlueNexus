@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.25.0 – 27.10.2026
+- Firmware 1.1.1 (im Flash-Fenster mitgeliefert): wählt den **Access Point mit dem stärksten Signal** (die Bibliothek nahm bisher den ersten gefundenen mit gleichem Namen und merkte ihn sich – bei mehreren Access Points oft einen weit entfernten) und gibt vor dem Tiefschlaf die letzten Diagnosezeilen noch aus.
+- Neu: Die Liste zeigt **an welchem Access Point** das Thermometer hängt („AP aa:bb:cc:…“) – ab Firmware 1.1.1.
+- Thermometer mit Firmware 1.1.0 laufen weiter; für den Access-Point-Fix einmal neu flashen.
+
 ## 1.24.0 – 27.10.2026
 - Neu: **Farbwähler mit „Übernehmen“** im Diagramm-Dialog der Verläufe (PC und Handy): Palette, eigene Farbe über Regler oder Hex-Wert, „Standard“, „Abbrechen“. Der Farbwähler des Browsers ließ sich nicht bestätigen, und ein Klick daneben hakte versehentlich eine andere Reihe an.
 

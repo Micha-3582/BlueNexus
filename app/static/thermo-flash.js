@@ -58,7 +58,7 @@
   var RR = { 1: 'Einschalten', 2: 'RESET-Taste', 3: 'Software-Neustart', 4: 'Absturz', 5: 'Watchdog', 6: 'Watchdog', 7: 'Watchdog', 8: 'Zeitgeber', 9: 'Batterie schwach (Brownout)', 11: 'USB', 12: 'JTAG' };
   function metaTxt(d) {                                   // ab Firmware 1.1: Aufwachen Nr. und Grund des letzten Starts
     var m = d.meta || {};
-    return m.n != null ? ' · Aufwachen Nr. ' + m.n + (m.rr != null && RR[m.rr] ? ' (' + RR[m.rr] + ')' : '') : '';
+    return (m.n != null ? ' · Aufwachen Nr. ' + m.n + (m.rr != null && RR[m.rr] ? ' (' + RR[m.rr] + ')' : '') : '') + (m.ap ? ' · AP ' + m.ap : '');
   }
   function calTxt(d) {
     var c = d.calib || {}, p = [];
