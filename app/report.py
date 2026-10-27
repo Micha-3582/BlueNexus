@@ -12,6 +12,7 @@ import os
 import shutil
 from datetime import datetime, timedelta
 
+import hardware
 import notify
 import opslog
 import pushover
@@ -169,6 +170,12 @@ def _checks(now: datetime, cfg: dict, ctrl: dict, stats: dict, hist_days: dict) 
     except OSError:
         pass
 
+    # 7b) Hardware (Arbeitsspeicher, Last, Temperatur) - bei jeder Installation, unabhaengig von den Modulen
+    hw = _safe(hardware.snapshot)
+    if hw and "_error" not in hw:
+        lvl, txt = hardware.judge(hw)
+        out.append(_check("hardware", "Hardware", lvl, txt))
+
     # 8) Batterie-Watchdog
     try:
         wd = store.battery_watchdog_state()
@@ -274,7 +281,9 @@ def build(days: int = 7, ctrl: dict | None = None, now: datetime | None = None) 
                                         "pv_tom_morning_factor", "min_peak_soc", "night_safety_soc", "target_safe_soc", "hysterese_soc",
                                         "peak_avoid_price", "poll_seconds", "dry_run", "rules_enabled", "rules_dry_run", "rules_manual_hold_min", "surplus_enabled", "surplus_dry_run", "surplus_min_soc", "tariff_mode")
                 if cfg.get(k) is not None and (energy or k not in ENERGY_SETTINGS)}
+    hw = _safe(hardware.snapshot)
     return {"generated": now.isoformat(timespec="seconds"), "app": store.default_app_name(cfg), "version": _version(), "energy": energy,
+            "hardware": hw if (hw and "_error" not in hw) else None,
             "started": ctrl.get("started"), "verdict": verdict, "checks": checks, "days": rows, "events": events, "settings": settings,
             "current": None if not energy else {"soc": (ctrl.get("status") or {}).get("soc"), "strategy": (ctrl.get("status") or {}).get("strategy"),
                         "ess": (ctrl.get("status") or {}).get("ess_text"), "pv_source": (ctrl.get("status") or {}).get("pv_source"),
@@ -300,6 +309,14 @@ def to_markdown(r: dict) -> str:
     L = [f"# Betriebsbericht – {r['app']}", f"Stand {r['generated']} · Version {r['version']} · gestartet {r.get('started') or '?'}", "", f"## Ergebnis: {verdict}", ""]
     for c in r["checks"]:
         L.append(f"- {ICON[c['status']]} **{c['title']}**: {c['detail']}")
+    hw = r.get("hardware")
+    if hw:
+        L += ["", "## Hardware", f"{hw.get('model') or 'System'}: {hw['cores']} Kerne · Arbeitsspeicher {hw['mem_avail_mb']}/{hw['mem_total_mb']} MB frei ({hw['mem_avail_pct']:.0f} %)"
+              + (f" · BlueNexus belegt {hw['app_rss_mb']} MB" if hw.get("app_rss_mb") is not None else "")
+              + (f" · Auslagerung {hw['swap_used_mb']}/{hw['swap_total_mb']} MB" if hw.get("swap_total_mb") else " · keine Auslagerung")
+              + (f" · Last {hw['load1']:.2f}/{hw['load5']:.2f}/{hw['load15']:.2f}" if hw.get("load1") is not None else "")
+              + (f" · {hw['temp_c']:.0f} °C" if hw.get("temp_c") is not None else "")
+              + (f" · läuft seit {hardware.fmt_uptime(hw['uptime_s'])}" if hw.get("uptime_s") is not None else "")]
     if not r.get("energy", True):                       # ohne Modul Energie: nur Pruefungen, Ereignisse, Einstellungen
         L += ["", "## Ereignisse (neueste zuerst)"]
         L += [f"- {e['ts'][5:16].replace('T', ' ')} [{e['kind']}] {e['text']}" for e in r["events"][:30]] or ["- keine bemerkenswerten Ereignisse"]

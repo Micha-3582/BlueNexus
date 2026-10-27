@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.14.0 – 27.10.2026
+- Neu: **Hardware-Monitor** im Betriebsbericht (bei jeder Installation, auch ohne Energie): freier Arbeitsspeicher und Anteil von BlueNexus, Prozessor-Last, Temperatur, Auslagerung (Swap), Speicherplatz und Laufzeit als Kacheln mit Farbbalken, dazu die Prüfung „Hardware“ (Warnung bei knappem Speicher, Hitze, Überlast; beim Raspberry Pi auch Unterspannung/Drosselung). Erscheint auch im Text zum Kopieren. Ohne Linux-Werte (z. B. Entwicklung unter Windows) entfällt der Block.
+
 ## 1.13.2 – 27.10.2026
 - Fix: Der **Betriebsbericht** zeigt ohne das Modul Energie nichts mehr aus der Energie-Regelung: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen, keine Durchlauf-Fehler/Unterbrechungen, keine Regler-Einstellungen und keine Energie-Ereignisse. Auch der Text zum Kopieren ist entsprechend kürzer.
 - Fix: Beschreibungen unter *Betriebsbericht* und *Pushover* erwähnen Regelung, Preise und Kamerabild nur noch, wenn das jeweilige Modul eingeschaltet ist.

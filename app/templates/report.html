@@ -18,6 +18,13 @@
   <div id="rp-checks" style="margin-top:12px;display:flex;flex-direction:column;gap:2px"></div>
 </div>
 
+<div class="card" id="rp-hw-card" hidden>
+  <h2>Hardware</h2>
+  <div class="sub">So belastet ist der Rechner gerade (Arbeitsspeicher, Last, Temperatur). Ein Schnappschuss beim Öffnen – „Aktualisieren“ misst neu.</div>
+  <div id="rp-hw" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px"></div>
+  <div id="rp-hw-note" class="muted" style="margin-top:8px"></div>
+</div>
+
 <div class="card" id="rp-now-card">
   <h2>Jetzt</h2>
   <div id="rp-now" class="muted"></div>
@@ -58,6 +65,22 @@ async function load() {
   $('rp-msg').textContent = `Stand ${r.generated.replace('T', ' ')} · Version ${r.version} · gestartet ${r.started ? r.started.replace('T', ' ') : '?'}`;
   $('rp-checks').innerHTML = r.checks.map((c, i) => `<div style="display:flex;gap:10px;padding:7px 10px;${i % 2 ? 'background:rgba(255,255,255,.04)' : ''}">
     <span>${ICON[c.status]}</span><div><b>${esc(c.title)}</b><div class="muted">${esc(c.detail)}</div></div></div>`).join('');
+  const hw = r.hardware;                          // Hardware-Monitor: Kacheln mit Balken (gruen / gelb / rot nach Schwellen aus hardware.py)
+  $('rp-hw-card').hidden = !hw;
+  if (hw) {
+    const col = p => p >= 85 ? '#e5544a' : p >= 60 ? '#f0a63c' : '#35c07a';
+    const tile = (label, val, sub, pct) => `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px"><div class="muted" style="font-size:12px">${label}</div><div style="font-size:20px;font-weight:700;margin:2px 0">${val}</div>`
+      + (pct == null ? '' : `<div style="height:6px;border-radius:3px;background:rgba(128,128,128,.25);overflow:hidden"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${col(pct)}"></div></div>`) + `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div></div>`;
+    const used = hw.mem_total_mb - hw.mem_avail_mb, upct = used / hw.mem_total_mb * 100;
+    const up = hw.uptime_s == null ? '–' : (Math.floor(hw.uptime_s / 86400) ? Math.floor(hw.uptime_s / 86400) + ' T ' : '') + Math.floor(hw.uptime_s % 86400 / 3600) + ' h ' + Math.floor(hw.uptime_s % 3600 / 60) + ' min';
+    $('rp-hw').innerHTML = tile('Arbeitsspeicher', `${hw.mem_avail_mb} MB frei`, `von ${hw.mem_total_mb} MB${hw.app_rss_mb != null ? ' · BlueNexus belegt ' + hw.app_rss_mb + ' MB' : ''}`, upct)
+      + (hw.load_per_core != null ? tile('Prozessor-Last', String(hw.load1).replace('.', ','), `${hw.cores} Kerne · 5 min ${String(hw.load5).replace('.', ',')} · 15 min ${String(hw.load15).replace('.', ',')}`, hw.load_per_core * 50) : '')
+      + (hw.temp_c != null ? tile('Temperatur', `${String(hw.temp_c).replace('.', ',')} °C`, 'Prozessor', (hw.temp_c - 30) / 55 * 100) : '')
+      + tile('Auslagerung (Swap)', hw.swap_total_mb ? `${hw.swap_used_mb} MB` : 'keine', hw.swap_total_mb ? `von ${hw.swap_total_mb} MB` : 'nicht eingerichtet', hw.swap_total_mb ? hw.swap_used_pct : null)
+      + (hw.disk_free_gb != null ? tile('Speicherplatz', `${String(hw.disk_free_gb).replace('.', ',')} GB frei`, 'am Ort der App', null) : '')
+      + tile('Läuft seit', up, hw.model ? esc(hw.model) : 'Rechner', null);
+    $('rp-hw-note').textContent = hw.power ? (hw.power.undervolt_now || hw.power.throttled_now ? '⚠️ Unterspannung/Drosselung gerade aktiv – Netzteil prüfen.' : hw.power.undervolt_ever || hw.power.throttled_ever ? 'Hinweis: Seit dem Start gab es Unterspannung/Drosselung (Netzteil prüfen).' : 'Stromversorgung unauffällig.') : '';
+  }
   const en = r.energy !== false;                 // ohne Modul Energie: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen
   $('rp-now-card').hidden = !en; $('rp-days-card').hidden = !en;
   const c = r.current || {};
