@@ -20,7 +20,7 @@
 
 <div class="card" id="rp-hw-card" hidden>
   <h2>Hardware</h2>
-  <div class="sub">So belastet ist der Rechner gerade (Arbeitsspeicher, Last, Temperatur). Ein Schnappschuss beim Öffnen – „Aktualisieren“ misst neu.</div>
+  <div class="sub">So belastet ist der Rechner gerade. Die Werte laufen live mit (alle 3 Sekunden) <span id="rp-hw-live" class="muted"></span></div>
   <div id="rp-hw" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px"></div>
   <div id="rp-hw-note" class="muted" style="margin-top:8px"></div>
 </div>
@@ -55,6 +55,50 @@ const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const ICON = { ok: '✅', warn: '⚠️', fail: '❌', info: 'ℹ️' };
 const f = (v, d = 1) => v == null ? '–' : Number(v).toFixed(d);
 let lastText = '';
+/* ---- Hardware-Monitor: Live-Werte + kleine Verlaufslinien der letzten ~3 Minuten (nur im Browser, nichts wird gespeichert) ---- */
+const HW_HIST = { cpu: [], mem: [] }, HW_MAX = 60;
+const dec = (v, d = 1) => v == null ? '–' : Number(v).toFixed(d).replace('.', ',');
+function hwSpark(arr, color) {
+  if (arr.length < 2) return '';
+  const pts = arr.map((v, i) => `${(i / (HW_MAX - 1) * 100).toFixed(1)},${(26 - Math.min(100, Math.max(0, v)) / 100 * 24).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 100 28" preserveAspectRatio="none" style="width:100%;height:28px;margin-top:6px;display:block"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function renderHw(hw) {
+  $('rp-hw-card').hidden = !hw;
+  if (!hw) return;
+  const col = (p, w = 60, r = 85) => p >= r ? '#e5544a' : p >= w ? '#f0a63c' : '#35c07a';
+  const help = txt => ` <span class="qhelp" role="button" tabindex="0" data-help="${esc(txt)}">?</span>`;
+  const tile = (label, val, sub, pct, spark, hlp, c) => `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px"><div class="muted" style="font-size:12px">${label}${hlp ? help(hlp) : ''}</div><div style="font-size:20px;font-weight:700;margin:2px 0">${val}</div>`
+    + (pct == null ? '' : `<div style="height:6px;border-radius:3px;background:rgba(128,128,128,.25);overflow:hidden"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${c || col(pct)};transition:width .4s"></div></div>`) + (spark || '') + `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div></div>`;
+  const used = hw.mem_total_mb - hw.mem_avail_mb, upct = used / hw.mem_total_mb * 100;
+  if (hw.cpu_pct != null) { HW_HIST.cpu.push(hw.cpu_pct); if (HW_HIST.cpu.length > HW_MAX) HW_HIST.cpu.shift(); }
+  HW_HIST.mem.push(upct); if (HW_HIST.mem.length > HW_MAX) HW_HIST.mem.shift();
+  const d = Math.floor(hw.uptime_s / 86400), up = hw.uptime_s == null ? '–' : (d ? d + ' T ' : '') + Math.floor(hw.uptime_s % 86400 / 3600) + ' h ' + Math.floor(hw.uptime_s % 3600 / 60) + ' min';
+  const cores = `${String(hw.cores).replace('.', ',')} ${hw.cores === 1 ? 'Kern' : 'Kernen'}`;
+  $('rp-hw').innerHTML =
+    (hw.cpu_pct != null ? tile('Prozessor-Auslastung', `${dec(hw.cpu_pct, 0)} %`, `bei ${cores}${hw.app_cpu_pct != null ? ' · davon BlueNexus ' + dec(hw.app_cpu_pct) + ' %' : ''}`, hw.cpu_pct, hwSpark(HW_HIST.cpu, col(hw.cpu_pct)),
+        'Wie viel von der zugewiesenen Rechenleistung gerade gebraucht wird. 100 % = alle Kerne voll ausgelastet. Kurze Spitzen sind normal; dauerhaft über 90 % wird es eng.') : '')
+    + tile('Arbeitsspeicher', `${hw.mem_avail_mb} MB frei`, `${used} von ${hw.mem_total_mb} MB belegt (${dec(upct, 0)} %)${hw.app_rss_mb != null ? ' · BlueNexus ' + hw.app_rss_mb + ' MB' : ''}`, upct, hwSpark(HW_HIST.mem, col(upct)),
+        'Frei ist der Speicher, den Programme noch bekommen können (inklusive dem, was Linux als Zwischenspeicher nutzt und sofort hergeben kann). Wird er knapp, lagert das System auf die Platte aus.')
+    + tile('Auslagerung (Swap)', hw.swap_total_mb ? `${hw.swap_used_mb} MB` : 'keine', hw.swap_total_mb ? `von ${hw.swap_total_mb} MB (${dec(hw.swap_used_pct, 0)} %)` : 'nicht eingerichtet', hw.swap_total_mb ? hw.swap_used_pct : null, '',
+        'Linux lagert selten gebrauchte Daten auf die Platte aus, um Arbeitsspeicher für Wichtigeres freizuhalten. Viel Auslagerung bei reichlich freiem Speicher ist harmlos (alte, ungenutzte Daten). Problematisch wird es nur, wenn zugleich der Arbeitsspeicher knapp ist.', hw.swap_total_mb ? col(hw.swap_used_pct, 50, 85) : null)
+    + (hw.temp_c != null ? tile('Temperatur', `${dec(hw.temp_c)} °C`, 'Prozessor', (hw.temp_c - 30) / 55 * 100, '', 'Ab etwa 80 °C bremst ein Raspberry Pi sich selbst. Normal sind 40–65 °C.') : '')
+    + (hw.load1 != null ? tile('Systemlast', dec(hw.load1, 2), `5 min ${dec(hw.load5, 2)} · 15 min ${dec(hw.load15, 2)}${hw.container ? ' · gilt für den ganzen Server' : ''}`, null, '',
+        'Durchschnittliche Zahl der Programme, die gerade rechnen oder auf Rechenzeit warten (letzte Minute). Faustregel: Liegt der Wert unter der Zahl der Kerne, ist alles in Ordnung.' + (hw.container ? ' Achtung: BlueNexus läuft hier in einem Container – diese Zahl gilt für den gesamten Server (alle Container zusammen), nicht nur für BlueNexus. Maßgeblich ist deshalb die Prozessor-Auslastung oben.' : '')) : '')
+    + (hw.disk_free_gb != null ? tile('Speicherplatz', `${dec(hw.disk_free_gb)} GB frei`, 'am Ort der App', null) : '')
+    + tile('Läuft seit', up, hw.model ? esc(hw.model) : (hw.container ? 'Container' : 'Rechner'), null);
+  $('rp-hw-note').textContent = hw.power ? (hw.power.undervolt_now || hw.power.throttled_now ? '⚠️ Unterspannung/Drosselung gerade aktiv – Netzteil prüfen.' : hw.power.undervolt_ever || hw.power.throttled_ever ? 'Hinweis: Seit dem Start gab es Unterspannung/Drosselung (Netzteil prüfen).' : 'Stromversorgung unauffällig.') : '';
+  $('rp-hw-live').textContent = '· zuletzt ' + new Date().toLocaleTimeString('de-DE');
+}
+let hwBusy = false;
+async function hwTick() {                          // nur solange die Seite sichtbar ist
+  if (document.hidden || hwBusy || $('rp-hw-card').hidden) return;
+  hwBusy = true;
+  try { const j = await (await fetch('/api/hardware')).json(); if (j.hardware) renderHw(j.hardware); } catch (e) { /* naechster Versuch in 3 s */ }
+  hwBusy = false;
+}
+setInterval(hwTick, 3000);
+
 async function load() {
   const days = $('rp-days').value;
   let r;
@@ -65,22 +109,7 @@ async function load() {
   $('rp-msg').textContent = `Stand ${r.generated.replace('T', ' ')} · Version ${r.version} · gestartet ${r.started ? r.started.replace('T', ' ') : '?'}`;
   $('rp-checks').innerHTML = r.checks.map((c, i) => `<div style="display:flex;gap:10px;padding:7px 10px;${i % 2 ? 'background:rgba(255,255,255,.04)' : ''}">
     <span>${ICON[c.status]}</span><div><b>${esc(c.title)}</b><div class="muted">${esc(c.detail)}</div></div></div>`).join('');
-  const hw = r.hardware;                          // Hardware-Monitor: Kacheln mit Balken (gruen / gelb / rot nach Schwellen aus hardware.py)
-  $('rp-hw-card').hidden = !hw;
-  if (hw) {
-    const col = p => p >= 85 ? '#e5544a' : p >= 60 ? '#f0a63c' : '#35c07a';
-    const tile = (label, val, sub, pct) => `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px"><div class="muted" style="font-size:12px">${label}</div><div style="font-size:20px;font-weight:700;margin:2px 0">${val}</div>`
-      + (pct == null ? '' : `<div style="height:6px;border-radius:3px;background:rgba(128,128,128,.25);overflow:hidden"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${col(pct)}"></div></div>`) + `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div></div>`;
-    const used = hw.mem_total_mb - hw.mem_avail_mb, upct = used / hw.mem_total_mb * 100;
-    const up = hw.uptime_s == null ? '–' : (Math.floor(hw.uptime_s / 86400) ? Math.floor(hw.uptime_s / 86400) + ' T ' : '') + Math.floor(hw.uptime_s % 86400 / 3600) + ' h ' + Math.floor(hw.uptime_s % 3600 / 60) + ' min';
-    $('rp-hw').innerHTML = tile('Arbeitsspeicher', `${hw.mem_avail_mb} MB frei`, `von ${hw.mem_total_mb} MB${hw.app_rss_mb != null ? ' · BlueNexus belegt ' + hw.app_rss_mb + ' MB' : ''}`, upct)
-      + (hw.load_per_core != null ? tile('Prozessor-Last', String(hw.load1).replace('.', ','), `${hw.cores} Kerne · 5 min ${String(hw.load5).replace('.', ',')} · 15 min ${String(hw.load15).replace('.', ',')}`, hw.load_per_core * 50) : '')
-      + (hw.temp_c != null ? tile('Temperatur', `${String(hw.temp_c).replace('.', ',')} °C`, 'Prozessor', (hw.temp_c - 30) / 55 * 100) : '')
-      + tile('Auslagerung (Swap)', hw.swap_total_mb ? `${hw.swap_used_mb} MB` : 'keine', hw.swap_total_mb ? `von ${hw.swap_total_mb} MB` : 'nicht eingerichtet', hw.swap_total_mb ? hw.swap_used_pct : null)
-      + (hw.disk_free_gb != null ? tile('Speicherplatz', `${String(hw.disk_free_gb).replace('.', ',')} GB frei`, 'am Ort der App', null) : '')
-      + tile('Läuft seit', up, hw.model ? esc(hw.model) : 'Rechner', null);
-    $('rp-hw-note').textContent = hw.power ? (hw.power.undervolt_now || hw.power.throttled_now ? '⚠️ Unterspannung/Drosselung gerade aktiv – Netzteil prüfen.' : hw.power.undervolt_ever || hw.power.throttled_ever ? 'Hinweis: Seit dem Start gab es Unterspannung/Drosselung (Netzteil prüfen).' : 'Stromversorgung unauffällig.') : '';
-  }
+  renderHw(r.hardware);
   const en = r.energy !== false;                 // ohne Modul Energie: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen
   $('rp-now-card').hidden = !en; $('rp-days-card').hidden = !en;
   const c = r.current || {};

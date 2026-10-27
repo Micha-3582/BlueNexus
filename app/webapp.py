@@ -36,6 +36,7 @@ import store
 import surplus
 import tuya
 import devicelog
+import hardware
 import homematic
 import perf
 import midea
@@ -218,7 +219,7 @@ def _deny(msg: str, code: int = 403):
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
 # Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
-                     "solar_log_page", "api_solar_log", "report_page", "api_report", "watchdog_page", "api_watchdog", "api_tunnel_log"}
+                     "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
 ENDPOINT_AREA = {
     "api_update_own_account": "account", "api_modules": "settings_system",
     "api_alexa": "smarthome_einrichten", "api_alexa_settings": "smarthome_einrichten", "api_alexa_add": "smarthome_einrichten", "api_alexa_modify": "smarthome_einrichten", "api_alexa_order": "smarthome_einrichten", "api_zigbee_gateways_order": "smarthome_einrichten",
@@ -229,7 +230,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4119,6 +4120,15 @@ def api_report():
     if request.args.get("format") == "md":
         return app.response_class(report.to_markdown(rep_), mimetype="text/plain; charset=utf-8")
     return jsonify(rep_)
+
+
+@app.route("/api/hardware", methods=["GET"])
+def api_hardware():
+    """Live-Werte des Hardware-Monitors (die Seite fragt alle paar Sekunden): Speicher, Prozessor-Auslastung, Temperatur ..."""
+    v = hardware.snapshot(live=True)
+    r = jsonify(hardware=v)
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 @app.route("/api/savings", methods=["GET"])

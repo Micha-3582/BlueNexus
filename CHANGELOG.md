@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.15.0 – 27.10.2026
+- Verbesserung: Der **Hardware-Monitor** läuft jetzt **live** (alle 3 Sekunden, solange der Betriebsbericht offen ist) und zeigt kleine Verlaufslinien der letzten Minuten.
+- Neu: echte **Prozessor-Auslastung** in % der zugewiesenen Kerne, dazu der Anteil von BlueNexus selbst. In Containern (z. B. Proxmox) war die „Last“ der Wert des ganzen Servers und wirkte deshalb zu hoch; sie steht jetzt als „Systemlast“ mit Erklärung und wird im Container nicht mehr bewertet.
+- Jede Kachel hat ein Fragezeichen mit Erklärung. Viel Auslagerung bei reichlich freiem Speicher löst keine Warnung mehr aus.
+
 ## 1.14.0 – 27.10.2026
 - Neu: **Hardware-Monitor** im Betriebsbericht (bei jeder Installation, auch ohne Energie): freier Arbeitsspeicher und Anteil von BlueNexus, Prozessor-Last, Temperatur, Auslagerung (Swap), Speicherplatz und Laufzeit als Kacheln mit Farbbalken, dazu die Prüfung „Hardware“ (Warnung bei knappem Speicher, Hitze, Überlast; beim Raspberry Pi auch Unterspannung/Drosselung). Erscheint auch im Text zum Kopieren. Ohne Linux-Werte (z. B. Entwicklung unter Windows) entfällt der Block.
 
