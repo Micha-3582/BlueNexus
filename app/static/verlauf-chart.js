@@ -80,7 +80,7 @@ window.VLChart = (function () {
     });
     var span = t1 - t0, grid = { color: GRIDC };
     var ZEROC = light ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.5)';
-    var ygrid = { color: function (c) { return c.tick && c.tick.value === 0 ? ZEROC : GRIDC; }, lineWidth: function (c) { return c.tick && c.tick.value === 0 ? 2 : 1; } };   // Nulllinie deutlicher
+    var ygrid = grid;
     var scales = {
       x: { type: 'linear', min: t0, max: t1, grid: grid, ticks: { color: TICK, maxRotation: 0, callback: function (v) { return fmtTick(v, span); } },
         afterBuildTicks: function (ax) { ax.ticks = niceTicks(ax.min, ax.max, Math.max(3, Math.min(10, Math.floor(ax.chart.width / 90)))); } },
@@ -121,6 +121,12 @@ window.VLChart = (function () {
         scales: scales
       },
       plugins: [{
+        id: 'zeroLine', beforeDatasetsDraw: function (chart) {     // Nulllinie der linken Achse deutlich zeichnen - unabhaengig davon, ob die Achse bei 0 eine Beschriftung hat
+          var y = chart.scales.y, a = chart.chartArea; if (!y || !(y.min < 0 && y.max > 0)) return;
+          var py = Math.round(y.getPixelForValue(0)) + 0.5, ctx = chart.ctx;
+          ctx.save(); ctx.strokeStyle = ZEROC; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke(); ctx.restore();
+        }
+      }, {
         id: 'zoomBox', afterDraw: function (chart) {            // Auswahlrechteck beim Aufziehen (Zoom)
           var s = chart._sel; if (!s) return;
           var a = chart.chartArea, x = Math.min(s.x0, s.x1), w = Math.abs(s.x1 - s.x0), ctx = chart.ctx;

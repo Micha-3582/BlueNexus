@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.12.3 – 27.10.2026
+- Fix: Die **Nulllinie** in den Diagrammen wird jetzt immer gezeichnet, auch wenn die Achse bei 0 keine Beschriftung hat (z. B. −500 / 500 / 1.500).
+
 ## 1.12.2 – 27.10.2026
 - Verbesserung: In den Diagrammen ist die **Nulllinie** jetzt deutlich stärker und heller gezeichnet, damit Bezug und Einspeisung besser zu unterscheiden sind.
 
