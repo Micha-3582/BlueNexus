@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.23.1 – 27.10.2026
+- Verbesserung: In *Verläufe → Datenreihen* hebt sich der Bereich zum **Hinzufügen** jetzt deutlich von der Liste ab (blau umrandete Fläche mit Überschrift „Neue Datenreihe hinzufügen“, farbiger Knopf „Aufzeichnen“); die Liste darunter hat eine eigene Überschrift „Das wird aufgezeichnet (Anzahl)“.
+
 ## 1.23.0 – 27.10.2026
 - Neu: **Meldungen für Funkthermometer** per Telegram/Pushover: „meldet sich nicht mehr“ (nach 3 verpassten Meldungen, mit Meldung beim Wiederkommen) und „Batterie bald wechseln“ (zweimal in Folge unter 3,0 V, nur mit verdrahteter Batteriemessung). Beides in den Einstellungen unter Meldungen einzeln abschaltbar.
 - Der Knopf „Etikett“ ist jetzt auch am PC zu sehen und erklärt dort, dass das Drucken am Android-Handy geht (vorher war er am PC ausgeblendet).

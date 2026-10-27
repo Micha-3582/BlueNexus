@@ -16,6 +16,9 @@
   .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .vl-canvas { position: relative; height: 280px; }
   .vl-empty { color: var(--muted); padding: 40px 0; text-align: center; position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+  .vl-add { margin-top: 4px; padding: 14px 16px; border: 1px solid #4b9be6; border-left-width: 5px; border-radius: 12px; background: rgba(75,155,230,.10); }
+  .vl-add-h { font-weight: 700; font-size: 16px; color: #4b9be6; }
+  .vl-list-h { margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 2px solid var(--border); font-weight: 700; font-size: 15px; }
   .vl-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
   .vl-table td { padding: 6px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
   .vl-modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
@@ -42,13 +45,17 @@
   <div class="muted" id="vl-note" style="margin-top:8px"></div>
 
   <div id="vl-manage-box" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-    <div class="muted" style="margin-bottom:8px">Was aufgezeichnet wird <span class="qhelp" role="button" tabindex="0" data-help="Aufgezeichnet wird nur, was hier steht. Rohwerte in der gewählten Abtastzeit bleiben 7 Tage erhalten, dazu gibt es eine Minuten-Zusammenfassung (Mittel, Min, Max) für ein Jahr. Wird eine Reihe entfernt, bleiben ihre Werte erhalten und schließen wieder an, wenn du sie neu anlegst.">?</span></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <select id="vl-src" style="flex:1;min-width:240px"></select>
-      <select id="vl-iv" style="width:auto"></select>
-      <input id="vl-label" placeholder="Name (optional)" maxlength="60" style="flex:1;min-width:160px">
-      <button class="ghost" id="vl-series-add">Aufzeichnen</button>
+    <div class="vl-add">
+      <div class="vl-add-h">＋ Neue Datenreihe hinzufügen</div>
+      <div class="muted" style="margin:2px 0 10px">Messwert auswählen, Abtastzeit wählen, bei Bedarf einen Namen geben und auf <b>Aufzeichnen</b> klicken – er erscheint danach in der Liste darunter.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <select id="vl-src" style="flex:1;min-width:240px"></select>
+        <select id="vl-iv" style="width:auto"></select>
+        <input id="vl-label" placeholder="Name (optional)" maxlength="60" style="flex:1;min-width:160px">
+        <button id="vl-series-add">Aufzeichnen</button>
+      </div>
     </div>
+    <div class="vl-list-h">Das wird aufgezeichnet <span id="vl-list-count" class="muted"></span> <span class="qhelp" role="button" tabindex="0" data-help="Aufgezeichnet wird nur, was hier steht. Rohwerte in der gewählten Abtastzeit bleiben 7 Tage erhalten, dazu gibt es eine Minuten-Zusammenfassung (Mittel, Min, Max) für ein Jahr. Wird eine Reihe entfernt, bleiben ihre Werte erhalten und schließen wieder an, wenn du sie neu anlegst.">?</span></div>
     <table class="vl-table" id="vl-series-table"></table>
     <div class="muted" id="vl-stats" style="margin-top:8px"></div>
   </div>
@@ -333,6 +340,7 @@ async function loadSeries() {
 function ivLabel(s) { return s < 60 ? s + ' s' : s / 60 + ' min'; }
 function renderSeriesTable() {
   const t = $('vl-series-table'), list = Object.values(SERIES);
+  $('vl-list-count').textContent = '(' + list.length + ')';
   const ivs = (CATALOG && CATALOG.intervals) || [5, 10, 30, 60, 300];
   t.innerHTML = list.length ? list.map(s => `<tr data-id="${esc(s.id)}"><td><input value="${esc(s.label)}" maxlength="60" onchange="seriesPatch('${esc(s.id)}', { label: this.value })"></td>
       <td style="white-space:nowrap"><select style="width:auto" onchange="seriesPatch('${esc(s.id)}', { interval_s: +this.value })">${ivs.map(i => `<option value="${i}" ${i === s.interval_s ? 'selected' : ''}>alle ${ivLabel(i)}</option>`).join('')}</select></td>
