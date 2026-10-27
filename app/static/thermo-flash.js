@@ -162,11 +162,13 @@
       });
     }).then(function () {
       steps(3, 'ok'); steps(4, 'ok'); steps(5, 'run');
-      return runApp(session);
-    }).then(function () {
-      steps(5, 'ok'); return session.transport.disconnect().catch(function () {});
-    }).then(function () {
-      steps(6, 'run', 'bis zu 60 Sekunden – tut sich nichts, die RESET-Taste am Board drücken'); return waitFirst(created.device.id, 60);
+      return autoRestart(session, created.device.id);
+    }).then(function (r) {
+      steps(5, 'ok', r.device ? 'automatisch (' + r.how + ')' : 'nicht automatisch – bitte jetzt die RESET-Taste am Board drücken');
+      return session.transport.disconnect().catch(function () {}).then(function () { return r; });
+    }).then(function (r) {
+      if (r.device) { steps(6, 'ok'); return r.device; }
+      steps(6, 'run', 'bitte jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden'); return waitFirst(created.device.id, 60);
     }).then(function (dev) {
       steps(6, 'ok');
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
@@ -187,14 +189,31 @@
       });
     });
   }
-  /* Neustart ins Programm: Beim eingebauten USB-Anschluss des ESP32-C3 (USB-Serial/JTAG) reicht "RTS loslassen" nicht - der Chip muss zuerst mit RTS=an in den Reset gezogen werden
-     (DTR=aus haelt den Boot-Pin hoch = normaler Start) und wird danach losgelassen. Ohne das bleibt er nach dem Flashen im Download-Modus stehen, bis man das USB-Kabel zieht. */
+  /* Neustart ins Programm nach dem Flashen. Beim eingebauten USB-Anschluss des ESP32-C3 (USB-Serial/JTAG) bleibt der Chip je nach Board und Treiber im Download-Modus stehen;
+     deshalb mehrere Verfahren nacheinander, nach jedem prueft BlueNexus, ob sich das Thermometer meldet (es meldet sich 1-20 s nach dem Start). Das erste, das wirkt, wird angezeigt.
+     Klappt keins, bleibt die RESET-Taste am Board. */
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function runApp(session) {
-    var tr = session.transport;
-    return tr.setDTR(false).then(function () { return tr.setRTS(true); }).then(function () { return sleep(200); })
-      .then(function () { return tr.setRTS(false); }).then(function () { return sleep(150); })
-      .catch(function () {}).then(function () { return session.loader.after('hard_reset').catch(function () {}); });
+  function seen(id) { return api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) { return j.device && j.device.last_seen != null ? j.device : null; }).catch(function () { return null; }); }
+  function pollSeen(id, secs) {
+    var t0 = Date.now();
+    return (function next() {
+      return seen(id).then(function (d) { if (d) return d; if (Date.now() - t0 > secs * 1000) return null; return sleep(1500).then(next); });
+    })();
+  }
+  function autoRestart(session, id) {
+    var tr = session.transport, ld = session.loader;
+    var tries = [
+      ['RTS-Reset', function () { return tr.setDTR(false).then(function () { return tr.setRTS(true); }).then(function () { return sleep(200); }).then(function () { return tr.setRTS(false); }); }],
+      ['Soft-Reset', function () { return ld.softReset(false); }],
+      ['Hard-Reset (Bibliothek)', function () { return ld.after('hard_reset'); }]
+    ];
+    return (function run(i) {
+      if (i >= tries.length) return Promise.resolve({ device: null, how: '' });
+      steps(5, 'run', 'Verfahren ' + (i + 1) + ' von ' + tries.length + ': ' + tries[i][0] + ' – bitte noch nichts drücken (das Thermometer meldet sich 1 bis 20 s nach dem Start)');
+      return Promise.race([Promise.resolve().then(tries[i][1]).catch(function () {}), sleep(4000)]).then(function () { return pollSeen(id, 18); })      /* haengt ein Verfahren (Chip startet mitten im Befehl neu), nach 4 s weiter */.then(function (d) {
+        return d ? { device: d, how: tries[i][0] } : run(i + 1);
+      });
+    })(0);
   }
   function waitFirst(id, secs) {
     var t0 = Date.now(), hinted = false;
