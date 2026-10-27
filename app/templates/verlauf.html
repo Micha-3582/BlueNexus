@@ -39,14 +39,14 @@
     </span>
     <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
     <button type="button" class="ghost" id="vl-zoomback" style="display:none" title="Zum vorherigen Zeitraum zurück (oder Doppelklick ins Diagramm)">↩ Zoom zurück</button>
+    <button type="button" class="ghost" id="vl-manage" style="display:none" title="Festlegen, welche Messwerte aufgezeichnet werden (Sensoren, Leistung, Preise …)">⚙ Messwerte</button>
     <button type="button" class="ghost" id="vl-add-chart" style="display:none">＋ Diagramm</button>
-    <button type="button" class="ghost" id="vl-manage" style="display:none">⚙ Datenreihen</button>
   </div>
   <div class="muted" id="vl-note" style="margin-top:8px"></div>
 
   <div id="vl-manage-box" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
     <div class="vl-add">
-      <div class="vl-add-h">＋ Neue Datenreihe hinzufügen</div>
+      <div class="vl-add-h">＋ Neuen Messwert hinzufügen</div>
       <div class="muted" style="margin:2px 0 10px">Messwert auswählen, Abtastzeit wählen, bei Bedarf einen Namen geben und auf <b>Aufzeichnen</b> klicken – er erscheint danach in der Liste darunter.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <select id="vl-src" style="flex:1;min-width:240px"></select>
@@ -168,7 +168,7 @@ function renderCharts() {
   Object.values(INST).forEach(ch => ch.destroy()); INST = {};
   const box = $('vl-charts');
   box.innerHTML = CHARTS.length ? CHARTS.map(chartCard).join('')
-    : `<div class="card vl-chart muted">${Object.keys(SERIES).length ? 'Noch kein Diagramm angelegt.' : 'Noch nichts aufgezeichnet.'} ${IS_ADMIN ? 'Mit „⚙ Datenreihen“ wählst du aus, was aufgezeichnet wird, mit „＋ Diagramm“ legst du ein Diagramm an.' : 'Ein Administrator legt fest, was aufgezeichnet und angezeigt wird.'}</div>`;
+    : `<div class="card vl-chart muted">${Object.keys(SERIES).length ? 'Noch kein Diagramm angelegt.' : 'Noch nichts aufgezeichnet.'} ${IS_ADMIN ? 'Mit „⚙ Messwerte“ wählst du aus, was aufgezeichnet wird, mit „＋ Diagramm“ legst du ein Diagramm an.' : 'Ein Administrator legt fest, was aufgezeichnet und angezeigt wird.'}</div>`;
   loadAll(true);
 }
 async function loadChartData(c) {
@@ -303,7 +303,7 @@ async function saveCharts() {
 }
 async function chartDialog(c) {
   const list = Object.values(SERIES);
-  if (!list.length) { toast('Zuerst unter „⚙ Datenreihen“ etwas zum Aufzeichnen wählen', true); return; }
+  if (!list.length) { toast('Zuerst unter „⚙ Messwerte“ etwas zum Aufzeichnen wählen', true); return; }
   const { box, close } = await modal(c ? 'Diagramm bearbeiten' : 'Neues Diagramm',
     `<label>Titel <span class="qhelp" role="button" tabindex="0" data-help="Überschrift des Diagramms, z. B. „aktueller Stromverbrauch in Watt“.">?</span></label><input id="vd-title" maxlength="60" value="${esc(c ? c.title : '')}" placeholder="z. B. aktueller Stromverbrauch in Watt">
      <label style="margin-top:12px">Darstellung <span class="qhelp" role="button" tabindex="0" data-help="Linie, Fläche, Balken, Stufen und weitere Arten. Balken zeigen den Mittelwert je Zeitabschnitt, Stufen halten den Wert bis zur nächsten Änderung.">?</span></label>
@@ -329,7 +329,7 @@ window.deleteChart = async id => {
 };
 $('vl-add-chart').addEventListener('click', () => chartDialog(null));
 
-/* ---------------- Datenreihen verwalten (Admin) ---------------- */
+/* ---------------- Messwerte verwalten (Admin) ---------------- */
 async function loadSeries() {
   const [s, c] = await Promise.all([api('/api/verlauf/series'), api('/api/verlauf/charts')]);
   SERIES = {}; s.series.forEach(x => { SERIES[x.id] = x; }); CHARTS = c.charts;

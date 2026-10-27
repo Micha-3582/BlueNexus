@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.23.2 – 27.10.2026
+- Änderung: In den Verläufen heißt „⚙ Datenreihen“ jetzt **„⚙ Messwerte“** („Neuen Messwert hinzufügen“), und der Knopf steht **vor** „＋ Diagramm“ (erst die Messwerte festlegen, dann das Diagramm anlegen).
+
 ## 1.23.1 – 27.10.2026
 - Verbesserung: In *Verläufe → Datenreihen* hebt sich der Bereich zum **Hinzufügen** jetzt deutlich von der Liste ab (blau umrandete Fläche mit Überschrift „Neue Datenreihe hinzufügen“, farbiger Knopf „Aufzeichnen“); die Liste darunter hat eine eigene Überschrift „Das wird aufgezeichnet (Anzahl)“.
 
