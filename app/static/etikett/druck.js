@@ -2,6 +2,7 @@
  * Etikett mit QR-Code und Namen auf einem Niimbot-Drucker (D110 / D110_M) drucken – Fenster für „NFC + QR“.
  * Braucht qrcode.js, niimbot.js, label.js (gleicher Ordner). Wird erst beim ersten Klick geladen.
  * Aufruf: EtikettDruck.open({ name: 'Garagentor', url: 'https://…/nfc/…' })
+ * Optional: sub (kleine zweite Zeile unter dem Namen), title (Fenstertitel), intro (Erklärtext) - z. B. für Funkthermometer-Etiketten.
  */
 (function (root) {
   'use strict';
@@ -29,10 +30,10 @@
   const lengthDots = () => Label.lengthDots(S.size === 'custom' ? Math.max(10, Math.min(80, Number(S.customMm) || 30)) : SIZES[S.size].mm);
 
   /** Etikett zeichnen; der QR-Code soll mindestens 2 Druckpunkte je Modul haben – sonst mit niedrigerer Fehlerkorrektur, sonst gesperrt. */
-  function build(name, url) {
+  function build(name, url, sub) {
     let r;
     for (const ecc of ['M', 'L']) {
-      r = Label.renderLabel({ link: url, name, lengthDots: lengthDots(), headDots: Label.HEAD_DOTS, layout: S.layout, ecc, quiet: 2, maxFont: 36 });
+      r = Label.renderLabel({ link: url, name, sub, lengthDots: lengthDots(), headDots: Label.HEAD_DOTS, layout: S.layout, ecc, quiet: 2, maxFont: 36 });
       if (r.info.qr && !r.info.qr.error && r.info.qr.moduleDots >= 2) break;
     }
     const q = r.info.qr;
@@ -46,12 +47,12 @@
   function open(opts) {
     const st = support();
     if (!st.ok) { if (root.uiAlert) root.uiAlert(st.text, 'Drucken hier nicht möglich'); return; }
-    const tagName = opts.name || 'Tag', url = opts.url;
+    const tagName = opts.name || 'Tag', url = opts.url, subLine = opts.sub || '';
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-start;justify-content:center;z-index:1000;padding:16px;overflow:auto';
     ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:440px;margin:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)">
-      <h3 style="margin:0 0 4px;font-size:18px">🏷 QR-Etikett drucken</h3>
-      <div class="muted" style="margin-bottom:12px">QR-Code und Name für den Tag „${esc(tagName)}“ (derselbe Link wie auf dem NFC-Tag).</div>
+      <h3 style="margin:0 0 4px;font-size:18px">${esc(opts.title || '🏷 QR-Etikett drucken')}</h3>
+      <div class="muted" style="margin-bottom:12px">${esc(opts.intro || ('QR-Code und Name für den Tag „' + tagName + '“ (derselbe Link wie auf dem NFC-Tag).'))}</div>
       <div style="background:#fff;border-radius:6px;padding:8px;display:inline-block;max-width:100%;overflow:auto"><canvas id="etk-prev" style="display:block;image-rendering:pixelated;max-width:100%;height:auto"></canvas></div>
       <div class="muted" id="etk-info" style="margin:6px 0 10px"></div>
       <label style="display:block;margin:8px 0 3px">Etikettengröße im Drucker</label>
@@ -84,7 +85,7 @@
     function preview() {
       $('etk-size').value = S.size; $('etk-layout').value = S.layout; $('etk-mm').value = S.customMm;
       $('etk-custom').style.display = S.size === 'custom' ? '' : 'none';
-      const r = build(tagName, url), c = $('etk-prev');
+      const r = build(tagName, url, subLine), c = $('etk-prev');
       c.width = r.canvas.width; c.height = r.canvas.height; c.getContext('2d').drawImage(r.canvas, 0, 0);
       c.style.width = (r.canvas.width * 3) + 'px';
       const q = r.info.qr, bits = ['Etikett ' + (r.canvas.width / 8).toFixed(0) + ' × 12 mm'];
@@ -134,7 +135,7 @@
         const flow = flowFor(printer.device.name), run = flow === 'v4' ? printer.printV4.bind(printer) : printer.printLegacy.bind(printer);
         log('Ablauf: ' + (flow === 'v4' ? 'D110_M / V4' : 'älterer D110') + ' (Drucker „' + (printer.device.name || '?') + '“)');
         say('Drucke …');
-        const res = await run(Label.toPrintCanvas(build(tagName, url).canvas, 'cw'), { density: 3, copies: 1, rowDelay: 6, onProgress: (p) => { $('etk-bar').style.width = Math.round(p * 100) + '%'; } });
+        const res = await run(Label.toPrintCanvas(build(tagName, url, subLine).canvas, 'cw'), { density: 3, copies: 1, rowDelay: 6, onProgress: (p) => { $('etk-bar').style.width = Math.round(p * 100) + '%'; } });
         $('etk-bar').style.width = '100%';
         if (res && res.ok) say('Fertig. Etikett aus dem Drucker ziehen.', 'ok');
         else say('Gesendet, aber der Drucker hat nicht alles bestätigt. Kam kein Etikett, bitte noch einmal drucken oder unter „Hilfe bei Problemen“ nachsehen.', 'warn');

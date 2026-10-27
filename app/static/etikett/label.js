@@ -1,4 +1,5 @@
-/* Kopie aus dem Testprojekt Etikettendruck-Test (Micha-3582/Etikettendruck-Test), Stand 17.10.2026. Änderungen bitte dort testen und hierher kopieren. */
+/* Kopie aus dem Testprojekt Etikettendruck-Test (Micha-3582/Etikettendruck-Test), Stand 17.10.2026. Änderungen bitte dort testen und hierher kopieren.
+   Abweichung in BlueNexus (27.10.2026): optionale zweite, kleine Zeile `sub` unter dem Namen (Funkthermometer: Geräte-ID) - bei Übernahme ins Testprojekt dort nachziehen. */
 /*
  * Etikett zeichnen: QR-Code + Name, in Lesrichtung (quer) – danach für den Druck um 90° gedreht.
  * Maße: 203 dpi = ca. 8 Punkte je mm; der Druckkopf des D110 hat 96 Punkte (= 12 mm).
@@ -97,11 +98,18 @@
       Object.assign(info, { qr: q });
     }
     if (textBox && o.name) {
-      const f = fitText(ctx, o.name, textBox.w, box, o.maxFont || 36, 9);
-      const totalH = f.lines.length * f.lineH, y0 = pad + Math.floor((box - totalH) / 2);
+      let subH = 0, sub = null;
+      if (o.sub) {                                               // kleine Zeile unter dem Namen (eine Zeile, Schrift so gross wie moeglich bis 14 Punkte)
+        let sz = 14;
+        for (; sz >= 8; sz--) { ctx.font = 'bold ' + sz + 'px ' + FONT; if (ctx.measureText(o.sub).width <= textBox.w) break; }
+        sub = { text: String(o.sub), size: sz }; subH = Math.round(sz * 1.2) + 4;
+      }
+      const f = fitText(ctx, o.name, textBox.w, box - subH, o.maxFont || 36, 9);
+      const totalH = f.lines.length * f.lineH + subH, y0 = pad + Math.floor((box - totalH) / 2);
       ctx.fillStyle = '#000';
       f.lines.forEach((l, i) => ctx.fillText(l, textBox.x, y0 + i * f.lineH));
-      info.text = { size: f.size, lines: f.lines.length, tooBig: !!f.tooBig };
+      if (sub) { ctx.font = 'bold ' + sub.size + 'px ' + FONT; ctx.fillText(sub.text, textBox.x, y0 + f.lines.length * f.lineH + 4); }
+      info.text = { size: f.size, lines: f.lines.length, tooBig: !!f.tooBig, sub: sub ? sub.size : 0 };
     }
     if (o.border) { ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1); }
     return { canvas: cv, info };

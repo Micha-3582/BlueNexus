@@ -145,7 +145,8 @@
 <div class="card" id="thermo-card" data-tab="system" data-area="settings_system">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Funkthermometer (ESP32) <span class="qhelp" role="button" tabindex="0" data-help="Selbstgebautes Batterie-Thermometer mit ESP32-C3. Hier gibst du das WLAN ein, BlueNexus spielt die Firmware per USB auf die Platine und verbindet sie – danach erscheinen Temperatur, Luftfeuchte, Batterie und Funkstärke bei den Sensoren.">?</span></h2>
   <div class="sub">Thermometer einrichten (USB anstecken, einmalig anlernen) und den ESP32 bei Bedarf löschen.</div>
-  <div id="th-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+  <div id="th-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
+  <div id="th-etk-hint" class="muted" style="margin-bottom:14px;font-size:13px"></div>
   <div id="th-warn" class="muted" style="display:none;border:1px solid #f0a030;border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
   <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
@@ -3798,7 +3799,7 @@ let etikettLoading = null;
 function etikettLoad() {
   if (window.EtikettDruck) return Promise.resolve();
   if (!etikettLoading) etikettLoading = ['qrcode.js', 'niimbot.js', 'label.js', 'druck.js'].reduce((p, f) => p.then(() => new Promise((ok, fail) => {
-    const s = document.createElement('script'); s.src = '/static/etikett/' + f + '?v=1'; s.onload = ok; s.onerror = () => fail(new Error(f)); document.head.appendChild(s);
+    const s = document.createElement('script'); s.src = '/static/etikett/' + f + '?v={{ asset_v }}'; s.onload = ok; s.onerror = () => fail(new Error(f)); document.head.appendChild(s);
   })), Promise.resolve()).catch(e => { etikettLoading = null; throw e; });
   return etikettLoading;
 }

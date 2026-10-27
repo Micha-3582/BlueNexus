@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.20.0 – 27.10.2026
+- Neu: **Etikett fürs Thermometer-Gehäuse.** Der Knopf „Etikett“ am Funkthermometer druckt auf dem Niimbot-Drucker ein Etikett mit Namen, Geräte-ID und QR-Code (Android-Handy, Chrome, https – wie bei den NFC-Tags). Der QR-Code öffnet das Thermometer in BlueNexus (Zeile wird hervorgehoben).
+- Das Etikettenfenster unterstützt eine kleine zweite Zeile unter dem Namen sowie eigene Titel und Erklärtexte (für weitere Verwendungen).
+
 ## 1.19.0 – 27.10.2026
 - Neu: **Abgleichen (Kalibrieren)** beim Funkthermometer: Referenz-Temperatur und/oder -Luftfeuchte eintragen, BlueNexus rechnet den Korrekturwert aus und wendet ihn auf alle künftigen Messungen an (Sensoren, Regeln, Diagramme). Nur mit frischer Messung (höchstens 5 Minuten; RESET-Taste am Thermometer misst sofort neu), mit Plausibilitätsgrenzen (±10 °C, ±30 %) und „Abgleich löschen“. Die Liste zeigt den Korrekturwert.
 

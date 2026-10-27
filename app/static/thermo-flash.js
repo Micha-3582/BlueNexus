@@ -40,13 +40,15 @@
   function renderList() {
     var el = $('th-list');
     if (!state.devices.length) { el.innerHTML = '<div class="muted">Noch kein Thermometer eingerichtet.</div>'; return; }
+    var etk = typeof etikettState === 'function' ? etikettState() : { kind: 'other', text: '' };
     el.innerHTML = state.devices.map(function (d) {
       var l = d.last || {}, bat = l.bat, bstate = bat == null || bat < 1 ? '' : (bat > 3.1 ? 'ok' : (bat < 3.0 ? 'low' : 'warn'));
       var batTxt = bstate === '' ? '' : ' · Batterie ' + dec(bat, 2) + ' V' + (bstate === 'low' ? ' – bald wechseln' : '');
-      return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
+      return '<div data-row="' + esc(d.id) + '" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + calTxt(d) + '</div></div>'
+        + (etk.kind === 'other' ? '' : '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot, am Android-Handy)">Etikett</button>')
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
         + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
@@ -58,11 +60,21 @@
     if (c.hum != null) p.push((c.hum > 0 ? '+' : '') + dec(c.hum, 1) + ' %');
     return p.length ? ' · Abgleich ' + p.join(' / ') : '';
   }
+  var focused = false;
+  function focusFromLink() {                                  // QR-Code vom Etikett: /admin?thermo=<ID>#system -> Zeile hervorheben
+    if (focused) return;
+    var id = new URLSearchParams(location.search).get('thermo'); if (!id) return;
+    focused = true;
+    var row = card.querySelector('[data-row="' + id.replace(/[^a-z0-9-]/gi, '') + '"]');
+    card.scrollIntoView({ block: 'start' });
+    if (row) { row.style.outline = '2px solid #f0a63c'; row.scrollIntoView({ block: 'center' }); setTimeout(function () { row.style.outline = ''; }, 5000); }
+    else msg('Dieses Thermometer gibt es nicht (mehr).', true);
+  }
   function load() {
     return api('/api/thermo').then(function (j) {
       state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure; state.wifi = j.wifi || state.wifi; applyWifi();
       if (!$('th-server').value) $('th-server').value = state.server;
-      renderList(); checkEnv();
+      renderList(); checkEnv(); labelHint(); focusFromLink();
     }).catch(function (e) { msg(e.message, true); });
   }
 
@@ -260,6 +272,22 @@
     return o;
   }
 
+  /* ---------------- Etikett fuers Gehaeuse (Niimbot, Code in /static/etikett/) ---------------- */
+  function printLabel(d) {
+    var es = etikettState();
+    if (!es.ok) { uiAlert(es.text, 'Drucken hier nicht möglich'); return; }
+    etikettLoad().then(function () {
+      var base = (typeof nfcBase === 'function' ? nfcBase() : location.origin).replace(/\/$/, '');
+      EtikettDruck.open({ title: '🏷 Thermometer-Etikett drucken', intro: 'Name, ID und QR-Code für „' + d.name + '“ – zum Aufkleben auf das Gehäuse. Der QR-Code öffnet dieses Thermometer in BlueNexus (nur für Administratoren).',
+        name: d.name, sub: d.id, url: base + '/admin?thermo=' + encodeURIComponent(d.id) + '#system' });
+    }).catch(function (e) { uiAlert('Das Druckfenster konnte nicht geladen werden (' + e.message + '). Bitte die Seite neu laden.', 'Drucken nicht möglich'); });
+  }
+  function labelHint() {
+    var el = $('th-etk-hint'); if (!el) return;
+    var es = typeof etikettState === 'function' ? etikettState() : null;
+    el.textContent = state.devices.length && es ? (es.ok ? '🏷 Etikett mit Namen, ID und QR-Code für das Gehäuse: „Etikett“ am Thermometer (Niimbot-Drucker, per Bluetooth).' : 'ℹ Etiketten für das Gehäuse drucken geht am Android-Handy (Chrome, https): BlueNexus dort öffnen und „Etikett“ am Thermometer drücken.') : '';
+  }
+
   /* ---------------- Abgleich (Kalibrieren) ---------------- */
   function calibrate(d) {
     var raw = d.raw || {}, age = d.age_s;
@@ -288,6 +316,8 @@
       });
     } else if (b.dataset.act === 'calib') {
       calibrate(d);
+    } else if (b.dataset.act === 'label') {
+      printLabel(d);
     } else if (b.dataset.act === 'del') {
       uiDialog({ title: 'Thermometer entfernen?', okText: 'Entfernen', message: '„' + (d.name || id) + '“ und seine Sensoren werden aus BlueNexus entfernt (Regeln und Diagramme, die sie benutzen, verlieren den Sensor). Am Chip selbst ändert sich nichts – dafür „ESP32 löschen“.' }).then(function (ok) {
         if (!ok) return;
