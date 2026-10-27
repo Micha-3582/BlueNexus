@@ -79,10 +79,12 @@ window.VLChart = (function () {
         stepped: (bin || step || kind === 'step') ? 'before' : false, yAxisID: ax, spanGaps: false, barPercentage: 0.9, categoryPercentage: 0.9 });
     });
     var span = t1 - t0, grid = { color: GRIDC };
+    var ZEROC = light ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.5)';
+    var ygrid = { color: function (c) { return c.tick && c.tick.value === 0 ? ZEROC : GRIDC; }, lineWidth: function (c) { return c.tick && c.tick.value === 0 ? 2 : 1; } };   // Nulllinie deutlicher
     var scales = {
       x: { type: 'linear', min: t0, max: t1, grid: grid, ticks: { color: TICK, maxRotation: 0, callback: function (v) { return fmtTick(v, span); } },
         afterBuildTicks: function (ax) { ax.ticks = niceTicks(ax.min, ax.max, Math.max(3, Math.min(10, Math.floor(ax.chart.width / 90)))); } },
-      y: { position: 'left', beginAtZero: isBar || stacked, stacked: stacked, grid: grid, ticks: { color: TICK }, title: { display: !!real[0], text: real[0] || '', color: TICK } }
+      y: { position: 'left', beginAtZero: isBar || stacked, stacked: stacked, grid: ygrid, ticks: { color: TICK }, title: { display: !!real[0], text: real[0] || '', color: TICK } }
     };
     if (real.length > 1) scales.y1 = { position: 'right', beginAtZero: isBar || stacked, stacked: stacked, grid: { drawOnChartArea: false }, ticks: { color: TICK }, title: { display: true, text: real.slice(1).join(' / '), color: TICK } };
     if (units.indexOf('__b') >= 0) scales.yb = { display: false, min: -0.05, max: 1.05 };
