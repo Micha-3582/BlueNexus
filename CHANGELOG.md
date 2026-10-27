@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.13.2 – 27.10.2026
+- Fix: Der **Betriebsbericht** zeigt ohne das Modul Energie nichts mehr aus der Energie-Regelung: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen, keine Durchlauf-Fehler/Unterbrechungen, keine Regler-Einstellungen und keine Energie-Ereignisse. Auch der Text zum Kopieren ist entsprechend kürzer.
+- Fix: Beschreibungen unter *Betriebsbericht* und *Pushover* erwähnen Regelung, Preise und Kamerabild nur noch, wenn das jeweilige Modul eingeschaltet ist.
+- Fix: Die Sichtbarkeits-Übersicht in der Benutzerverwaltung listet Geräte/Schalter/Sensoren nur mit Modul Smart Home und Kameras nur mit Modul Kameras.
+
 ## 1.13.1 – 27.10.2026
 - Verbesserung: Das **PIN-Feld** bleibt nach der vierten Ziffer kurz offen und zeigt das Ergebnis: „Wird gesendet …“, dann ein **grüner Haken** mit „Befehl angenommen“ bzw. ein rotes Kreuz mit der Fehlermeldung; danach blendet es sich selbst aus. Gilt für Geräte, eigene Schalter/Knöpfe und Wake-on-LAN (Dashboard, Favoriten, Smart Home).
 

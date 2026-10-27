@@ -179,8 +179,8 @@
 </div>
 
 <div class="card" id="report-admin">
-  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.">?</span></h2>
-  <div class="sub">Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.</div>
+  <h2><svg class="h2i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="{% if modules.energy %}Zeigt, ob die Regelung sauber läuft und Prognose, Preise und Daten vollständig sind – mit Tagestabelle und Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung. Die Tageszusammenfassung per Telegram enthält eine Kurzfassung.{% else %}Zeigt, ob die App sauber läuft (Neustarts, Sicherungen, Speicherplatz, Meldungen, Regeln) – mit Ereignisprotokoll. Per Klick als Text kopierbar, z. B. zur gemeinsamen Auswertung.{% endif %}">?</span></h2>
+  <div class="sub">{% if modules.energy %}Zustand von Regelung, Prognose, Preisen und Daten auf einen Blick.{% else %}Zustand der App und ihrer Dienste auf einen Blick.{% endif %}</div>
   {% if user_role == 'admin' %}<a href="/report"><button type="button" class="ghost">📋 Betriebsbericht öffnen</button></a>{% endif %}
 </div>
 
@@ -570,8 +570,8 @@
 </div>
 
 <div class="card" id="pushover-admin">
-  <h2><svg class="h2i" style="color:#1185fe" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M9.5 17V7.5h3.2a2.9 2.9 0 0 1 0 5.8H9.5"/></svg>Pushover <span class="qhelp" role="button" tabindex="0" data-help="Zusätzlicher Meldeweg neben Telegram – mit Priorität, Ton und Kamerabild. Jede Person braucht ein eigenes Pushover-Konto.">?</span></h2>
-  <div class="sub">Zweiter Meldeweg mit Priorität, Ton und Kamerabild.</div>
+  <h2><svg class="h2i" style="color:#1185fe" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M9.5 17V7.5h3.2a2.9 2.9 0 0 1 0 5.8H9.5"/></svg>Pushover <span class="qhelp" role="button" tabindex="0" data-help="Zusätzlicher Meldeweg neben Telegram – mit Priorität und Ton{% if modules.cameras %} und Kamerabild{% endif %}. Jede Person braucht ein eigenes Pushover-Konto.">?</span></h2>
+  <div class="sub">Zweiter Meldeweg mit Priorität und Ton{% if modules.cameras %} und Kamerabild{% endif %}.</div>
     <div id="po-setup" class="sub" style="margin:6px 0 8px">Anleitung zur Einrichtung <span class="qhelp" role="button" tabindex="0" data-help="<ol><li>Konto auf <b>pushover.net</b> anlegen und die Pushover-App installieren (nach der Testzeit einmalig ca. 5 $ je Plattform).</li><li>Unter „Create an Application/API Token“ eine Anwendung anlegen (z. B. „BlueNexus“) und den <b>API-Token</b> kopieren.</li><li>Token hier einfügen und speichern. Dann je Person den <b>User Key</b> (oben auf pushover.net bzw. in der App) mit einem Namen eintragen.</li></ol>">?</span></div>
     <div class="grid2" style="margin-top:8px">
       <div><label>App-Token <span class="qhelp" role="button" tabindex="0" data-help="API-Token deiner Pushover-Anwendung (30 Zeichen). Nicht weitergeben.">?</span></label><div class="pw-wrap"><input id="po-token" type="password" autocomplete="new-password" placeholder="30 Zeichen"><button type="button" class="pw-toggle" data-for="po-token" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>

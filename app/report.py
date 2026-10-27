@@ -51,7 +51,10 @@ def _age_min(iso: str | None, now: datetime) -> float | None:
 
 
 # ---------------------------------------------------------------- Pruefungen
-ENERGY_CHECKS = {"tick", "status", "dry_run", "vrm", "tibber", "prices", "history", "history_span", "gaps", "sampler", "forecast", "watchdog", "surplus"}
+ENERGY_KINDS = {"battery", "ess", "tibber", "tick_error", "tick_ok", "vrm", "watchdog", "surplus"}      # Ereignisarten der Energie-Regelung (ohne Modul Energie nicht im Bericht)
+ENERGY_SETTINGS = {"battery_usable_kwh", "daily_usage_kwh", "charge_power_w", "pv_reserve_soc", "pv_reserve_kwh", "max_charge_soc", "absolute_cheap_price", "pv_tom_morning_factor",
+                   "min_peak_soc", "night_safety_soc", "target_safe_soc", "hysterese_soc", "peak_avoid_price", "poll_seconds", "dry_run", "tariff_mode", "surplus_enabled", "surplus_dry_run", "surplus_min_soc"}
+ENERGY_CHECKS = {"tick", "status", "errors", "dry_run", "vrm", "tibber", "prices", "history", "history_span", "gaps", "sampler", "forecast", "watchdog", "surplus"}
 
 
 def _checks(now: datetime, cfg: dict, ctrl: dict, stats: dict, hist_days: dict) -> list[dict]:
@@ -140,7 +143,7 @@ def _checks(now: datetime, cfg: dict, ctrl: dict, stats: dict, hist_days: dict) 
 
     # 7) Dateien + Sicherungen + Platz
     files = {}
-    for name in ("history.json", "monthly_summary.json", "solar_log.json", "config.json", "state.json", "price_history.json"):
+    for name in (("history.json", "monthly_summary.json", "solar_log.json", "config.json", "state.json", "price_history.json") if store.module_on("energy", cfg) else ("config.json",)):
         p = os.path.join(store._DIR, name)
         try:
             with open(p, encoding="utf-8") as f:
@@ -250,29 +253,30 @@ def build(days: int = 7, ctrl: dict | None = None, now: datetime | None = None) 
     ctrl = ctrl or {}
     cfg = store.load_config()
     stats = opslog.stats_days(60)
-    hist_days = _safe(store.price_history, 60)
+    energy = store.module_on("energy", cfg)                  # ohne Modul Energie: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen, keine Regler-Einstellungen
+    hist_days = _safe(store.price_history, 60) if energy else {}
     if "_error" in hist_days:
         hist_days = {}
     checks = _safe(_checks, now, cfg, ctrl, stats, hist_days)
     if isinstance(checks, dict):
         checks = [_check("report", "Prüfungen", "fail", checks["_error"])]
-    rows = _safe(_day_rows, now, max(1, min(days, 30)), stats, hist_days)
+    rows = _safe(_day_rows, now, max(1, min(days, 30)), stats, hist_days) if energy else []
     if isinstance(rows, dict):
         rows = []
-    events = [e for e in opslog.recent(80, None, now - timedelta(days=days)) if e.get("kind") not in ROUTINE][:40]
+    events = [e for e in opslog.recent(80, None, now - timedelta(days=days)) if e.get("kind") not in ROUTINE and (energy or e.get("kind") not in ENERGY_KINDS)][:40]
     fails = [c for c in checks if c["status"] == "fail"]
     warns = [c for c in checks if c["status"] == "warn"]
     verdict = "fail" if fails else ("warn" if warns else "ok")
     plan = ctrl.get("plansim") or {}
-    sv = _safe(store.savings, cfg, now)
-    cal = _safe(store.pv_calibration, now)
+    sv = _safe(store.savings, cfg, now) if energy else {"_error": "Modul Energie aus"}
+    cal = _safe(store.pv_calibration, now) if energy else {"_error": "Modul Energie aus"}
     settings = {k: cfg.get(k) for k in ("battery_usable_kwh", "daily_usage_kwh", "charge_power_w", "pv_reserve_soc", "pv_reserve_kwh", "max_charge_soc", "absolute_cheap_price",
                                         "pv_tom_morning_factor", "min_peak_soc", "night_safety_soc", "target_safe_soc", "hysterese_soc",
                                         "peak_avoid_price", "poll_seconds", "dry_run", "rules_enabled", "rules_dry_run", "rules_manual_hold_min", "surplus_enabled", "surplus_dry_run", "surplus_min_soc", "tariff_mode")
-                if cfg.get(k) is not None}
-    return {"generated": now.isoformat(timespec="seconds"), "app": store.default_app_name(cfg), "version": _version(),
+                if cfg.get(k) is not None and (energy or k not in ENERGY_SETTINGS)}
+    return {"generated": now.isoformat(timespec="seconds"), "app": store.default_app_name(cfg), "version": _version(), "energy": energy,
             "started": ctrl.get("started"), "verdict": verdict, "checks": checks, "days": rows, "events": events, "settings": settings,
-            "current": {"soc": (ctrl.get("status") or {}).get("soc"), "strategy": (ctrl.get("status") or {}).get("strategy"),
+            "current": None if not energy else {"soc": (ctrl.get("status") or {}).get("soc"), "strategy": (ctrl.get("status") or {}).get("strategy"),
                         "ess": (ctrl.get("status") or {}).get("ess_text"), "pv_source": (ctrl.get("status") or {}).get("pv_source"),
                         "pv_today": (ctrl.get("status") or {}).get("pv_today"), "pv_tom": (ctrl.get("status") or {}).get("pv_tom"),
                         "plan_windows": (ctrl.get("status") or {}).get("plan_windows"), "now_price": (ctrl.get("status") or {}).get("now_price")},
@@ -283,7 +287,7 @@ def build(days: int = 7, ctrl: dict | None = None, now: datetime | None = None) 
                          "sim_end_soc": plan["result"]["sim"]["end_soc"], "current_end_soc": plan["result"]["current"]["end_soc"],
                          "horizon_end": plan["result"]["horizon_end"],
                          "sim_windows": plan["result"]["sim"]["windows"], "current_windows": plan["result"]["current"]["windows"]}
-                        if plan.get("available") else None)}
+                        if (energy and plan.get("available")) else None)}
 
 
 def _f(v, fmt="{:.1f}", dash="–"):
@@ -296,6 +300,11 @@ def to_markdown(r: dict) -> str:
     L = [f"# Betriebsbericht – {r['app']}", f"Stand {r['generated']} · Version {r['version']} · gestartet {r.get('started') or '?'}", "", f"## Ergebnis: {verdict}", ""]
     for c in r["checks"]:
         L.append(f"- {ICON[c['status']]} **{c['title']}**: {c['detail']}")
+    if not r.get("energy", True):                       # ohne Modul Energie: nur Pruefungen, Ereignisse, Einstellungen
+        L += ["", "## Ereignisse (neueste zuerst)"]
+        L += [f"- {e['ts'][5:16].replace('T', ' ')} [{e['kind']}] {e['text']}" for e in r["events"][:30]] or ["- keine bemerkenswerten Ereignisse"]
+        L += ["", "## Einstellungen", ", ".join(f"{k}={v}" for k, v in r["settings"].items())]
+        return "\n".join(L) + "\n"
     cur = r.get("current") or {}
     L += ["", "## Jetzt", f"SOC {_f(cur.get('soc'), '{:.0f}')} % · ESS {cur.get('ess') or '–'} · Strategie {cur.get('strategy') or '–'} · Preis {_f(cur.get('now_price'), '{:.1f}')} ct · "
           f"Sonne heute/morgen {_f(cur.get('pv_today'))}/{_f(cur.get('pv_tom'))} kWh ({cur.get('pv_source') or '?'}) · Plan: {cur.get('plan_windows') or 'kein Netzladen'}"]

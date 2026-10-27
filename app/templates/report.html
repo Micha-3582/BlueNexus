@@ -4,7 +4,7 @@
 
 <div class="card">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <h2 style="margin:0">Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="Alles Wichtige auf einen Blick: Läuft die Regelung, sind Prognosen und Preise vorhanden, sind die Daten vollständig? Mit „Als Text kopieren“ erhältst du den kompletten Bericht zum Einfügen, z. B. für eine gemeinsame Auswertung der Anlage.">?</span></h2>
+    <h2 style="margin:0">Betriebsbericht <span class="qhelp" role="button" tabindex="0" data-help="{% if modules.energy %}Alles Wichtige auf einen Blick: Läuft die Regelung, sind Prognosen und Preise vorhanden, sind die Daten vollständig?{% else %}Alles Wichtige auf einen Blick: Läuft die App sauber, sind Sicherungen, Speicherplatz und Meldungen in Ordnung?{% endif %} Mit „Als Text kopieren“ erhältst du den kompletten Bericht zum Einfügen, z. B. für eine gemeinsame Auswertung der Anlage.">?</span></h2>
     <select id="rp-days" class="ghost" style="width:auto">
       <option value="3">3 Tage</option><option value="7" selected>7 Tage</option><option value="14">14 Tage</option><option value="30">30 Tage</option>
     </select>
@@ -12,18 +12,18 @@
     <button id="rp-copy" type="button">📋 Als Text kopieren</button>
     <button id="rp-download" class="ghost" type="button">Als Datei speichern</button>
   </div>
-  <div class="sub" style="margin:6px 0 0">Zustand von Regelung, Prognose, Preisen und Daten.</div>
+  <div class="sub" style="margin:6px 0 0">{% if modules.energy %}Zustand von Regelung, Prognose, Preisen und Daten.{% else %}Zustand der App und ihrer Dienste.{% endif %}</div>
   <div id="rp-msg" class="muted" style="margin-top:8px"></div>
   <div id="rp-verdict" style="margin-top:12px;padding:14px 16px;border-radius:12px;font-size:18px;font-weight:700;border:1px solid var(--border)"></div>
   <div id="rp-checks" style="margin-top:12px;display:flex;flex-direction:column;gap:2px"></div>
 </div>
 
-<div class="card">
+<div class="card" id="rp-now-card">
   <h2>Jetzt</h2>
   <div id="rp-now" class="muted"></div>
 </div>
 
-<div class="card">
+<div class="card" id="rp-days-card">
   <h2>Tage</h2>
   <div class="sub">Tagesbilanz mit Preisen, Prognose, Ladevorgängen und Zählern.</div>
   <div class="table-scroll"><table id="rp-days-table"></table></div>
@@ -58,6 +58,8 @@ async function load() {
   $('rp-msg').textContent = `Stand ${r.generated.replace('T', ' ')} · Version ${r.version} · gestartet ${r.started ? r.started.replace('T', ' ') : '?'}`;
   $('rp-checks').innerHTML = r.checks.map((c, i) => `<div style="display:flex;gap:10px;padding:7px 10px;${i % 2 ? 'background:rgba(255,255,255,.04)' : ''}">
     <span>${ICON[c.status]}</span><div><b>${esc(c.title)}</b><div class="muted">${esc(c.detail)}</div></div></div>`).join('');
+  const en = r.energy !== false;                 // ohne Modul Energie: kein Akku/ESS/Strategie, keine Tagesbilanz mit Preisen und Prognosen
+  $('rp-now-card').hidden = !en; $('rp-days-card').hidden = !en;
   const c = r.current || {};
   $('rp-now').innerHTML = `Akku <b>${f(c.soc, 0)} %</b> · ESS <b>${esc(c.ess || '–')}</b> · Strategie <b>${esc(c.strategy || '–')}</b> · Preis <b>${f(c.now_price)} ct</b><br>
     Sonne heute/morgen <b>${f(c.pv_today)}/${f(c.pv_tom)} kWh</b> (${esc(c.pv_source || '?')}) · Ladeplan: ${esc(c.plan_windows || 'kein Netzladen')}`

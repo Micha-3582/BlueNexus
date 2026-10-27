@@ -1213,7 +1213,7 @@ def api_user_visible(username):
     if request.method == "GET":
         groups = []
         for kind, label, icon in VIS_GROUPS:
-            if kind not in _VIS_KINDS:
+            if kind not in _VIS_KINDS or not store.module_on("cameras" if kind == "camera" else "smarthome"):          # Modul aus: seine Eintraege gibt es fuer die Konten nicht (Daten bleiben)
                 continue
             load, _save = _VIS_KINDS[kind]()
             items = [{"id": x["id"], "name": x.get("name") or x["id"], "icon": x.get("icon") or icon, "on": visibility.can_see(x, key, False)} for x in load()]
