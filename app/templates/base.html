@@ -383,7 +383,7 @@
 function pinCss() {
   if (document.getElementById('pin-ov-css')) return;
   const st = document.createElement('style'); st.id = 'pin-ov-css';
-  st.textContent = '@keyframes pinDraw{to{stroke-dashoffset:0}}@keyframes pinPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}@keyframes pinSpin{to{transform:rotate(360deg)}}@keyframes pinShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}';
+  st.textContent = '@keyframes pinDraw{to{stroke-dashoffset:0}}@keyframes pinPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}@keyframes pinSpin{to{transform:rotate(360deg)}}@keyframes pinShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}@keyframes pinWobble{0%,100%{transform:rotate(0)}10%{transform:rotate(-7deg)}25%{transform:rotate(6deg)}40%{transform:rotate(-5deg)}55%{transform:rotate(4deg)}70%{transform:rotate(-2.5deg)}85%{transform:rotate(1.2deg)}}';
   document.head.appendChild(st);
 }
 function askPinDone(ok, text) {
@@ -405,9 +405,15 @@ function askPin(title, keepOpen) {
     ov.querySelector('.pin-t').textContent = title || '';
     const dots = ov.querySelector('.pin-dots');
     const card = ov.firstElementChild;
-    if (/^Falsche PIN/i.test(title || '')) {                      // falsche PIN: deutlich zeigen (roter Rahmen, rote Fettschrift, Wackeln, Vibration am Handy)
-      pinCss();
-      card.style.border = '2px solid #e5544a'; card.style.animation = 'pinShake .4s';
+    let wrong = false;
+    const clearWrong = () => {                                    // sobald man die erste Ziffer eingibt: roter Rahmen und Warnung weg
+      wrong = false; card.style.border = '1px solid var(--border)'; card.style.animation = 'none';
+      const h = ov.querySelector('.pin-t'); h.textContent = ''; h.style.color = ''; h.style.fontWeight = ''; h.style.fontSize = '';
+      ov.querySelector('.pin-dots').style.color = '';
+    };
+    if (/^Falsche PIN/i.test(title || '')) {                      // falsche PIN: deutlich zeigen (roter Rahmen, rote Fettschrift, Drehen hin und her wie ein nasser Hund, Vibration am Handy)
+      pinCss(); wrong = true;
+      card.style.border = '2px solid #e5544a'; card.style.transformOrigin = '50% 60%'; card.style.animation = 'pinWobble .65s ease-out';
       const hint = ov.querySelector('.pin-t');
       hint.textContent = '✗ ' + title; hint.style.cssText += ';color:#e5544a;font-weight:700;font-size:16px';
       ov.querySelector('.pin-dots').style.color = '#e5544a';
@@ -418,6 +424,7 @@ function askPin(title, keepOpen) {
     ov._status = (ok, text) => {                                  // Ergebnis im PIN-Feld zeigen, danach ausblenden
       pinCss();
       const col = ok ? '#2fb86b' : '#e5544a';
+      card.style.animation = 'none'; card.style.border = ok ? '1px solid var(--border)' : '2px solid ' + col;       // Erfolg: normaler Rahmen (kein roter Rest von einer falschen PIN)
       card.innerHTML = `<div style="padding:18px 0 8px"><svg viewBox="0 0 52 52" width="84" height="84" style="animation:${ok ? 'pinPop .35s ease-out' : 'pinShake .35s'}"><circle cx="26" cy="26" r="23" fill="none" stroke="${col}" stroke-width="3" opacity=".35"/>`
         + (ok ? `<path d="M15 27l7 7 15-16" fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="40" stroke-dashoffset="40" style="animation:pinDraw .35s .15s ease-out forwards"/>`
               : `<path d="M17 17l18 18M35 17L17 35" fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round"/>`) + `</svg>
@@ -428,6 +435,7 @@ function askPin(title, keepOpen) {
     ov.addEventListener('click', e => { if (card.querySelector('.pin-msg') && e.target === ov) gone(); });
     const press = k => {
       if (k === 'x') return close(null);
+      if (wrong && /^\d$/.test(k)) clearWrong();
       if (k === 'c') pin = pin.slice(0, -1); else if (/^\d$/.test(k) && pin.length < 4) pin += k;
       dots.textContent = '●'.repeat(pin.length) + '○'.repeat(4 - pin.length);
       if (pin.length === 4) setTimeout(() => {

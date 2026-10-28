@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.3 – 28.10.2026
+- Änderung: Bei falscher PIN **dreht** sich das PIN-Feld kurz hin und her und klingt ab (statt seitlich zu rutschen).
+- Fix: Sobald man die **erste Ziffer** eingibt, verschwinden der rote Rahmen und die Warnung. Die **Erfolgsmeldung** hat danach wieder den normalen Rahmen (der rote Rahmen blieb vorher stehen).
+
 ## 1.26.2 – 28.10.2026
 - Verbesserung: Bei einer **falschen PIN** zeigt das PIN-Feld die Meldung jetzt deutlich: roter Rahmen, rote Fettschrift „✗ Falsche PIN – bitte erneut“, rote Kreise, kurzes Wackeln des Feldes und am Handy ein kurzer Vibrationsimpuls.
 
