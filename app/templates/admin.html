@@ -1417,6 +1417,7 @@ document.getElementById('btn-check').addEventListener('click', async () => {
     }
   } catch (e) { st.textContent = 'Fehler bei der Prüfung.'; }
 });
+window.updReload = () => location.reload();                       // eigene Funktion, damit man das Neuladen testen kann
 document.getElementById('btn-update').addEventListener('click', async () => {
   if (!await uiDialog({ title: 'Jetzt aktualisieren?', message: 'Die App wird dabei kurz neu gestartet.', okText: 'Aktualisieren' })) return;
   const st = document.getElementById('update-status');
@@ -1429,10 +1430,17 @@ document.getElementById('btn-update').addEventListener('click', async () => {
       document.getElementById('btn-update').style.display = 'none'; document.getElementById('btn-check').style.display = 'none';       // nichts mehr zu druecken: der Neustart laeuft
       pinCss();
       st.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--cheap);border-radius:12px;background:rgba(53,192,122,.10)"><span style="width:28px;height:28px;flex:none;border:4px solid var(--border);border-top-color:var(--cheap);border-radius:50%;animation:pinSpin .9s linear infinite"></span><div><div style="font-size:18px;font-weight:700;color:var(--cheap)">Aktualisiert – die App startet jetzt neu</div><div class="muted" id="upd-wait">Die Seite lädt gleich von selbst neu. Bitte nichts drücken …</div></div></div>';
-      const t0 = Date.now(); let sawDown = false;                      // sobald die App wieder antwortet (nach dem Neustart), Seite neu laden
+      const t0 = Date.now(), oldVer = document.getElementById('app-version').textContent.trim(); let good = 0;
+      // Neu laden erst, wenn die App UEBER DENSELBEN WEG (z. B. Cloudflare-Tunnel) wieder richtig antwortet: mindestens 20 s Anzeige, die Versionsnummer hat sich geaendert
+      // und zwei Antworten in Folge sind gueltige JSON-Antworten (eine Cloudflare-Fehlerseite oder ein Verbindungsfehler zaehlt nicht und setzt den Zaehler zurueck).
       (function poll() {
-        fetch('/api/version', { cache: 'no-store' }).then(r => { if (r.ok && (sawDown || Date.now() - t0 > 14000)) location.reload(); else setTimeout(poll, 2000); }).catch(() => { sawDown = true; setTimeout(poll, 2000); });
-        if (Date.now() - t0 > 45000) { const w = document.getElementById('upd-wait'); if (w) w.textContent = 'Das dauert länger als gewöhnlich. Lade die Seite in einer Minute von Hand neu (Strg+F5).'; }
+        const el = Date.now() - t0, w = document.getElementById('upd-wait');
+        fetch('/api/version', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject(new Error('nicht bereit'))).then(v => {
+          good++;
+          const changed = !!v.version && v.version !== oldVer;
+          if (good >= 2 && el > 20000 && (changed || el > 60000)) { if (w) w.textContent = 'Die App läuft wieder – die Seite wird neu geladen …'; setTimeout(() => window.updReload(), 1200); return; }
+          setTimeout(poll, 2000);
+        }).catch(() => { good = 0; if (w && el > 60000) w.textContent = 'Das dauert länger als gewöhnlich. Lade die Seite in einer Minute von Hand neu (Strg+F5).'; setTimeout(poll, 2500); });
       })();
     } else if (d.ok) {
       document.getElementById('btn-update').style.display = 'none';

@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.5 – 28.10.2026
+- Fix: Nach einem Update lädt die Seite erst dann neu, wenn die App **über denselben Weg** (z. B. den Cloudflare-Tunnel) wieder richtig antwortet: mindestens 20 Sekunden Anzeige, die Versionsnummer hat sich geändert und zwei gültige Antworten in Folge. Eine Cloudflare-Fehlerseite oder ein Verbindungsfehler zählt nicht. So erscheint die Fehlerseite „nicht erreichbar“ nicht mehr, weil die Seite zu früh neu lädt.
+
 ## 1.26.4 – 28.10.2026
 - Verbesserung: Nach einem erfolgreichen Update im System-Reiter verschwinden die Knöpfe „Jetzt aktualisieren“ und „Nach Updates suchen“; stattdessen steht groß eine grüne Meldung mit Kreisel: „Aktualisiert – die App startet jetzt neu“. Die Seite lädt selbst neu, sobald die App wieder antwortet (statt nach fester Zeit), bei Verzögerung gibt es einen Hinweis.
 
