@@ -81,7 +81,7 @@ window.VLChart = (function () {
     ids.forEach(function (i) { var u = series[i].binary ? '__b' : (series[i].unit || ''); if (units.indexOf(u) < 0) units.push(u); });
     var real = units.filter(function (u) { return u !== '__b'; });
     var axisOf = function (u) { return u === '__b' ? 'yb' : (u === real[0] ? 'y' : 'y1'); };
-    var datasets = [], any = false;
+    var datasets = [], any = false, hid = (inst[c.id] && inst[c.id]._hid) || {};          // vom Nutzer ausgeblendete Reihen bleiben ausgeblendet (auch nach Aktualisierung)
     ids.forEach(function (id, k) {
       var s = d.series[id], col = (c.colors || {})[id] || COLORS[k % COLORS.length], bin = !!series[id].binary;
       var ax = axisOf(bin ? '__b' : (series[id].unit || '')), pts = (s && s.points) || [];
@@ -89,10 +89,10 @@ window.VLChart = (function () {
       var step = !!series[id].step;                       // z. B. Strompreis: Stufenlinie, kein Min/Max-Band
       var banded = kind === 'line' && !bin && !step && s && s.bucket_s > s.interval_s * 1.5;
       if (banded) {
-        datasets.push({ label: '_min', _band: true, data: pts.map(function (p) { return { x: p[0], y: p[2] }; }), borderWidth: 0, pointRadius: 0, fill: false, yAxisID: ax, spanGaps: false });
-        datasets.push({ label: '_max', _band: true, data: pts.map(function (p) { return { x: p[0], y: p[3] }; }), borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: col + '30', yAxisID: ax, spanGaps: false });
+        datasets.push({ label: '_min', _band: true, _key: id, hidden: !!hid[id], data: pts.map(function (p) { return { x: p[0], y: p[2] }; }), borderWidth: 0, pointRadius: 0, fill: false, yAxisID: ax, spanGaps: false });
+        datasets.push({ label: '_max', _band: true, _key: id, hidden: !!hid[id], data: pts.map(function (p) { return { x: p[0], y: p[3] }; }), borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: col + '30', yAxisID: ax, spanGaps: false });
       }
-      datasets.push({ label: series[id].label + (series[id].unit && !bin ? ' (' + series[id].unit + ')' : ''), _unit: series[id].unit || '', _bin: bin, _minmax: banded,
+      datasets.push({ _key: id, hidden: !!hid[id], label: series[id].label + (series[id].unit && !bin ? ' (' + series[id].unit + ')' : ''), _unit: series[id].unit || '', _bin: bin, _minmax: banded,
         data: pts.map(function (p) { return { x: p[0], y: p[1], mn: p[2], mx: p[3] }; }),
         borderColor: col, backgroundColor: isBar ? col + 'cc' : (kind === 'area' ? col + '33' : (kind === 'stackarea' ? col + '88' : col)), borderWidth: isBar ? 0 : 1.3,
         pointRadius: kind === 'points' ? 2 : 0, pointHoverRadius: 4, showLine: kind !== 'points', fill: (kind === 'stackarea' && !bin) ? 'stack' : (kind === 'area' ? 'origin' : false), tension: 0,
@@ -119,7 +119,12 @@ window.VLChart = (function () {
       options: {
         animation: false, parsing: isBar, normalized: !isBar, maintainAspectRatio: false, interaction: { mode: (stacked || isBar || !(window.Chart && Chart.Interaction && Chart.Interaction.modes.lastKnown)) ? (stacked ? 'index' : 'nearest') : 'lastKnown', axis: 'x', intersect: false },
         plugins: {
-          legend: { display: opts.legend !== false, align: 'start', labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
+          legend: { display: opts.legend !== false, align: 'start', onClick: function (e, item, legend) {
+            var ch = legend.chart, ds = ch.data.datasets, key = ds[item.datasetIndex]._key, vis = ch.isDatasetVisible(item.datasetIndex);
+            ch._hid = ch._hid || {}; ch._hid[key] = vis;                  // vis = war sichtbar -> jetzt ausgeblendet
+            ds.forEach(function (d, i) { if (d._key === key) ch.setDatasetVisibility(i, !vis); });
+            ch.update();
+          }, labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
           tooltip: {
             position: (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners.mouseX && !stacked && !isBar) ? 'mouseX' : 'average',
             filter: function (it) { return !it.dataset._band; },
