@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.14 – 28.10.2026
+- Fehlerbehebung: In der Geräteübersicht stehen **Zigbee-Geräte** (hinter dem Gateway) und **Homematic-Geräte** (hinter der CCU) nicht mehr mit einer scheinbaren IP-Adresse, sondern am Ende der Liste mit dem Hinweis „über Gateway …“ bzw. „Adresse …“. Mehrkanalige Homematic-Geräte lösen keine Warnung „doppelte IP-Adresse“ mehr aus.
+
 ## 1.26.13 – 28.10.2026
 - Neu: **Geräteübersicht** unter *Einstellungen → System* (nur Administratoren): alle Geräte mit IP-Adresse (Steckdosen und Schalter, Klimaanlagen, Kameras, Zigbee-Gateways, Homematic-Zentrale, Wake-on-LAN-Rechner, Cerbo GX, Funkthermometer), sortiert nach IP, mit Suche, Kopieren und CSV-Export. Doppelt vergebene IP-Adressen werden markiert. Es werden nie Passwörter oder Schlüssel ausgegeben.
 

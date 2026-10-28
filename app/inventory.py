@@ -12,6 +12,8 @@ import logging
 log = logging.getLogger("inventory")
 
 KIND_NAMES = {"shelly": "Shelly", "tasmota": "Tasmota", "wled": "WLED", "tuya": "Tuya / Smart Life", "midea": "Klimaanlage (Midea)"}
+# Geraete HINTER einer Zentrale: keine eigene IP-Adresse (Zigbee ueber das Gateway, Homematic ueber die CCU)
+BEHIND = {"zigbee": ("Zigbee (über Gateway)", "über Gateway"), "homematic": ("Homematic (über CCU)", "Adresse")}
 
 
 def _ip_only(host: str) -> str:
@@ -44,6 +46,10 @@ def collect() -> list[dict]:
         import shelly                                           # noqa: PLC0415
         for d in shelly.load_devices():
             kind = d.get("kind") or "shelly"
+            if kind in BEHIND:                                  # das Feld "ip" ist hier die Gateway-Adresse bzw. die Geraete-Adresse, keine eigene IP
+                typ, label = BEHIND[kind]
+                add(typ, d.get("name") or d.get("id"), "", "", " · ".join(x for x in (f"{label} {d['ip']}" if d.get("ip") else "", d.get("model")) if x))
+                continue
             det = [x for x in (d.get("model"), "Cloud-Anbindung" if d.get("cloud") else "") if x]
             add(KIND_NAMES.get(kind, kind), d.get("name") or d.get("id"), d.get("ip", ""), d.get("mac", ""), " · ".join(det))
     except Exception as e:                                      # noqa: BLE001 - eine Quelle darf die Liste nicht verhindern
