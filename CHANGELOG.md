@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.1 – 28.10.2026
+- Änderung: Die Erfolgsmeldung im PIN-Feld (grüner Haken „Befehl angenommen“) bleibt **eine Sekunde länger** sichtbar (2,1 s statt 1,1 s). Die Fehleranzeige (rotes Kreuz) bleibt bei 1,9 s.
+
 ## 1.26.0 – 28.10.2026
 - Neu: **Thermometer neu flashen, ohne es zu verlieren.** Beim Thermometer gibt es den Knopf „Neu flashen“ (und im Formular die Auswahl „Einrichten für“). Das Gerät behält ID, Sensoren, Aufzeichnung in den Verläufen, Regeln und Abgleich; nur der Schlüssel wird erneuert, der alte gilt bis zur ersten Meldung mit dem neuen weiter. Bisher entstand bei jedem Flashen ein neues Thermometer mit neuen Sensoren, die Aufzeichnung der alten brach ab.
 - Fehlgeschlagenes Neu-Flashen löscht ein vorhandenes Thermometer nie.

@@ -415,7 +415,7 @@ function askPin(title, keepOpen) {
               : `<path d="M17 17l18 18M35 17L17 35" fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round"/>`) + `</svg>
         <div style="font-weight:600;margin-top:10px;color:${col}" class="pin-msg"></div></div>`;
       card.querySelector('.pin-msg').textContent = text || (ok ? 'Befehl angenommen' : 'Fehlgeschlagen');
-      clearTimeout(ov._t); ov._t = setTimeout(gone, ok ? 1100 : 1900);
+      clearTimeout(ov._t); ov._t = setTimeout(gone, ok ? 2100 : 1900);        // Erfolg: 2,1 s sichtbar (war 1,1 s)
     };
     ov.addEventListener('click', e => { if (card.querySelector('.pin-msg') && e.target === ov) gone(); });
     const press = k => {
