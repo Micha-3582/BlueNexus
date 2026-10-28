@@ -253,7 +253,7 @@ Die Einstellungen sind in Reiter gegliedert (Anlage, Tarif & Laden, VRM, Wetter,
 ### 4.1 Betrieb und System
 
 - **Anzeigename:** Steht in der Kopfzeile und im Browser-Tab (praktisch bei mehreren Anlagen).
-- *(Reihenfolge im Reiter **System**: App-Version & Update, Uhrzeit & Zeitzone, Betrieb, Module, Fernzugriff, Betriebsbericht, Sicherung & Wiederherstellung, Testmodus. Dry-Run, Regel-Intervall und Energie-Messtakt stehen in der Karte **Ladesteuerung** im Reiter **Anlage**, direkt unter den Cerbo-Angaben.)*
+- *(Reihenfolge im Reiter **System**: App-Version & Update, Uhrzeit & Zeitzone, Betrieb, Module, Fernzugriff, **Geräteübersicht**, Betriebsbericht, Sicherung & Wiederherstellung, Testmodus. Dry-Run, Regel-Intervall und Energie-Messtakt stehen in der Karte **Ladesteuerung** im Reiter **Anlage**, direkt unter den Cerbo-Angaben.)*
 - **Dry-Run:** An = die Ladesteuerung rechnet und protokolliert nur, am Cerbo wird nichts geschaltet. Für den echten Betrieb ausschalten. Läuft parallel noch eine andere Steuerung (z. B. ioBroker), die den ESS-Modus setzt, diese vorher stoppen.
 - **Regel-Intervall:** Wie oft die Ladesteuerung neu rechnet (Standard 300 s, ausgerichtet aufs Viertelstunden-Raster). Strompreise ändern sich nur viertelstündlich, daher reicht das.
 - **Energie-Messtakt:** Wie oft Solar/Verbrauch/Netz/Akku für Verlauf und Tagesbilanz gemessen werden (Standard 10 s).
@@ -1006,6 +1006,10 @@ Geräte und Schalter liefern `on`/`off`, Knöpfe `button`.
 - Bei Sensoren, die BlueNexus von einer anderen Anlage per *Teilen* geholt hat, liefert die Schnittstelle den zuletzt geholten Zustand (`source: "remote"`).
 - Mehrere Standorte (Teilen über das Internet) lassen sich so in **einem** BlueNexus sammeln und dort per Schnittstelle an andere Programme im Netz weitergeben.
 - Kein Schlüssel angelegt = nichts erreichbar. Die Schnittstelle ist also von Anfang an „zu“, bis du einen Schlüssel erzeugst.
+
+### Geräteübersicht (IP-Adressen)
+
+Unter *Einstellungen → System → Geräteübersicht (IP-Adressen)* – nur für Administratoren – steht eine Liste **aller Geräte mit IP-Adresse**, die in BlueNexus eingetragen sind: Steckdosen und Schalter (Shelly, Tasmota, WLED, Tuya), Klimaanlagen, Kameras, Zigbee-Gateways, die Homematic-Zentrale, Wake-on-LAN-Rechner, der Cerbo GX und die Funkthermometer (ohne feste Adresse). Sinn: Nach einem Ausfall oder beim Umbau des Netzes ist klar, **was alles dazugehörte**. Die Liste ist nach IP-Adresse sortiert, mit Suchfeld, **Kopieren** und **Als CSV speichern**. Sie wird aus den Einstellungen gelesen – es wird nichts im Netz abgefragt, und es stehen nie Passwörter oder Schlüssel darin. Kommt eine IP-Adresse **doppelt** vor, ist die Zeile rot markiert und trägt ein ⚠.
 
 ## 14. Kosten, Tarife und Tarifwechsel
 

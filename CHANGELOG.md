@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.13 – 28.10.2026
+- Neu: **Geräteübersicht** unter *Einstellungen → System* (nur Administratoren): alle Geräte mit IP-Adresse (Steckdosen und Schalter, Klimaanlagen, Kameras, Zigbee-Gateways, Homematic-Zentrale, Wake-on-LAN-Rechner, Cerbo GX, Funkthermometer), sortiert nach IP, mit Suche, Kopieren und CSV-Export. Doppelt vergebene IP-Adressen werden markiert. Es werden nie Passwörter oder Schlüssel ausgegeben.
+
 ## 1.26.12 – 28.10.2026
 - Fehlerbehebung: Die Tuya-Suche durchsucht jetzt **immer auch das eigene Netz des Servers** per Verbindungsversuch – bisher nur bei leerer Liste „Weitere Netze“. War dort ein Netz eingetragen, wurde das eigene Netz nur per Broadcast abgedeckt, und manche (neue oder besonders gesprächige) Geräte kamen mit „im Heimnetz nicht gefunden“ zurück.
 

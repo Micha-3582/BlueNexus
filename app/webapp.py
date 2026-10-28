@@ -39,6 +39,7 @@ import tuya
 import devicelog
 import hardware
 import thermo
+import inventory
 import homematic
 import perf
 import midea
@@ -232,7 +233,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_inventory": "user_management", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -4241,6 +4242,14 @@ def api_thermo_ingest(tid):
     else:
         ctrl._rules_wake.set()                                          # Regeln mit diesem Sensor gleich pruefen
     return jsonify(body), code
+
+
+@app.route("/api/inventory", methods=["GET"])
+def api_inventory():
+    """Geraeteuebersicht fuer Administratoren: alle Geraete mit IP-Adresse (nur Stammdaten, nichts Geheimes)."""
+    r = jsonify(devices=inventory.collect())
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 @app.route("/api/hardware", methods=["GET"])
