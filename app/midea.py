@@ -231,7 +231,7 @@ async def _with_dev(entry: dict, op, attempts: int = 2, delays=(LOCAL_RETRY_DELA
     if "Authentication" in name or "authent" in msg.lower():
         _auth_fails[cid] = _auth_fails.get(cid, 0) + 1
         if _auth_fails[cid] >= AUTH_FAIL_LIMIT:
-            raise MideaError("Die Klimaanlage lehnt den Schlüssel wiederholt ab – an der Anlage „🔑 Schlüssel“ drücken (nötig nach neuem Koppeln)")
+            raise MideaError("Die Klimaanlage hat die Anmeldung mehrmals hintereinander abgelehnt – meist eine kurze Schwäche des WLAN-Moduls, das geht von selbst vorbei. Nur wenn es stundenlang so bleibt oder die Anlage neu gekoppelt wurde: „🔑 Schlüssel“ drücken")
     raise Unreachable("Die Klimaanlage antwortet gerade nicht (WLAN-Modul beschäftigt oder schwacher Empfang)")
 
 

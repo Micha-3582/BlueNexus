@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.10 – 28.10.2026
+- Verbesserung: Die Meldung bei einer Klimaanlage, die mehrmals die Anmeldung ablehnt, ist verständlicher: Sie sagt jetzt, dass das meist nur eine kurze Schwäche des WLAN-Moduls ist und von selbst vergeht, und nennt den Schlüssel nur noch als Ausweg, wenn es dauerhaft so bleibt oder die Anlage neu gekoppelt wurde.
+
 ## 1.26.9 – 28.10.2026
 - Fehlerbehebung: In Verlaufs-Diagrammen **bleiben ausgeblendete Reihen ausgeblendet** (Klick auf die Legende). Bisher wurden sie bei jedem neuen Messwert wieder eingeblendet.
 - Fehlerbehebung: Das Diagramm-Skript wird mit der Programmversion geladen (`?v=`), damit nach einem Update nicht noch die alte Fassung aus dem Zwischenspeicher läuft (dann fehlte die minutengenaue, interpolierte Anzeige im Infokasten).
