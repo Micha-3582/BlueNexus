@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.8 – 28.10.2026
+- Verbesserung: Der Infokasten in Linien- und Flächendiagrammen **interpoliert** jetzt zwischen zwei Messpunkten – der angezeigte Wert liegt genau auf der gezeichneten Linie. Stufenreihen, An/Aus-Werte, Punkt- und Balkendiagramme zeigen weiter den letzten bekannten Wert.
+
 ## 1.26.7 – 28.10.2026
 - Verbesserung: Der Infokasten in Verlaufs-Diagrammen (Linien, Punkte, Stufen) zeigt jetzt an jeder Stelle **alle** Reihen mit ihrem **letzten bekannten Wert** links vom Mauszeiger – nicht mehr nur dort, wo gerade ein eigener Messpunkt liegt. Die Uhrzeit im Kasten folgt der Mausposition. Balken- und gestapelte Diagramme bleiben unverändert.
 

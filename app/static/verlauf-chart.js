@@ -30,12 +30,15 @@ window.VLChart = (function () {
   if (window.Chart && Chart.Interaction && Chart.Tooltip) {
     Chart.Interaction.modes.lastKnown = function (chart, e) {
       var x = chart.scales.x.getValueForPixel(e.x), out = [];
-      chart._hoverX = x;
+      chart._hoverX = x; chart._interp = {};
+      var lin = chart._vlKind === 'line' || chart._vlKind === 'area';        // Linien: Wert zwischen zwei Messpunkten berechnen (wie die gezeichnete Linie)
       chart.data.datasets.forEach(function (ds, di) {
         if (ds._band || !chart.isDatasetVisible(di)) return;
         var meta = chart.getDatasetMeta(di), data = ds.data, lo = 0, hi = data.length - 1, k = -1;
         while (lo <= hi) { var m = (lo + hi) >> 1; if (data[m].x <= x) { k = m; lo = m + 1; } else hi = m - 1; }
         while (k >= 0 && data[k].y == null) k--;                       // Luecke (kein Wert) ueberspringen: letzter echter Wert davor
+        if (k >= 0 && lin && !ds.stepped && !ds._bin && data[k].x < x && data[k + 1] && data[k + 1].y != null && data[k + 1].x > data[k].x)
+          chart._interp[di] = data[k].y + (data[k + 1].y - data[k].y) * (x - data[k].x) / (data[k + 1].x - data[k].x);
         if (k >= 0 && meta.data[k]) out.push({ element: meta.data[k], datasetIndex: di, index: k });
       });
       return out;
@@ -131,7 +134,7 @@ window.VLChart = (function () {
               label: function (it) {
                 var r = it.raw || {}, ds = it.dataset;
                 if (ds._bin) return ds.label + ': ' + (r.y ? 'an' : 'aus');
-                return ds.label.replace(/ \(.*\)$/, '') + ': ' + fmtNum(r.y) + ' ' + ds._unit + (ds._minmax ? '  (' + fmtNum(r.mn) + ' … ' + fmtNum(r.mx) + ')' : '');
+                return ds.label.replace(/ \(.*\)$/, '') + ': ' + fmtNum(it.chart._interp && it.chart._interp[it.datasetIndex] != null ? it.chart._interp[it.datasetIndex] : r.y) + ' ' + ds._unit + (ds._minmax ? '  (' + fmtNum(r.mn) + ' … ' + fmtNum(r.mx) + ')' : '');
               }
             }
           }
