@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.12 – 28.10.2026
+- Fehlerbehebung: Die Tuya-Suche durchsucht jetzt **immer auch das eigene Netz des Servers** per Verbindungsversuch – bisher nur bei leerer Liste „Weitere Netze“. War dort ein Netz eingetragen, wurde das eigene Netz nur per Broadcast abgedeckt, und manche (neue oder besonders gesprächige) Geräte kamen mit „im Heimnetz nicht gefunden“ zurück.
+
 ## 1.26.11 – 28.10.2026
 - Verbesserung: Die Tuya-Suche meldet genauer, was die Tuya-Cloud geliefert hat: „keine Geräte geliefert“ (Verknüpfung/Region prüfen) oder „Geräte ohne Schlüssel“ (Zugangsdaten/API-Dienste prüfen). Bisher kam in beiden Fällen nur „keine Geräte gefunden“. Die Anzahl steht zusätzlich im Betriebsbericht-Protokoll.
 

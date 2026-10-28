@@ -130,6 +130,21 @@ def _cloud_devices() -> list[dict]:
     return ok
 
 
+def _own_net() -> str | None:
+    """Das Netz (/24), in dem der Server selbst steht - ohne Verbindungsaufbau ermittelt (UDP-Socket nur zum Bestimmen der eigenen Adresse)."""
+    import socket                                        # noqa: PLC0415
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))
+        ip = s.getsockname()[0]
+        a = ipaddress.ip_address(ip)
+        return str(ipaddress.ip_network(ip + "/24", strict=False)) if a.is_private else None
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def discover(known_ids: set[str], networks: list[str] | None = None) -> list[dict]:
     """Holt die Geraete samt Keys aus der Cloud und sucht sie per Broadcast im LAN.
     Rueckgabe: Kandidaten ohne Schluessel; die Schluessel bleiben serverseitig im Zwischenspeicher."""
@@ -137,6 +152,9 @@ def discover(known_ids: set[str], networks: list[str] | None = None) -> list[dic
     cloud = _cloud_devices()
     nets = list(networks) if networks else (load_credentials().get("networks") or [])
     if nets:
+        own = _own_net()                                 # tinytuya durchsucht bei einer Netzliste NUR diese Netze - das eigene gehoert dazu
+        if own and own not in nets:
+            nets = [own] + nets
         # UDP-Broadcast kommt nicht ueber VLAN-Grenzen: zusaetzlich die genannten Netze per TCP (Port 6668)
         # absuchen; die Geraete werden dort anhand ihrer Cloud-Schluessel erkannt.
         from tinytuya import scanner          # noqa: PLC0415
