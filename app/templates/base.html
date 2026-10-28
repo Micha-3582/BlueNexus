@@ -480,6 +480,7 @@ function askPin(title, keepOpen) {
     })();
   </script>
   <script src="{{ url_for('static', filename='pwa.js') }}"></script>
+  <script src="{{ url_for('static', filename='scrollguard.js') }}?v={{ asset_v }}"></script>
 {% if demo and demo_view %}<script>
 /* Demo mit Nur-Lese-Konto: Klicks in gesperrten Bereichen zeigen einen freundlichen Hinweis; Servermeldungen "Kein Zugriff" werden dadurch ersetzt. */
 (function () {

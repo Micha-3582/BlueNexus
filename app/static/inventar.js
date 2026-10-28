@@ -36,22 +36,7 @@
     }).join('') : '<tr><td colspan="5" class="muted" style="padding:10px 8px">Nichts gefunden.</td></tr>';
   }
   function setSort(k) { sort = sort.k === k ? { k: k, dir: -sort.dir } : { k: k, dir: 1 }; render(); }
-  var lock = null;
-  function lockPage() {                                       // Seite hinter dem Fenster festhalten (sonst scrollt sie mit, sobald die Liste am Anfang/Ende ist)
-    var de = document.documentElement, b = document.body, gap = window.innerWidth - de.clientWidth;
-    lock = { de: de.style.overflow, b: b.style.overflow, pr: b.style.paddingRight };
-    de.style.overflow = 'hidden';
-    b.style.overflow = 'hidden';
-    if (gap > 0) b.style.paddingRight = gap + 'px';           // kein Springen durch die verschwindende Bildlaufleiste
-  }
-  function unlockPage() {
-    if (!lock) return;
-    document.documentElement.style.overflow = lock.de;
-    document.body.style.overflow = lock.b;
-    document.body.style.paddingRight = lock.pr;
-    lock = null;
-  }
-  function close() { if (!ov) return; document.removeEventListener('keydown', onKey, true); ov.remove(); ov = null; unlockPage(); }
+  function close() { if (!ov) return; document.removeEventListener('keydown', onKey, true); ov.remove(); ov = null; }
   function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
   function text(sep) { return view().map(function (r) { return [r.ip, r.name, r.typ, r.mac, r.detail].join(sep); }).join('\n'); }
   async function load() {
@@ -75,7 +60,6 @@
       + '<div style="overflow:auto;overscroll-behavior:contain;flex:1;min-height:120px"><table style="width:100%;border-collapse:collapse"><thead><tr></tr></thead><tbody></tbody></table></div>'
       + '<div class="muted inv-msg" style="margin-top:6px"></div></div>';
     document.body.appendChild(ov);
-    lockPage();
     document.addEventListener('keydown', onKey, true);
     ov.addEventListener('mousedown', function (e) { if (e.target === ov) close(); });
     ov.querySelector('.inv-x').addEventListener('click', close);

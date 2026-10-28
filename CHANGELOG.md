@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.17 – 28.10.2026
+- Verbesserung: Bei **allen Fenstern** der App (Dialoge, Auswahl- und Einstellungsfenster, Farbwähler, PIN-Eingabe, Kamera-Vollbild, Geräteübersicht) scrollt die Seite dahinter nicht mehr mit dem Mausrad mit. Die Seite wird festgehalten, solange ein Fenster offen ist, und danach an derselben Stelle wieder freigegeben. Erkannt wird das automatisch, einzelne Fenster müssen nichts dafür tun.
+
 ## 1.26.16 – 28.10.2026
 - Fehlerbehebung: Bei geöffneter **Geräteübersicht** scrollt die Seite dahinter nicht mehr mit, wenn man am Anfang oder Ende der Liste weiter mit dem Mausrad dreht. Die Seite wird, solange das Fenster offen ist, festgehalten und danach an derselben Stelle freigegeben.
 
