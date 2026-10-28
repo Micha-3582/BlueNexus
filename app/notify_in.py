@@ -239,17 +239,20 @@ def handle_message(token: str, msg: dict, now: float | None = None) -> None:
             return
         _pending.pop(cid, None)
         if lw in NO:
+            _devlog("aktor", "telegram:word", f"Telegram „{p[0]}“", f"abgebrochen von {rec['name']} (Rückfrage mit „nein“ beantwortet)", False, "Telegram")
             _reply(token, cid, "Abgebrochen.")
             return
     match = [e for e in entries if e["word"] == word]
     if not match:
         _log(f"Telegram: unbekanntes Wort „{str(text)[:40]}“ von {rec['name']}")
+        _devlog("aktor", "telegram:unknown", "Telegram", f"unbekanntes Wort „{str(text)[:40]}“ von {rec['name']} – nichts ausgelöst", False, "Telegram")
         if _opt("unknown"):
             _reply(token, cid, fill(_text("unknown") if shown else DEFAULT_TEXT["nocommand"], rec["name"], str(text)[:40]))
         return
     if any(e["confirm"] for e in match):
         _pending[cid] = (word, now)
         _log(f"Telegram: „{word}“ von {rec['name']} – Rückfrage gestellt")
+        _devlog("aktor", "telegram:word", f"Telegram „{word}“", f"Rückfrage an {rec['name']} gestellt (wartet auf „ja“)", True, "Telegram")
         _reply(token, cid, f"„{word}“ wirklich auslösen? Antworte innerhalb einer Minute mit „ja“.")
         return
     _fire(rec, word)

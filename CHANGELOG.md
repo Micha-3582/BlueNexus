@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.6 – 28.10.2026
+- Verbesserung: Das Smart-Home-**Logbuch** zeigt jetzt auch Telegram-Nachrichten, die nichts ausgelöst haben: ein **unbekanntes Wort** eines freigegebenen Empfängers („unbekanntes Wort „toll“ von Michael – nichts ausgelöst“), eine **Rückfrage** (wartet auf „ja“) und ein **Abbruch** mit „nein“. Bisher standen sie nur im Betriebsbericht.
+
 ## 1.26.5 – 28.10.2026
 - Fix: Nach einem Update lädt die Seite erst dann neu, wenn die App **über denselben Weg** (z. B. den Cloudflare-Tunnel) wieder richtig antwortet: mindestens 20 Sekunden Anzeige, die Versionsnummer hat sich geändert und zwei gültige Antworten in Folge. Eine Cloudflare-Fehlerseite oder ein Verbindungsfehler zählt nicht. So erscheint die Fehlerseite „nicht erreichbar“ nicht mehr, weil die Seite zu früh neu lädt.
 
