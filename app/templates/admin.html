@@ -1426,9 +1426,16 @@ document.getElementById('btn-update').addEventListener('click', async () => {
     const d = await (await fetch('/api/update', {method:'POST'})).json();
     out.style.display = 'block'; out.textContent = d.output || '';
     if (d.ok && d.restarting) {
-      st.innerHTML = '<span style="color:var(--cheap)">Aktualisiert – App startet neu. Seite lädt gleich neu …</span>';
-      setTimeout(() => location.reload(), 12000);
+      document.getElementById('btn-update').style.display = 'none'; document.getElementById('btn-check').style.display = 'none';       // nichts mehr zu druecken: der Neustart laeuft
+      pinCss();
+      st.innerHTML = '<div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--cheap);border-radius:12px;background:rgba(53,192,122,.10)"><span style="width:28px;height:28px;flex:none;border:4px solid var(--border);border-top-color:var(--cheap);border-radius:50%;animation:pinSpin .9s linear infinite"></span><div><div style="font-size:18px;font-weight:700;color:var(--cheap)">Aktualisiert – die App startet jetzt neu</div><div class="muted" id="upd-wait">Die Seite lädt gleich von selbst neu. Bitte nichts drücken …</div></div></div>';
+      const t0 = Date.now(); let sawDown = false;                      // sobald die App wieder antwortet (nach dem Neustart), Seite neu laden
+      (function poll() {
+        fetch('/api/version', { cache: 'no-store' }).then(r => { if (r.ok && (sawDown || Date.now() - t0 > 14000)) location.reload(); else setTimeout(poll, 2000); }).catch(() => { sawDown = true; setTimeout(poll, 2000); });
+        if (Date.now() - t0 > 45000) { const w = document.getElementById('upd-wait'); if (w) w.textContent = 'Das dauert länger als gewöhnlich. Lade die Seite in einer Minute von Hand neu (Strg+F5).'; }
+      })();
     } else if (d.ok) {
+      document.getElementById('btn-update').style.display = 'none';
       st.innerHTML = '<span style="color:var(--exp)">Aktualisiert ✓ – bitte App von Hand neu starten.</span>';
     } else {
       st.innerHTML = '<span style="color:var(--vexp)">Update fehlgeschlagen.</span>';

@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.4 – 28.10.2026
+- Verbesserung: Nach einem erfolgreichen Update im System-Reiter verschwinden die Knöpfe „Jetzt aktualisieren“ und „Nach Updates suchen“; stattdessen steht groß eine grüne Meldung mit Kreisel: „Aktualisiert – die App startet jetzt neu“. Die Seite lädt selbst neu, sobald die App wieder antwortet (statt nach fester Zeit), bei Verzögerung gibt es einen Hinweis.
+
 ## 1.26.3 – 28.10.2026
 - Änderung: Bei falscher PIN **dreht** sich das PIN-Feld kurz hin und her und klingt ab (statt seitlich zu rutschen).
 - Fix: Sobald man die **erste Ziffer** eingibt, verschwinden der rote Rahmen und die Warnung. Die **Erfolgsmeldung** hat danach wieder den normalen Rahmen (der rote Rahmen blieb vorher stehen).
