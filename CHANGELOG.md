@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.11 – 28.10.2026
+- Verbesserung: Die Tuya-Suche meldet genauer, was die Tuya-Cloud geliefert hat: „keine Geräte geliefert“ (Verknüpfung/Region prüfen) oder „Geräte ohne Schlüssel“ (Zugangsdaten/API-Dienste prüfen). Bisher kam in beiden Fällen nur „keine Geräte gefunden“. Die Anzahl steht zusätzlich im Betriebsbericht-Protokoll.
+
 ## 1.26.10 – 28.10.2026
 - Verbesserung: Die Meldung bei einer Klimaanlage, die mehrmals die Anmeldung ablehnt, ist verständlicher: Sie sagt jetzt, dass das meist nur eine kurze Schwäche des WLAN-Moduls ist und von selbst vergeht, und nennt den Schlüssel nur noch als Ausweg, wenn es dauerhaft so bleibt oder die Anlage neu gekoppelt wurde.
 

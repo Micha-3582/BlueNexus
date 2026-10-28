@@ -118,7 +118,16 @@ def _cloud_devices() -> list[dict]:
     res = cloud.getdevices()
     if isinstance(res, dict):                       # Fehler (falsche Keys, Region, Konto nicht verknuepft ...)
         raise TuyaError("Tuya-Cloud: " + str(res.get("Error") or res.get("Payload") or res))
-    return [d for d in res if isinstance(d, dict) and d.get("id") and d.get("key")]
+    devs = [d for d in res if isinstance(d, dict) and d.get("id")]
+    ok = [d for d in devs if d.get("key")]
+    log.info("Tuya-Cloud: %d Geräte geliefert, %d davon mit Schlüssel", len(devs), len(ok))
+    if not devs:
+        raise TuyaError("Die Tuya-Cloud hat keine Geräte geliefert – in iot.tuya.com unter Devices → Link App Account prüfen, "
+                        "ob das Smart-Life-Konto verknüpft ist, und ob die Region zum Projekt passt")
+    if not ok:
+        raise TuyaError(f"Die Tuya-Cloud hat {len(devs)} Gerät(e) geliefert, aber ohne Schlüssel – Zugangsdaten (Access Secret) und "
+                        "die freigeschalteten API-Dienste des Projekts prüfen")
+    return ok
 
 
 def discover(known_ids: set[str], networks: list[str] | None = None) -> list[dict]:
