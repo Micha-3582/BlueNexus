@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.16 – 28.10.2026
+- Fehlerbehebung: Bei geöffneter **Geräteübersicht** scrollt die Seite dahinter nicht mehr mit, wenn man am Anfang oder Ende der Liste weiter mit dem Mausrad dreht. Die Seite wird, solange das Fenster offen ist, festgehalten und danach an derselben Stelle freigegeben.
+
 ## 1.26.15 – 28.10.2026
 - Verbesserung: Die **Geräteübersicht** ist nicht mehr dauerhaft aufgeklappt, sondern öffnet sich per Knopf **Geräteübersicht öffnen** in einem eigenen Fenster (schließen mit ✕, Esc oder Klick daneben). Die Spalten (IP-Adresse, Name, Art, MAC, Hinweis) lassen sich per Klick auf die Überschrift **auf- und absteigend sortieren**; die IP-Adressen werden dabei nach Zahlen sortiert, Einträge ohne IP stehen am Ende. Kopieren und CSV übernehmen die aktuelle Suche und Sortierung.
 
