@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.15 – 28.10.2026
+- Verbesserung: Die **Geräteübersicht** ist nicht mehr dauerhaft aufgeklappt, sondern öffnet sich per Knopf **Geräteübersicht öffnen** in einem eigenen Fenster (schließen mit ✕, Esc oder Klick daneben). Die Spalten (IP-Adresse, Name, Art, MAC, Hinweis) lassen sich per Klick auf die Überschrift **auf- und absteigend sortieren**; die IP-Adressen werden dabei nach Zahlen sortiert, Einträge ohne IP stehen am Ende. Kopieren und CSV übernehmen die aktuelle Suche und Sortierung.
+
 ## 1.26.14 – 28.10.2026
 - Fehlerbehebung: In der Geräteübersicht stehen **Zigbee-Geräte** (hinter dem Gateway) und **Homematic-Geräte** (hinter der CCU) nicht mehr mit einer scheinbaren IP-Adresse, sondern am Ende der Liste mit dem Hinweis „über Gateway …“ bzw. „Adresse …“. Mehrkanalige Homematic-Geräte lösen keine Warnung „doppelte IP-Adresse“ mehr aus.
 
