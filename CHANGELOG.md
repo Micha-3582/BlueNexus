@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.2 – 28.10.2026
+- Verbesserung: Bei einer **falschen PIN** zeigt das PIN-Feld die Meldung jetzt deutlich: roter Rahmen, rote Fettschrift „✗ Falsche PIN – bitte erneut“, rote Kreise, kurzes Wackeln des Feldes und am Handy ein kurzer Vibrationsimpuls.
+
 ## 1.26.1 – 28.10.2026
 - Änderung: Die Erfolgsmeldung im PIN-Feld (grüner Haken „Befehl angenommen“) bleibt **eine Sekunde länger** sichtbar (2,1 s statt 1,1 s). Die Fehleranzeige (rotes Kreuz) bleibt bei 1,9 s.
 

@@ -405,6 +405,14 @@ function askPin(title, keepOpen) {
     ov.querySelector('.pin-t').textContent = title || '';
     const dots = ov.querySelector('.pin-dots');
     const card = ov.firstElementChild;
+    if (/^Falsche PIN/i.test(title || '')) {                      // falsche PIN: deutlich zeigen (roter Rahmen, rote Fettschrift, Wackeln, Vibration am Handy)
+      pinCss();
+      card.style.border = '2px solid #e5544a'; card.style.animation = 'pinShake .4s';
+      const hint = ov.querySelector('.pin-t');
+      hint.textContent = '✗ ' + title; hint.style.cssText += ';color:#e5544a;font-weight:700;font-size:16px';
+      ov.querySelector('.pin-dots').style.color = '#e5544a';
+      try { if (navigator.vibrate) navigator.vibrate([90, 60, 90]); } catch (e) { /* nur Komfort */ }
+    }
     const close = v => { document.removeEventListener('keydown', onKey); if (!keepOpen || v === null) ov.remove(); resolve(v); };
     const gone = () => { clearTimeout(ov._t); ov.style.transition = 'opacity .25s'; ov.style.opacity = '0'; setTimeout(() => ov.remove(), 260); };
     ov._status = (ok, text) => {                                  // Ergebnis im PIN-Feld zeigen, danach ausblenden
