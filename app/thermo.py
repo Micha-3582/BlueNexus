@@ -171,6 +171,31 @@ def create(name: str, interval=DEFAULT_INTERVAL_MIN) -> tuple[dict, str]:
     return public(dev), token
 
 
+def rekey(tid: str, name: str | None = None, interval=None) -> tuple[dict, str] | None:
+    """Vorhandenes Thermometer NEU einrichten (z. B. neu geflasht): behaelt ID, Sensoren, Aufzeichnung, Regeln, Abgleich. Es bekommt einen neuen Schluessel;
+    der ALTE gilt weiter, bis sich das Geraet zum ersten Mal mit dem neuen meldet (schlaegt das Flashen fehl, laeuft das alte Geraet unveraendert weiter).
+    -> (Geraet, Klartext-Schluessel) oder None, wenn es die ID nicht gibt."""
+    token = new_token()
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if not d:
+            return None
+        d["pending_hash"] = _hash(token)
+        d["low_n"] = 0
+        d.pop("attempt", None)
+        if name is not None and name.strip():
+            d["name"] = name.strip()[:40]
+        if interval is not None:
+            d["interval"] = _interval(interval)
+        _save(items)
+        dev = dict(d)
+    _make_sensors(dev)                                                  # fehlende Sensoren (falls einer geloescht wurde) wieder anlegen
+    if name is not None and name.strip():
+        rename(tid, name=name.strip())
+    return public(dev), token
+
+
 def public(dev: dict) -> dict:
     """Ohne Schluessel-Hash, mit Status fuer die Oberflaeche."""
     now = time.time()
@@ -272,7 +297,9 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
     with _lock:
         items = _load()
         d = next((x for x in items if x.get("id") == tid), None)
-        if not d or not hmac.compare_digest(str(d.get("token_hash") or ""), _hash(token)):
+        h = _hash(token) if d else ""
+        is_new = bool(d) and bool(d.get("pending_hash")) and hmac.compare_digest(str(d["pending_hash"]), h)
+        if not d or not (is_new or hmac.compare_digest(str(d.get("token_hash") or ""), h)):
             if d:
                 d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "falscher Schlüssel"}
                 _save(items)
@@ -304,6 +331,9 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
             return 400, {"error": "keine gueltigen Messwerte"}
         d["last"], d["last_seen"] = last, time.time()
         d.pop("attempt", None)
+        if is_new:                                                            # das Geraet kennt den neuen Schluessel: der alte ist ab jetzt ungueltig
+            d["token_hash"] = d.pop("pending_hash")
+            d.pop("interval_ack", None)
         meta = dict(d.get("meta") or {})                                      # Diagnose ab Firmware 1.1: laufende Nummer der Aufwachen und Grund des Starts
         n = _num(body.get("n"), 0, 4294967295)
         rr = _num(body.get("rr"), 0, 20)

@@ -49,6 +49,7 @@
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
         + '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot-Drucker, nur am Android-Handy)">Etikett</button>'
+        + '<button type="button" class="ghost" data-act="reflash" data-id="' + esc(d.id) + '" title="Dieses Thermometer neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten">Neu flashen</button>'
         + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
@@ -66,6 +67,15 @@
     if (c.hum != null) p.push((c.hum > 0 ? '+' : '') + dec(c.hum, 1) + ' %');
     return p.length ? ' · Abgleich ' + p.join(' / ') : '';
   }
+  function fillFor() {                                      // Auswahl "Einrichten fuer": neues Thermometer oder ein vorhandenes neu flashen
+    var sel = $('th-for'), cur = sel.value;
+    sel.innerHTML = '<option value="">Neues Thermometer</option>' + state.devices.map(function (d) { return '<option value="' + esc(d.id) + '">' + esc(d.name) + ' · ' + esc(d.id) + ' – neu flashen (Messwerte bleiben)</option>'; }).join('');
+    sel.value = state.devices.some(function (d) { return d.id === cur; }) ? cur : '';
+  }
+  function forChanged() {                                   // vorhandenes gewaehlt: Name und Intervall des Geraets uebernehmen
+    var d = state.devices.find(function (x) { return x.id === $('th-for').value; });
+    if (d) { $('th-name').value = d.name; if ([5, 10, 15, 30, 60].indexOf(d.interval) >= 0) $('th-int').value = String(d.interval); }
+  }
   var focused = false;
   function focusFromLink() {                                  // QR-Code vom Etikett: /admin?thermo=<ID>#system -> Zeile hervorheben
     if (focused) return;
@@ -80,7 +90,7 @@
     return api('/api/thermo').then(function (j) {
       state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure; state.wifi = j.wifi || state.wifi; applyWifi();
       if (!$('th-server').value) $('th-server').value = state.server;
-      renderList(); checkEnv(); labelHint(); focusFromLink();
+      renderList(); fillFor(); checkEnv(); labelHint(); focusFromLink();
     }).catch(function (e) { msg(e.message, true); });
   }
 
@@ -115,7 +125,7 @@
   }
 
   /* ---------------- Fortschritt ---------------- */
-  var STEPS = ['Thermometer anlegen', 'Mit dem Chip verbinden', 'Chip löschen', 'Firmware schreiben', 'Konfiguration schreiben', 'Neustart', 'Auf die erste Messung warten'];
+  var STEPS = ['Thermometer anlegen bzw. vorbereiten', 'Mit dem Chip verbinden', 'Chip löschen', 'Firmware schreiben', 'Konfiguration schreiben', 'Neustart', 'Auf die erste Messung warten'];
   var stepState = [];
   function steps(i, st, extra) {
     stepState[i] = { st: st, extra: extra || '' };
@@ -163,7 +173,7 @@
     msg(''); resetSteps(); setBusy(true);
     var log = function (s) { logLines.push(String(s)); if (logLines.length > 40) logLines.shift(); };
     steps(0, 'run');
-    api('/api/thermo', 'POST', { name: f.name, interval: f.interval, remember: $('th-remember').checked, wifi: { ssid: f.ssid, pass: f.pass, server: f.server, ip: f.ip } }).then(function (j) {
+    api('/api/thermo', 'POST', { name: f.name, interval: f.interval, replace: $('th-for').value || undefined, remember: $('th-remember').checked, wifi: { ssid: f.ssid, pass: f.pass, server: f.server, ip: f.ip } }).then(function (j) {
       created = j; steps(0, 'ok', j.device.id); if (j.wifi) { state.wifi = j.wifi; applyWifi(); }
       var cfgBytes = Uint8Array.from(atob(j.cfg), function (c) { return c.charCodeAt(0); });       // vom Server gebaut (ID, Schluessel, WLAN) - 4096 Byte
       steps(1, 'run');
@@ -190,7 +200,7 @@
     }).then(function () {
       steps(6, 'run', 'jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden');
       ov = resetOverlay();                                                         // grosser Hinweis ueber der Seite: nicht zu uebersehen
-      return waitFirst(created.device.id, 90, ov);
+      return waitFirst(created.device.id, 90, ov, created.replaced ? created.device.last_seen : null);
     }).then(function (dev) {
       steps(6, 'ok'); if (ov) ov.close(true);
       msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
@@ -198,7 +208,7 @@
     }).catch(function (e) {
       if (ov) ov.close(false);
       var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
-      var ours = created && k >= 0 && k <= 5;
+      var ours = created && !created.replaced && k >= 0 && k <= 5;          // nur selbst Angelegtes wieder entfernen, nie ein vorhandenes Thermometer
       var cleanup = (ours ? api('/api/thermo/' + created.device.id, 'DELETE').catch(function () {}) : Promise.resolve());
       var closer = session ? session.transport.disconnect().catch(function () {}) : Promise.resolve();
       var diag = (k === 6 && created) ? api('/api/thermo/' + encodeURIComponent(created.device.id) + '/status').then(function (j) { return j.device; }).catch(function () { return null; }) : Promise.resolve(null);
@@ -212,12 +222,12 @@
       });
     });
   }
-  function waitFirst(id, secs, ov) {
+  function waitFirst(id, secs, ov, base) {            // base = last_seen vor dem Flashen (neu eingerichtetes vorhandenes Thermometer): erst eine NEUERE Meldung zaehlt
     var t0 = Date.now(), hinted = false;
     return new Promise(function (resolve, reject) {
       (function poll() {
         api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) {
-          if (j.device && j.device.last_seen != null) return resolve(j.device);
+          if (j.device && j.device.last_seen != null && (base == null || j.device.last_seen > base)) return resolve(j.device);
           if (ov && ov.cancelled) return reject(new Error('Abgebrochen'));
           if (ov) ov.tick(Math.round((Date.now() - t0) / 1000));
           if (Date.now() - t0 > secs * 1000) return reject(new Error('timeout'));
@@ -332,6 +342,9 @@
         if (!r || !String(r.name || '').trim()) return;
         api('/api/thermo/' + encodeURIComponent(id), 'PATCH', { name: r.name }).then(load).catch(function (e) { msg(e.message, true); });
       });
+    } else if (b.dataset.act === 'reflash') {
+      $('th-for').value = id; forChanged(); $('th-ssid').scrollIntoView({ block: 'center' }); $('th-flash').focus();
+      msg('„' + (d.name || id) + '“ ausgewählt: WLAN prüfen und „Einrichten und flashen“ klicken. ID, Sensoren und Aufzeichnung bleiben erhalten.');
     } else if (b.dataset.act === 'interval') {
       setInterval_(d);
     } else if (b.dataset.act === 'calib') {
@@ -345,6 +358,7 @@
       });
     }
   });
+  $('th-for').addEventListener('change', forChanged);
   $('th-fixed').addEventListener('change', function () { card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = $('th-fixed').checked ? '' : 'none'; }); });
   card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = 'none'; });
   $('th-forget').addEventListener('click', function () {

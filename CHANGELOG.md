@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.26.0 – 28.10.2026
+- Neu: **Thermometer neu flashen, ohne es zu verlieren.** Beim Thermometer gibt es den Knopf „Neu flashen“ (und im Formular die Auswahl „Einrichten für“). Das Gerät behält ID, Sensoren, Aufzeichnung in den Verläufen, Regeln und Abgleich; nur der Schlüssel wird erneuert, der alte gilt bis zur ersten Meldung mit dem neuen weiter. Bisher entstand bei jedem Flashen ein neues Thermometer mit neuen Sensoren, die Aufzeichnung der alten brach ab.
+- Fehlgeschlagenes Neu-Flashen löscht ein vorhandenes Thermometer nie.
+
 ## 1.25.0 – 27.10.2026
 - Firmware 1.1.1 (im Flash-Fenster mitgeliefert): wählt den **Access Point mit dem stärksten Signal** (die Bibliothek nahm bisher den ersten gefundenen mit gleichem Namen und merkte ihn sich – bei mehreren Access Points oft einen weit entfernten) und gibt vor dem Tiefschlaf die letzten Diagnosezeilen noch aus.
 - Neu: Die Liste zeigt **an welchem Access Point** das Thermometer hängt („AP aa:bb:cc:…“) – ab Firmware 1.1.1.

@@ -4170,14 +4170,20 @@ def api_thermo_list():
             ssid, pw, server, fixed = thermo.check_wifi_input(ssid, pw, w.get("server") or _thermo_server_hint(), w.get("ip"))
         except thermo.ThermoError as e:
             return jsonify(error=str(e)), 400              # nichts angelegt
-    dev, token = thermo.create(str(b.get("name") or ""), interval)
+    replace = str(b.get("replace") or "").strip()
+    if replace:                                            # vorhandenes Thermometer neu einrichten: gleiche ID, gleiche Sensoren, neuer Schluessel
+        if not thermo.get(replace):
+            return jsonify(error="Thermometer nicht gefunden"), 404
+        dev, token = thermo.rekey(replace, str(b.get("name") or ""), interval)
+    else:
+        dev, token = thermo.create(str(b.get("name") or ""), interval)
     if isinstance(w, dict):
         cfg_b64 = base64.b64encode(thermo.build_cfg({"v": 1, "name": dev["name"], "ssid": ssid, "pass": pw, "ip": fixed, "server": server,
                                                      "id": dev["id"], "token": token, "interval": dev["interval"]})).decode("ascii")
         if b.get("remember"):
             thermo.wifi_set(ssid, pw)
-    opslog.log("thermo", f"Funkthermometer „{dev['name']}“ angelegt ({dev['id']})", dry=False)
-    return jsonify(device=dev, token=token, server=_thermo_server_hint(), cfg=cfg_b64, wifi=thermo.wifi_public()), 201
+    opslog.log("thermo", f"Funkthermometer „{dev['name']}“ " + ("neu eingerichtet" if replace else "angelegt") + f" ({dev['id']})", dry=False)
+    return jsonify(device=dev, token=token, server=_thermo_server_hint(), cfg=cfg_b64, wifi=thermo.wifi_public(), replaced=bool(replace)), 201
 
 
 @app.route("/api/thermo_wifi", methods=["DELETE"])
