@@ -25,6 +25,23 @@
  *     opts    { legend: true, theme: 'dark' | 'light', onCreate(chart) }
  */
 window.VLChart = (function () {
+  /* Infokasten an der Mausposition: zeigt je Reihe den LETZTEN BEKANNTEN Wert links vom Mauszeiger (nicht nur an Stellen mit eigenem Messpunkt).
+     Nur fuer Linien/Punkte/Stufen; gestapelte Diagramme und Balken behalten die Index-Darstellung. */
+  if (window.Chart && Chart.Interaction && Chart.Tooltip) {
+    Chart.Interaction.modes.lastKnown = function (chart, e) {
+      var x = chart.scales.x.getValueForPixel(e.x), out = [];
+      chart._hoverX = x;
+      chart.data.datasets.forEach(function (ds, di) {
+        if (ds._band || !chart.isDatasetVisible(di)) return;
+        var meta = chart.getDatasetMeta(di), data = ds.data, lo = 0, hi = data.length - 1, k = -1;
+        while (lo <= hi) { var m = (lo + hi) >> 1; if (data[m].x <= x) { k = m; lo = m + 1; } else hi = m - 1; }
+        while (k >= 0 && data[k].y == null) k--;                       // Luecke (kein Wert) ueberspringen: letzter echter Wert davor
+        if (k >= 0 && meta.data[k]) out.push({ element: meta.data[k], datasetIndex: di, index: k });
+      });
+      return out;
+    };
+    Chart.Tooltip.positioners.mouseX = function (items, pos) { return { x: pos.x, y: pos.y }; };
+  }
   var COLORS = ['#4b9be6', '#35c07a', '#f0b429', '#e5544a', '#b57bee', '#2ec4b6', '#ff8fab', '#a0a8b8'];
   var STEPS = [60e3, 300e3, 600e3, 900e3, 1800e3, 3600e3, 7200e3, 10800e3, 21600e3, 43200e3, 86400e3, 172800e3, 604800e3, 2592000e3];
 
@@ -97,13 +114,14 @@ window.VLChart = (function () {
     var cfg = {
       type: isBar ? 'bar' : 'line', data: { datasets: datasets },
       options: {
-        animation: false, parsing: isBar, normalized: !isBar, maintainAspectRatio: false, interaction: { mode: stacked ? 'index' : 'nearest', axis: 'x', intersect: false },
+        animation: false, parsing: isBar, normalized: !isBar, maintainAspectRatio: false, interaction: { mode: (stacked || isBar || !(window.Chart && Chart.Interaction && Chart.Interaction.modes.lastKnown)) ? (stacked ? 'index' : 'nearest') : 'lastKnown', axis: 'x', intersect: false },
         plugins: {
           legend: { display: opts.legend !== false, align: 'start', labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
           tooltip: {
+            position: (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners.mouseX && !stacked && !isBar) ? 'mouseX' : 'average',
             filter: function (it) { return !it.dataset._band; },
             callbacks: {
-              title: function (items) { return items.length ? new Date(items[0].parsed.x).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: span <= 6 * 3600000 ? '2-digit' : undefined }) : ''; },
+              title: function (items) { return items.length ? new Date(items[0].chart._hoverX != null && !stacked && !isBar ? items[0].chart._hoverX : items[0].parsed.x).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: span <= 6 * 3600000 ? '2-digit' : undefined }) : ''; },
               footer: function (items) {                         // gestapelt: Summe je Achse/Einheit
                 if (!stacked) return '';
                 var sums = {};
