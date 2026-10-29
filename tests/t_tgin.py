@@ -80,7 +80,7 @@ msg(778, "Hallo", frm="Noch einer"); assert l.get("/api/notify/requests").status
 for u in ("/rules-log", "/automation-log", "/solar-log", "/report", "/watchdog", "/api/automation/log?module=rules", "/api/automation/unread", "/api/solar-log", "/api/report", "/api/watchdog"):
     rr = l.get(u); assert rr.status_code == (403 if u.startswith('/api/') else 302), (u, rr.status_code)            # Seiten leiten zum Dashboard um
     assert c.get(u).status_code in (200, 302), (u, c.get(u).status_code)
-assert l.get("/rules").status_code == 200 and "/rules-log" not in l.get("/rules").data.decode() and "/rules-log" in c.get("/rules").data.decode()
+assert l.get("/rules").status_code == 200 and "/smarthome#logbuch" not in l.get("/rules").data.decode() and "/smarthome#logbuch" in c.get("/rules").data.decode()
 assert "/solar-log" not in l.get("/admin").data.decode() or True
 print("6) API/Logbuecher OK")
 

@@ -37,7 +37,7 @@ def make_valley_prices(_):
             ct = 55.0
         else:
             ct = 32.0
-        out.append({"startsAt": t.strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": ct / 100, "level": "NORMAL"})
+        out.append({"startsAt": t.astimezone().isoformat(timespec="seconds"), "total": ct / 100, "level": "NORMAL"})
     return out
 
 

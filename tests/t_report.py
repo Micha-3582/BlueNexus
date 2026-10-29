@@ -11,7 +11,7 @@ store.PRICE_HISTORY_PATH = os.path.join(tmp, "ph.json"); store._price_cache = No
 store.BACKUP_DIR = os.path.join(tmp, "backups"); os.makedirs(store.BACKUP_DIR); open(os.path.join(store.BACKUP_DIR, "history.json-2026-09-26.json"), "w").write("{}")
 store.HISTORY_PATH = os.path.join(tmp, "h.json"); store.MONTHLY_PATH = os.path.join(tmp, "m.json"); store.SOLAR_LOG_PATH = os.path.join(tmp, "s.json")
 store.PLANSIM_LOG_PATH = os.path.join(tmp, "ps.json") if hasattr(store, "PLANSIM_LOG_PATH") else None
-sent = []; notify._send_async = lambda text: sent.append(text)
+sent = []; notify._send_async = lambda text, to=None, system=False: sent.append(text)
 json.dump({"token": "1:T", "chat_id": "5"}, open(notify.CRED_PATH, "w"))
 vrm.CREDENTIALS_PATH = os.path.join(tmp, "vrm.json"); json.dump({"token": "T", "installation_id": "1"}, open(vrm.CREDENTIALS_PATH, "w"))
 cfg.update({"app_display_name": "Testanlage", "dry_run": False, "poll_seconds": 300})
@@ -70,7 +70,7 @@ if c3.get("plansim") and c3["plansim"].get("available"):
 
 # ---- Endpunkte
 class U:
-    def get(self, n): return {"username": "t"}
+    def get(self, n): return {"username": "t", "permissions": dict(__import__("auth").PRESETS["admin"])}
     def __getattr__(self, n): return lambda *a, **k: False
 webapp.users = U()
 c = webapp.app.test_client()

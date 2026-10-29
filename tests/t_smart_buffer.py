@@ -26,7 +26,7 @@ webapp.planner.run = spy_run
 
 now0 = datetime(2026, 9, 29, 5, 0)
 vrm_data = {"hours": [{"day": "today", "hour": h, "wh": 500.0} for h in range(24)]}
-prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": 0.30}
+prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).astimezone().isoformat(timespec="seconds"), "total": 0.30}
           for i in range(48)]
 
 # ---- Cerbo-Minimalwert 15%, Puffer 0% (Standard vor der Umstellung) -> Planung rechnet mit genau 15%

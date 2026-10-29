@@ -42,7 +42,10 @@ def setup(root):
         def __init__(self, *a, **k): pass
         def read_soc(self): return 42.0
         def read_ess_mode(self): return 10
-        def read_system(self): return None
+        def read_system(self, **k): return None
+        def read_min_soc(self): return 20.0
+        def read_alarms(self): return {"values": {}, "errors": {}}
+        def read_soh(self): return None
         def write_ess_mode(self, m, dry_run=True): return False
     webapp.Cerbo = FakeCerbo
     now = datetime.now()
@@ -52,7 +55,7 @@ def setup(root):
         for i in range(192):
             t = day0 + timedelta(minutes=15 * i)
             ct = 21 if t.hour < 6 else (46 if 17 <= t.hour < 21 else 31)
-            out.append({"startsAt": t.strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": ct / 100, "level": "NORMAL"})
+            out.append({"startsAt": t.astimezone().isoformat(timespec="seconds"), "total": ct / 100, "level": "NORMAL"})
         return out
     webapp.fetch_tibber_prices = prices
     cfg = {"cerbo_host": "x", "tibber_token": "x", "dry_run": True}

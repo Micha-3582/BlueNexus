@@ -63,7 +63,7 @@ r = c.post("/api/homematic/blinds/add", json={"ids": ["hmR-OEQ0009002-1", "hmR-0
 assert r.status_code == 200 and len(r.get_json()["added"]) == 2, r.get_json()
 assert c.post("/api/homematic/blinds/add", json={"ids": ["hmR-OEQ0009002-1"], "edits": {"hmR-OEQ0009002-1": {"icon": "nix"}}}).status_code == 400
 lst = {x["id"]: x for x in c.get("/api/homematic/blinds").get_json()}
-assert lst["hmR-OEQ0009002-1"]["name"] == "Rollladen Wohnzimmer" and lst["hmR-OEQ0009002-1"]["icon"] == "🏠" and lst["hmR-000A-3"]["icon"] == "🪟"
+assert lst["hmR-OEQ0009002-1"]["name"] == "Rollladen Wohnzimmer" and lst["hmR-OEQ0009002-1"]["icon"] == "🏠" and lst["hmR-000A-3"]["icon"] == "🏠"        # Standard-Symbol: nur gaengige Emoji (🪟 zeigt manche Handys als Kaestchen)
 assert lst["hmR-OEQ0009002-1"]["level"] == 45 and lst["hmR-OEQ0009002-1"]["users"] == [], lst
 assert c.get("/api/homematic/blinds?light=1").get_json()[0]["level"] is None                 # ohne Live-Abfrage
 UNREACH["v"] = True; homematic._unreach_cache.clear(); homematic._pushed.clear()

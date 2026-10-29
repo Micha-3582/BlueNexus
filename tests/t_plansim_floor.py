@@ -26,7 +26,7 @@ webapp.planner.run = spy_run
 now0 = datetime(2026, 9, 29, 20, 0)          # abends, keine Sonne mehr -> Floor wird im Verlauf der Nacht relevant
 vrm_data = {"hours": [{"day": "today", "hour": h, "wh": 0.0} for h in range(24)]
             + [{"day": "tomorrow", "hour": h, "wh": 500.0} for h in range(24)]}
-prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": 0.30}
+prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).astimezone().isoformat(timespec="seconds"), "total": 0.30}
           for i in range(96)]
 cfg.update({"tariff_mode": "tibber", "smart_planner_enabled": True, "battery_usable_kwh": 20.0,
             "pv_reserve_kwh": 2.0, "max_charge_soc": 95.0, "daily_usage_kwh": 24.0, "charge_power_w": 3000})

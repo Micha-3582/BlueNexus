@@ -41,17 +41,17 @@ assert step(23, 0, True) == []
 assert step(7, 40, True) == ["off"]                       # Sonnenaufgang vorbei: aus
 
 # Telegram-Prefix
-c0 = {"app_display_name": "Michas Victron Steuerung"}
-assert notify._prefix(c0) == "[Michas Victron Steuerung] " and notify._prefix({**c0, "notify_prefix": True}) == "[Michas Victron Steuerung] "
+c0 = {"app_display_name": "Hanss Victron Steuerung"}
+assert notify._prefix(c0) == "[Hanss Victron Steuerung] " and notify._prefix({**c0, "notify_prefix": True}) == "[Hanss Victron Steuerung] "
 assert notify._prefix({**c0, "notify_prefix": False}) == ""
 assert notify.settings_public({})["prefix"] is True and notify.settings_public({"notify_prefix": False})["prefix"] is False
 assert notify.validate_settings({"prefix": False}) == {"notify_prefix": False}
 sent = []
 notify.CRED_PATH = os.path.join(tmp, "tg.json"); json.dump({"token": "T", "chat_id": "1"}, open(notify.CRED_PATH, "w"))
-notify.send = lambda text, token=None, chat_id=None: sent.append(text)
+notify.send = lambda text, token=None, chat_id=None, to=None: sent.append(text)
 notify.message("Hallo", {**c0, "notify_prefix": False}); time.sleep(0.3)
 notify.message("Hallo", c0); time.sleep(0.3)
-assert sent == ["Hallo", "[Michas Victron Steuerung] Hallo"], sent
+assert sent == ["Hallo", "[Hanss Victron Steuerung] Hallo"], sent
 from auth import UserStore
 webapp.users = UserStore(os.path.join(tmp, "u.json")); webapp.users.create("admin", "adminpass1")
 c = webapp.app.test_client(); c.post("/login", data={"username": "admin", "password": "adminpass1"}, follow_redirects=True)

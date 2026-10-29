@@ -9,7 +9,7 @@ notify.CRED_PATH = os.path.join(tmp, "tg.json")
 notify.STATE_PATH = os.path.join(tmp, "ns.json")
 import json
 json.dump({"token": "t", "chat_id": "1"}, open(notify.CRED_PATH, "w"))
-notify._send_async = lambda text: sent.append(text)
+notify._send_async = lambda text, to=None, system=False: sent.append(text)
 webapp.notify = notify
 cfg.update({"notify_events": {"alarms": True}})
 

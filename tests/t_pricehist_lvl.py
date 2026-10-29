@@ -10,7 +10,7 @@ LEVELS = ["VERY_CHEAP", "CHEAP", "NORMAL", "EXPENSIVE", "VERY_EXPENSIVE"]
 
 def entries(day, lvl=lambda i: LEVELS[i % 5]):
     t0 = datetime.strptime(day, "%Y-%m-%d")
-    return [{"startsAt": (t0 + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S+02:00"),
+    return [{"startsAt": (t0 + timedelta(minutes=15 * i)).astimezone().isoformat(timespec="seconds"),
              "total": (20 + i % 10) / 100, "level": lvl(i)} for i in range(96)]
 
 

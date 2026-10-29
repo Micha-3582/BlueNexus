@@ -81,7 +81,7 @@ except rules.RuleError as e:
 
 sent, log = [], []
 notify.CRED_PATH = os.path.join(tmp, "tg.json"); json.dump({"token": "T", "chat_id": "1"}, open(notify.CRED_PATH, "w"))
-notify.send_photo = lambda jpeg, caption="", token=None, chat_id=None: sent.append((jpeg, caption))
+notify.send_photo = lambda jpeg, caption="", token=None, chat_id=None, to=None: sent.append((jpeg, caption))
 camera.snapshot = lambda item, max_age=None: b"\xff\xd8JPEG-" + item["id"].encode()
 autolog.log = lambda module, text, dev="", action="", dry=False, rule=None, now=None: log.append((action, dev, text, dry))
 webapp.opslog.log = lambda *a, **k: None

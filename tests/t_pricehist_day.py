@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 def entries(day, ct=lambda i: 20 + i % 10):
     t0 = datetime.strptime(day, "%Y-%m-%d")
-    return [{"startsAt": (t0 + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": ct(i) / 100} for i in range(96)]
+    return [{"startsAt": (t0 + timedelta(minutes=15 * i)).astimezone().isoformat(timespec="seconds"), "total": ct(i) / 100} for i in range(96)]
 
 
 store.record_prices(entries("2026-09-20"))

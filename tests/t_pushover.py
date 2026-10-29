@@ -87,7 +87,7 @@ print("2) Senden OK")
 
 # 2b) Zwei Handys im selben Konto: gleicher Schluessel, verschiedene Geraete
 ina = pushover.add_recipient("Ina (S22)", KEY1, device="GalaxyS22")
-mic = pushover.add_recipient("Max (S25)", KEY1, device="Michas-S25-Ultra")
+mic = pushover.add_recipient("Max (S25)", KEY1, device="Hanss-S25-Ultra")
 assert ina["id"] == "p4" and mic["id"] == "p5"
 for bad in (("Doppelt", KEY1, "GalaxyS22"), ("Doppelt", KEY1, ""), ("X", KEY1, "mit leerzeichen"), ("X", KEY1, "a" * 26)):
     try:
@@ -95,9 +95,9 @@ for bad in (("Doppelt", KEY1, "GalaxyS22"), ("Doppelt", KEY1, ""), ("X", KEY1, "
     except pushover.PushoverError:
         pass
 DEV.clear(); pushover.send("nur Ina", to=["p4"]); assert DEV == [(KEY1, "GalaxyS22")], DEV
-DEV.clear(); pushover.send("nur ich", to=["p5"]); assert DEV == [(KEY1, "Michas-S25-Ultra")], DEV
+DEV.clear(); pushover.send("nur ich", to=["p5"]); assert DEV == [(KEY1, "Hanss-S25-Ultra")], DEV
 DEV.clear(); pushover.send("alle Geraete", to=["p1"]); assert DEV == [(KEY1, None)], "ohne Geraet: an alle Geraete des Kontos"
-DEV.clear(); pushover.send("beide", to=["p4", "p5"]); assert sorted(d for _, d in DEV) == ["GalaxyS22", "Michas-S25-Ultra"]
+DEV.clear(); pushover.send("beide", to=["p4", "p5"]); assert sorted(d for _, d in DEV) == ["GalaxyS22", "Hanss-S25-Ultra"]
 assert pushover.remove_recipient("p4") and pushover.remove_recipient("p5")
 print("2b) Geraete OK")
 

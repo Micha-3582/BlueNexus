@@ -11,24 +11,24 @@ sys.path.insert(0, "K:/Claude Projekte/BlueNexus-Thermometer/tools")
 import make_cfg
 
 def post(**w):
-    base = {"ssid": "Michas WLAN", "pass": "geheim1234", "server": "http://192.168.50.40:5005", "ip": None}; base.update(w)
+    base = {"ssid": "Hanss WLAN", "pass": "geheim1234", "server": "http://192.168.50.40:5005", "ip": None}; base.update(w)
     return A.post("/api/thermo", json={"name": "Außen", "interval": 15, "remember": False, "wifi": base})
 
 # 1) Server baut die Konfiguration, bytegleich zur Referenz des Thermometer-Projekts
 r = post(); assert r.status_code == 201, r.get_json()
 j = r.get_json(); dev, token = j["device"], j["token"]
 cb = base64.b64decode(j["cfg"]); assert len(cb) == 4096
-exp = make_cfg.build({"v": 1, "name": "Außen", "ssid": "Michas WLAN", "pass": "geheim1234", "ip": None, "server": "http://192.168.50.40:5005", "id": dev["id"], "token": token, "interval": 15})
+exp = make_cfg.build({"v": 1, "name": "Außen", "ssid": "Hanss WLAN", "pass": "geheim1234", "ip": None, "server": "http://192.168.50.40:5005", "id": dev["id"], "token": token, "interval": 15})
 assert cb == exp, "cfg.bin weicht von make_cfg.py ab"
-p = make_cfg.parse(cb); assert p["ssid"] == "Michas WLAN" and p["pass"] == "geheim1234" and p["id"] == dev["id"] and p["token"] == token
+p = make_cfg.parse(cb); assert p["ssid"] == "Hanss WLAN" and p["pass"] == "geheim1234" and p["id"] == dev["id"] and p["token"] == token
 assert not os.path.exists(thermo.WIFI_PATH) and j["wifi"]["saved"] is False                    # ohne "merken" bleibt nichts gespeichert
 assert "geheim1234" not in open(thermo.THERMO_PATH, encoding="utf-8").read()
 # 2) Merken: Name + Passwort gespeichert, Oberflaeche sieht nie das Passwort
-r = A.post("/api/thermo", json={"name": "Hof", "interval": 15, "remember": True, "wifi": {"ssid": "Michas WLAN", "pass": "geheim1234", "server": "http://192.168.50.40:5005"}}); assert r.status_code == 201
-assert r.get_json()["wifi"] == {"saved": True, "ssid": "Michas WLAN", "has_pass": True}
-lst = A.get("/api/thermo").get_json(); assert lst["wifi"] == {"saved": True, "ssid": "Michas WLAN", "has_pass": True} and "geheim1234" not in json.dumps(lst)
+r = A.post("/api/thermo", json={"name": "Hof", "interval": 15, "remember": True, "wifi": {"ssid": "Hanss WLAN", "pass": "geheim1234", "server": "http://192.168.50.40:5005"}}); assert r.status_code == 201
+assert r.get_json()["wifi"] == {"saved": True, "ssid": "Hanss WLAN", "has_pass": True}
+lst = A.get("/api/thermo").get_json(); assert lst["wifi"] == {"saved": True, "ssid": "Hanss WLAN", "has_pass": True} and "geheim1234" not in json.dumps(lst)
 # 3) Weiteres Thermometer mit leerem Passwortfeld: gemerktes Passwort wird benutzt
-r = A.post("/api/thermo", json={"name": "Garten", "interval": 30, "wifi": {"ssid": "Michas WLAN", "pass": "", "server": "http://192.168.50.40:5005"}}); assert r.status_code == 201
+r = A.post("/api/thermo", json={"name": "Garten", "interval": 30, "wifi": {"ssid": "Hanss WLAN", "pass": "", "server": "http://192.168.50.40:5005"}}); assert r.status_code == 201
 p = make_cfg.parse(base64.b64decode(r.get_json()["cfg"])); assert p["pass"] == "geheim1234" and p["interval"] == 30 and p["name"] == "Garten", p
 # anderes WLAN, leeres Passwort: NICHT das gemerkte Passwort des anderen WLANs verwenden
 r = A.post("/api/thermo", json={"name": "Keller", "wifi": {"ssid": "Anderes WLAN", "pass": "", "server": "http://192.168.50.40:5005"}}); assert r.status_code == 201

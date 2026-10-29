@@ -17,11 +17,11 @@ def nav(html):
     m = re.search(r"<header>.*?</header>", html, re.S).group(0)
     return re.findall(r'<a href="([^"]+)"( class="active")?[^>]*>(?:<span[^>]*>)?([^<]+)', m)
 
-# Admin: drei Menuepunkte, aktiv je nach Seite
+# Admin: alle Menuepunkte, aktiv je nach Seite
 for path, active in (("/", "Dashboard"), ("/smarthome", "Smart Home"), ("/automation", "Einstellungen"), ("/rules", "Smart Home"), ("/admin", "Einstellungen")):
     r = A.get(path); assert r.status_code == 200, (path, r.status_code)
     n = nav(r.get_data(as_text=True))
-    assert [x[2] for x in n] == ["Dashboard", "Smart Home", "Kameras", "Einstellungen"], n
+    assert [x[2] for x in n] == ["Dashboard", "Smart Home", "Verläufe", "Kameras", "Einstellungen"], n
     assert [x[2] for x in n if x[1]] == [active], (path, n)
 print("Hauptmenue OK")
 
@@ -29,7 +29,8 @@ print("Hauptmenue OK")
 h = A.get("/smarthome").get_data(as_text=True)
 sub = re.search(r'<nav class="shnav".*?</nav>', h, re.S).group(0)
 labels = re.findall(r'title="([^"]+)"', sub)
-assert labels == ["Aktoren", "Sensoren", "Thermostate", "Sicherheit", "Regeln", "Geräte suchen", "Wake-on-LAN", "Sonstiges"], labels
+# Ohne eingerichtete Homematic/Zigbee/Kameras fehlen Sensoren, Thermostate und Sicherheit (Reiter nur fuer vorhandene Systeme)
+assert labels == ["Aktoren", "Regeln", "Geräte suchen", "NFC + QR", "Teilen", "Wake-on-LAN", "Logbuch", "Sonstiges"], labels
 assert "window.PAGE_MODE = \"smarthome\"" in h
 t = A.get("/rules").get_data(as_text=True)
 s2 = re.search(r'<nav class="shnav".*?</nav>', t, re.S).group(0)
@@ -78,7 +79,8 @@ G = login("geraete", "geraetepass1")
 st, nv = navlabels(G, "/smarthome"); assert st == 200
 href = [x[0] for x in nav(G.get("/smarthome").get_data(as_text=True)) if x[2] == "Smart Home"][0]; assert href == "/smarthome"
 sub = re.search(r'<nav class="shnav".*?</nav>', G.get("/smarthome").get_data(as_text=True), re.S).group(0)
-assert re.findall(r'title="([^"]+)"', sub) == ["Aktoren", "Sensoren", "Thermostate", "Sicherheit", "Geräte suchen", "Wake-on-LAN", "Sonstiges"]
+# Nur "Einstellungen: Geraete": Sensoren/Thermostate/Sicherheit nur mit eingerichtetem System, Wake-on-LAN nur mit freigegebenem Rechner
+assert re.findall(r'title="([^"]+)"', sub) == ["Aktoren", "Geräte suchen", "Sonstiges"]
 assert G.get("/rules").status_code == 302
 print("Rechte OK")
 print("MENUE OK")

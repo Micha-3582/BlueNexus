@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ps_common
-webapp, store, cfg, tmp = ps_common.setup("K:/Claude Projekte/Victron Standalone Steuerung")
+webapp, store, cfg, tmp = ps_common.setup(sys.argv[1])
 from logic import PersistentState
 import datetime as dt
 print("STATE_PATH", store.STATE_PATH)

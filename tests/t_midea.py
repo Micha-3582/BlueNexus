@@ -8,19 +8,27 @@ webapp.users = UserStore(os.path.join(tmp, "u_m.json")); webapp.users.create("ad
 webapp.opslog.log = lambda *a, **k: None
 midea.LOGIN_STATE_PATH = os.path.join(tmp, "ml.json"); midea._login_fail.clear()
 
-# 1) Anmeldefehler: Wartezeit (Passwort falsch = lang) und Ueberleben eines Neustarts
+# 1) Anmeldefehler: Wartezeit (Passwort falsch = lang) und Ueberleben eines Neustarts.
+# Fehlversuche merkt die Schranke an der Bibliothek (_install_login_gate); hier schlaegt die Anmeldung der Bibliothek selbst fehl.
+from midea_beautiful.midea import DEFAULT_APP_ID, DEFAULT_APPKEY, DEFAULT_HMACKEY, DEFAULT_IOTKEY, DEFAULT_PROXIED, DEFAULT_SIGNKEY
+from midea_beautiful.cloud import MideaCloud
+_orig_login = (MideaCloud._login_proxied, MideaCloud._login_non_proxied)
+class AuthErr(Exception): pass
+def _bad_login(self): raise AuthErr("Cloud authentication error: password error (3101)")
+MideaCloud._login_proxied = MideaCloud._login_non_proxied = _bad_login
+if hasattr(MideaCloud, "_bnx_gated"): del MideaCloud._bnx_gated
+midea._install_login_gate(None)
 class FakeMb:
     calls = 0
-    class Err(Exception): pass
     @classmethod
     def connect_to_cloud(cls, account, password):
         cls.calls += 1
-        if password != "richtig": raise cls.Err("Cloud authentication error: password error (3101)")
-        class C: max_retries = 0
-        return C()
+        MideaCloud(appkey=DEFAULT_APPKEY, account=account, password=password, appid=DEFAULT_APP_ID, hmac_key=DEFAULT_HMACKEY, iot_key=DEFAULT_IOTKEY,
+                   proxied=DEFAULT_PROXIED, sign_key=DEFAULT_SIGNKEY)._login_proxied()
+        raise AssertionError("Anmeldung haette scheitern muessen")
 midea._mb = lambda: FakeMb
-try: midea._cloud_conn("a@b.de", "falsch"); raise SystemExit("sollte scheitern")
-except Exception as e: assert "password" in str(e).lower()
+try: midea._cloud_conn("a@b.de", "falsch", manual=True); raise SystemExit("sollte scheitern")
+except AuthErr as e: assert "password" in str(e).lower()
 t, msg, wait = midea._login_fail["a@b.de"]; assert wait == midea.LOGIN_BACKOFF_AUTH_S
 try: midea._cloud_conn("a@b.de", "falsch"); raise SystemExit("Wartezeit")
 except midea.MideaError as e: assert "Zugang erneuern" in str(e) and FakeMb.calls == 1
@@ -28,6 +36,7 @@ midea._login_fail.clear(); midea._login_fail.update(midea._load_login_fail())   
 assert "a@b.de" in midea._login_fail
 try: midea._cloud_conn("a@b.de", "falsch"); raise SystemExit("nach Neustart weiter warten")
 except midea.MideaError: assert FakeMb.calls == 1, "kein neuer Anmeldeversuch nach Neustart"
+MideaCloud._login_proxied, MideaCloud._login_non_proxied = _orig_login; del MideaCloud._bnx_gated           # Bibliothek fuer die weiteren Teile unveraendert
 print("1) Wartezeit ueberlebt Neustart OK")
 
 # 2) Zugang erneuern

@@ -1,6 +1,6 @@
 import os, sys, tempfile, time
 from datetime import datetime, timedelta
-sys.path.insert(0, r"K:\Claude Projekte\Victron Standalone Steuerung\app")
+sys.path.insert(0, sys.argv[1] + "/app")
 import vrm
 vrm.CREDENTIALS_PATH = os.path.join(tempfile.mkdtemp(), "vrm.json")
 

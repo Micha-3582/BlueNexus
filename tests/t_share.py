@@ -170,7 +170,7 @@ assert k.post("/api/share-item", json={"ref": "device:sh-1", "shares": {}}).stat
 print("9) Einzel-Teilen OK")
 
 # 10) Einladungscode: Adresse + Schluessel + Name in einem
-cf = store.load_config(); cf["app_display_name"] = "Michas BlueNexus"; store.save_config(cf)
+cf = store.load_config(); cf["app_display_name"] = "Hanss BlueNexus"; store.save_config(cf)
 r = c.post("/api/shares", json={"name": "Anna", "origin": "http://geber.test"}).get_json(); code, tok2, sid3 = r["invite"], r["token"], r["share"]["id"]
 assert code.startswith("bnxshare1_") and tok2 not in code and len(code) > 40
 assert share.parse_invite("Hier: " + code + " viel Spass") == ("http://geber.test", tok2)                        # auch aus einer Nachricht
@@ -178,7 +178,7 @@ assert share.parse_invite(code[:10] + " " + code[10:30] + chr(10) + code[30:]) =
 assert c.post("/api/shares", json={"name": "Ohne"}).get_json()["invite"] is None                                  # ohne Adresse: nur Schluessel
 for bad in ("hallo", "bnxshare1_", "bnxshare1_abc", "bnxshare1_" + code[10:-6]):
     assert c.post("/api/sources", json={"invite": bad}).status_code == 400, bad
-r = c.post("/api/sources", json={"invite": code}); assert r.status_code == 200 and r.get_json()["name"] == "Michas BlueNexus", r.data     # Name kommt von der anderen Anlage
+r = c.post("/api/sources", json={"invite": code}); assert r.status_code == 200 and r.get_json()["name"] == "Hanss BlueNexus", r.data     # Name kommt von der anderen Anlage
 nt = c.post(f"/api/shares/{sid3}/token", json={"origin": "http://geber.test"}).get_json(); assert nt["invite"] != code and share.parse_invite(nt["invite"])[1] == nt["token"]
 assert c.post("/api/sources", json={"invite": code}).status_code == 401                                         # alter Code nach neuem Schluessel ungueltig
 print("10) Einladungscode OK")

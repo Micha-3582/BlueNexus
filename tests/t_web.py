@@ -7,7 +7,7 @@ vrm.CREDENTIALS_PATH = os.path.join(tmp, "vrm.json")
 import webapp
 c = webapp.app.test_client()
 class U:
-    def get(self, n): return {'username': 'test'}
+    def get(self, n): return {"username": "test", "permissions": dict(__import__("auth").PRESETS["admin"])}
     def __getattr__(self, n): return lambda *a, **k: False
 webapp.users = U()
 user = 'test'

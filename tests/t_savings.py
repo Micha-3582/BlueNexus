@@ -71,7 +71,7 @@ cfg["pv_auto_calibration"] = True; webapp.ctrl.safe_tick(); st = webapp.ctrl.sta
 assert abs(st["pv_tom"] - off * 0.8) < 0.05 and "gesenkt" in (st.get("pv_note") or "") and webapp.ctrl.pv_cal == 0.8, (off, st["pv_tom"], st.get("pv_note"))
 # ---- Endpunkte + Seiten + Bericht
 class U:
-    def get(self, n): return {"username": "t"}
+    def get(self, n): return {"username": "t", "permissions": dict(__import__("auth").PRESETS["admin"])}
     def __getattr__(self, n): return lambda *a, **k: False
 webapp.users = U(); cl = webapp.app.test_client()
 with cl.session_transaction() as s: s["user"] = "t"

@@ -23,7 +23,7 @@ webapp.Cerbo = victron.Cerbo
 cfg.update({"cerbo_host": "1.2.3.4"})
 webapp.store.is_configured = lambda c: True
 class U:
-    def get(self, n): return {"username": "t"}
+    def get(self, n): return {"username": "t", "permissions": dict(__import__("auth").PRESETS["admin"])}
     def __getattr__(self, n): return lambda *a, **k: False
 webapp.users = U(); c = webapp.app.test_client()
 with c.session_transaction() as s: s["user"] = "t"

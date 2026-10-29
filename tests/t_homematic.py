@@ -44,7 +44,7 @@ DEVICES = [
     {"id": "9701", "name": "Wohnzimmer Heizkoerper", "address": "KEQ0000011", "interface": "BidCos-RF", "type": "HM-CC-RT-DN", "channels": [
         ch(9710, "KEQ0000011:0", "x:0", "MAINTENANCE", 0),
         ch(9714, "KEQ0000011:4", "KEQ0000011:4", "CLIMATECONTROL_RT_TRANSCEIVER", 4)]},
-    {"id": "9801", "name": "Tuerschloss Micha", "address": "NEQ0000012", "interface": "HmIP-RF", "type": "HmIP-DLD", "channels": [
+    {"id": "9801", "name": "Tuerschloss Hans", "address": "NEQ0000012", "interface": "HmIP-RF", "type": "HmIP-DLD", "channels": [
         ch(9810, "NEQ0000012:0", "x:0", "MAINTENANCE", 0),
         ch(9811, "NEQ0000012:1", "NEQ0000012:1", "DOOR_LOCK_STATE_TRANSMITTER", 1)]},
     {"id": "9901", "name": "Tuerschloss - Oma", "address": "OEQ0000001", "interface": "BidCos-RF", "type": "HM-Sec-Key-S", "channels": [
@@ -265,7 +265,7 @@ exp = {"hmS-NEQ0000006-1-ACTUAL_TEMPERATURE": ("temperature", "Wohnzimmer Thermo
        "hmS-NEQ0000001-6-POWER": ("power", "Steckdose Studio – Leistung", "W", False),
        "hmS-KEQ0000003-2-POWER": ("power", "Waschmaschine – Leistung", "W", False),
        "hmS-NEQ0000010-1-ACTUAL_TEMPERATURE": ("temperature", "Bad Heizkoerper – Temperatur", "°C", False),
-       "hmS-NEQ0000012-1-LOCK_STATE": ("lock", "Tuerschloss Micha – Türschloss", "", True)}
+       "hmS-NEQ0000012-1-LOCK_STATE": ("lock", "Tuerschloss Hans – Türschloss", "", True)}
 assert set(sby) == set(exp), set(sby) ^ set(exp)
 for sid_, (kind, name, unit, binary) in exp.items():
     f = sby[sid_]
@@ -395,7 +395,7 @@ for act in ("open", "unlock"):
         homematic.lock_action("hmK-NEQ0000012-1", act); raise AssertionError("ohne Freigabe")
     except homematic.HomematicError as e:
         assert "nicht freigegeben" in str(e)
-assert homematic.lock_action("hmK-NEQ0000012-1", "lock") == "Tuerschloss Micha" and mock.values[("NEQ0000012:1", "LOCK_TARGET_LEVEL")] == 0     # Verriegeln ist immer erlaubt
+assert homematic.lock_action("hmK-NEQ0000012-1", "lock") == "Tuerschloss Hans" and mock.values[("NEQ0000012:1", "LOCK_TARGET_LEVEL")] == 0     # Verriegeln ist immer erlaubt
 homematic.update_lock("hmK-NEQ0000012-1", allow_open=True)
 homematic.lock_action("hmK-NEQ0000012-1", "open"); assert mock.values[("NEQ0000012:1", "LOCK_TARGET_LEVEL")] == 2                              # wie im ioBroker-Skript: 2 = Tuer oeffnen
 homematic.lock_action("hmK-NEQ0000012-1", "unlock"); assert mock.values[("NEQ0000012:1", "LOCK_TARGET_LEVEL")] == 1

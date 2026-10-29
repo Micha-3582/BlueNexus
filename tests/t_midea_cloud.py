@@ -58,40 +58,35 @@ class FakeCloud:
 def fake_connect(account, password, **kw):
     CALLS["connect"].append((account, password))
     if password != "richtig":
-        from midea_beautiful.exceptions import AuthenticationError
-        raise AuthenticationError("Account or password incorrect")
+        # die Anmeldung scheitert in der Bibliothek selbst; Fehlversuche merkt die Schranke (midea._install_login_gate)
+        from midea_beautiful.cloud import MideaCloud
+        from midea_beautiful.midea import DEFAULT_APP_ID, DEFAULT_APPKEY, DEFAULT_HMACKEY, DEFAULT_IOTKEY, DEFAULT_PROXIED, DEFAULT_SIGNKEY
+        MideaCloud(appkey=DEFAULT_APPKEY, account=account, password=password, appid=DEFAULT_APP_ID, hmac_key=DEFAULT_HMACKEY, iot_key=DEFAULT_IOTKEY,
+                   proxied=DEFAULT_PROXIED, sign_key=DEFAULT_SIGNKEY)._login_proxied()
     return FakeCloud()
 
 
+LOGINS = []                                                 # Anmeldungen, die wirklich bei Midea ankommen (hinter der Schranke)
+def _bad_login(self):
+    from midea_beautiful.exceptions import AuthenticationError
+    LOGINS.append(self._account)
+    raise AuthenticationError("Account or password incorrect")
+from midea_beautiful.cloud import MideaCloud as _MC
+_MC._login_proxied = _MC._login_non_proxied = _bad_login
+if hasattr(_MC, "_bnx_gated"): del _MC._bnx_gated
+midea._install_login_gate(mb)
 mb.connect_to_cloud = fake_connect
 midea.STATUS_TTL_S = 0.3; midea.CLOUD_STATUS_TTL_S = 0.3; midea.FAIL_TTL_S = 0.3
 
-# 1) Suche: lokal scheitert (Cloud 9999) -> Konto-Liste ueber die Cloud
-async def bad_discover(region, account, password, target):
-    raise midea.MideaError("Midea-Cloud: Code: 9999, system error")
-midea._discover = bad_discover
-try:
-    shelly.midea_scan("DE", None, None, None); raise SystemExit("ohne Konto muss es scheitern")
-except shelly.ShellyError as e:
-    assert "9999" in str(e)
-try:
-    shelly.midea_scan("DE", "mail@x.de", "falsch", None); raise SystemExit("falsches Passwort")
-except shelly.ShellyError as e:
-    assert "Anmeldung bei der Midea-Cloud fehlgeschlagen" in str(e) and "9999" in str(e), str(e)
-found = shelly.midea_scan("DE", "mail@x.de", "richtig", None)
-assert len(found) == 1 and found[0]["id"] == "midea-142936511665569" and found[0]["name"] == "Wohnzimmer" and found[0]["ip"] == "Cloud" and "Cloud" in found[0]["model"], found
-assert "cloud_password" not in found[0] and "token" not in found[0]
-print("1) Suche ueber Konto OK")
-
-# 2) Anlegen: Konto im Eintrag, nirgends oeffentlich
-added = shelly.add_midea(["midea-142936511665569"])
-assert len(added) == 1 and added[0]["cloud"] is True and added[0]["cloud_password"] == "richtig" and added[0]["name"] == "Wohnzimmer"
+# 1+2) Anlage mit Konto (die Suche ueber das Konto gibt es nicht mehr, die Suche laeuft lokal): Eintrag direkt anlegen, Zugangsdaten nirgends oeffentlich
+import json
+shelly._save([{"id": "midea-142936511665569", "kind": "midea", "cloud": True, "cloud_account": "mail@x.de", "cloud_password": "richtig", "device_id": 142936511665569,
+               "name": "Wohnzimmer", "icon": "❄️", "ip": "", "gen": 0, "channel": 0, "model": "Midea Klimaanlage (Cloud)", "users": []}])
 dev = shelly.load_devices()[0]; DID = dev["id"]
 lst = shelly.list_with_status(ids={DID}, live=False)[0]
 assert "cloud_password" not in lst and "cloud_account" not in lst and lst["kind"] == "midea"
-import json
 assert "richtig" not in json.dumps(lst) and "mail@x.de" not in json.dumps(lst)
-print("2) Anlegen OK")
+print("1+2) Anlegen OK")
 
 # 3) Zustand
 st = shelly.status(dev)
@@ -123,15 +118,15 @@ assert [m["key"] for m in d["modes"]] == ["auto", "cool", "dry", "heat", "fan_on
 print("4) Setzen OK")
 
 # 5) Cloud-Fehler beim Setzen -> klare Meldung
-midea._cdevs.clear(); midea._clouds.clear(); midea._login_fail.clear()
+midea._cdevs.clear(); midea._clouds.clear(); midea._login_fail.clear(); midea._good.clear(); midea._cache.clear()      # ohne letzten guten Zustand (sonst deckt die Schonfrist einen Aussetzer ab)
 dev2 = {**dev, "cloud_password": "falsch"}
 try:
     shelly.status(dev2)
     s2 = shelly.status(dev2); assert s2["online"] is False and "Anmeldung" in s2["error"], s2
 except Exception as e:
     raise SystemExit("unerwartet %r" % e)
-n = len(CALLS["connect"]); shelly.status({**dev2, "id": "midea-x"}); time.sleep(0.4); shelly.status(dev2)
-assert len(CALLS["connect"]) == n, "nach fehlgeschlagener Anmeldung 5 Minuten nicht erneut anmelden"
-assert "nächster Versuch" in shelly.status(dev2)["error"] or True
+shelly.status({**dev2, "id": "midea-x"}); time.sleep(0.4); shelly.status(dev2)
+assert LOGINS == [], "automatische Abfragen melden sich nie bei Midea an (sonst sperrt Midea das Konto)"
+assert "automatische Anmeldung ist abgeschaltet" in shelly.status(dev2)["error"], shelly.status(dev2)
 print("5) Fehler OK")
 print("MIDEA CLOUD OK")

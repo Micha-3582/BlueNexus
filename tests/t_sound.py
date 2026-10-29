@@ -9,9 +9,9 @@ rules.RULES_PATH = os.path.join(tmp, "r.json")
 
 CT = {"v": "SIGNAL_CHIME"}
 def devs():
-    return [{"interface": "BidCos-RF", "type": "HM-OU-CM-PCB", "name": "Soundmodul - Micha", "id": 1, "channels": [
-        {"address": "OEQ0009001:0", "channelType": "MAINTENANCE", "name": "Soundmodul - Micha:0", "id": 10},
-        {"address": "OEQ0009001:1", "channelType": CT["v"], "name": "Soundmodul - Micha", "id": 11}]},
+    return [{"interface": "BidCos-RF", "type": "HM-OU-CM-PCB", "name": "Soundmodul - Hans", "id": 1, "channels": [
+        {"address": "OEQ0009001:0", "channelType": "MAINTENANCE", "name": "Soundmodul - Hans:0", "id": 10},
+        {"address": "OEQ0009001:1", "channelType": CT["v"], "name": "Soundmodul - Hans", "id": 11}]},
         {"interface": "BidCos-RF", "type": "HM-LC-Sw1-FM", "name": "Schalter", "id": 2, "channels": [
         {"address": "ABC:1", "channelType": "SWITCH", "name": "Schalter", "id": 21}]}]
 calls = []
@@ -26,7 +26,7 @@ homematic._param_desc = lambda iface, addr: {"SUBMIT": {"OPERATIONS": 2}} if add
 for ct in ("SIGNAL_CHIME", "IRGENDWAS"):                         # Kanaltyp- bzw. Geraetetyp-Treffer (HM-OU-C...)
     CT["v"] = ct
     found = homematic.sounds_scan()
-    assert [f["id"] for f in found] == ["hmA-OEQ0009001-1"] and found[0]["name"] == "Soundmodul - Micha" and not found[0]["known"], found
+    assert [f["id"] for f in found] == ["hmA-OEQ0009001-1"] and found[0]["name"] == "Soundmodul - Hans" and not found[0]["known"], found
 print("Suche OK")
 
 # Format wie im ioBroker-Skript

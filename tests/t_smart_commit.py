@@ -24,7 +24,7 @@ params = Params.from_config(cfg)
 
 now0 = datetime(2026, 9, 28, 12, 0)
 vrm_data = {"hours": [{"day": "today", "hour": h, "wh": 0.0} for h in range(24)]}
-prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S+02:00"), "total": 0.30}
+prices = [{"startsAt": (now0 + timedelta(minutes=15 * i)).astimezone().isoformat(timespec="seconds"), "total": 0.30}
           for i in range(96)]
 
 
