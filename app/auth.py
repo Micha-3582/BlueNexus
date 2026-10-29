@@ -303,8 +303,24 @@ class UserStore:
         for u in self._users.values():
             self._migrate(u)
         self._stamp = stamp
-        if self._ensure_owner() and os.path.exists(self.path):
+        changed = self._ensure_owner()
+        changed = self._ensure_session_ids() or changed
+        if changed and os.path.exists(self.path):
             self._write()
+
+    def _ensure_session_ids(self) -> bool:
+        """Jedes Konto hat eine zufaellige Kennung (uid, entsteht beim Anlegen neu - auch bei einem spaeteren Konto mit gleichem Namen) und einen
+        Sitzungszaehler (sess_epoch, steigt bei jeder Passwortaenderung). Beides steht im Anmelde-Cookie: so endet eine Sitzung, wenn das Konto
+        geloescht und neu angelegt oder das Passwort geaendert wird. Aeltere Datensaetze bekommen beides beim Einlesen. True, wenn etwas geaendert wurde."""
+        changed = False
+        for u in self._users.values():
+            if not u.get("uid"):
+                u["uid"] = secrets.token_hex(8)
+                changed = True
+            if "sess_epoch" not in u:
+                u["sess_epoch"] = 0
+                changed = True
+        return changed
 
     def _ensure_owner(self) -> bool:
         """Das erste angelegte Konto ist das Hauptkonto (owner): immer Administrator, nie loeschbar. Aeltere Datenbestaende ohne Kennzeichen:
@@ -454,6 +470,8 @@ class UserStore:
             user = {
                 "username": username.strip(),
                 "pw_hash": generate_password_hash(password),
+                "uid": secrets.token_hex(8),
+                "sess_epoch": 0,
                 "created": time.time(),
                 "last_login": None,
                 "permissions": perms,
@@ -693,6 +711,7 @@ class UserStore:
             if not user:
                 raise UserError("Benutzer nicht gefunden.")
             user["pw_hash"] = generate_password_hash(password)
+            user["sess_epoch"] = int(user.get("sess_epoch") or 0) + 1        # alle bestehenden Sitzungen (Cookies) dieses Kontos enden
             self._write()
             return dict(user)
 

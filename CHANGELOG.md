@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.0 – 29.10.2026
+- Sicherheit: **Sitzungen enden jetzt, wenn sich das Passwort eines Kontos ändert.** Bisher blieb ein Gerät, auf dem man einmal angemeldet war, bis zu ein Jahr angemeldet – auch nach einer Passwortänderung (z. B. ein verlorenes Handy oder ein fremder Rechner). Jetzt werden nach jeder Passwortänderung (selbst unter *Konto & Zugang*, durch den Administrator unter *Weitere Benutzer*, über *Passwort vergessen* und mit `reset_password.py`) alle **anderen** Geräte abgemeldet. Das Gerät, an dem man sein eigenes Passwort ändert, bleibt angemeldet.
+- Sicherheit: Löscht man ein Konto und legt später eines **mit demselben Namen** neu an (oder vergibt den alten Namen nach einer Umbenennung neu), erbt das neue Konto nicht mehr die Anmeldung des alten. Jedes Konto bekommt dazu beim Anlegen eine zufällige Kennung.
+- Hinweis zum Update: Wer schon angemeldet ist, bleibt angemeldet (bestehende Anmeldungen gelten einmalig weiter und bekommen die neue Kennung). Wer sichergehen will, dass ein früher verlorenes Gerät abgemeldet ist, ändert einmal das Passwort des Kontos.
+- Intern: Neuer Test `tests/t_sitzung.py` (117 Tests).
+
 ## 1.27.3 – 29.10.2026
 - Sicherheit (Ergebnis einer Prüfung des Codes, keine Lücke mit bekanntem Missbrauch): Die **Geräteübersicht** (Einstellungen → System) ist wirklich nur für Administratoren. Bisher sah sie auch ein normales Konto, dem nur das Ansehen der Benutzerliste erlaubt war (Gerätenamen mit IP und MAC).
 - Sicherheit: **App aktualisieren, Fernzugriff (Tunnel-Token, ein/aus, cloudflared installieren und aktualisieren) und Testmodus ändern** dürfen nur Administratoren, auch wenn ein Konto im Bereich System Schreibrecht hat. Ansehen bleibt wie bisher möglich.

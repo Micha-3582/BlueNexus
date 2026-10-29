@@ -394,6 +394,36 @@ def _block_cross_site():
     return None
 
 
+def _login_session(user: dict, remember: bool = True) -> None:
+    """Neue Anmeldung: Sitzung mit Benutzername, Kontokennung und Sitzungszaehler (siehe auth.UserStore._ensure_session_ids)."""
+    session.clear()
+    session["user"] = (user.get("username") or "").strip().lower()
+    if user.get("uid"):
+        session["uid"], session["ep"] = user["uid"], int(user.get("sess_epoch") or 0)
+    session.permanent = remember
+
+
+def _reissue_session(username: str) -> None:
+    """Eigenes Passwort/Name geaendert: die laufende Sitzung bleibt gueltig, alle anderen enden."""
+    u = users.get(username)
+    session["user"] = (username or "").strip().lower()
+    if u and u.get("uid"):
+        session["uid"], session["ep"] = u["uid"], int(u.get("sess_epoch") or 0)
+
+
+def _session_matches(user: dict) -> bool:
+    """Gehoert die Sitzung noch zu diesem Konto? Nein, wenn das Konto geloescht und unter gleichem Namen neu angelegt wurde (andere Kennung) oder
+    sich das Passwort geaendert hat (anderer Zaehler). Cookies aus der Zeit vor 1.28.0 haben noch keine Kennung: sie gelten einmalig weiter und
+    bekommen sie jetzt (sonst waere jeder nach dem Update abgemeldet)."""
+    uid = user.get("uid")
+    if not uid:
+        return True
+    if session.get("uid") is None:
+        session["uid"], session["ep"] = uid, int(user.get("sess_epoch") or 0)
+        return True
+    return session.get("uid") == uid and int(session.get("ep") or 0) == int(user.get("sess_epoch") or 0)
+
+
 @app.before_request
 def _require_login():
     if request.endpoint in PUBLIC_ENDPOINTS:
@@ -404,7 +434,7 @@ def _require_login():
         return redirect(url_for("create_account"))
     username = session.get("user")
     user = users.get(username) if username else None
-    if not user or is_expired(user):
+    if not user or is_expired(user) or not _session_matches(user):
         session.clear()
         if request.path.startswith("/api/"):
             return jsonify(error="Nicht angemeldet.", login_required=True), 401
@@ -600,9 +630,7 @@ def create_account():
     cfg["owner_first_name"] = first
     store.save_config(cfg)
 
-    session.clear()
-    session["user"] = username.strip().lower()
-    session.permanent = True
+    _login_session(users.get(username) or {"username": username}, True)
     nxt = url_for("setup_modules") if not store.modules_chosen() else url_for("setup")
     try:
         key = users.set_recovery(username)
@@ -910,7 +938,8 @@ def login():
     if users.is_empty():
         return redirect(url_for("create_account"))
     if request.method == "GET":
-        if session.get("user") and users.get(session["user"]):
+        u_ = users.get(session["user"]) if session.get("user") else None
+        if u_ and not is_expired(u_) and _session_matches(u_):
             return redirect(url_for("index"))
         return render_template("login.html", error=None)
 
@@ -931,9 +960,7 @@ def login():
         _nfc_alert(f"Fehlgeschlagene Anmeldung als „{username[:40]}“", "Anmeldung", ip, "login", "login:alert", "Anmeldung")      # damit man sieht, ob jemand Fremdes es probiert
         return render_template("login.html", error="Benutzername oder Passwort falsch."), 401
 
-    session.clear()
-    session["user"] = username.strip().lower()
-    session.permanent = remember
+    _login_session(user, remember)
     return redirect(_safe_next(request.args.get("next")))
 
 
@@ -1115,7 +1142,7 @@ def api_update_own_account():
             users.update_password(active, new_password)
     except UserError as exc:
         return jsonify(error=str(exc)), 400
-    session["user"] = active
+    _reissue_session(active)                              # diese Sitzung bleibt, alle anderen Geraete dieses Kontos sind nach einer Passwortaenderung abgemeldet
     return jsonify(ok=True)
 
 
