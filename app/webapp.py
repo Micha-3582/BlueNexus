@@ -18,6 +18,7 @@ import base64
 import re
 import threading
 import subprocess
+import socket
 import time
 from datetime import datetime, timedelta
 from functools import wraps
@@ -175,10 +176,49 @@ _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
 
 
+_own_ips_cache = {"t": 0.0, "ips": frozenset()}
+
+
+def _own_ips() -> frozenset:
+    """Adressen dieses Rechners (Schleife und LAN). Spricht der Tunnel (cloudflared) die App ueber die LAN-Adresse des eigenen Rechners an statt ueber
+    localhost, kommt die Anfrage von einer dieser Adressen. Ein anderer Rechner kann diese Quelladresse nicht vortaeuschen. Wird eine Minute gemerkt."""
+    now = time.time()
+    if _own_ips_cache["ips"] and now - _own_ips_cache["t"] < 60:
+        return _own_ips_cache["ips"]
+    ips = {"127.0.0.1", "::1"}
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            ips.add(str(info[4][0]).split("%")[0])
+    except OSError:
+        pass
+    try:                                                   # ausgehende Hauptadresse (verbindet nichts, schickt kein Paket)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))
+            ips.add(s.getsockname()[0])
+    except OSError:
+        pass
+    try:                                                   # Linux: Adresse jeder Netzwerkschnittstelle
+        import fcntl
+        import struct
+        for _, name in socket.if_nameindex():
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                try:
+                    ips.add(socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack("256s", name[:15].encode()))[20:24]))
+                except OSError:
+                    pass
+    except (ImportError, OSError, AttributeError):
+        pass
+    _own_ips_cache.update(t=now, ips=frozenset(ips))
+    return _own_ips_cache["ips"]
+
+
 def _from_local_proxy() -> bool:
-    """True, wenn die Anfrage von einem Proxy auf diesem Rechner kommt (cloudflared des Tunnels, Apache davor)."""
-    ra = request.remote_addr or ""
-    return ra in ("127.0.0.1", "::1") or ra.startswith("::ffff:127.")
+    """True, wenn die Anfrage von einem Proxy auf diesem Rechner kommt (cloudflared des Tunnels, Apache davor): von Loopback oder von der eigenen
+    Adresse des Rechners (Tunnel-Ziel mit IP statt localhost)."""
+    ra = (request.remote_addr or "").split("%")[0]
+    if ra.startswith("::ffff:"):
+        ra = ra[7:]
+    return ra.startswith("127.") or ra == "::1" or ra in _own_ips()
 
 
 def client_ip() -> str:

@@ -12,6 +12,7 @@
  "t_cam_motion.py": true,
  "t_camera.py": true,
  "t_camera_rtsp.py": true,
+ "t_clientip.py": true,
  "t_contract_periods.py": true,
  "t_cookie.py": true,
  "t_cycles.py": true,
