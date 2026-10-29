@@ -71,6 +71,7 @@
  "t_share.py": true,
  "t_shareall.py": true,
  "t_sharesp.py": true,
+ "t_sicherheit.py": true,
  "t_smart.py": true,
  "t_smart_buffer.py": true,
  "t_smart_commit.py": true,

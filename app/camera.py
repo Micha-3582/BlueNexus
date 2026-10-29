@@ -721,14 +721,19 @@ def stream(item: dict, quality: str = DEFAULT_QUALITY):
 
 
 # ---------------------------------------------------------------- Verwaltung (nur Administratoren, die Aufrufer pruefen das)
+def _check_host(host: str) -> None:
+    """Adresse einer Kamera: nur IP oder Rechnername. Zeichen wie / @ ? # wuerden die gebaute http- bzw. rtsp-Adresse verbiegen."""
+    if any(c in host for c in "/ @?#"):
+        raise CameraError("Adresse: nur IP oder Rechnername, ohne http:// und ohne Pfad")
+
+
 def add(name: str, host: str, user: str, password: str, port=None, channel=0, https=False, kind: str = "reolink", path_main: str = "", path_sub: str = "") -> dict:
     name = (name or "").strip()[:60]
     host = (host or "").strip()
     kind = "rtsp" if kind == "rtsp" else "reolink"
     if not host:
         raise CameraError("IP-Adresse oder Name der Kamera eingeben")
-    if any(c in host for c in "/ @?#"):
-        raise CameraError("Adresse: nur IP oder Rechnername, ohne http:// und ohne Pfad")
+    _check_host(host)
     try:
         port = int(port) if port not in (None, "") else None
         channel = int(channel or 0)
@@ -781,6 +786,8 @@ def update(cid: str, **f) -> bool:
                 it["name"] = f["name"].strip()[:60]
             for k in ("host", "user"):
                 if isinstance(f.get(k), str) and f[k].strip():
+                    if k == "host":
+                        _check_host(f[k].strip())
                     it[k] = f[k].strip()
             if isinstance(f.get("password"), str) and f["password"]:
                 it["password"] = f["password"]

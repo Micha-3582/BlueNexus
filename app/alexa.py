@@ -263,7 +263,6 @@ class Bridge:
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data)))
-                self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Connection", "close")                  # wie die kleinen Hue-/Tasmota-Bridges: pro Anfrage eine Verbindung
                 self.close_connection = True
                 self.end_headers()

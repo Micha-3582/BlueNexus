@@ -200,11 +200,13 @@
   <details style="margin-top:8px"><summary>Protokoll von cloudflared</summary><pre id="tn-log" style="max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:8px 0 0"></pre></details>
 </div>
 
+{% if user_role == 'admin' or demo_view %}
 <div class="card" id="inv-card" data-tab="system" data-area="user_management">
   <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Geräteübersicht (IP-Adressen) <span class="qhelp" role="button" tabindex="0" data-help="Alle Geräte mit IP-Adresse, die in BlueNexus eingetragen sind: Steckdosen und Schalter, Klimaanlagen, Kameras, Zigbee-Gateways, Homematic-Zentrale, Wake-on-LAN-Rechner, Cerbo GX und Funkthermometer. Zum Nachschlagen oder um nach einem Ausfall zu wissen, was dazugehörte. Die Liste wird aus den Einstellungen gelesen, es wird nichts im Netz abgefragt. Passwörter und Schlüssel stehen nie darin. Ist eine IP-Adresse doppelt vergeben, steht ein ⚠ dahinter.">?</span></h2>
   <div class="sub">Alles, was mit BlueNexus verbunden ist – nur für Administratoren sichtbar.</div>
   <div style="margin-top:10px"><button id="inv-open" class="ghost" type="button">Geräteübersicht öffnen</button></div>
 </div>
+{% endif %}
 
 <div class="card" id="api-card" data-tab="system" data-area="user_management">
   <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg>Schnittstelle (API) für andere Programme <span class="qhelp" role="button" tabindex="0" data-help="Andere Programme im selben Netzwerk – ein Info-Monitor, ein Skript, ein anderes Smart-Home-System, ein eigenes Projekt – können hier Zustände von BlueNexus <b>lesen</b>. Jedes Programm bekommt einen eigenen Schlüssel. Es geht nur lesen (nichts schalten), nur aus dem lokalen Netz (nie über den Fernzugriff/Tunnel) und nur für die Sensoren, Geräte und Schalter, die du dem Schlüssel freigibst. Das Teilen mit anderen BlueNexus-Anlagen ist davon getrennt und bleibt unverändert.">?</span></h2>

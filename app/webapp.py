@@ -175,14 +175,24 @@ _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
 
 
+def _from_local_proxy() -> bool:
+    """True, wenn die Anfrage von einem Proxy auf diesem Rechner kommt (cloudflared des Tunnels, Apache davor)."""
+    ra = request.remote_addr or ""
+    return ra in ("127.0.0.1", "::1") or ra.startswith("::ffff:127.")
+
+
 def client_ip() -> str:
-    # Hinter Cloudflare Tunnel steht die echte IP im Header.
-    return (
-        request.headers.get("CF-Connecting-IP")
-        or (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-        or request.remote_addr
-        or "?"
-    )
+    """Adresse des Besuchers. Hinter dem Cloudflare Tunnel steht die echte Adresse in der Kopfzeile - die zaehlt aber nur, wenn die Anfrage von einem Proxy
+    auf diesem Rechner kommt. Wer die App direkt erreicht, koennte die Kopfzeile sonst frei setzen und die Bremsen gegen Passwort-Raten umgehen.
+    Bei X-Forwarded-For gilt der letzte Eintrag (den hat unser Proxy angehaengt), nicht der erste (den kann der Besucher selbst mitschicken)."""
+    if _from_local_proxy():
+        cf = (request.headers.get("CF-Connecting-IP") or "").strip()
+        if cf:
+            return cf
+        fwd = [p.strip() for p in (request.headers.get("X-Forwarded-For") or "").split(",") if p.strip()]
+        if fwd:
+            return fwd[-1]
+    return request.remote_addr or "?"
 
 
 def too_many_attempts(ip: str) -> bool:
@@ -221,6 +231,10 @@ def _deny(msg: str, code: int = 403):
 # neue/vergessene Routen) - ausser sie stehen in ALWAYS_ALLOWED (eigenes Konto, Ab-/Anmelden).
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
 # Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
+# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus): nur Administratoren, auch mit Schreibrecht im Bereich System.
+# Ansehen (GET) bleibt wie bisher fuer alle mit Lese-Recht.
+ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "api_tunnel_enable", "api_tunnel_install", "api_tunnel_check", "api_tunnel_update"}
+
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
 ENDPOINT_AREA = {
@@ -233,7 +247,7 @@ ENDPOINT_AREA = {
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
     "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
-    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_inventory": "user_management", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
+    "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
     # "api_my_tiles" bewusst NICHT hier - braucht nur Lesezugriff auch fuer sein POST (siehe Sonderfall unten)
@@ -458,9 +472,11 @@ def _require_login():
         # Das Regel-Logbuch gehoert zu den Regeln (geht auch ohne Energie-Modul), nur das der Ueberschuss-Automatik zum Bereich "Automatik" (braucht Energie UND Smart Home)
         mod = request.args.get("module") or (request.get_json(silent=True) or {}).get("module")
         return _check_area("rules" if mod == "rules" else "automation", "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write")
+    if request.endpoint in ADMIN_ONLY_CHANGES and request.method not in ("GET", "HEAD", "OPTIONS") and not auth.is_full_admin(g.perms):
+        return _deny("Das darf nur ein Administrator (Update, Fernzugriff, Testmodus).")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
-        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last")):      # Demo: Schnittstellen-Karte nur ansehen
+        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last", "api_inventory")):      # Demo: Schnittstellen-Karte nur ansehen
             return _deny("Kein Zugriff mit diesem Konto.")
         return None
     need = "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write"

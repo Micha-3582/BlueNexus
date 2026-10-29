@@ -4,6 +4,14 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.27.3 – 29.10.2026
+- Sicherheit (Ergebnis einer Prüfung des Codes, keine Lücke mit bekanntem Missbrauch): Die **Geräteübersicht** (Einstellungen → System) ist wirklich nur für Administratoren. Bisher sah sie auch ein normales Konto, dem nur das Ansehen der Benutzerliste erlaubt war (Gerätenamen mit IP und MAC).
+- Sicherheit: **App aktualisieren, Fernzugriff (Tunnel-Token, ein/aus, cloudflared installieren und aktualisieren) und Testmodus ändern** dürfen nur Administratoren, auch wenn ein Konto im Bereich System Schreibrecht hat. Ansehen bleibt wie bisher möglich.
+- Sicherheit: Die **Bremse gegen Passwort-Raten** ließ sich umgehen, wenn man die App direkt im Heimnetz erreichte und selbst eine Absenderadresse in die Anfrage schrieb. Die Absenderadresse aus den Kopfzeilen des Fernzugriffs zählt jetzt nur noch, wenn die Anfrage vom Tunnel bzw. Webserver auf demselben Rechner kommt. Über den Fernzugriff hat weiterhin jeder Besucher seine eigene Bremse.
+- Sicherheit: Die **Adresse einer Kamera** wird beim Ändern genauso geprüft wie beim Anlegen (keine Zeichen wie `/ @ ? #`).
+- Sicherheit: Die **Alexa-Bridge** sendet keine offene Kopfzeile `Access-Control-Allow-Origin: *` mehr. Echo-Geräte brauchen sie nicht.
+- Intern: Neuer Test mit allen Punkten (`tests/t_sicherheit.py`, 116 Tests) und eine Liste, welche Endpunkte unter „Benutzerverwaltung“ hängen; neue Einträge brauchen eine bewusste Entscheidung.
+
 ## 1.27.2 – 29.10.2026
 - Fehlerbehebung: Das **Kalender-Symbol** in der Benutzerliste ist jetzt genauso groß wie die anderen Symbole der Zeile (Knopfgröße, Symbolgröße und Höhe passen zu 🛠️ 👁 ⧉ 🔑).
 
