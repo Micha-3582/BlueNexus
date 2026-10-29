@@ -1616,7 +1616,7 @@ function readTileOrder(idPrefix) {                                     // null =
   return keys.join(',') === (GLOBAL_ORDER || []).join(',') ? null : keys;
 }
 const LEVEL_SHORT = { none: '–', read: 'Lesen', write: 'Schreiben' };
-const CAL_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>';
+const CAL_SVG = '<svg viewBox="2 2 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>';
 function expiryBtnHtml(u) {      // Kalender-Symbol: weiss = laeuft nie ab, orange = hat ein Ablaufdatum, rot = ist abgelaufen
   const d = new Date(), today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   let color = 'var(--fg)', tip = 'Läuft nie ab – klicken, um ein Ablaufdatum festzulegen';
@@ -1625,7 +1625,7 @@ function expiryBtnHtml(u) {      // Kalender-Symbol: weiss = laeuft nie ab, oran
     color = gone ? '#e5544a' : '#f59e0b';
     tip = (gone ? 'Abgelaufen am ' : 'Läuft am ') + fmtDay(u.expires) + (gone ? ' – der Zugang funktioniert nicht mehr' : ' ab') + ' – klicken zum Ändern';
   }
-  return `<button type="button" class="ghost u-exp" data-u="${escHUsers(u.username)}" data-exp="${escHUsers(u.expires || '')}" title="${escHUsers(tip)}" aria-label="${escHUsers(tip)}" style="color:${color};padding:8px 10px">${CAL_SVG}</button>`;
+  return `<button type="button" class="ghost u-exp" data-u="${escHUsers(u.username)}" data-exp="${escHUsers(u.expires || '')}" title="${escHUsers(tip)}" aria-label="${escHUsers(tip)}" style="color:${color};padding:13px 16px 12px">${CAL_SVG}</button>`;      // Innenabstand so, dass der Knopf (44 px) bündig zu 🛠️ 👁 ⧉ 🔑 sitzt: deren Emoji-Zeile ist höher als das Symbol
 }
 function summarizePerms(perms) {
   for (const [name, p] of Object.entries(PRESETS_META)) {

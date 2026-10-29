@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.27.2 – 29.10.2026
+- Fehlerbehebung: Das **Kalender-Symbol** in der Benutzerliste ist jetzt genauso groß wie die anderen Symbole der Zeile (Knopfgröße, Symbolgröße und Höhe passen zu 🛠️ 👁 ⧉ 🔑).
+
 ## 1.27.1 – 29.10.2026
 - Verbesserung: In der **Benutzerliste** braucht der Ablauf eines Kontos keine eigene Spalte mehr. Stattdessen sitzt in jeder Zeile ein **Kalender-Symbol**: **weiß** = läuft nie ab, **orange** = hat ein Ablaufdatum, **rot** = ist abgelaufen (das Konto kann sich nicht mehr anmelden). Ein Klick öffnet ein kleines Fenster, in dem man das Datum wählt und speichert oder mit **Kein Ablauf** wieder entfernt; der Mauszeiger-Text zeigt das Datum. Die Liste hat dadurch mehr Platz für die Rechte. Administratoren laufen nie ab und haben kein Symbol.
 
