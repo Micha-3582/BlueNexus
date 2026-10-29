@@ -1033,7 +1033,7 @@
     <table id="users-table" style="width:100%;border-collapse:collapse">
       <thead><tr>
         <th style="text-align:left">Benutzername</th><th style="text-align:left">Rechte</th>
-        <th style="text-align:left">Ablauf</th><th style="text-align:left">Letzter Login</th><th style="text-align:left" title="Wann dieses Konto zuletzt etwas bedient hat (Seite geöffnet, geschaltet, gespeichert). Auf etwa 10 Minuten genau.">Zuletzt aktiv</th><th></th>
+        <th style="text-align:left">Letzter Login</th><th style="text-align:left" title="Wann dieses Konto zuletzt etwas bedient hat (Seite geöffnet, geschaltet, gespeichert). Auf etwa 10 Minuten genau.">Zuletzt aktiv</th><th></th>
       </tr></thead>
       <tbody id="users-body"></tbody>
     </table>
@@ -1616,6 +1616,17 @@ function readTileOrder(idPrefix) {                                     // null =
   return keys.join(',') === (GLOBAL_ORDER || []).join(',') ? null : keys;
 }
 const LEVEL_SHORT = { none: '–', read: 'Lesen', write: 'Schreiben' };
+const CAL_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>';
+function expiryBtnHtml(u) {      // Kalender-Symbol: weiss = laeuft nie ab, orange = hat ein Ablaufdatum, rot = ist abgelaufen
+  const d = new Date(), today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  let color = 'var(--fg)', tip = 'Läuft nie ab – klicken, um ein Ablaufdatum festzulegen';
+  if (u.expires) {
+    const gone = u.expires < today;
+    color = gone ? '#e5544a' : '#f59e0b';
+    tip = (gone ? 'Abgelaufen am ' : 'Läuft am ') + fmtDay(u.expires) + (gone ? ' – der Zugang funktioniert nicht mehr' : ' ab') + ' – klicken zum Ändern';
+  }
+  return `<button type="button" class="ghost u-exp" data-u="${escHUsers(u.username)}" data-exp="${escHUsers(u.expires || '')}" title="${escHUsers(tip)}" aria-label="${escHUsers(tip)}" style="color:${color};padding:8px 10px">${CAL_SVG}</button>`;
+}
 function summarizePerms(perms) {
   for (const [name, p] of Object.entries(PRESETS_META)) {
     if (AREAS_META.every(([id]) => (perms[id] || 'none') === (p[id] || 'none'))) {
@@ -1644,12 +1655,10 @@ async function loadUsers() {
       tr.innerHTML = `
         <td style="padding:6px 4px">${escHUsers(u.username)}${u.is_me ? ' <span class="muted">(du)</span>' : ''}</td>
         <td style="padding:6px 4px">${isFullAdmin ? '<b>Administrator</b>' + (u.owner ? ' <span class="muted">· Hauptkonto</span>' : '') : escHUsers(summarizePerms(perms))}</td>
-        <td style="padding:6px 4px">${isFullAdmin
-          ? '<span class="muted" title="Ein Zugang mit Benutzerverwaltung läuft nie ab">– läuft nie ab –</span>'
-          : `<input type="date" class="u-expires" data-u="${escHUsers(u.username)}" value="${u.expires || ''}" style="padding:4px 6px">`}</td>
         <td style="padding:6px 4px" class="muted">${fmtLogin(u.last_login)}</td>
         <td style="padding:6px 4px" class="muted">${u.last_active ? fmtLogin(u.last_active) : '–'}</td>
         <td style="padding:6px 4px;white-space:nowrap">${locked ? '<span class="muted" title="Das Hauptkonto kann nur vom Hauptadmin selbst geändert werden">🔒 Hauptkonto</span>' : `
+          ${u.admin ? '' : expiryBtnHtml(u)}
           <button type="button" class="ghost u-edit" data-u="${escHUsers(u.username)}" title="Rechte bearbeiten">🛠️</button>
           ${u.admin ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
           ${u.admin ? '' : `<button type="button" class="ghost u-copy" data-u="${escHUsers(u.username)}" title="Profil kopieren: neues Konto mit denselben Rechten, Kacheln und sichtbaren Geräten">⧉</button>`}
@@ -1660,7 +1669,7 @@ async function loadUsers() {
       const editRow = document.createElement('tr');
       const uid = userDomId(u.username);
       editRow.className = 'u-editrow'; editRow.dataset.u = u.username; editRow.style.display = 'none';
-      editRow.innerHTML = `<td colspan="6" style="padding:8px 4px 16px;background:var(--card2);border-radius:8px">
+      editRow.innerHTML = `<td colspan="5" style="padding:8px 4px 16px;background:var(--card2);border-radius:8px">
         <div style="margin-bottom:12px"><label class="chk"><input type="checkbox" class="u-isadmin" data-u="${escHUsers(u.username)}" id="${uid}-isadmin" ${u.admin ? 'checked' : ''} ${u.owner ? 'disabled' : ''}> <b>Administrator</b></label>
           <span class="qhelp" role="button" tabindex="0" data-help="Ein Administrator darf alles: Benutzer verwalten, Geräte anlegen, ändern und löschen, alle Einstellungen, Regeln, Zugang an andere teilen. Die Rechte-Tabelle gilt für ihn nicht. „Schreiben“ in der Tabelle heißt bei normalen Konten nur: Geräte bedienen bzw. den Bereich ändern – es macht niemanden zum Administrator.">?</span>
           <span class="muted">${u.owner ? 'Hauptkonto – bleibt immer Administrator und kann nicht gelöscht werden (umbenennen und neues Passwort sind möglich).' : 'Darf alles, auch Benutzer verwalten und Zugang teilen.'}</span></div>
@@ -1688,7 +1697,11 @@ async function loadUsers() {
       const ok = await uiDialog({ title: `Vorschau als „${el.dataset.u}“`, message: 'Zeigt die App in diesem Fenster so, wie dieses Konto sie sieht – mit seinen Rechten, Menüs und sichtbaren Geräten. Es wird nur angesehen: Schalten, Speichern und Ändern sind gesperrt. Mit „Vorschau beenden“ oben kommst du hierher zurück.\n\nHinweis: Dein Browser teilt die Anmeldung – andere offene Fenster dieser App zeigen nach dem Neuladen ebenfalls die Vorschau.', okText: 'Vorschau starten' });
       if (ok) location.href = '/preview/' + encodeURIComponent(el.dataset.u);
     }));
-    body.querySelectorAll('.u-expires').forEach(el => el.addEventListener('change', () => patchUser(el.dataset.u, { expires: el.value })));
+    body.querySelectorAll('.u-exp').forEach(el => el.addEventListener('click', async () => {
+      const res = await uiExpiry(el.dataset.u, el.dataset.exp || '');
+      if (res === null) return;
+      if (await patchUser(el.dataset.u, { expires: res })) loadUsers();
+    }));
     body.querySelectorAll('.u-edit').forEach(el => el.addEventListener('click', () => {
       body.querySelector(`.u-editrow[data-u="${CSS.escape(el.dataset.u)}"]`).style.display = '';
     }));
@@ -1857,6 +1870,33 @@ function uiDialog({ title, message, html, info, label, value = '', type = 'text'
     document.addEventListener('keydown', onKey);
     document.body.appendChild(ov);
     if (inp) { inp.focus(); inp.select(); } else ov.querySelector('.dlg-ok').focus();
+  });
+}
+
+/* Ablaufdatum eines Kontos: Datum -> 'YYYY-MM-DD', "Kein Ablauf" -> '', Abbrechen -> null */
+function uiExpiry(username, current) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = `<div role="dialog" aria-modal="true" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 10px;font-size:17px"></h3>
+      <div class="muted" style="margin-bottom:12px">Bis zu diesem Tag (einschließlich) funktioniert der Zugang, danach lässt sich das Konto nicht mehr anmelden. Praktisch für Gäste.</div>
+      <label>Ablaufdatum</label><input type="date" class="dlg-date" style="width:100%">
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px">
+        <button type="button" class="ghost dlg-none">Kein Ablauf</button><button type="button" class="ghost dlg-no">Abbrechen</button><button type="button" class="dlg-ok">Speichern</button></div></div>`;
+    ov.querySelector('h3').textContent = 'Ablauf von „' + username + '“';
+    const inp = ov.querySelector('.dlg-date'); inp.value = current || '';
+    ov.querySelector('.dlg-none').style.display = current ? '' : 'none';
+    const close = v => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') close(null); else if (e.key === 'Enter') ok(); };
+    const ok = () => { if (!inp.value) { inp.focus(); return; } close(inp.value); };
+    ov.querySelector('.dlg-ok').onclick = ok;
+    ov.querySelector('.dlg-none').onclick = () => close('');
+    ov.querySelector('.dlg-no').onclick = () => close(null);
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(null); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+    inp.focus();
   });
 }
 

@@ -73,4 +73,5 @@ assert users.touch("gibtsnicht") is False
 # 7) die Seite hat die Spalte
 h = A.get("/admin").get_data(as_text=True)
 assert "Zuletzt aktiv" in h and "last_active" in h
+assert 'class="u-expires"' not in h and "u-exp" in h and "uiExpiry" in h, "Ablauf: Kalender-Symbol mit Fenster statt Datumsfeld in jeder Zeile"
 print("LAST ACTIVE OK", sys.argv[1].split("/")[-1])
