@@ -1,8 +1,12 @@
 """
 Tests für die Ladelogik (logic.py).
-Ausführen:  python test_logic.py
+Ausführen:  python tests/run_all.py logic
 """
+import os
+import sys
 from datetime import datetime, timedelta
+
+sys.path.insert(0, (sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")) + "/app")
 
 from logic import decide, PersistentState, ESS_CHARGE, ESS_IDLE
 

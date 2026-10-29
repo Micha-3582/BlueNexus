@@ -1,4 +1,5 @@
 """Regel-/Automatik-Logbuch: Zaehler, Lesemarke, Leeren, Uhrensprung (Zeilen nicht zeitlich geordnet), Fehlermeldungen statt stillem Misserfolg."""
+import time
 import sys, os, json
 from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +41,7 @@ autolog.READ_PATH = os.path.join(tmp, "read.json")
 assert c.post("/api/automation/log/read", json={"module": "rules"}).status_code == 200
 assert c.post("/api/automation/log/read", json={"module": "quatsch"}).status_code == 400 and c.post("/api/automation/log/clear", json={"module": "quatsch"}).status_code == 400
 # 5) Installation OHNE Energie-Modul (wie am Hof): das Regel-Logbuch muss trotzdem laden, als gelesen markieren und leeren
+time.sleep(0.01)                                                                                    # die Lesemarke ist auf die Millisekunde genau: der Eintrag muss danach liegen
 for m in ("rules",): autolog.log(m, "Hof-Eintrag", now=datetime.now())
 cf = store.load_config(); old = dict(cf.get("modules") or {}); cf["modules"] = {"energy": False, "smarthome": True, "cameras": False, "verlauf": False, "alexa": False}; store.save_config(cf)
 r = c.get("/api/automation/log?module=rules&days=30"); assert r.status_code == 200 and [e["text"] for e in r.get_json()["entries"]] == ["Hof-Eintrag"], r.get_data(as_text=True)    # vorher: 403 -> Seite zeigte "Keine Eintraege"

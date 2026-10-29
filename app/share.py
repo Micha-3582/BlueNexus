@@ -540,10 +540,6 @@ def imported_other_ids(source_id: str) -> dict:
     return {kind: [s["id"] for s in load() if s.get("source") == "remote" and s.get("src") == source_id] for kind, load, _l, _i in _more_registries()}
 
 
-def imported_setpoint_ids(source_id: str) -> list[str]:
-    return imported_other_ids(source_id)["setpoint"]
-
-
 def remove_source(source_id: str) -> bool:
     """Quelle samt aller von dort geholten Geraete, Sensoren und Thermostate entfernen."""
     import homematic

@@ -556,13 +556,6 @@ def _powers_from_system(system: dict) -> dict:
     return {"pv": pv, "load": load, "grid": grid, "bc": bc, "bd": bd}
 
 
-def _flows_from_system(system: dict) -> dict:
-    """Momentane Flüsse (W) aus einem read_system()-Dict."""
-    p = _powers_from_system(system)
-    return decompose_flows(p["pv"], p["load"], max(0.0, p["grid"]),
-                           max(0.0, -p["grid"]), p["bc"], p["bd"])
-
-
 def _new_bucket(soc: float) -> dict:
     b = {"verbrauch": 0.0, "solar": 0.0, "soc_min": soc, "soc_max": soc,
          "soc_sum": 0.0, "soc_n": 0, "grid_cost_ct": 0.0}
