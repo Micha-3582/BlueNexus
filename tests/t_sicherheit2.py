@@ -1,5 +1,5 @@
 """Nachprüfung der Sicherheitsprüfung (1.28.1):
-N-02 Systemempfänger (sie bekommen die Codes von "Passwort vergessen") und Zugänge (Telegram-Bot, Pushover, VRM) nur durch Administratoren,
+N-02 Telegram und Pushover (Bot, Empfänger, Freigaben, Einstellungen; Empfänger bekommen die Codes von "Passwort vergessen") und der VRM-Zugang nur durch Administratoren,
 N-01 Cookies ohne Kennung nur für Konten, die beim Update schon bestanden, und nur ohne Passwortänderung,
 N-03 Kennungen von Fremdgeräten enthalten nur harmlose Zeichen, N-04 Module und Zeitzone nur durch Administratoren."""
 import sys, os, json
@@ -36,43 +36,38 @@ def login(name, pw):
 
 A, M = login("admin", "adminpass1"), login("mel", "melpass12345")
 
-# ---- N-02: Systemempfaenger und Zugaenge nur durch Administratoren
+# ---- N-02: alles rund um Telegram und Pushover (Bot, Empfaenger, Freigaben, Einstellungen, Tests) richtet nur ein Administrator ein
 r = A.post("/api/notify/recipient", json={"name": "Hausmeister", "chat_id": "200", "system": True}); assert r.status_code == 201, r.get_data(as_text=True)
 tg_sys = r.get_json()["id"]
+r = A.post("/api/notify/recipient", json={"name": "Familie", "chat_id": "300"}); assert r.status_code == 201; tg_norm = r.get_json()["id"]
 r = A.post("/api/pushover/recipient", json={"name": "Admin2", "user_key": "k" * 30, "system": True}); assert r.status_code == 201, r.get_data(as_text=True)
 po_sys = r.get_json()["id"]
-before_tg = sorted(x["id"] for x in notify.recipients() if x["system"]); before_po = sorted(x["id"] for x in pushover.recipients() if x["system"])
+r = A.post("/api/pushover/recipient", json={"name": "Familie", "user_key": "f" * 30}); assert r.status_code == 201; po_norm = r.get_json()["id"]
+before_tg = [x["id"] for x in notify.recipients()]; before_po = [x["id"] for x in pushover.recipients()]
+cred_tg, cred_po = notify.load_credentials(), pushover.load()
 
-# normale Empfaenger darf anlegen/aendern/loeschen, wer das Recht hat
-r = M.post("/api/notify/recipient", json={"name": "Familie", "chat_id": "300"}); assert r.status_code == 201, r.get_data(as_text=True)
-tg_norm = r.get_json()["id"]
-r = M.post("/api/pushover/recipient", json={"name": "Familie", "user_key": "f" * 30}); assert r.status_code == 201, r.get_data(as_text=True)
-po_norm = r.get_json()["id"]
-assert M.patch("/api/notify/recipient/" + tg_norm, json={"name": "Familie 2"}).status_code == 200
-assert M.patch("/api/pushover/recipient/" + po_norm, json={"name": "Familie 2"}).status_code == 200
-
-# ... aber kein Systemempfaenger
-assert M.post("/api/notify/recipient", json={"name": "Angreifer", "chat_id": "400", "system": True}).status_code == 403
-assert M.post("/api/pushover/recipient", json={"name": "Angreifer", "user_key": "z" * 30, "system": True}).status_code == 403
-assert M.patch("/api/notify/recipient/" + tg_norm, json={"system": True}).status_code == 403
-assert M.patch("/api/pushover/recipient/" + po_norm, json={"system": True}).status_code == 403
-for url in ("/api/notify/recipient/main", "/api/notify/recipient/" + tg_sys, "/api/pushover/recipient/" + po_sys):
-    assert M.patch(url, json={"name": "x"}).status_code == 403, url
-    assert M.delete(url).status_code == 403, url
-# Zugaenge austauschen oder loeschen
-assert M.post("/api/notify/credentials", json={"token": "neuer-bot", "chat_id": "999"}).status_code == 403
-assert M.delete("/api/notify/credentials").status_code == 403
-assert M.post("/api/pushover/credentials", json={"token": "b" * 30}).status_code == 403
-assert M.delete("/api/pushover/credentials").status_code == 403
-assert M.post("/api/vrm/credentials", json={"installation_id": "1", "token": "t"}).status_code == 403
-assert M.delete("/api/vrm/credentials").status_code == 403
-# nichts hat sich veraendert: die Reset-Codes gehen nur an die Systemempfaenger, die ein Administrator angelegt hat
-assert sorted(x["id"] for x in notify.recipients() if x["system"]) == before_tg and sorted(x["id"] for x in pushover.recipients() if x["system"]) == before_po
-assert notify.load_credentials()["token"] == "tok" and pushover.load()["token"] == "a" * 30
-# Administrator darf weiter alles
-assert A.patch("/api/notify/recipient/" + tg_sys, json={"name": "Hausmeister 2"}).status_code == 200
-assert A.delete("/api/notify/recipient/" + tg_sys).status_code == 200
-assert A.delete("/api/pushover/recipient/" + po_sys).status_code == 200
+# das Konto mit dem Recht "Meldungen: Schreiben" darf nichts davon: auch keine normalen Empfaenger
+forbidden = [("post", "/api/notify/recipient", {"name": "X", "chat_id": "400"}), ("post", "/api/notify/recipient", {"name": "X", "chat_id": "400", "system": True}),
+             ("post", "/api/pushover/recipient", {"name": "X", "user_key": "z" * 30}), ("post", "/api/pushover/recipient", {"name": "X", "user_key": "z" * 30, "system": True}),
+             ("post", "/api/notify/credentials", {"token": "neuer-bot", "chat_id": "999"}), ("delete", "/api/notify/credentials", None),
+             ("post", "/api/pushover/credentials", {"token": "b" * 30}), ("delete", "/api/pushover/credentials", None),
+             ("post", "/api/notify/settings", {}), ("post", "/api/notify/test", {}), ("post", "/api/notify/detect", {}), ("post", "/api/pushover/test", {}),
+             ("delete", "/api/notify/request/777", None), ("post", "/api/vrm/credentials", {"installation_id": "1", "token": "t"}), ("delete", "/api/vrm/credentials", None)]
+for rid in ("main", tg_sys, tg_norm):
+    forbidden += [("patch", "/api/notify/recipient/" + rid, {"name": "x"}), ("patch", "/api/notify/recipient/" + rid, {"system": True}), ("delete", "/api/notify/recipient/" + rid, None)]
+for rid in (po_sys, po_norm):
+    forbidden += [("patch", "/api/pushover/recipient/" + rid, {"name": "x"}), ("patch", "/api/pushover/recipient/" + rid, {"system": True}), ("delete", "/api/pushover/recipient/" + rid, None)]
+for method, url, body in forbidden:
+    r = getattr(M, method)(url, json=body) if body is not None else getattr(M, method)(url)
+    assert r.status_code == 403, (method, url, r.status_code)
+assert M.get("/api/notify").status_code == 200 and M.get("/api/pushover").status_code == 200 and M.get("/api/notify/requests").status_code == 200     # Ansehen bleibt
+# nichts hat sich veraendert
+assert [x["id"] for x in notify.recipients()] == before_tg and [x["id"] for x in pushover.recipients()] == before_po
+assert notify.load_credentials() == cred_tg and pushover.load() == cred_po
+# der Administrator darf weiter alles
+assert A.patch("/api/notify/recipient/" + tg_norm, json={"name": "Familie 2"}).status_code == 200
+assert A.patch("/api/pushover/recipient/" + po_norm, json={"name": "Familie 2"}).status_code == 200
+assert A.delete("/api/notify/recipient/" + tg_sys).status_code == 200 and A.delete("/api/pushover/recipient/" + po_sys).status_code == 200
 assert A.post("/api/notify/credentials", json={"token": "tok2", "chat_id": "100"}).status_code == 200
 assert A.post("/api/pushover/credentials", json={"token": "c" * 30}).status_code == 200
 

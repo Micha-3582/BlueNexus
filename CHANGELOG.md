@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.3 – 29.10.2026
+- Sicherheit: **Alles rund um Telegram und Pushover richtet nur noch der Administrator ein**: Bot und Zugang, Empfänger anlegen, ändern und löschen, Chats freigeben oder ablehnen, die Einstellungen der Meldungen und die Test-Nachrichten. Auch mit dem Recht „Einstellungen: Meldungen“ = Schreiben können andere Konten das nicht; Ansehen bleibt möglich. Wer Meldungen bekommen soll, muss dem Bot nur einmal schreiben, den Rest stellt der Administrator ein. (Die Systemempfänger bekommen auch die Codes von „Passwort vergessen“, deshalb ist die Regel bewusst streng.) Die Regel aus 1.28.1, dass Konten mit diesem Recht normale Empfänger anlegen dürfen, entfällt damit.
+- Intern: Test `t_sicherheit2` auf die strengere Regel angepasst.
+
 ## 1.28.2 – 29.10.2026
 - Sicherheit: Bei **Web-Aufrufen** (eigener Knopf mit Adresse und Regel-Schritt „Adresse aufrufen“) darf das Ziel nicht mehr der **Server selbst** sein (`localhost`, `127.0.0.1`, `[::1]`). Geräte im Heimnetz (z. B. `192.168.…`) und Adressen im Internet gehen weiter. Ein manipulierter Aufruf konnte sonst Dienste erreichen, die nur auf dem Server selbst lauschen. Bei Bestandsinstallationen mit einem solchen Ziel meldet das Logbuch „Diese Zieladresse ist nicht erlaubt“.
 - Intern: Webhook-Test um die Sperre erweitert.

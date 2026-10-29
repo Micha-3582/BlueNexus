@@ -231,10 +231,13 @@ def _deny(msg: str, code: int = 403):
 # neue/vergessene Routen) - ausser sie stehen in ALWAYS_ALLOWED (eigenes Konto, Ab-/Anmelden).
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
 # Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
-# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus, Module ein/aus, Zeitzone) und Zugaenge ersetzen (VRM, Telegram-Bot, Pushover): nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich.
+# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus, Module ein/aus, Zeitzone) und alles rund um VRM, Telegram und Pushover einrichten: nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich.
 # Ansehen (GET) bleibt wie bisher fuer alle mit Lese-Recht.
 ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "api_tunnel_enable", "api_tunnel_install", "api_tunnel_check", "api_tunnel_update",
-                      "api_modules", "api_system_timezone", "api_vrm_credentials", "api_notify_credentials", "api_pushover_credentials"}
+                      "api_modules", "api_system_timezone", "api_vrm_credentials",
+                      # Telegram und Pushover (Bot, Empfaenger, Freigaben, Einstellungen, Tests): Empfaenger schreiben nur dem Bot, eingerichtet wird alles vom Administrator
+                      "api_notify_credentials", "api_notify_detect", "api_notify_recipient_add", "api_notify_recipient_modify", "api_notify_request", "api_notify_settings",
+                      "api_notify_test", "api_pushover_credentials", "api_pushover_recipient_add", "api_pushover_recipient_modify", "api_pushover_test"}
 
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
@@ -507,7 +510,7 @@ def _require_login():
         mod = request.args.get("module") or (request.get_json(silent=True) or {}).get("module")
         return _check_area("rules" if mod == "rules" else "automation", "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write")
     if request.endpoint in ADMIN_ONLY_CHANGES and request.method not in ("GET", "HEAD", "OPTIONS") and not auth.is_full_admin(g.perms):
-        return _deny("Das darf nur ein Administrator (Update, Fernzugriff, Testmodus).")
+        return _deny("Das richtet nur ein Administrator ein (Update, Fernzugriff, Telegram/Pushover, VRM, Module, Testmodus).")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
         if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last", "api_inventory")):      # Demo: Schnittstellen-Karte nur ansehen
@@ -3914,9 +3917,6 @@ def api_pushover_credentials():
 @app.route("/api/pushover/recipient", methods=["POST"])
 def api_pushover_recipient_add():
     b = request.get_json(silent=True) or {}
-    denied = _system_recipient_guard(pushover.recipients(), None, b)
-    if denied:
-        return denied
     try:
         return jsonify(pushover.add_recipient(b.get("name"), b.get("user_key"), bool(b.get("system")), device=b.get("device") or "")), 201
     except pushover.PushoverError as e:
@@ -3925,9 +3925,6 @@ def api_pushover_recipient_add():
 
 @app.route("/api/pushover/recipient/<rid>", methods=["PATCH", "DELETE"])
 def api_pushover_recipient_modify(rid):
-    denied = _system_recipient_guard(pushover.recipients(), rid, {} if request.method == "DELETE" else (request.get_json(silent=True) or {}))
-    if denied:
-        return denied
     try:
         if request.method == "DELETE":
             ok = pushover.remove_recipient(rid)
@@ -4036,25 +4033,9 @@ def api_notify_request(cid):
     return (jsonify(ok=True), 200) if notify_in.reject_request(cid) else (jsonify(error="Anfrage nicht gefunden"), 404)
 
 
-def _system_recipient_guard(recs: list, rid, body: dict):
-    """Systemempfaenger bekommen u. a. die Codes zum Zuruecksetzen von Passwoertern ("Passwort vergessen"): Anlegen, Aendern und Loeschen darf sie nur ein
-    Administrator. Sonst koennte sich ein Konto mit Schreibrecht im Bereich Meldungen als Systemempfaenger eintragen und ein Administratorkonto uebernehmen.
-    Normale Empfaenger (ohne "system") darf weiter anlegen, wer das Recht hat. None = erlaubt."""
-    if auth.is_full_admin(g.perms):
-        return None
-    cur = next((r for r in recs if r.get("id") == rid), None) if rid else None
-    wants = isinstance(body.get("system"), bool) and body["system"]
-    if (cur and cur.get("system")) or wants:
-        return jsonify(error="Systemempfänger (sie bekommen u. a. die Codes zum Zurücksetzen von Passwörtern) legt, ändert und löscht nur ein Administrator."), 403
-    return None
-
-
 @app.route("/api/notify/recipient", methods=["POST"])
 def api_notify_recipient_add():
     b = request.get_json(silent=True) or {}
-    denied = _system_recipient_guard(notify.recipients(), None, b)
-    if denied:
-        return denied
     try:
         return jsonify(notify.add_recipient(b.get("name"), b.get("chat_id"), bool(b.get("system")))), 201
     except notify.NotifyError as e:
@@ -4063,9 +4044,6 @@ def api_notify_recipient_add():
 
 @app.route("/api/notify/recipient/<rid>", methods=["PATCH", "DELETE"])
 def api_notify_recipient_modify(rid):
-    denied = _system_recipient_guard(notify.recipients(), rid, {} if request.method == "DELETE" else (request.get_json(silent=True) or {}))
-    if denied:
-        return denied
     try:
         if request.method == "DELETE":
             ok = notify.remove_recipient(rid)
