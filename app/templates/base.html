@@ -515,6 +515,7 @@ function askPin(title, keepOpen) {
     var inLocked = t.closest('.ro-locked');
     var sw = t.closest('label.switch');
     if (sw && sw.querySelector('input:disabled')) return true;           // gesperrter Schalter
+    if (t.closest('#th-reset, #th-flash, [data-act="reflash"], [data-act="label"]')) return true;     // Funkthermometer: kein Flashen/Loeschen ueber den USB-Anschluss des Besuchers
     if (inLocked && t.closest('input,select,textarea,button,a[href],label,[onclick]')) return true;
     return false;
   }

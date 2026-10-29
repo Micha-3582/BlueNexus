@@ -232,7 +232,7 @@ def view_perms(perms: dict) -> dict:
     if not ACTIVE or any(v == "write" for v in (perms or {}).values()):
         return perms
     out = dict(perms)
-    for area in ("smarthome_teilen", "user_management"):
+    for area in ("smarthome_teilen", "user_management", "smarthome_logbuch"):
         if out.get(area, "none") == "none":
             out[area] = "read"
     return out

@@ -263,9 +263,9 @@ def _weather_forecast(force: bool = False) -> dict:
     now = datetime.now()
     day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
     code_for = lambda f: 0 if f >= 0.95 else 1 if f >= 0.75 else 2 if f >= 0.6 else 3 if f >= 0.4 else 61
-    hourly = {k: [] for k in ("time", "temperature_2m", "precipitation_probability", "precipitation", "weather_code", "cloud_cover", "wind_speed_10m")}
+    hourly = {k: [] for k in ("time", "temperature_2m", "precipitation_probability", "precipitation", "weather_code", "cloud_cover", "wind_speed_10m", "uv_index")}
     daily = {k: [] for k in ("time", "weather_code", "temperature_2m_max", "temperature_2m_min", "precipitation_sum",
-                             "precipitation_probability_max", "wind_speed_10m_max", "sunrise", "sunset", "sunshine_duration")}
+                             "precipitation_probability_max", "wind_speed_10m_max", "sunrise", "sunset", "sunshine_duration", "uv_index_max")}
 
     def at(t):
         f, s = _day_factor(t.date()), _season(t.date())
@@ -273,6 +273,11 @@ def _weather_forecast(force: bool = False) -> dict:
         amp = 2.5 + 4 * f
         temp = mean + amp * math.sin(2 * math.pi * (t.hour + t.minute / 60.0 - 9) / 24.0)
         return f, temp
+
+    def uv_at(hour, f, s):
+        """Erfundener UV-Tagesgang: Sommer Mittag ~6, Winter ~1; nachts 0; bewoelkt weniger."""
+        sun = max(0.0, math.sin(math.pi * (hour - 6.0) / 14.0)) if 6 <= hour <= 20 else 0.0
+        return round(sun * (1.2 + 5.0 * s) * (0.35 + 0.65 * f), 1)
 
     for d in range(7):
         base = day0 + timedelta(days=d)
@@ -292,6 +297,7 @@ def _weather_forecast(force: bool = False) -> dict:
             hourly["weather_code"].append(code_for(f))
             hourly["cloud_cover"].append(int(100 - f * 90))
             hourly["wind_speed_10m"].append(round(8 + 8 * (1 - f) + 2 * math.sin(h / 3.0), 1))
+            hourly["uv_index"].append(uv_at(h, f, s))
         daily["time"].append(base.strftime("%Y-%m-%d"))
         daily["weather_code"].append(code_for(f))
         daily["temperature_2m_max"].append(round(max(temps), 1))
@@ -302,6 +308,7 @@ def _weather_forecast(force: bool = False) -> dict:
         daily["sunrise"].append((base + timedelta(hours=rise)).strftime("%Y-%m-%dT%H:%M"))
         daily["sunset"].append((base + timedelta(hours=rise + length)).strftime("%Y-%m-%dT%H:%M"))
         daily["sunshine_duration"].append(round(length * 3600 * f * 0.9))
+        daily["uv_index_max"].append(uv_at(13, f, s))
     f, temp = at(now)
     h = _h(now)
     s = _season(now.date())
@@ -309,7 +316,7 @@ def _weather_forecast(force: bool = False) -> dict:
     rise = 13.0 - length / 2.0
     current = {"time": now.strftime("%Y-%m-%dT%H:%M"), "temperature_2m": round(temp, 1), "apparent_temperature": round(temp - 1.5, 1),
                "relative_humidity_2m": int(85 - 25 * f), "is_day": int(rise <= h <= rise + length), "precipitation": 0.0,
-               "weather_code": code_for(f), "cloud_cover": int(100 - f * 90), "wind_speed_10m": round(8 + 8 * (1 - f), 1), "wind_direction_10m": 250}
+               "weather_code": code_for(f), "cloud_cover": int(100 - f * 90), "wind_speed_10m": round(8 + 8 * (1 - f), 1), "wind_direction_10m": 250, "uv_index": uv_at(h, f, s)}
     loc = weather.get_location()
     data = weather._parse({"current": current, "hourly": hourly, "daily": daily}, loc.get("name") or "Demo")
     data.update(configured=True, error=None, updated=now.isoformat(timespec="seconds"))
@@ -351,6 +358,7 @@ def activate() -> None:
     neutral_names()                                         # private Vornamen in den Demo-Daten neutral benennen
     try:
         seed_devicelog()                                    # Geraete-Logbuch (erfunden)
+        seed_thermo()                                       # erfundenes Funkthermometer, meldet sich laufend
     except Exception:                                       # noqa: BLE001
         pass
     try:
@@ -516,11 +524,11 @@ def fake_users() -> list:
         ("gast", auth.PRESETS["user"], now - 20 * 86400, now - 86400 * 9, "2027-03-31", False),
         ("demo", auth.PRESETS["demo"], now - 5 * 86400, now - 600, None, False),
     ]
-    return [{"username": n, "permissions": dict(p), "created": c, "last_login": l, "expires": e, "owner": o} for n, p, c, l, e, o in rows]
+    return [{"username": n, "permissions": dict(p), "created": c, "last_login": l, "last_active": l, "expires": e, "owner": o} for n, p, c, l, e, o in rows]
 
 
 _PRIVATE = {"Jonas": "Ben", "Paul": "Finn", "Alex": "Anna", "Oma": "Gast"}
-_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor"), ("Test NFC", "Garagentor-Tag"), ("Ben Zimmerlicht", "Garagentor"))      # Testnamen aus den Rohdaten
+_RENAMES = (("NFC Test Aktion", "Garagentor-Tag"), ("Test-NFC", "Garagentor"), ("Test NFC", "Garagentor-Tag"), ("Ben Zimmerlicht", "Garagentor"), ("Waermepumpe", "Wärmepumpe"))      # Testnamen aus den Rohdaten
 
 
 def neutral_names() -> None:
@@ -704,6 +712,45 @@ def demo_apikeys() -> list:
         {"id": "k-demo0002", "name": "Auswertung (Node-RED)", "prefix": "bnx_Nr7q", "created": now - 5 * 86400, "last_used": now - 90, "last_ip": "192.168.1.31",
          "all": True, "items": [], "allow": []},
     ]
+
+
+def seed_thermo() -> None:
+    """Erfundenes Funkthermometer 'Gartenthermometer': liegt in thermo.json (mit den vier Sensoren) und meldet sich jede Minute mit
+    frischen, tageszeitabhaengigen Werten, damit es in Demo und Sensorliste online bleibt."""
+    import hashlib
+    import thermo
+    from demo import _day_factor, _season
+    tid = "t-demo0001"
+    now = time.time()
+    dev = {"id": tid, "name": "Gartenthermometer", "token_hash": hashlib.sha256(b"demo").hexdigest(), "interval": 15, "created": now - 19 * 86400,
+           "last_seen": now, "fw": "1.1.1", "last": {}, "interval_ack": 15, "meta": {"n": 1830, "rr": 8, "ap": "aa:bb:cc:12:34:56"}}
+
+    def values():
+        t = datetime.now()
+        f, sea = _day_factor(t.date()), _season(t.date())
+        mean = 3 + 16 * (sea - 0.3) / 0.7 - (1.5 if f < 0.5 else 0)
+        temp = mean + (2.5 + 4 * f) * math.sin(2 * math.pi * (t.hour + t.minute / 60.0 - 9) / 24.0)
+        return {"temp": round(temp, 1), "hum": round(max(35.0, min(98.0, 88 - 22 * f - 0.6 * (temp - mean))), 1), "bat": 3.71, "rssi": -61.0}
+
+    dev["last"] = values()
+    with thermo._lock:
+        items = [x for x in thermo._load() if x.get("id") != tid] + [dev]
+        thermo._save(items)
+    thermo._make_sensors(dev)
+
+    def loop():
+        while True:
+            time.sleep(60)
+            try:
+                with thermo._lock:
+                    items = thermo._load()
+                    for x in items:
+                        if x.get("id") == tid:
+                            x["last"], x["last_seen"] = values(), time.time()
+                    thermo._save(items)
+            except Exception:
+                pass
+    threading.Thread(target=loop, daemon=True, name="demo-thermo").start()
 
 
 def seed_devicelog() -> None:
