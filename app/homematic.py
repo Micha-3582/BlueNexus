@@ -15,6 +15,7 @@ Die Aufrufformen sind aus dem WebUI-Code der CCU abgelesen (webui.js): `valueKey
 from __future__ import annotations
 
 import ipaddress
+import idsafe
 import json
 import logging
 import os
@@ -307,7 +308,7 @@ def discover(known_ids: set[str]) -> list[dict]:
 
 # ---------------------------------------------------------------- Anlegen
 def entry_id(address: str) -> str:
-    return "hm-" + address.replace(":", "-")
+    return "hm-" + idsafe.safe_id(address.replace(":", "-"))
 
 
 def _icon_for(f: dict) -> str:
@@ -516,7 +517,7 @@ def reorder_blinds(ids: list[str]) -> None:
 
 
 def sensor_id(address: str, datapoint: str) -> str:
-    return "hmS-" + address.replace(":", "-") + "-" + datapoint
+    return "hmS-" + idsafe.safe_id(address.replace(":", "-")) + "-" + idsafe.safe_id(datapoint)
 
 
 def _probe_sensor_channel(item: dict) -> list[dict]:
@@ -789,7 +790,7 @@ def setpoint_users_registry():
 
 
 def setpoint_id(address: str) -> str:
-    return "hmT-" + address.replace(":", "-")
+    return "hmT-" + idsafe.safe_id(address.replace(":", "-"))
 
 
 def _probe_setpoint_channel(item: dict) -> dict | None:
@@ -983,7 +984,7 @@ def _save_locks(items: list[dict]):
 
 
 def lock_id(address: str) -> str:
-    return "hmK-" + address.replace(":", "-")
+    return "hmK-" + idsafe.safe_id(address.replace(":", "-"))
 
 
 def _probe_lock_channel(item: dict) -> dict | None:
@@ -1168,7 +1169,7 @@ def sound_users_registry():
 
 
 def sound_id(address: str) -> str:
-    return "hmA-" + address.replace(":", "-")
+    return "hmA-" + idsafe.safe_id(address.replace(":", "-"))
 
 
 def _probe_sound_channel(item: dict) -> dict | None:
@@ -1329,7 +1330,7 @@ def blind_users_registry():
 
 
 def blind_id(address: str) -> str:
-    return "hmR-" + address.replace(":", "-")
+    return "hmR-" + idsafe.safe_id(address.replace(":", "-"))
 
 
 def _probe_blind_channel(item: dict) -> dict | None:

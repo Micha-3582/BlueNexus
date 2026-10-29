@@ -11,6 +11,7 @@ import ipaddress
 import json
 import logging
 import os
+import idsafe
 import re
 import socket
 import threading
@@ -132,7 +133,7 @@ def probe(ip: str, timeout: float = PROBE_TIMEOUT) -> dict | None:
     if not isinstance(info, dict) or not (info.get("mac") or info.get("id")):
         return None
     gen = int(info.get("gen") or 1)
-    mac = str(info.get("mac") or info.get("id")).replace(":", "").upper()
+    mac = idsafe.safe_id(str(info.get("mac") or info.get("id")).replace(":", "").upper())
     if gen >= 2:
         model = info.get("app") or info.get("model") or "Shelly"
         name = info.get("name") or info.get("id") or model
@@ -632,7 +633,7 @@ def add_tuya(dev_id: str, ip: str = "") -> dict:
         entry = tuya.build_entry(dev_id, ip)
     except tuya.TuyaError as e:
         raise ShellyError(str(e))
-    entry["id"] = f"tuya-{dev_id}-{entry['dp']}"
+    entry["id"] = f"tuya-{idsafe.safe_id(dev_id)}-{entry['dp']}"
     entry["mac"] = None
     items = load_devices()
     if any(d["id"] == entry["id"] for d in items):

@@ -74,14 +74,15 @@ assert r.status_code == 200
 client.post("/logout")
 assert cfg.get("app_display_name") != "Hack2", "demo (nur read auf settings_anzeige) haette nichts aendern duerfen"
 
-# ---- custom: settings_tarif=read (Token verborgen), settings_vrm=write (VRM-Zugangsdaten setzen erlaubt)
+# ---- custom: settings_tarif=read (Token verborgen), settings_vrm=write (Ansehen ja; VRM-Zugangsdaten ersetzen seit 1.28.1 nur Administratoren)
 login("custom", "custompass1")
 r = client.get("/api/config")
 assert r.get_json()["tibber_token"] == ""
 r = client.get("/admin")
 assert r.status_code == 200
 r = client.post("/api/vrm/credentials", json={"installation_id": "123", "token": "vrm-tok"})
-assert r.status_code != 403, r.get_json()
+assert r.status_code == 403, r.get_json()          # Zugaenge ersetzen nur Administratoren, auch mit Schreibrecht im Bereich
+assert client.get("/api/vrm").status_code == 200     # Ansehen bleibt moeglich
 r = client.post("/api/notify/credentials", json={"token": "x", "chat_id": "1"})
 assert r.status_code == 403          # kein Zugriff auf settings_meldungen
 r = client.get("/api/users")

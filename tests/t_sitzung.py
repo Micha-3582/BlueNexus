@@ -92,6 +92,10 @@ assert ok(login("admin", "adminneu1234"))
 
 # ---- 7) Cookie aus der Zeit vor der Aenderung (nur Benutzername, keine Kennung): gilt einmalig weiter und bekommt die Kennung
 users.create("alt", "altpass12345", auth.PRESETS["user"])
+raw_ = json.load(open(path, encoding="utf-8"))                                  # Konto "von vor dem Update": Datei ohne Kennung, Zaehler und Merkmal
+for f_ in ("uid", "sess_epoch", "legacy_session_ok"): raw_["users"]["alt"].pop(f_, None)
+json.dump(raw_, open(path, "w", encoding="utf-8"))
+webapp.users = users = UserStore(path)
 L = webapp.app.test_client()
 with L.session_transaction() as s:
     s["user"] = "alt"; s.permanent = True

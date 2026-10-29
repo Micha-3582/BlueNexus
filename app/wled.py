@@ -6,6 +6,7 @@ Beim Einschalten behaelt WLED seine zuletzt eingestellte Helligkeit/Farbe/Effekt
 """
 from __future__ import annotations
 
+import idsafe
 import re
 import threading
 import time
@@ -54,7 +55,7 @@ def probe(ip: str, timeout: float = PROBE_TIMEOUT) -> dict | None:
         info = _get(ip, "/json/info", timeout, retries=1)
     except (requests.RequestException, ValueError):
         return None
-    ver, mac = info.get("ver"), str(info.get("mac") or "").replace(":", "").upper()
+    ver, mac = info.get("ver"), idsafe.safe_id(str(info.get("mac") or "").replace(":", "").upper())
     if not ver or not mac or not (str(info.get("brand") or "").upper() == "WLED" or "leds" in info):
         return None
     leds = info.get("leds") if isinstance(info.get("leds"), dict) else {}

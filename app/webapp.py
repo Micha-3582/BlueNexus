@@ -231,9 +231,10 @@ def _deny(msg: str, code: int = 403):
 # neue/vergessene Routen) - ausser sie stehen in ALWAYS_ALLOWED (eigenes Konto, Ab-/Anmelden).
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
 # Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
-# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus): nur Administratoren, auch mit Schreibrecht im Bereich System.
+# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus, Module ein/aus, Zeitzone) und Zugaenge ersetzen (VRM, Telegram-Bot, Pushover): nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich.
 # Ansehen (GET) bleibt wie bisher fuer alle mit Lese-Recht.
-ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "api_tunnel_enable", "api_tunnel_install", "api_tunnel_check", "api_tunnel_update"}
+ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "api_tunnel_enable", "api_tunnel_install", "api_tunnel_check", "api_tunnel_update",
+                      "api_modules", "api_system_timezone", "api_vrm_credentials", "api_notify_credentials", "api_pushover_credentials"}
 
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
@@ -413,14 +414,17 @@ def _reissue_session(username: str) -> None:
 
 def _session_matches(user: dict) -> bool:
     """Gehoert die Sitzung noch zu diesem Konto? Nein, wenn das Konto geloescht und unter gleichem Namen neu angelegt wurde (andere Kennung) oder
-    sich das Passwort geaendert hat (anderer Zaehler). Cookies aus der Zeit vor 1.28.0 haben noch keine Kennung: sie gelten einmalig weiter und
-    bekommen sie jetzt (sonst waere jeder nach dem Update abgemeldet)."""
+    sich das Passwort geaendert hat (anderer Zaehler). Cookies aus der Zeit vor 1.28.0 haben noch keine Kennung: sie gelten nur fuer Konten, die damals
+    schon bestanden, und nur solange sich das Passwort seitdem nicht geaendert hat (Zaehler 0); dann bekommen sie die Kennung (sonst waere jeder
+    nach dem Update abgemeldet). Fuer neue Konten und nach einer Passwortaenderung gilt ein Cookie ohne Kennung nie."""
     uid = user.get("uid")
     if not uid:
         return True
     if session.get("uid") is None:
-        session["uid"], session["ep"] = uid, int(user.get("sess_epoch") or 0)
-        return True
+        if user.get("legacy_session_ok") and int(user.get("sess_epoch") or 0) == 0:
+            session["uid"], session["ep"] = uid, 0
+            return True
+        return False
     return session.get("uid") == uid and int(session.get("ep") or 0) == int(user.get("sess_epoch") or 0)
 
 
@@ -3910,6 +3914,9 @@ def api_pushover_credentials():
 @app.route("/api/pushover/recipient", methods=["POST"])
 def api_pushover_recipient_add():
     b = request.get_json(silent=True) or {}
+    denied = _system_recipient_guard(pushover.recipients(), None, b)
+    if denied:
+        return denied
     try:
         return jsonify(pushover.add_recipient(b.get("name"), b.get("user_key"), bool(b.get("system")), device=b.get("device") or "")), 201
     except pushover.PushoverError as e:
@@ -3918,6 +3925,9 @@ def api_pushover_recipient_add():
 
 @app.route("/api/pushover/recipient/<rid>", methods=["PATCH", "DELETE"])
 def api_pushover_recipient_modify(rid):
+    denied = _system_recipient_guard(pushover.recipients(), rid, {} if request.method == "DELETE" else (request.get_json(silent=True) or {}))
+    if denied:
+        return denied
     try:
         if request.method == "DELETE":
             ok = pushover.remove_recipient(rid)
@@ -4026,9 +4036,25 @@ def api_notify_request(cid):
     return (jsonify(ok=True), 200) if notify_in.reject_request(cid) else (jsonify(error="Anfrage nicht gefunden"), 404)
 
 
+def _system_recipient_guard(recs: list, rid, body: dict):
+    """Systemempfaenger bekommen u. a. die Codes zum Zuruecksetzen von Passwoertern ("Passwort vergessen"): Anlegen, Aendern und Loeschen darf sie nur ein
+    Administrator. Sonst koennte sich ein Konto mit Schreibrecht im Bereich Meldungen als Systemempfaenger eintragen und ein Administratorkonto uebernehmen.
+    Normale Empfaenger (ohne "system") darf weiter anlegen, wer das Recht hat. None = erlaubt."""
+    if auth.is_full_admin(g.perms):
+        return None
+    cur = next((r for r in recs if r.get("id") == rid), None) if rid else None
+    wants = isinstance(body.get("system"), bool) and body["system"]
+    if (cur and cur.get("system")) or wants:
+        return jsonify(error="Systemempfänger (sie bekommen u. a. die Codes zum Zurücksetzen von Passwörtern) legt, ändert und löscht nur ein Administrator."), 403
+    return None
+
+
 @app.route("/api/notify/recipient", methods=["POST"])
 def api_notify_recipient_add():
     b = request.get_json(silent=True) or {}
+    denied = _system_recipient_guard(notify.recipients(), None, b)
+    if denied:
+        return denied
     try:
         return jsonify(notify.add_recipient(b.get("name"), b.get("chat_id"), bool(b.get("system")))), 201
     except notify.NotifyError as e:
@@ -4037,6 +4063,9 @@ def api_notify_recipient_add():
 
 @app.route("/api/notify/recipient/<rid>", methods=["PATCH", "DELETE"])
 def api_notify_recipient_modify(rid):
+    denied = _system_recipient_guard(notify.recipients(), rid, {} if request.method == "DELETE" else (request.get_json(silent=True) or {}))
+    if denied:
+        return denied
     try:
         if request.method == "DELETE":
             ok = notify.remove_recipient(rid)

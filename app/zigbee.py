@@ -13,6 +13,7 @@ damit Dashboard, Regeln und Abläufe sie gleich behandeln. Werte werden 1 s zwis
 from __future__ import annotations
 
 import ipaddress
+import idsafe
 import json
 import logging
 import os
@@ -380,7 +381,7 @@ def _gwname(gw_id: str) -> str:
 
 # ---------------------------------------------------------------- Lichter / Steckdosen (Schalter)
 def device_id(uid: str) -> str:
-    return "zb-" + uid.replace(":", "-")
+    return "zb-" + idsafe.safe_id(uid.replace(":", "-"))
 
 
 def discover(known_ids: set[str]) -> list[dict]:
@@ -471,11 +472,11 @@ KIND_LABEL = {"contact": "Fenster/Tür", "motion": "Bewegung", "temperature": "T
 
 
 def sensor_id(uid: str) -> str:
-    return "zbS-" + uid.replace(":", "-")
+    return "zbS-" + idsafe.safe_id(uid.replace(":", "-"))
 
 
 def thermostat_id(uid: str) -> str:
-    return "zbT-" + uid.replace(":", "-")
+    return "zbT-" + idsafe.safe_id(uid.replace(":", "-"))
 
 
 def _sensor_scan_items(known_ids: set[str]) -> list[dict]:

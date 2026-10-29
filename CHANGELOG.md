@@ -4,6 +4,13 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.1 – 29.10.2026
+- Sicherheit (Ergebnis der Nachprüfung): **Systemempfänger** (bei Telegram und Pushover die Empfänger, die Systemmeldungen und die Codes von „Passwort vergessen“ bekommen) dürfen nur noch **Administratoren** anlegen, ändern und löschen. Ein Konto mit dem Recht „Einstellungen: Meldungen“ konnte sich bisher als Systemempfänger eintragen, den Code für ein Administratorkonto empfangen und es so übernehmen. Normale Empfänger (z. B. für Regel-Nachrichten) darf weiter anlegen, wer das Recht hat.
+- Sicherheit: Den **Telegram-Bot**, den **Pushover-Zugang** und den **VRM-Zugang** ersetzen oder löschen sowie **Module ein- und ausschalten** und die **Zeitzone** ändern dürfen nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich. Ansehen bleibt wie bisher möglich.
+- Sicherheit: Anmeldungen aus der Zeit vor 1.28.0 (Cookie ohne Kennung) gelten nur noch für Konten, die damals schon bestanden, und nur solange sich das Passwort seitdem nicht geändert hat. Bisher blieben solche Cookies auch nach einer Passwortänderung oder für ein neu angelegtes gleichnamiges Konto gültig. Niemand wird durch das Update abgemeldet.
+- Sicherheit: **Gerätekennungen** (MAC, Adresse, Seriennummer), die ein Gerät oder eine Zentrale selbst meldet (Shelly, Tasmota, WLED, Homematic, Zigbee, Tuya), enthalten nur noch Buchstaben, Ziffern und `. _ : -`. Normale Kennungen bleiben unverändert, bestehende Geräte ebenfalls. Damit kann ein manipuliertes Gerät im Heimnetz keine Zeichen in Seiten und Adressen einschmuggeln.
+- Intern: Neuer Test `tests/t_sicherheit2.py` (118 Tests).
+
 ## 1.28.0 – 29.10.2026
 - Sicherheit: **Sitzungen enden jetzt, wenn sich das Passwort eines Kontos ändert.** Bisher blieb ein Gerät, auf dem man einmal angemeldet war, bis zu ein Jahr angemeldet – auch nach einer Passwortänderung (z. B. ein verlorenes Handy oder ein fremder Rechner). Jetzt werden nach jeder Passwortänderung (selbst unter *Konto & Zugang*, durch den Administrator unter *Weitere Benutzer*, über *Passwort vergessen* und mit `reset_password.py`) alle **anderen** Geräte abgemeldet. Das Gerät, an dem man sein eigenes Passwort ändert, bleibt angemeldet.
 - Sicherheit: Löscht man ein Konto und legt später eines **mit demselben Namen** neu an (oder vergibt den alten Namen nach einer Umbenennung neu), erbt das neue Konto nicht mehr die Anmeldung des alten. Jedes Konto bekommt dazu beim Anlegen eine zufällige Kennung.

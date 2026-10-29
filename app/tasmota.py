@@ -7,6 +7,7 @@ Passwortgeschuetzte Geraete (WebPassword) werden per HTTP-Basic-Auth (Benutzer "
 """
 from __future__ import annotations
 
+import idsafe
 import re
 import threading
 import time
@@ -60,7 +61,7 @@ def probe(ip: str, timeout: float = PROBE_TIMEOUT, auth=None) -> dict | None:
     st, net, sts = data.get("Status"), data.get("StatusNET"), data.get("StatusSTS")
     if not isinstance(st, dict) or not isinstance(net, dict) or not isinstance(sts, dict):
         return None
-    mac = str(net.get("Mac") or "").replace(":", "").upper()
+    mac = idsafe.safe_id(str(net.get("Mac") or "").replace(":", "").upper())
     if not mac:
         return None
     fn = st.get("FriendlyName")

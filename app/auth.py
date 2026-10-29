@@ -320,6 +320,9 @@ class UserStore:
             if "sess_epoch" not in u:
                 u["sess_epoch"] = 0
                 changed = True
+            if "legacy_session_ok" not in u:          # Konto bestand schon vor dieser Funktion: Anmeldungen ohne Kennung (Cookie von frueher) gelten noch, solange sich das Passwort nicht geaendert hat
+                u["legacy_session_ok"] = True
+                changed = True
         return changed
 
     def _ensure_owner(self) -> bool:
@@ -472,6 +475,7 @@ class UserStore:
                 "pw_hash": generate_password_hash(password),
                 "uid": secrets.token_hex(8),
                 "sess_epoch": 0,
+                "legacy_session_ok": False,           # neues Konto: nie eine Anmeldung ohne Kennung annehmen
                 "created": time.time(),
                 "last_login": None,
                 "permissions": perms,
