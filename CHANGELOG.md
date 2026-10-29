@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.5 – 29.10.2026
+- Verbesserung: In der **Wetter-Vorhersage** ist das Symbol vor der Sonnenscheindauer jetzt das **farbige (gelbe) Sonnen-Emoji** ☀️ und genauso groß wie die anderen Symbole der Zeile (💧 💨). Vorher war es ein schmaleres, einfarbiges graues Zeichen.
+
 ## 1.28.4 – 29.10.2026
 - Sicherheit (Ergebnis der zweiten Nachprüfung): Die **Zugänge zu Zentralen und Clouds** (Homematic-CCU, Zigbee-Gateway, Tuya, Midea-Cloud) und die **Funkthermometer** (anlegen, ändern, löschen, kalibrieren, gemerktes WLAN vergessen) ändert nur noch ein **Administrator**, auch mit Schreibrecht im Bereich. Ansehen bleibt möglich. Hintergrund: Wer die Adresse der CCU änderte, behielt das gespeicherte Passwort, und es ging danach an die neue Adresse. Und beim Anlegen eines Thermometers baute der Server die Konfiguration mit dem gemerkten WLAN-Passwort und gab sie an den Browser des Kontos.
 - Intern: Neuer Test `tests/t_sicherheit3.py` (119 Tests).

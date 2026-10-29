@@ -1930,7 +1930,7 @@ function renderWeather() {
     const dt = new Date(d.date + 'T00:00');
     return `<div class="d"><div><b>${i === 0 ? 'Heute' : WD[dt.getDay()] + ' ' + pad(dt.getDate()) + '.'}</b></div><div>${d.icon}</div>
       <div><b>${d.tmax}°</b> <span class="muted">/ ${d.tmin}°</span></div>
-      <div class="m">${d.pop != null ? '💧 ' + d.pop + ' % · ' : ''}${d.precip} mm · 💨 ${d.wind} km/h${d.sun_h != null ? ' · ☀︎ ' + d.sun_h + ' h' : ''}${d.uv != null && d.uv > 0 ? ' · ' + uvTxt(d.uv) : ''}${d.sunrise ? ' · ↑' + d.sunrise + ' ↓' + d.sunset : ''}</div></div>`;
+      <div class="m">${d.pop != null ? '💧 ' + d.pop + ' % · ' : ''}${d.precip} mm · 💨 ${d.wind} km/h${d.sun_h != null ? ' · ☀️ ' + d.sun_h + ' h' : ''}${d.uv != null && d.uv > 0 ? ' · ' + uvTxt(d.uv) : ''}${d.sunrise ? ' · ↑' + d.sunrise + ' ↓' + d.sunset : ''}</div></div>`;
   }).join('');
   $('wx-foot').textContent = (w.error ? '⚠ ' + w.error + ' · ' : '') + 'Daten: Open-Meteo' + (w.updated ? ' · Stand ' + w.updated.slice(11, 16) + ' Uhr' : '');
 }
