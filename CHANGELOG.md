@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.4 – 29.10.2026
+- Sicherheit (Ergebnis der zweiten Nachprüfung): Die **Zugänge zu Zentralen und Clouds** (Homematic-CCU, Zigbee-Gateway, Tuya, Midea-Cloud) und die **Funkthermometer** (anlegen, ändern, löschen, kalibrieren, gemerktes WLAN vergessen) ändert nur noch ein **Administrator**, auch mit Schreibrecht im Bereich. Ansehen bleibt möglich. Hintergrund: Wer die Adresse der CCU änderte, behielt das gespeicherte Passwort, und es ging danach an die neue Adresse. Und beim Anlegen eines Thermometers baute der Server die Konfiguration mit dem gemerkten WLAN-Passwort und gab sie an den Browser des Kontos.
+- Intern: Neuer Test `tests/t_sicherheit3.py` (119 Tests).
+
 ## 1.28.3 – 29.10.2026
 - Sicherheit: **Alles rund um Telegram und Pushover richtet nur noch der Administrator ein**: Bot und Zugang, Empfänger anlegen, ändern und löschen, Chats freigeben oder ablehnen, die Einstellungen der Meldungen und die Test-Nachrichten. Auch mit dem Recht „Einstellungen: Meldungen“ = Schreiben können andere Konten das nicht; Ansehen bleibt möglich. Wer Meldungen bekommen soll, muss dem Bot nur einmal schreiben, den Rest stellt der Administrator ein. (Die Systemempfänger bekommen auch die Codes von „Passwort vergessen“, deshalb ist die Regel bewusst streng.) Die Regel aus 1.28.1, dass Konten mit diesem Recht normale Empfänger anlegen dürfen, entfällt damit.
 - Intern: Test `t_sicherheit2` auf die strengere Regel angepasst.

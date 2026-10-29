@@ -231,13 +231,17 @@ def _deny(msg: str, code: int = 403):
 # neue/vergessene Routen) - ausser sie stehen in ALWAYS_ALLOWED (eigenes Konto, Ab-/Anmelden).
 ALWAYS_ALLOWED_ENDPOINTS = {"preview_start", "preview_stop"}
 # Logbuecher (Regeln, Automatik, Solar, Betriebsbericht, Watchdog, Tunnel) sehen nur Administratoren - unabhaengig von den Bereichsrechten
-# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus, Module ein/aus, Zeitzone) und alles rund um VRM, Telegram und Pushover einrichten: nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich.
+# Das Verhalten der ganzen Anlage aendern (App aktualisieren, Fernzugriff ins Internet, Testmodus, Module ein/aus, Zeitzone) und alles rund um Zugaenge (VRM, Telegram, Pushover, Homematic, Zigbee, Tuya, Midea) und Thermometer einrichten: nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich.
 # Ansehen (GET) bleibt wie bisher fuer alle mit Lese-Recht.
 ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "api_tunnel_enable", "api_tunnel_install", "api_tunnel_check", "api_tunnel_update",
                       "api_modules", "api_system_timezone", "api_vrm_credentials",
                       # Telegram und Pushover (Bot, Empfaenger, Freigaben, Einstellungen, Tests): Empfaenger schreiben nur dem Bot, eingerichtet wird alles vom Administrator
                       "api_notify_credentials", "api_notify_detect", "api_notify_recipient_add", "api_notify_recipient_modify", "api_notify_request", "api_notify_settings",
-                      "api_notify_test", "api_pushover_credentials", "api_pushover_recipient_add", "api_pushover_recipient_modify", "api_pushover_test"}
+                      "api_notify_test", "api_pushover_credentials", "api_pushover_recipient_add", "api_pushover_recipient_modify", "api_pushover_test",
+                      # Zugaenge zu Zentralen und Clouds (Passwort/Schluessel bleiben beim Wechsel der Adresse sonst erhalten) und Funkthermometer (gemerktes WLAN-Passwort).
+                      # Alexa-Einstellungen und Teilen (Freigaben) pruefen den Administrator in der Route selbst (_admin_only).
+                      "api_homematic_credentials", "api_zigbee_credentials", "api_zigbee_gateway_delete", "api_tuya_credentials", "api_midea_cloud", "api_midea_rekey",
+                      "api_thermo_list", "api_thermo_wifi", "api_thermo_item", "api_thermo_calibrate"}
 
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
@@ -510,7 +514,7 @@ def _require_login():
         mod = request.args.get("module") or (request.get_json(silent=True) or {}).get("module")
         return _check_area("rules" if mod == "rules" else "automation", "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write")
     if request.endpoint in ADMIN_ONLY_CHANGES and request.method not in ("GET", "HEAD", "OPTIONS") and not auth.is_full_admin(g.perms):
-        return _deny("Das richtet nur ein Administrator ein (Update, Fernzugriff, Telegram/Pushover, VRM, Module, Testmodus).")
+        return _deny("Das richtet nur ein Administrator ein (Zugänge, Fernzugriff, Update, Telegram/Pushover, Thermometer, Module).")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
         if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last", "api_inventory")):      # Demo: Schnittstellen-Karte nur ansehen
