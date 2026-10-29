@@ -34,6 +34,7 @@
  "t_ipedit.py": true,
  "t_jsall.py": true,
  "t_keys.py": true,
+ "t_lastactive.py": true,
  "t_latch.py": true,
  "t_logic.py": true,
  "t_logrecht.py": true,

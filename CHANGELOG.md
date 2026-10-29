@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.27.0 – 29.10.2026
+- Neu: In der **Benutzerliste** (Einstellungen → Konto & Benutzer) zeigt die neue Spalte **Zuletzt aktiv**, wann ein Konto zuletzt etwas bedient hat. **Letzter Login** zeigt weiterhin nur, wann zuletzt das Passwort eingegeben wurde – wer angemeldet bleibt, meldet sich nicht neu an, deshalb war dieses Datum oft alt. Gezählt wird echte Bedienung (eine Seite öffnen, schalten, speichern oder drücken), nicht die Abfragen im Hintergrund eines offen gelassenen Dashboards und nicht die Vorschau eines Administrators. Der Wert ist auf etwa 10 Minuten genau (es wird höchstens alle 10 Minuten gespeichert). Bei Konten, die seit dem Update noch nichts bedient haben, steht „–“.
+- Intern: Die Testsammlung (jetzt 115 Tests) liegt im Repo unter `tests/` (`python tests/run_all.py`); zwei ungenutzte Funktionen entfernt. Am Verhalten der App ändert sich dadurch nichts.
+
 ## 1.26.17 – 28.10.2026
 - Verbesserung: Bei **allen Fenstern** der App (Dialoge, Auswahl- und Einstellungsfenster, Farbwähler, PIN-Eingabe, Kamera-Vollbild, Geräteübersicht) scrollt die Seite dahinter nicht mehr mit dem Mausrad mit. Die Seite wird festgehalten, solange ein Fenster offen ist, und danach an derselben Stelle wieder freigegeben. Erkannt wird das automatisch, einzelne Fenster müssen nichts dafür tun.
 

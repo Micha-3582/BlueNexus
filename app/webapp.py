@@ -1105,7 +1105,7 @@ def api_update_own_account():
 
 def _user_out(u: dict) -> dict:
     return {"username": u["username"], "permissions": auth.normalize_permissions(u.get("permissions")),
-            "created": u.get("created"), "last_login": u.get("last_login"),
+            "created": u.get("created"), "last_login": u.get("last_login"), "last_active": u.get("last_active"),
             "expires": u.get("expires"), "is_me": u["username"].strip().lower() == g.user,
             "admin": auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))), "owner": bool(u.get("owner")),
             "dashboard_tiles": auth.normalize_tiles(u.get("dashboard_tiles")),
@@ -5524,6 +5524,22 @@ def _perf_end(resp):
     t0 = getattr(g, "_perf_t0", None)
     if t0 is not None and not request.path.startswith("/static/") and not resp.direct_passthrough:        # Datenstroeme (Kamerabild) nicht mitzaehlen
         perf.note_request(request.endpoint or "", request.path, (time.perf_counter() - t0) * 1000)
+    return resp
+
+
+@app.after_request
+def _note_activity(resp):
+    """Benutzerliste "Zuletzt aktiv": zaehlt nur echte Bedienung - eine Seite oeffnen oder etwas schalten/speichern (POST/PUT/PATCH/DELETE).
+    Abfragen im Hintergrund (GET auf /api/..., Dateien) zaehlen nicht, sonst waere ein offen gelassenes Dashboard immer "gerade aktiv".
+    Gespeichert wird hoechstens alle 10 Minuten (auth.ACTIVE_WRITE_EVERY_S). Die Vorschau (Administrator sieht als anderes Konto) zaehlt nicht."""
+    try:
+        user = getattr(g, "user", None)
+        if (user and not getattr(g, "preview", None) and not demo.ACTIVE and resp.status_code < 400 and request.endpoint != "static"
+                and request.path not in ("/sw.js", "/manifest.webmanifest")):
+            if request.method in ("POST", "PUT", "PATCH", "DELETE") or (request.method == "GET" and not request.path.startswith("/api/")):
+                users.touch(user)
+    except Exception:                                      # noqa: BLE001 - die Anzeige darf nie eine Anfrage stoeren
+        log.debug("Zuletzt aktiv nicht gespeichert", exc_info=True)
     return resp
 
 

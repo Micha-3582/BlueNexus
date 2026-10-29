@@ -1033,7 +1033,7 @@
     <table id="users-table" style="width:100%;border-collapse:collapse">
       <thead><tr>
         <th style="text-align:left">Benutzername</th><th style="text-align:left">Rechte</th>
-        <th style="text-align:left">Ablauf</th><th style="text-align:left">Letzter Login</th><th></th>
+        <th style="text-align:left">Ablauf</th><th style="text-align:left">Letzter Login</th><th style="text-align:left" title="Wann dieses Konto zuletzt etwas bedient hat (Seite geöffnet, geschaltet, gespeichert). Auf etwa 10 Minuten genau.">Zuletzt aktiv</th><th></th>
       </tr></thead>
       <tbody id="users-body"></tbody>
     </table>
@@ -1648,6 +1648,7 @@ async function loadUsers() {
           ? '<span class="muted" title="Ein Zugang mit Benutzerverwaltung läuft nie ab">– läuft nie ab –</span>'
           : `<input type="date" class="u-expires" data-u="${escHUsers(u.username)}" value="${u.expires || ''}" style="padding:4px 6px">`}</td>
         <td style="padding:6px 4px" class="muted">${fmtLogin(u.last_login)}</td>
+        <td style="padding:6px 4px" class="muted">${u.last_active ? fmtLogin(u.last_active) : '–'}</td>
         <td style="padding:6px 4px;white-space:nowrap">${locked ? '<span class="muted" title="Das Hauptkonto kann nur vom Hauptadmin selbst geändert werden">🔒 Hauptkonto</span>' : `
           <button type="button" class="ghost u-edit" data-u="${escHUsers(u.username)}" title="Rechte bearbeiten">🛠️</button>
           ${u.admin ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
@@ -1659,7 +1660,7 @@ async function loadUsers() {
       const editRow = document.createElement('tr');
       const uid = userDomId(u.username);
       editRow.className = 'u-editrow'; editRow.dataset.u = u.username; editRow.style.display = 'none';
-      editRow.innerHTML = `<td colspan="5" style="padding:8px 4px 16px;background:var(--card2);border-radius:8px">
+      editRow.innerHTML = `<td colspan="6" style="padding:8px 4px 16px;background:var(--card2);border-radius:8px">
         <div style="margin-bottom:12px"><label class="chk"><input type="checkbox" class="u-isadmin" data-u="${escHUsers(u.username)}" id="${uid}-isadmin" ${u.admin ? 'checked' : ''} ${u.owner ? 'disabled' : ''}> <b>Administrator</b></label>
           <span class="qhelp" role="button" tabindex="0" data-help="Ein Administrator darf alles: Benutzer verwalten, Geräte anlegen, ändern und löschen, alle Einstellungen, Regeln, Zugang an andere teilen. Die Rechte-Tabelle gilt für ihn nicht. „Schreiben“ in der Tabelle heißt bei normalen Konten nur: Geräte bedienen bzw. den Bereich ändern – es macht niemanden zum Administrator.">?</span>
           <span class="muted">${u.owner ? 'Hauptkonto – bleibt immer Administrator und kann nicht gelöscht werden (umbenennen und neues Passwort sind möglich).' : 'Darf alles, auch Benutzer verwalten und Zugang teilen.'}</span></div>

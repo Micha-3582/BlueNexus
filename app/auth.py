@@ -241,6 +241,7 @@ def _norm(username: str) -> str:
     return (username or "").strip().lower()
 
 
+ACTIVE_WRITE_EVERY_S = 600.0                                      # "zuletzt aktiv" wird hoechstens alle 10 Minuten gespeichert
 USERNAME_RE = re.compile(r"[A-Za-z0-9ÄÖÜäöüß][A-Za-z0-9ÄÖÜäöüß ._@-]{0,39}")      # neue Benutzernamen: Buchstaben, Ziffern, Leerzeichen und . _ @ - (keine HTML-/Sonderzeichen)
 _DUMMY_HASH = generate_password_hash("kein-solcher-benutzer")                   # fuer gleiche Rechenzeit bei unbekanntem Konto (kein Raten, welche Namen es gibt)
 
@@ -278,6 +279,7 @@ class UserStore:
         self._lock = threading.RLock()
         self._users: dict[str, dict] = {}
         self._stamp = None
+        self._active_seen: dict[str, float] = {}                  # Konto -> zuletzt gespeicherter Zeitpunkt von "zuletzt aktiv" (spart das Anfassen der Datei)
         self._load()
 
     def _file_stamp(self):
@@ -406,6 +408,27 @@ class UserStore:
             user["last_login"] = time.time()
             self._write()
             return dict(user)
+
+    def touch(self, username: str, now: float | None = None) -> bool:
+        """Merkt, dass dieses Konto gerade etwas bedient hat („zuletzt aktiv“). Gespeichert wird hoechstens alle ACTIVE_WRITE_EVERY_S Sekunden,
+        sonst wuerde jede Bedienung die Benutzerdatei neu schreiben. True, wenn gespeichert wurde."""
+        key = _norm(username)
+        now = time.time() if now is None else now
+        if now - self._active_seen.get(key, 0.0) < ACTIVE_WRITE_EVERY_S:
+            return False
+        with self._lock:
+            self._sync()
+            user = self._users.get(key)
+            if not user:
+                return False
+            last = float(user.get("last_active") or 0)
+            if now - last < ACTIVE_WRITE_EVERY_S:
+                self._active_seen[key] = last
+                return False
+            user["last_active"] = now
+            self._write()
+        self._active_seen[key] = now
+        return True
 
     def create(self, username: str, password: str, permissions: dict | None = None,
                expires: str | None = None, dashboard_tiles=None, dashboard_order=None, admin: bool | None = None) -> dict:
