@@ -33,7 +33,12 @@ class WebhookError(ValueError):
 
 
 def _bad_ip(ip) -> bool:
-    return ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved and not ip.is_private
+    """Nicht erlaubte Ziele: der Server selbst (Loopback, auch als ::ffff:127.0.0.1), Link-Local (u. a. Cloud-Metadaten 169.254.169.254), Multicast, 0.0.0.0.
+    Adressen im Heimnetz (192.168.x.x, 10.x.x.x ...) bleiben erlaubt: dort stehen die Geraete, die man per Web-Aufruf schaltet."""
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None and _bad_ip(mapped):
+        return True
+    return ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved and not ip.is_private
 
 
 def validate(url: str) -> str:

@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.28.2 – 29.10.2026
+- Sicherheit: Bei **Web-Aufrufen** (eigener Knopf mit Adresse und Regel-Schritt „Adresse aufrufen“) darf das Ziel nicht mehr der **Server selbst** sein (`localhost`, `127.0.0.1`, `[::1]`). Geräte im Heimnetz (z. B. `192.168.…`) und Adressen im Internet gehen weiter. Ein manipulierter Aufruf konnte sonst Dienste erreichen, die nur auf dem Server selbst lauschen. Bei Bestandsinstallationen mit einem solchen Ziel meldet das Logbuch „Diese Zieladresse ist nicht erlaubt“.
+- Intern: Webhook-Test um die Sperre erweitert.
+
 ## 1.28.1 – 29.10.2026
 - Sicherheit (Ergebnis der Nachprüfung): **Systemempfänger** (bei Telegram und Pushover die Empfänger, die Systemmeldungen und die Codes von „Passwort vergessen“ bekommen) dürfen nur noch **Administratoren** anlegen, ändern und löschen. Ein Konto mit dem Recht „Einstellungen: Meldungen“ konnte sich bisher als Systemempfänger eintragen, den Code für ein Administratorkonto empfangen und es so übernehmen. Normale Empfänger (z. B. für Regel-Nachrichten) darf weiter anlegen, wer das Recht hat.
 - Sicherheit: Den **Telegram-Bot**, den **Pushover-Zugang** und den **VRM-Zugang** ersetzen oder löschen sowie **Module ein- und ausschalten** und die **Zeitzone** ändern dürfen nur Administratoren, auch mit Schreibrecht im jeweiligen Bereich. Ansehen bleibt wie bisher möglich.

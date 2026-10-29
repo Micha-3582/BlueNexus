@@ -28,13 +28,18 @@ adm = webapp.app.test_client(); adm.post("/login", data={"username": "admin", "p
 dm = webapp.app.test_client(); dm.post("/login", data={"username": "demo", "password": "demopass1234"})
 
 # 1) Pruefung der Adresse
-for bad in ("", "ftp://x/y", "http://169.254.169.254/latest/meta-data", "http://[fe80::1]/x", "http://a b/c", "http://host:99999/x", "http://0.0.0.0/x"):
+for bad in ("", "ftp://x/y", "http://169.254.169.254/latest/meta-data", "http://[fe80::1]/x", "http://a b/c", "http://host:99999/x", "http://0.0.0.0/x",
+            "http://127.0.0.1/x", "http://127.0.0.2:8080/x", "http://[::1]/x", "http://[::ffff:127.0.0.1]/x"):        # Loopback = der Server selbst (seit 1.28.2 gesperrt)
     try:
         webhook.validate(bad); raise AssertionError("haette abgelehnt werden muessen: " + bad)
     except webhook.WebhookError:
         pass
 assert webhook.validate("192.168.50.50/relay") == "http://192.168.50.50/relay" and webhook.validate("https://x.example/a?b=1").startswith("https://")
+ok_, txt_ = webhook.call("http://localhost:1/x"); assert ok_ is False and txt_ == "Diese Zieladresse ist nicht erlaubt", txt_      # Name, der auf Loopback zeigt: beim Aufruf abgewiesen
 print("1) Adresspruefung OK")
+# Die folgenden Funktionstests laufen gegen einen kleinen Testserver auf 127.0.0.1: nur fuer sie ist Loopback hier erlaubt
+_orig_bad = webhook._bad_ip
+webhook._bad_ip = lambda ip: _orig_bad(ip) and not ip.is_loopback
 
 # 2) Anlegen: nur Admin, nur Knopf; Adresse bleibt geheim
 SECRET = BASE + "/geheim/schalten?key=abc123"
