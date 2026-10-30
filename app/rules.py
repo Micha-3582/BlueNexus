@@ -947,6 +947,8 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
         name = info.get("name") or info["id"]
         if "is" in c:
             txt = f"{name} ist {'an' if c['is'] == 'on' else 'aus'}"
+            if info.get("kind") == "esphome":                                  # Hardware-Taster: gedrueckt / nicht gedrueckt
+                txt = f"{name} {'wird gedrückt' if c['is'] == 'on' else 'ist nicht gedrückt'}"
             return _by_check(c, "device:" + str(c.get("device_id")), (None if not info.get("online") or info.get("on") is None else bool(info["on"]) == (c["is"] == "on")), txt)
         p = info.get("power")
         txt = f"{name} Leistung {'unter' if c['op'] == 'below' else 'über'} {c['value']:g} W"

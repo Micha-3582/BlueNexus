@@ -24,7 +24,7 @@ Handy bedient und verbindet alles, was im Haus Strom verbraucht, misst, schaltet
 | | |
 |---|---|
 | ⚡ **Energie** | Victron Cerbo GX, Tibber-Strompreise, PV-Prognose, intelligente Ladeplanung, Überschuss-Automatik, Kosten und Ersparnis |
-| 🏠 **Smart Home** | Shelly, Tasmota, WLED, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
+| 🏠 **Smart Home** | Shelly, Tasmota, WLED, ESPHome-Taster, Tuya, Homematic / HomematicIP, Zigbee (deCONZ), Klimaanlagen (Midea), Wake-on-LAN, Rollläden, Türschlösser, Soundmodule |
 | 🏷️ **NFC + QR** | Handy an einen Aufkleber halten – und die Zentrale schaltet, startet eine Regel, schickt ein Foto oder einen Gong. Tags beschreibst du direkt in BlueNexus (Android). Nur registrierte Handys, auch unterwegs |
 | 🔗 **Geräte teilen** | Gib Geräte, Sensoren, Schalter und die Klimaanlage an ein anderes BlueNexus weiter (z. B. Mutter im selben Haus). Zugangsdaten und Cloud-Logins bleiben bei dir |
 | 🔌 **Offene Schnittstelle** | Andere Programme im Heimnetz (Info-Monitor, Skripte, eigene Projekte) lesen Zustände von Sensoren, Geräten und Schaltern per JSON-API – nur lesend, nur im lokalen Netz, mit eigenem Schlüssel pro Programm und Zeitpunkt der letzten Änderung |
@@ -124,6 +124,7 @@ Smart Home. Die App läuft auch **ganz ohne Victron** als reines Smart-Home-Syst
 | **Shelly** (Gen1–Gen3) | Schalten, Leistungsmessung | Suche im Heimnetz oder IP eintragen, lokal |
 | **Tasmota** | Schalten, Leistungsmessung, Messwerte als Sensoren (Temperatur, Luftfeuchte, Luftdruck – auch ohne Relais) | Suche oder IP eintragen, lokal |
 | **WLED** | Ein/Aus, Helligkeit per Regler | Gemeinsame Suche mit Tasmota, lokal |
+| **ESPHome** | Hardware-Taster (Eingänge) als Auslöser für Regeln, erscheint unter Aktoren | IP eintragen, lokal (Weboberfläche des Geräts) |
 | **Tuya / Smart Life** (z. B. Gosund) | Schalten | Die Cloud liefert nur einmalig die Geräteschlüssel, geschaltet wird **lokal** |
 | **Homematic / HomematicIP** (OpenCCU) | Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden, Soundmodule (Gong), Wandtaster | CCU-Anbindung; optional **Push von der CCU**: Reaktion in unter einer Sekunde, ohne ständiges Abfragen |
 | **Zigbee** (Phoscon / deCONZ) | Aktoren, Sensoren, Thermostate | **Mehrere Gateways** (z. B. eins pro Haus) möglich |

@@ -33,6 +33,7 @@ import json
 import os
 
 import share
+import esphome
 import shelly
 import store
 import surplus
@@ -347,7 +348,7 @@ ENDPOINT_AREA = {
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
-    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten",
+    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten", "api_esphome_scan": "smarthome_einrichten", "api_esphome_add": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
@@ -2446,6 +2447,7 @@ class Controller:
             store.repair_fixed_costs_once()
         threading.Thread(target=_fixed_price_housekeeping, daemon=True).start()
         homematic.add_listener(self._rules_wake.set)               # Meldung der CCU -> Regeln sofort pruefen
+        esphome.start(self._rules_wake.set, shelly.load_devices, lambda: store.module_on("smarthome") and not (demo.ACTIVE or sandbox.ACTIVE))        # ESPHome-Taster: Druck weckt die Regeln sofort
         notify_in.start(_telegram_words, self._rules_wake.set, lambda: not (demo.ACTIVE or sandbox.ACTIVE))        # Telegram-Befehle (Triggerworte)
         homematic.push_start()
         tunnel.startup()                                           # Cloudflare-Tunnel (Fernzugriff) wieder verbinden, falls eingeschaltet
@@ -4679,7 +4681,7 @@ def api_homematic_sensor_add():
     return jsonify({"added": len(added)}), 201
 
 
-FAMILIES = ("shelly", "tasmota", "tuya", "homematic", "zigbee", "midea", "wol")
+FAMILIES = ("shelly", "tasmota", "tuya", "homematic", "zigbee", "midea", "esphome", "wol")
 
 
 def _families() -> dict:
@@ -4693,6 +4695,7 @@ def _families() -> dict:
             "homematic": "homematic" in kinds or bool(homematic.credentials_public().get("configured")),
             "zigbee": "zigbee" in kinds or bool(zigbee.credentials_public().get("configured")),
             "midea": "midea" in kinds,
+            "esphome": "esphome" in kinds,
             "wol": bool(wol.load())}
 
 
@@ -6339,6 +6342,35 @@ def api_tasmota_scan():
     except Exception as e:                               # noqa: BLE001
         log.warning("Tasmota-Scan fehlgeschlagen: %s", e)
         return jsonify(error=f"Suche fehlgeschlagen: {e}"), 500
+
+
+@app.route("/api/esphome/scan", methods=["POST"])
+def api_esphome_scan():
+    """Eingaenge (Taster) eines ESPHome-Geraets unter einer IP-Adresse anzeigen (noch nichts anlegen)."""
+    ip = (request.get_json(silent=True) or {}).get("ip")
+    if not isinstance(ip, str) or not ip.strip():
+        return jsonify(error="IP-Adresse fehlt"), 400
+    try:
+        return jsonify(shelly.esphome_scan(ip.strip()))
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.route("/api/esphome/add", methods=["POST"])
+def api_esphome_add():
+    b = request.get_json(silent=True) or {}
+    ip, ids = b.get("ip"), b.get("ids")
+    if not isinstance(ip, str) or not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+        return jsonify(error="Adresse oder Auswahl fehlt"), 400
+    bad = _edit_err(_edits(), "device")
+    if bad:
+        return bad
+    try:
+        res = shelly.add_esphome(ip.strip(), ids)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    _apply_edits(res, _edits(), "device")
+    return jsonify(added=res), 201
 
 
 @app.route("/api/shelly/preview", methods=["POST"])

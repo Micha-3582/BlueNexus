@@ -361,12 +361,33 @@ Jedes Gerät hat eine Zeile mit Symbol (antippen = anderes Symbol wählen), Name
 |---|---|
 | **Shelly** (Gen1–Gen3) | „Shellys suchen“ durchsucht das Heimnetz, oder IP einzeln eintragen. |
 | **Tasmota / WLED** | „Tasmota / WLED suchen“ (eine Suche für beide) oder IP einzeln eintragen. **WLED**-Lampen/-Streifen werden an der JSON-Schnittstelle erkannt, lassen sich ein-/ausschalten (auch in Regeln, per Alexa, auf dem Dashboard) und in der Geräteliste mit einem **Helligkeits-Regler** dimmen (ganz links 0 % = aus, ganz rechts 100 %; beim Loslassen übernommen). Über den Knopf **🎨** unter einer WLED-Lampe (Geräteliste, Reiter Aktoren) stellst du **Farbe**, **Effekt**, **Farbpalette** und eine **Voreinstellung** (Preset aus WLED) direkt ein; jede Änderung schaltet die Lampe ein. Beim Einschalten durch Regeln/Dashboard/Alexa behält WLED seine zuletzt eingestellte Helligkeit, Farbe und den Effekt. Mit **„💾 Aktuelle Einstellung speichern …“** speicherst du, wie die Lampe gerade leuchtet (Farbe, Effekt, Palette, Helligkeit), unter einem Namen als **Voreinstellung in WLED** (gleicher Name überschreibt; es werden die kleinsten freien Plätze 1–250 belegt). **In Regeln** (Art „Ablauf“) gibt es den Schritt **„WLED: Voreinstellung / Farbe setzen“**: entweder eine Voreinstellung der Lampe aufrufen (die Liste wird aus der Lampe geladen) oder eine Farbe (mit optionaler Helligkeit in %) setzen. Ein- und Ausschalten geht wie bei jedem Gerät über „Gerät ein-/ausschalten“. Tipp: Lampe in der Geräteliste einstellen, als Voreinstellung speichern und diese in der Regel aufrufen (z. B. „bei Sonnenuntergang Voreinstellung Warmweiß“). Die Lampe lässt sich nicht entfernen, solange eine eingeschaltete Regel sie benutzt. Einen eingebauten Rückschalt-Timer gibt es bei WLED hier nicht. **Messwerte:** Tasmota-Geräte mit Fühlern (DS18B20, DHT, BME280 …) oder Strommessung – auch **ohne Relais**, z. B. ein Selbstbau mit zwei Temperaturfühlern – erscheinen unter *Sensoren* → **„Tasmota-Messwerte suchen“**. Pro Messwert (Temperatur, Luftfeuchte, Luftdruck, Helligkeit, Leistung) wird ein Sensor angelegt, mit Dashboard, Verlauf und Regeln wie jeder andere. Findet die Suche ein Gerät nicht (z. B. weil es langsam antwortet), die **IP daneben eintragen** – dann wird genau dieses Gerät abgefragt und eine Fehlermeldung nennt den Grund (nicht erreichbar, passwortgeschützt, kein Fühler erkannt). Fahrenheit wird in °C umgerechnet; ändert sich die IP des Geräts, folgen die Sensoren. |
+| **ESPHome** | Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (`web_server`), zum Beispiel ein selbstgebauter **Taster**. IP-Adresse des Geräts eintragen, **Suchen** klicken: Die Eingänge (`binary_sensor`) erscheinen, Name und Symbol anpassen, **Hinzufügen**. Der Taster steht danach unter **Aktoren** (siehe unten „ESPHome-Taster“). |
 | **Tuya / Smart Life** (z. B. Gosund) | Einmalig Zugang (Region, Access ID, Access Secret) von iot.tuya.com eintragen; die Cloud wird nur zum Abholen der Geräteschlüssel gebraucht, geschaltet wird lokal. |
 | **Homematic / HomematicIP (OpenCCU)** | CCU-Adresse, Benutzer, Passwort eintragen (Benutzer mit Schreibrechten). Dann Geräte, Sensoren, Thermostate und Türschlösser suchen. Das Passwort bleibt auf dem Server und wird nie wieder angezeigt. |
 | **Zigbee (Phoscon / deCONZ)** | In Phoscon *Einstellungen → Gateway → Erweitert → „App autorisieren“* drücken, dann hier innerhalb einer Minute „Mit Gateway verbinden“. Danach Geräte, Sensoren und Thermostate suchen. **Mehrere Gateways** (z. B. eins pro Haus) sind möglich: Name und Adresse eintragen, verbinden, dann „Weiteres Gateway hinzufügen“. Die Treffer aller Gateways erscheinen gemeinsam (mit dem Gateway-Namen dahinter). |
 | **Wake-on-LAN** | Siehe [Kapitel 11](#11-wake-on-lan). |
 
 **Weitere Netze / VLANs:** Standardmäßig durchsucht die App nur das Netz des Servers. Weitere Netze (z. B. `192.168.178.0/24`, mehrere mit Komma) kann man für Shelly, Tasmota und Tuya zusätzlich eintragen. Der Server muss dorthin routen dürfen.
+
+**ESPHome-Taster:** Ein Taster mit ESPHome-Firmware erscheint unter **Aktoren** wie ein Gerät, ist aber **nicht schaltbar**: Er meldet nur Tastendrücke. Die Zeile zeigt „Taster · bereit“ oder „Taster · gedrückt“, auf dem Dashboard erscheint er als Kachel. Er steht getrennt von den **Eigenen Schaltern & Knöpfen (Software)**.
+- **Am Gerät nötig:** In der ESPHome-Konfiguration muss die Weboberfläche eingeschaltet sein, und der Taster ist ein Eingang (`binary_sensor`). Beispiel (Pin an den eigenen Aufbau anpassen):
+  ```yaml
+  web_server:
+    port: 80
+    version: 2
+
+  binary_sensor:
+    - platform: gpio
+      pin: { number: D2, mode: INPUT_PULLUP, inverted: true }
+      name: "Taster"
+      filters:
+        - delayed_on: 20ms
+        - delayed_off: 20ms
+  ```
+- **In Regeln:** Als Bedingung **„Meine Aktoren“** den Taster wählen und **„wird gedrückt“**; was dann geschehen soll (Meldung, Gerät schalten, Tür öffnen …), legst du in der Regel fest. Ein Druck gilt etwa **5 Sekunden** als „gedrückt“ und löst genau einen Ablauf aus; ein zweiter Druck innerhalb dieser Zeit zählt nicht noch einmal.
+- **Verbindung:** BlueNexus hält eine dauerhafte Verbindung zum Gerät (Ereignis-Strom der Weboberfläche) und erkennt jeden Druck sofort, ohne ständig nachzufragen. Fällt das Gerät aus (WLAN, Strom), steht die Zeile auf „nicht erreichbar“ und verbindet sich von selbst wieder. Ein Druck, der **während des Ausfalls** geschieht, geht verloren und wird nach dem Verbinden nicht nachgeholt.
+- **IP-Adresse:** Ändert der Router die Adresse des Geräts, trägst du die neue im Stift-Bereich ✎ der Zeile ein. Haben mehrere Eingänge desselben Geräts dieselbe Adresse, wandern sie gemeinsam.
+- Es werden in dieser Version nur **Eingänge/Taster** (`binary_sensor`) eingebunden; Messwerte, Schalter und Klimaanlagen von ESPHome-Geräten folgen später.
 
 **Homematic-Push:** Mit dem Schalter „Push von der CCU“ meldet die CCU Änderungen (Tür geht auf, Schalter betätigt) selbst an die App. Regeln mit Sensoren reagieren dann in unter einer Sekunde, und es wird nichts ständig abgefragt. Die CCU muss den Server unter dem eingestellten Port erreichen können (Standard 8703). Fällt der Push aus, fragt die App wie gewohnt ab.
 

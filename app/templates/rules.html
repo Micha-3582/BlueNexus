@@ -298,8 +298,9 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
   } else if (c.type === 'device') {
     const opts = S.devs.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!dev(c.device_id)) opts.unshift([escH(c.device_id), '(Gerät fehlt)']);
     const kind = 'is' in c ? c.is : 'power';
-    const pick = sel('c-dev', c.device_id, opts);
-    const k = `<select class="c-dk" style="width:auto" onchange="deviceCondKind(this)">${optHtml([['on', 'ist an'], ['off', 'ist aus'], ['power', 'Leistung …']], kind)}</select>`;
+    const isBtn = (dev(c.device_id) || {}).kind === 'esphome';                          // Hardware-Taster: gedrückt / nicht gedrückt, keine Leistung
+    const pick = `<select class="c-dev" style="width:auto" onchange="deviceCondDev(this)">${optHtml(opts, c.device_id)}</select>`;
+    const k = `<select class="c-dk" style="width:auto" onchange="deviceCondKind(this)">${optHtml(isBtn ? [['on', 'wird gedrückt'], ['off', 'ist nicht gedrückt']] : [['on', 'ist an'], ['off', 'ist aus'], ['power', 'Leistung …']], kind)}</select>`;
     body = `${pick} ${k}` + (kind === 'power' ? ` ${cmp('c-op', c.op || 'above')} ${num('c-val', c.value ?? 50, 70)} W` : byPick(c));
   }
   return `<div class="cond" data-type="${c.type}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg,rgba(255,255,255,.04));border-radius:8px;padding:6px 8px;margin-top:6px">
@@ -502,6 +503,11 @@ function sunDir(sel) {                           // Sonne: "genau" blendet den V
 }
 function virtChanged(sel) { condTypeChanged(sel, virtualDefault(sel.value)); }
 function sensorChanged(sel) { condTypeChanged(sel, sensorDefault(sel.value)); }          // anderer Sensor: Art kann wechseln (Messwert <-> Ja/Nein)
+function deviceCondDev(sel) {                     // anderes Gerät gewählt: ein Hardware-Taster kennt nur gedrückt / nicht gedrückt, keine Leistung
+  const row = sel.closest('.cond'), c = collectCond(row);
+  if (((dev(c.device_id) || {}).kind === 'esphome') && !('is' in c)) { c.is = 'on'; delete c.op; delete c.value; }
+  condTypeChanged(sel, c);
+}
 function deviceCondKind(sel) {                    // ist an / ist aus / Leistung: Eingabefeld ein- oder ausblenden
   const row = sel.closest('.cond'), c = collectCond(row);
   if (sel.value === 'power') { c.op = 'above'; c.value = 50; delete c.is; }
@@ -656,7 +662,7 @@ function condSummary(c) {
   if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return (c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`) + byText(c); }
   if (c.type === 'telegram') return `Telegram „${c.shown || c.word}“${(c.who || []).length ? ' von ' + c.who.map(i => ((S.recipients || []).find(r => r.id === i) || {}).name || '?').join(', ') : ''}${c.confirm ? ' (mit Rückfrage)' : ''}`;
   if (c.type === 'rule') { const k = R.find(x => x.id === c.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ist ${c.is === 'on' ? 'an' : 'aus'}`; }
-  if (c.type === 'device') return 'is' in c ? `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}${byText(c)}` : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
+  if (c.type === 'device') return 'is' in c ? (((dev(c.device_id) || {}).kind === 'esphome') ? `${devName(c.device_id)} ${c.is === 'on' ? 'wird gedrückt' : 'ist nicht gedrückt'}` : `${devName(c.device_id)} ist ${c.is === 'on' ? 'an' : 'aus'}${byText(c)}`) : `${devName(c.device_id)} Leistung ${cmp} ${c.value} W`;
   return c.type;
 }
 const LOCK_WORD = { open: 'öffnen', unlock: 'entriegeln', lock: 'verriegeln' };

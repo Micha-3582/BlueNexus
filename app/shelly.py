@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
+import esphome
 import homematic
 import pins
 import zigbee
@@ -607,6 +608,47 @@ def add_zigbee(ids: list[str]) -> list[dict]:
     return added
 
 
+# ---------------------------------------------------------------- ESPHome (Hardware-Taster), siehe esphome.py
+def esphome_scan(ip: str) -> list[dict]:
+    """Eingaenge (Taster) eines ESPHome-Geraets unter dieser Adresse. Schon angelegte sind mit known=True markiert."""
+    ip = check_ip(ip)
+    try:
+        info = esphome.probe(ip)
+    except esphome.EsphomeError as e:
+        raise ShellyError(str(e))
+    have = {d["id"] for d in load_devices()}
+    out = []
+    for e in info["entities"]:
+        dev_id = esphome.entity_id(info["title"], e["entity"])
+        out.append({"id": dev_id, "name": e["name"], "model": f"ESPHome · {info['title']}", "ip": ip, "entity": e["entity"],
+                    "icon": "🔘", "known": dev_id in have})
+    return out
+
+
+def add_esphome(ip: str, ids: list[str]) -> list[dict]:
+    """Legt die gewaehlten Eingaenge (Kennungen aus esphome_scan) als Geraete an. Der Zustand wird dabei frisch vom Geraet gelesen."""
+    found = {f["id"]: f for f in esphome_scan(ip)}
+    items = load_devices()
+    have = {d["id"] for d in items}
+    added = []
+    for dev_id in ids:
+        f = found.get(dev_id)
+        if f is None:
+            raise ShellyError("Dieser Eingang ist am Gerät nicht mehr zu finden – bitte noch einmal suchen")
+        if dev_id in have:
+            continue
+        entry = {"id": dev_id, "kind": "esphome", "ip": f["ip"], "entity": f["entity"], "gen": 0, "channel": 0, "model": f["model"], "name": f["name"],
+                 "icon": "🔘", "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "user": "", "password": "",
+                 "switchable": False}
+        entry["users"] = []                         # neu angelegt: zunaechst nur fuer Administratoren sichtbar (siehe visibility.py)
+        items.append(entry)
+        added.append(entry)
+        have.add(dev_id)
+    _save(items)
+    esphome.sync(items)
+    return added
+
+
 # ---------------------------------------------------------------- Tuya (Gosund & Co.)
 def tuya_scan(networks: list[str] | None = None) -> list[dict]:
     """Tuya-Geraete (Cloud-Schluessel + LAN-Suche). Aktualisiert dabei die IPs bekannter Geraete."""
@@ -669,7 +711,8 @@ def update(dev_id: str, name: str | None = None, icon: str | None = None,
             if new_ip is not None:
                 if d.get("kind") == "remote" or d.get("cloud") or not d.get("ip"):
                     raise ShellyError("Dieses Gerät hat keine eigene IP-Adresse (Cloud, Gateway oder geteilt) – hier gibt es nichts zu ändern")
-                same = [x for x in items if x is d or (d.get("mac") and x.get("mac") == d.get("mac") and x.get("kind") == d.get("kind"))]       # mehrere Kanaele eines Geraets teilen die Adresse
+                same = [x for x in items if x is d or (d.get("mac") and x.get("mac") == d.get("mac") and x.get("kind") == d.get("kind"))
+                        or (d.get("kind") == "esphome" and x.get("kind") == "esphome" and x.get("ip") == d.get("ip"))]       # mehrere Kanaele eines Geraets teilen die Adresse
                 for x in same:
                     x["ip"] = new_ip
                 if d.get("kind") == "tasmota" and d.get("mac"):               # Messwert-Sensoren desselben Geraets folgen der neuen Adresse
@@ -687,6 +730,8 @@ def update(dev_id: str, name: str | None = None, icon: str | None = None,
             if min_off_min is not None:
                 d["min_off_min"] = _num(min_off_min, 0, 1440, "Mindest-Pause")
             sw = d.get("switchable", True) if switchable is None else bool(switchable)
+            if d.get("kind") == "esphome":
+                sw = False                      # ein Taster meldet nur Druecke, es gibt nichts zu schalten
             if auto and not sw:
                 raise ShellyError("Nur-Überwachung: ein nicht schaltbares Gerät kann nicht in der Automatik verwendet werden")
             d["switchable"] = sw
@@ -760,6 +805,7 @@ def remove(dev_id: str) -> bool:
     if len(keep) == len(items):
         return False
     _save(keep)
+    esphome.sync(keep)                                      # nicht mehr benoetigte Verbindung zu einem ESPHome-Geraet trennen
     return True
 
 
@@ -781,6 +827,11 @@ def status(d: dict) -> dict:
     """{'online': bool, 'on': bool|None, 'power': W|None}. Ein Geraet, das gerade nicht geantwortet hat, wird fuer DOWN_BACKOFF_S Sekunden nicht erneut
     abgefragt (sonst wartet JEDER Abruf - Dashboard, Geraeteliste, Regeln - jedes Mal die ganze Zeitueberschreitung ab)."""
     key = d.get("id")
+    if d.get("kind") == "esphome":                         # Taster: Zustand kommt aus der gehaltenen Verbindung (esphome.py), nichts abzufragen; ein Druck gilt nur kurz
+        st = esphome.status(d)
+        if key is not None:
+            _st_cache[key] = (time.time(), dict(st))
+        return st
     hit = _down.get(key)
     if hit and hit[0] > time.time():
         return dict(hit[1])
@@ -821,6 +872,8 @@ def status_cached(d: dict, max_age: float = 5.0) -> dict:
     wird er genommen; ist er aelter (bis STALE_OK_S), kommt er sofort und das Geraet wird im Hintergrund aufgefrischt (die naechste Anzeige ist aktuell);
     erst ohne brauchbaren Stand wird wirklich gewartet. Regeln und Automatik fragen weiter live ab (status)."""
     key, now = d.get("id"), time.time()
+    if d.get("kind") == "esphome":                         # Taster: liest nur den Speicher (esphome.py) - kein Zwischenspeicher, sonst waere ein kurzer Druck nicht zu sehen
+        return status(d)
     hit = _st_cache.get(key)
     if hit and now - hit[0] <= max_age:
         return dict(hit[1])
@@ -873,7 +926,7 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
         raise ShellyError("Gerät nicht gefunden")
     _down.pop(dev_id, None)                                  # wer schaltet, will den echten Zustand sehen: Ruhezeit nach einem Offline-Befund aufheben
     _st_cache.pop(dev_id, None)                              # und der gemerkte Zustand gilt nicht mehr (naechste Anzeige fragt neu)
-    if d.get("switchable") is False:
+    if d.get("switchable") is False or d.get("kind") == "esphome":
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
     if d.get("kind") == "remote":
         import share

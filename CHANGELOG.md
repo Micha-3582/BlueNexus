@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.29.0 – 30.10.2026
+- Neu: **ESPHome-Taster.** Ein Gerät mit ESPHome-Firmware und eingeschalteter Weboberfläche (`web_server`) lässt sich unter *Smart Home → Geräte suchen* über das neue System **ESPHome** (Häkchen bei „Welche Systeme hast du?“) einbinden: IP-Adresse eintragen, **Suchen**, Name und Symbol anpassen, **Hinzufügen**. Der Taster steht danach unter **Aktoren** (nicht schaltbar, Anzeige „bereit“ / „gedrückt“) und auf dem Dashboard und ist in Regeln unter **„Meine Aktoren“** als Bedingung **„wird gedrückt“** nutzbar. BlueNexus hält dafür eine dauerhafte Verbindung zum Gerät und erkennt jeden Druck sofort; nach einem Ausfall verbindet es sich von selbst wieder, ein Druck während des Ausfalls wird nicht nachgeholt. Ein Druck gilt etwa 5 Sekunden als „gedrückt“. Die Eigenen Schalter & Knöpfe (Software) bleiben davon getrennt.
+- Intern: Neues Modul `app/esphome.py`, neuer Test `tests/t_esphome.py` mit nachgebildetem ESPHome-Gerät (121 Tests).
+
 ## 1.28.6 – 29.10.2026
 - Fehlerbehebung: Spricht der **Cloudflare-Tunnel** die App über die **LAN-Adresse des eigenen Rechners** an (im Cloudflare-Dashboard Ziel „IP:Port“ statt `localhost`), wurde seit 1.27.3 die Adresse der Besucher nicht mehr übernommen. Alle Besucher hatten dann dieselbe **Bremse gegen Passwort-Raten** (10 Fehlversuche in 5 Minuten für alle zusammen), und in Logbüchern und Meldungen stand die Adresse des Rechners statt der des Besuchers. Jetzt zählt die Besucher-Adresse aus den Kopfzeilen des Tunnels auch dann, wenn die Anfrage von der **eigenen Adresse des Rechners** kommt (nicht nur von `localhost`). Von anderen Rechnern im Heimnetz werden diese Kopfzeilen weiterhin ignoriert.
 - Intern: Neuer Test `tests/t_clientip.py` (120 Tests).

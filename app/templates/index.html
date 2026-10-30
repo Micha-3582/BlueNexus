@@ -1590,14 +1590,16 @@ const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&l
 let shellyCache = [];
 let shellyDragActive = false;   // waehrend Verschieben: Neuaufbau pausieren
 function shellyTile(d, tid) {
+    const btn = d.kind === 'esphome';                      // Hardware-Taster: gedrückt / bereit
     const stat = d.pending ? '…' : !d.online ? 'nicht erreichbar'
+      : btn ? 'Taster · ' + (d.on ? 'gedrückt' : 'bereit')
       : (d.on ? 'an' : 'aus') + (d.power != null && d.switchable !== false ? ` · ${Math.round(d.power)} W` : '') + (d.automated ? ' · Auto' : '') + (d.switchable === false ? ' · Überwachung' : '');
     return `<div class="systile" data-tile-id="${escH(tid || d.id)}" ${d.online || d.pending ? '' : 'style="opacity:.55"'}>
       <div class="systile-t">${escH(d.name)}${d.pin_set && d.switchable !== false ? ' 🔒' : ''}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span style="font-size:30px;line-height:1.1">${escH(d.icon)}</span>
         ${d.switchable === false
-          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${d.on ? 'var(--on)' : 'var(--muted)'}">${d.pending ? '…' : d.online ? (d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
+          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${d.on ? 'var(--on)' : 'var(--muted)'}">${d.pending ? '…' : d.online ? (btn ? (d.on ? 'gedrückt' : 'bereit') : d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
           : `<label class="switch${d.pin_set ? ' pinned' : ''}" ${d.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${d.on ? 'checked' : ''} ${d.online ? '' : 'disabled'}
           onchange="shellySwitch('${escH(d.id)}', this.checked, this)"><span class="slider"></span></label>`}
       </div>

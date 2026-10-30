@@ -697,6 +697,7 @@
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="homematic"> Homematic / HomematicIP (OpenCCU) <span class="qhelp" role="button" tabindex="0" data-help="Homematic und HomematicIP über die OpenCCU: Aktoren, Sensoren, Thermostate, Türschlösser, Rollläden und Soundmodule.">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="zigbee"> Zigbee (Phoscon / deCONZ) <span class="qhelp" role="button" tabindex="0" data-help="Zigbee-Geräte über ein Phoscon/deCONZ-Gateway (ConBee/RaspBee), auch mehrere Gateways.">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="midea"> Klimaanlage (Midea / MSmartHome) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen mit Midea-Technik (MSmartHome, NetHome Plus, Comfee, Inventor, Pioneer u. a.).">?</span></label>
+      <label class="chk"><input type="checkbox" class="fam-cb" data-fam="esphome"> ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (web_server), zum Beispiel ein selbstgebauter Taster. Der Taster erscheint unter Aktoren und lässt sich in Regeln als Auslöser nutzen.">?</span></label>
     </div>
     <div class="muted" id="fam-hint" style="margin-top:8px" hidden>Noch kein System gewählt.</div>
   </div>
@@ -736,6 +737,15 @@
     <button id="tasmota-scan" class="ghost">Tasmota / WLED suchen</button>
     <input type="text" id="tasmota-ip" placeholder="oder IP, z.B. 192.168.2.55" style="flex:1;min-width:190px"> <span class="qhelp" role="button" tabindex="0" data-help="IP-Adresse eines einzelnen Shelly- oder Tasmota-Geräts, falls die Suche es nicht findet. Das Gerät erscheint darunter in der Trefferliste – dort Name und Symbol anpassen und auf Hinzufügen klicken.">?</span>
     <button id="tasmota-add" class="ghost">Suchen</button>
+  </div>
+</div>
+
+<div class="card fam-card" id="fam-esphome" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf Suchen klicken: Die Eingänge (Taster) des Geräts erscheinen darunter. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren; in Regeln heißt er „wird gedrückt“.">?</span></h2>
+  <div class="sub">Taster und Eingänge eines ESPHome-Geräts per IP-Adresse hinzufügen.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
+    <button id="esphome-scan" class="ghost">Suchen</button>
   </div>
 </div>
 
@@ -1957,6 +1967,7 @@ function savedToast(text = 'Gespeichert ✓') {
 function shellyMsg(t, err, id = 'shelly-msg') { const m = document.getElementById(id); m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; }
 function shellyStatText(d) {
   if (d.online === undefined) return 'wird abgefragt …';                       // Liste steht schon, Live-Werte kommen gleich
+  if (d.kind === 'esphome') return !d.online ? 'nicht erreichbar' : 'Taster · ' + (d.on ? 'gedrückt' : 'bereit');
   return !d.online ? 'nicht erreichbar' + (d.error ? ' – ' + d.error : '') : (d.on ? 'an' : 'aus') + (d.power != null ? ` · ${Math.round(d.power)} W` : '') + (d.info ? ' · ' + d.info : '');
 }
 /* Nur Status/Watt/Knopffarbe aktualisieren - Eingabefelder und offene Symbolauswahl bleiben unangetastet */
@@ -2090,7 +2101,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
         ${eyeBtn('shelly', id)}${favBtn('shelly', id)}
-        <button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>
+        ${d.kind === 'esphome' ? '' : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>`}
         </div>
       </div>
       ${isAc(d) && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
@@ -2102,9 +2113,9 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button type="button" class="tgl" title="IP-Adresse speichern (z. B. wenn der Router dem Gerät eine neue vergeben hat)" aria-label="IP-Adresse speichern" onclick="shellyIpSave('${id}')">${I_CHECK}</button></div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
-          ${tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
-          ${d.kind !== 'remote' ? `<button type="button" class="tgl${d.as_sensor ? ' on' : ''}" title="${d.as_sensor ? 'Es gibt einen Sensor zu diesem Gerät – hier ändern (Bedeutung, Name) oder entfernen' : 'Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)'}" aria-label="Zustand als Sensor" data-name="${escH(d.name)}" data-sensor="${escH(d.as_sensor || '')}" onclick="devAsSensor('${id}', this.dataset.name, this.dataset.sensor)">${I_SENSORDEV}</button>` : ''}
-          ${d.kind !== 'remote' ? `<button type="button" class="tgl" title="Einen Messwert dieses Geräts als eigenen Sensor anlegen (z. B. die Außentemperatur der Klimaanlage oder die Leistung) – lässt sich einzeln teilen" aria-label="Messwert als Sensor" data-name="${escH(d.name)}" onclick="devMetric('${id}', this.dataset.name)">${I_METRIC}</button>` : ''}
+          ${d.kind === 'esphome' ? '' : tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
+          ${d.kind !== 'remote' && d.kind !== 'esphome' ? `<button type="button" class="tgl${d.as_sensor ? ' on' : ''}" title="${d.as_sensor ? 'Es gibt einen Sensor zu diesem Gerät – hier ändern (Bedeutung, Name) oder entfernen' : 'Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)'}" aria-label="Zustand als Sensor" data-name="${escH(d.name)}" data-sensor="${escH(d.as_sensor || '')}" onclick="devAsSensor('${id}', this.dataset.name, this.dataset.sensor)">${I_SENSORDEV}</button>` : ''}
+          ${d.kind !== 'remote' && d.kind !== 'esphome' ? `<button type="button" class="tgl" title="Einen Messwert dieses Geräts als eigenen Sensor anlegen (z. B. die Außentemperatur der Klimaanlage oder die Leistung) – lässt sich einzeln teilen" aria-label="Messwert als Sensor" data-name="${escH(d.name)}" onclick="devMetric('${id}', this.dataset.name)">${I_METRIC}</button>` : ''}
           ${d.kind === 'tasmota' ? tglBtn(!!d.hook, I_BELL, 'Schaltvorgänge von außen im Logbuch (z. B. Lichtschranke, Taster am Gerät, eigener Timer): das Gerät meldet jedes Schalten an BlueNexus. Trägt eine Regel in das Gerät ein (Regel 3).', `tasHook('${id}', ${!!d.hook})`) : ''}
           ${visBtn('shelly', id, d.users)}
           ${shareBtn('shelly', id, d.kind === 'remote')}
@@ -2604,10 +2615,10 @@ document.getElementById('devlog-q')?.addEventListener('input', () => { clearTime
 setInterval(() => { const c = document.getElementById('fam-devlog'); if (c && c.offsetParent !== null && !document.hidden && document.activeElement !== document.getElementById('devlog-q')) loadDevLog(); }, 3000);
 loadDevLog();
 function applyFamilies(f) {
-  const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
+  const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea', 'esphome'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
-  show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
+  show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); show('fam-esphome', f.esphome); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
   window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
   { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
@@ -2626,6 +2637,19 @@ document.addEventListener('click', e => {
 document.getElementById('tasmota-add').addEventListener('click', () => {
   const ip = document.getElementById('tasmota-ip').value.trim(); if (ip) { shellyMsg('Suche …'); foundShow(ip, '', true).then(() => shellyMsg('')); }
 });
+document.getElementById('esphome-scan').addEventListener('click', async e => {
+  const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
+  b.disabled = true; shellyMsg('Frage ' + ip + ' ab … (einige Sekunden)');
+  try {
+    if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
+    const found = await shellyApi('/api/esphome/scan', 'POST', { ip }), fresh = found.filter(f => !f.known);
+    shellyMsg(found.length ? `${found.length} Eingang/Eingänge gefunden, ${fresh.length} noch nicht angelegt.` : 'Das Gerät meldet keine Eingänge (Taster). Ist im ESPHome-Setup ein binary_sensor eingetragen?');
+    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · Taster`,
+      add: (ids, edits) => shellyApi('/api/esphome/add', 'POST', { ip, ids, edits }) });
+  } catch (err) { shellyMsg(err.message, true); }
+  b.disabled = false;
+});
+document.getElementById('esphome-ip').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('esphome-scan').click(); });
 async function loadFamilies() {
   if (!window.IS_ADMIN) { const a = document.getElementById('sub-aktoren'), s = document.getElementById('sub-sensoren'); if (a) a.textContent = 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.'; if (s) s.textContent = 'Messwerte und Zustände (nur lesen).'; }      // auch ohne Zugriff auf die Geräte-Einstellungen
   try { const r = await (await fetch('/api/device-families', { cache: 'no-store' })).json(); if (r.families) applyFamilies(r.families); } catch (e) { /* egal */ }
