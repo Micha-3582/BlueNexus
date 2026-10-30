@@ -27,9 +27,9 @@ DISPLAY_S = 3.0                  # so lange zeigt die Oberflaeche "gedrueckt" (d
 PROBE_CONNECT_S = 8.0            # ein ESP8266 an schwachem WLAN nimmt Verbindungen manchmal erst nach einigen Sekunden an
 PROBE_QUIET_S = 1.5              # beim Suchen: so lange auf weitere Eintraege warten, nachdem nichts mehr kommt
 PROBE_MAX_S = 6.0
-STREAM_READ_S = 45.0             # das Geraet pingt alle 30 s; 45 s Stille = Verbindung tot
-BACKOFF_START_S = 3.0
-BACKOFF_MAX_S = 60.0
+STREAM_READ_S = 25.0             # das Geraet pingt alle 10 s; 25 s Stille = Verbindung tot (ein ESP8266 mit WLAN-Aussetzer schliesst sie oft nicht sauber; bis dahin gehen Druecke verloren)
+BACKOFF_START_S = 1.0            # nach einem Abbruch schnell neu verbinden: bis dahin gehen Druecke verloren
+BACKOFF_MAX_S = 30.0
 SYNC_EVERY_S = 5.0
 MAX_QUEUE = 5                    # so viele Druecke warten hoechstens darauf, von den Regeln gesehen zu werden (Schutz vor einem prellenden Taster)
 DOMAINS = ("binary_sensor",)     # erste Stufe: Eingaenge/Taster

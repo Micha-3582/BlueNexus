@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.29.2 – 30.10.2026
+- Verbesserung: **ESPHome-Taster verbindet nach einem Aussetzer schneller neu** (nach 1 Sekunde statt 3) und erkennt eine tote Verbindung nach 25 statt 45 Sekunden. Beim ESP8266 beendet das Gerät den Ereignis-Strom manchmal von selbst oder verliert das WLAN, ohne die Verbindung zu schließen; in dieser Zeit gehen Tastendrücke verloren. Messung am echten Gerät: Verbindung bricht alle ein bis zwei Minuten ab, Neuaufbau dauert 5 bis 10 Sekunden. Zusätzlich im Handbuch: Empfehlungen für die ESPHome-Konfiguration des Tasters (`power_save_mode: none`, `log: false`).
+
 ## 1.29.1 – 30.10.2026
 - Verbesserung: **ESPHome-Taster reagiert direkt.** Ein Druck war bisher 5 Sekunden lang „gedrückt“, in dieser Zeit konnte kein zweiter Druck erkannt werden. Jetzt ist ein Druck ein **kurzer Impuls**: Jeder Druck löst genau einen Ablauf aus, auch bei schnell aufeinanderfolgenden Drücken (bis zu 5 wartende Drücke werden nacheinander abgearbeitet). Die Anzeige in der Liste und auf dem Dashboard zeigt „gedrückt“ nur noch 3 Sekunden. Die Verbindung zum Gerät wartet länger auf die Annahme (schwaches WLAN).
 - Fehlerbehebung: Änderungsmeldungen eines ESPHome-Geräts enthalten keine Angabe zur Art des Eingangs; solche Meldungen wurden verworfen, Tastendrücke kamen nicht an (1.29.0 am echten Gerät aufgefallen und noch am selben Tag behoben).
