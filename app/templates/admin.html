@@ -741,11 +741,12 @@
 </div>
 
 <div class="card fam-card" id="fam-esphome" data-tab="suchen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf Suchen klicken: Die Eingänge (Taster) des Geräts erscheinen darunter. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren; in Regeln heißt er „wird gedrückt“.">?</span></h2>
-  <div class="sub">Taster und Eingänge eines ESPHome-Geräts per IP-Adresse hinzufügen.</div>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf <b>Taster suchen</b> (Eingänge) oder <b>Messwerte suchen</b> (Temperatur, Luftfeuchte, Leistung, Druck, Helligkeit, Spannung, Funkstärke) klicken. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren („wird gedrückt“ in Regeln), Messwerte unter Sensoren. Bekommt das Gerät eine neue IP-Adresse, die Suche mit der neuen Adresse wiederholen: Die Einträge ziehen um.">?</span></h2>
+  <div class="sub">Taster, Eingänge und Messwerte eines ESPHome-Geräts per IP-Adresse hinzufügen.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
-    <button id="esphome-scan" class="ghost">Suchen</button>
+    <button id="esphome-scan" class="ghost">Taster suchen</button>
+    <button id="esphome-sensor-scan" class="ghost">Messwerte suchen</button>
   </div>
 </div>
 
@@ -2619,11 +2620,11 @@ function applyFamilies(f) {
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); show('fam-esphome', f.esphome); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
-  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
+  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || f.esphome || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
   { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
     set('sub-aktoren', window.IS_ADMIN ? 'Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.' : 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.');
-    const src = [f.homematic && 'Homematic', f.zigbee && 'Zigbee', f.tasmota && 'Tasmota', f.camera && 'Kameras'].filter(Boolean);
+    const src = [f.homematic && 'Homematic', f.zigbee && 'Zigbee', f.tasmota && 'Tasmota', f.esphome && 'ESPHome', f.camera && 'Kameras'].filter(Boolean);
     set('sub-sensoren', 'Messwerte und Zustände' + (window.IS_ADMIN && src.length ? ' von ' + (src.length > 1 ? src.slice(0, -1).join(', ') + ' und ' + src[src.length - 1] : src[0]) : '') + ' (nur lesen).'); }
   show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !(f.homematic || famN('fam-locks')));
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
@@ -2646,6 +2647,18 @@ document.getElementById('esphome-scan').addEventListener('click', async e => {
     shellyMsg(found.length ? `${found.length} Eingang/Eingänge gefunden, ${fresh.length} noch nicht angelegt.` : 'Das Gerät meldet keine Eingänge (Taster). Ist im ESPHome-Setup ein binary_sensor eingetragen?');
     foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · Taster`,
       add: (ids, edits) => shellyApi('/api/esphome/add', 'POST', { ip, ids, edits }) });
+  } catch (err) { shellyMsg(err.message, true); }
+  b.disabled = false;
+});
+document.getElementById('esphome-sensor-scan').addEventListener('click', async e => {
+  const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
+  b.disabled = true; shellyMsg('Frage ' + ip + ' ab … (einige Sekunden)');
+  try {
+    if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
+    const found = await shellyApi('/api/esphome/sensors/scan', 'POST', { ip }), fresh = found.filter(f => !f.known), skipped = found.length ? found[0].skipped : 0;
+    shellyMsg(found.length ? `${found.length} Messwert(e) gefunden, ${fresh.length} noch nicht angelegt.` + (skipped ? ` ${skipped} weitere Messwerte (andere Einheiten) gibt es in BlueNexus noch nicht.` : '') : 'Das Gerät meldet keine passenden Messwerte (Temperatur °C, Luftfeuchte %, Leistung W, Druck hPa, Helligkeit lx, Spannung V, Funkstärke dBm).');
+    foundList(fresh, { key: f => f.id, icons: 'sensor', reload: () => loadSensorsAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · ${f.value != null ? escH(f.value + ' ' + f.unit) : escH(f.unit)}`,
+      add: (ids, edits) => shellyApi('/api/esphome/sensors/add', 'POST', { ids, edits }) });
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });

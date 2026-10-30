@@ -616,13 +616,98 @@ def esphome_scan(ip: str) -> list[dict]:
         info = esphome.probe(ip)
     except esphome.EsphomeError as e:
         raise ShellyError(str(e))
-    have = {d["id"] for d in load_devices()}
+    items = load_devices()
+    have = {d["id"] for d in items}
     out = []
     for e in info["entities"]:
+        if e["domain"] != "binary_sensor":
+            continue
         dev_id = esphome.entity_id(info["title"], e["entity"])
         out.append({"id": dev_id, "name": e["name"], "model": f"ESPHome · {info['title']}", "ip": ip, "entity": e["entity"],
                     "icon": "🔘", "known": dev_id in have})
+    if _esphome_follow_ip(ip, {x["id"] for x in out if x["known"]}, set()):
+        esphome.resync()
     return out
+
+
+def _esphome_follow_ip(ip: str, dev_ids: set, sensor_ids: set) -> bool:
+    """Hat ein schon angelegtes ESPHome-Geraet eine neue IP-Adresse (Router), genuegt es, es dort noch einmal zu suchen: die Eintraege folgen."""
+    import homematic
+    changed = False
+    items = load_devices()
+    for d in items:
+        if d.get("kind") == "esphome" and d["id"] in dev_ids and d.get("ip") != ip:
+            d["ip"], changed = ip, True
+    if changed:
+        _save(items)
+    sens, ch2 = homematic.load_sensors(), False
+    for s in sens:
+        if s.get("source") == "esphome" and s["id"] in sensor_ids and s.get("ip") != ip:
+            s["ip"], ch2 = ip, True
+    if ch2:
+        homematic._save_sensors(sens)
+    return changed or ch2
+
+
+_esp_sensor_scan: dict = {}
+
+
+def esphome_sensor_scan(ip: str) -> list[dict]:
+    """Messwerte (Temperatur, Luftfeuchte, Leistung, Druck, Helligkeit, Spannung, Funkstaerke) eines ESPHome-Geraets. Schon angelegte sind mit known=True markiert."""
+    import homematic
+    ip = check_ip(ip)
+    try:
+        info = esphome.probe(ip)
+    except esphome.EsphomeError as e:
+        raise ShellyError(str(e))
+    have = {s["id"] for s in homematic.load_sensors()}
+    out, skipped = [], 0
+    for e in info["entities"]:
+        if e["domain"] != "sensor":
+            continue
+        k = esphome.sensor_kind(e["uom"], e["name"])
+        if k is None:
+            skipped += 1
+            continue
+        kind, unit, conv = k
+        sid = esphome.sensor_id(info["title"], e["entity"])
+        v = e.get("value")
+        if v is not None and conv:
+            v = esphome._CONV[conv](v)
+        out.append({"id": sid, "kind": kind, "address": info["title"], "interface": "ESPHome", "datapoint": e["entity"], "unit": unit, "binary": False,
+                    "model": f"ESPHome · {info['title']}", "room": "", "ip": ip, "source": "esphome", "conv": conv or "",
+                    "name": e["name"], "known": sid in have, "value": None if v is None else round(v, 1), "skipped": skipped})
+    for x in out:
+        x["skipped"] = skipped
+    if _esphome_follow_ip(ip, set(), {x["id"] for x in out if x["known"]}):
+        esphome.resync()
+    _esp_sensor_scan.clear()
+    _esp_sensor_scan.update({x["id"]: x for x in out})
+    return out
+
+
+def add_esphome_sensors(ids: list[str]) -> list[dict]:
+    import homematic
+    if not ids or any(i not in _esp_sensor_scan for i in ids):
+        raise ShellyError("Bitte zuerst neu suchen")
+    items = homematic.load_sensors()
+    have = {s["id"] for s in items}
+    added = []
+    for i in ids:
+        f = _esp_sensor_scan[i]
+        if i in have:
+            continue
+        item = {k: f[k] for k in ("id", "kind", "address", "interface", "datapoint", "unit", "binary", "model", "room", "name", "source", "ip")}
+        if f.get("conv"):
+            item["conv"] = f["conv"]
+        item["users"] = []                                        # neu: zunaechst nur fuer Administratoren sichtbar
+        items.append(item)
+        added.append(item)
+        have.add(i)
+    if added:
+        homematic._save_sensors(items)
+        esphome.resync()
+    return added
 
 
 def add_esphome(ip: str, ids: list[str]) -> list[dict]:
@@ -645,7 +730,7 @@ def add_esphome(ip: str, ids: list[str]) -> list[dict]:
         added.append(entry)
         have.add(dev_id)
     _save(items)
-    esphome.sync(items)
+    esphome.resync()
     return added
 
 
@@ -805,7 +890,7 @@ def remove(dev_id: str) -> bool:
     if len(keep) == len(items):
         return False
     _save(keep)
-    esphome.sync(keep)                                      # nicht mehr benoetigte Verbindung zu einem ESPHome-Geraet trennen
+    esphome.resync()                                        # nicht mehr benoetigte Verbindung zu einem ESPHome-Geraet trennen
     return True
 
 

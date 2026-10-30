@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.30.0 – 30.10.2026
+- Neu: **ESPHome-Messwerte als Sensoren.** Im Fenster *ESPHome* (Geräte suchen) gibt es neben **Taster suchen** jetzt **Messwerte suchen**: Temperatur (°C, °F), Luftfeuchte (%), Leistung (W, kW), Luftdruck (hPa, mbar, kPa, Pa), Helligkeit (lx), Spannung (V) und Funkstärke (dBm) eines ESPHome-Geräts werden zu **Sensoren** mit Dashboard, Verlauf, Regeln und Teilen. Die Werte kommen über dieselbe dauerhafte Verbindung wie beim Taster; nach einem kurzen Abbruch gilt der letzte Wert noch 2 Minuten. Andere Einheiten (z. B. ppm, Akku in %) werden noch nicht angeboten, die Suche nennt ihre Zahl. Nur für Geräte mit Dauerstrom (nicht für Batteriegeräte im Tiefschlaf).
+- Neu: **Neue IP-Adresse eines ESPHome-Geräts:** die Suche mit der neuen Adresse wiederholen, die Einträge (Taster und Messwerte) ziehen um.
+- Fehlerbehebung: Wird einem schon verbundenen Gerät ein Eintrag hinzugefügt, baut BlueNexus die Verbindung einmal neu auf, damit der Anfangswert ankommt (sonst blieb der neue Sensor bis zur nächsten Änderung leer).
+- Intern: `t_esphome` um Messwerte, Einheiten, Umrechnung, fehlende Werte (null), Schonfrist, Verbindung nach Ausfall und IP-Umzug erweitert; geprüft am echten Gerät (WLAN-Signal als Messwert).
+
 ## 1.29.2 – 30.10.2026
 - Verbesserung: **ESPHome-Taster verbindet nach einem Aussetzer schneller neu** (nach 1 Sekunde statt 3) und erkennt eine tote Verbindung nach 25 statt 45 Sekunden. Beim ESP8266 beendet das Gerät den Ereignis-Strom manchmal von selbst oder verliert das WLAN, ohne die Verbindung zu schließen; in dieser Zeit gehen Tastendrücke verloren. Messung am echten Gerät: Verbindung bricht alle ein bis zwei Minuten ab, Neuaufbau dauert 5 bis 10 Sekunden. Zusätzlich im Handbuch: Empfehlungen für die ESPHome-Konfiguration des Tasters (`power_save_mode: none`, `log: false`).
 

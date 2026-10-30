@@ -653,6 +653,10 @@ def _read_sensor_now(sen: dict):
             import thermo
             v = thermo.read_value(sen)
             unreach = v is None
+        elif sen.get("source") == "esphome":                   # Messwert eines ESPHome-Geraets: kommt aus der gehaltenen Verbindung (esphome.py), nach einem kurzen Abbruch noch 2 Minuten gueltig
+            import esphome
+            v = esphome.read_value(sen)
+            unreach = v is None
         elif sen.get("source") == "tasmota":                   # Messwert eines Tasmota-Geraets (DS18B20, BME280, Stromzaehler ...)
             import shelly, tasmota
             pw = next((d.get("password") for d in shelly.load_devices() if d.get("kind") == "tasmota" and d.get("mac") == sen.get("address") and d.get("password")), "")
@@ -1791,7 +1795,7 @@ def _local_ip(ccu_ip: str) -> str:
 def _known_interfaces() -> set[str]:
     import shelly
     out = {d.get("interface") for d in shelly.load_devices() if d.get("kind") == "homematic"}
-    out |= {s.get("interface") for s in load_sensors() if s.get("source") not in ("zigbee", "camera", "thermo")}
+    out |= {s.get("interface") for s in load_sensors() if s.get("source") not in ("zigbee", "camera", "thermo", "esphome")}
     return {i for i in out if i}
 
 

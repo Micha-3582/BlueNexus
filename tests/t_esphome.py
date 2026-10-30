@@ -10,6 +10,8 @@ from auth import UserStore
 
 # ---------------------------------------------------------------- nachgebildetes Geraet
 STATE = {"Taster": False, "Tuer": False}
+SENSORS = {"Temperatur": (21.5, "°C"), "Luftfeuchte": (48.0, "%"), "Akku": (87.0, "%"), "CO2": (612.0, "ppm"), "Druck": (1008.0, "hPa"),
+           "Leistung": (12.0, "W"), "Temp F": (70.0, "°F"), "Druck kPa": (101.3, "kPa"), "WLAN Signal": (-74.0, "dBm")}
 STREAMS = []                                        # offene Verbindungen: je eine Warteschlange
 
 
@@ -29,8 +31,9 @@ class Dev(BaseHTTPRequestHandler):
             for name, v in STATE.items():
                 j = {"id": "binary_sensor/" + name, "domain": "binary_sensor", "name": name, "entity_category": 0, "value": v, "state": "ON" if v else "OFF"}
                 self.wfile.write(("event: state\ndata: " + json.dumps(j) + "\n\n").encode()); self.wfile.flush()
-            j = {"id": "sensor/WLAN Signal", "domain": "sensor", "name": "WLAN Signal", "value": -74, "state": "-74 dBm"}
-            self.wfile.write(("event: state\ndata: " + json.dumps(j) + "\n\n").encode()); self.wfile.flush()
+            for name, (v, uom) in SENSORS.items():
+                j = {"id": "sensor/" + name, "domain": "sensor", "name": name, "entity_category": 0, "value": v, "state": "%s %s" % (v, uom), "uom": uom}
+                self.wfile.write(("event: state\ndata: " + json.dumps(j) + "\n\n").encode()); self.wfile.flush()
             while True:
                 item = q.get()
                 if item is None:
@@ -46,6 +49,13 @@ class Dev(BaseHTTPRequestHandler):
 def push(name, value):
     STATE[name] = value
     j = {"id": "binary_sensor/" + name, "value": value, "state": "ON" if value else "OFF"}          # wie das echte Geraet: Aenderungen ohne "domain" und "name"
+    for q in list(STREAMS):
+        q.put("event: state\ndata: " + json.dumps(j) + "\n\n")
+
+
+def push_sensor(name, value):
+    SENSORS[name] = (value, SENSORS[name][1])
+    j = {"id": "sensor/" + name, "value": value, "state": str(value)}
     for q in list(STREAMS):
         q.put("event: state\ndata: " + json.dumps(j) + "\n\n")
 
@@ -77,8 +87,9 @@ esphome.DISPLAY_S, esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKO
 
 # ---------------------------------------------------------------- Suchen (nur Binaersensoren, Titel, Kennung)
 info = esphome.probe("192.168.50.9")
-assert info["title"] == "taster" and [e["name"] for e in info["entities"]] == ["Taster", "Tuer"], info
-assert all(e["domain"] == "binary_sensor" and e["value"] is False for e in info["entities"]), "WLAN-Signal (Messwert) kommt in dieser Stufe nicht dazu"
+assert info["title"] == "taster" and [e["name"] for e in info["entities"] if e["domain"] == "binary_sensor"] == ["Taster", "Tuer"], info
+assert all(e["value"] is False for e in info["entities"] if e["domain"] == "binary_sensor")
+assert {e["name"]: e["uom"] for e in info["entities"] if e["domain"] == "sensor"}["Temperatur"] == "°C"
 assert esphome.entity_id("taster", "binary_sensor/Taster") == "esphome-taster-taster" and esphome.entity_id("Mein Taster", "binary_sensor/Pin D2") == "esphome-mein_taster-pin_d2"
 assert all(ch.isalnum() or ch in "._:-" for ch in esphome.entity_id("a');x", "binary_sensor/b'\"c")), "Kennung nur mit harmlosen Zeichen"
 real_url = esphome._url
@@ -88,6 +99,16 @@ try:
 except esphome.EsphomeError as e:
     assert "ESPHome" in str(e)
 esphome._url = real_url
+
+# ---------------------------------------------------------------- Einheiten -> Sensorarten
+sk = esphome.sensor_kind
+assert sk("°C", "x") == ("temperature", "°C", None) and sk("°F", "x") == ("temperature", "°C", "f2c") and sk("hPa", "x") == ("pressure", "hPa", None)
+assert sk("%", "Luftfeuchte") == ("humidity", "%", None) and sk("%", "Relative humidity")[0] == "humidity"
+assert sk("%", "Akku") is None and sk("%", "Bodenfeuchte")[0] == "humidity" and sk("ppm", "CO2") is None and sk("", "x") is None and sk("W", "x")[0] == "power"
+assert sk("dB", "WLAN") == ("signal", "dBm", None) and sk("V", "Akku")[0] == "voltage" and sk("lx", "Licht")[0] == "brightness"
+assert abs(esphome._CONV["f2c"](70.0) - 21.11) < 0.01 and esphome._CONV["x10"](101.3) == 1013.0 and esphome._CONV["k"](1.5) == 1500.0
+assert esphome._num(None) is None and esphome._num("NaN") is None and esphome._num(float("inf")) is None and esphome._num(True) is None and esphome._num("3.5") == 3.5
+assert esphome.sensor_id("taster", "sensor/Temperatur") == "espS-taster-temperatur"
 
 # ---------------------------------------------------------------- Webseite: Rechte, Suchen, Hinzufuegen
 webapp.users = UserStore(os.path.join(tmp, "u.json")); webapp.users.create("admin", "adminpass1")
@@ -221,24 +242,76 @@ ok, txt = rules.eval_condition(c, cx()); assert ok is True and txt == "Klingel w
 dev["on"] = False; assert rules.eval_condition(c, cx())[0] is False
 dev["online"], dev["on"] = False, None; assert rules.eval_condition(c, cx())[0] is None, "Geraet offline: unbekannt, nie ausloesen"
 
+# ---------------------------------------------------------------- Messwerte als Sensoren
+import homematic
+assert L.post("/api/esphome/sensors/scan", json={"ip": "192.168.50.9"}).status_code == 403 and L.post("/api/esphome/sensors/add", json={"ids": ["espS-taster-temperatur"]}).status_code == 403
+assert A.post("/api/esphome/sensors/scan", json={}).status_code == 400
+r = A.post("/api/esphome/sensors/scan", json={"ip": "192.168.50.9"}); assert r.status_code == 200, r.get_data(as_text=True)
+fs = {f["name"]: f for f in r.get_json()}
+assert set(fs) == {"Temperatur", "Luftfeuchte", "Druck", "Leistung", "Temp F", "Druck kPa", "WLAN Signal"}, set(fs)      # Akku (%) und CO2 (ppm) gibt es nicht als Art, Taster sind keine Messwerte
+assert all(f["skipped"] == 2 and f["known"] is False for f in fs.values())
+assert fs["Temperatur"]["kind"] == "temperature" and fs["Temperatur"]["value"] == 21.5 and fs["Temperatur"]["unit"] == "°C" and fs["Luftfeuchte"]["kind"] == "humidity"
+assert fs["Temp F"]["value"] == 21.1 and fs["Temp F"]["conv"] == "f2c" and fs["Druck kPa"]["value"] == 1013.0 and fs["Leistung"]["unit"] == "W" and fs["WLAN Signal"]["kind"] == "signal"
+assert homematic.load_sensors() == [], "Suchen legt nichts an"
+r = A.post("/api/esphome/sensors/add", json={"ids": ["espS-taster-gibtsnicht"]}); assert r.status_code == 400 and "neu suchen" in r.get_json()["error"]
+r = A.post("/api/esphome/sensors/add", json={"ids": ["espS-taster-temperatur"], "edits": {"espS-taster-temperatur": {"icon": ""}}}); assert r.status_code == 400
+r = A.post("/api/esphome/sensors/add", json={"ids": ["espS-taster-temperatur", "espS-taster-luftfeuchte", "espS-taster-temp_f", "espS-taster-druck_kpa"],
+                                              "edits": {"espS-taster-temperatur": {"name": "Flur Temperatur", "icon": "🌡️"}}})
+assert r.status_code == 201 and r.get_json()["added"] == 4, r.get_data(as_text=True)
+sens = {x["id"]: x for x in homematic.load_sensors()}
+t1 = sens["espS-taster-temperatur"]
+assert t1["source"] == "esphome" and t1["kind"] == "temperature" and t1["name"] == "Flur Temperatur" and t1["datapoint"] == "sensor/Temperatur" and t1["ip"] == "192.168.50.9" and t1["users"] == [] and t1["binary"] is False, t1
+assert sens["espS-taster-temp_f"]["conv"] == "f2c" and "conv" not in t1
+assert A.post("/api/esphome/sensors/scan", json={"ip": "192.168.50.9"}).get_json() and [f["known"] for f in A.post("/api/esphome/sensors/scan", json={"ip": "192.168.50.9"}).get_json() if f["name"] == "Temperatur"] == [True]
+rd = lambda sid: (homematic._value_cache.clear(), homematic._read_sensor_now(sens[sid]))[1]
+wait(lambda: rd("espS-taster-temperatur") == 21.5, 6.0, "Messwert gelesen")
+assert rd("espS-taster-luftfeuchte") == 48.0 and rd("espS-taster-temp_f") == 21.1 and rd("espS-taster-druck_kpa") == 1013.0
+push_sensor("Temperatur", 22.34); wait(lambda: rd("espS-taster-temperatur") == 22.3, 3.0, "Aenderung (ohne domain) uebernommen")
+push_sensor("Temp F", 68.0); wait(lambda: rd("espS-taster-temp_f") == 20.0, 3.0, "Fahrenheit umgerechnet")
+push_sensor("Luftfeuchte", None); wait(lambda: rd("espS-taster-luftfeuchte") is None, 3.0, "fehlender Wert (null) = nicht lesbar")
+j = A.get("/api/sensors"); assert j.status_code == 200
+assert "espS-taster-temperatur" in json.dumps(j.get_json()), "erscheint in der Sensorliste"
+assert "WLAN Signal" not in json.dumps(j.get_json()), "nicht angelegte Messwerte erscheinen nicht"
+
+pg = A.get("/smarthome").get_data(as_text=True)
+assert "esphome-sensor-scan" in pg and "/api/esphome/sensors/scan" in pg and "Messwerte suchen" in pg, "die Seite bietet die Messwert-Suche an"
+
+# ein nicht angelegter Messwert wird nicht mitgefuehrt
+assert ("192.168.50.9", "sensor/WLAN Signal") not in esphome._values
+
 # ---------------------------------------------------------------- Ausfall und Wiederverbindung
 stop_server(srv)
 wait(lambda: esphome.status(e)["online"] is False, 5.0, "Ausfall erkannt")
 st = esphome.status(e); assert st == {"online": False, "on": None, "power": None, "shown": False}, st
 x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["online"] is False and x["on"] is None
+assert rd("espS-taster-temperatur") == 22.3, "kurzer Ausfall: der letzte Messwert gilt noch (Schonfrist)"
+esphome.VALUE_GRACE_S = 0.2; time.sleep(0.4)
+assert rd("espS-taster-temperatur") is None, "nach der Schonfrist: nicht lesbar"
+esphome.VALUE_GRACE_S = 120.0
 STATE["Taster"] = True                                                                        # waehrend des Ausfalls gedrueckt und gehalten
 srv = start_server(PORT)
 wait(lambda: esphome.status(e)["online"] is True, 6.0, "wieder verbunden")
 time.sleep(0.4)
 assert esphome.status(e)["on"] is False, "was waehrend des Ausfalls war, gilt nach dem Verbinden nie als Druck"
+wait(lambda: rd("espS-taster-temperatur") == 22.3, 6.0, "Messwert nach Wiederverbindung wieder da (Anfangszustand)")
 n1 = len(wakes)
 push("Taster", False); push("Taster", True); wait(lambda: esphome.status(e)["on"], what="Druck nach Wiederverbindung")
 assert len(wakes) == n1 + 1
+
+# ---------------------------------------------------------------- IP aendern: erneutes Suchen unter der neuen Adresse zieht Taster und Messwerte um
+r = A.post("/api/esphome/scan", json={"ip": "192.168.50.77"}); assert r.status_code == 200
+assert shelly.load_devices()[0]["ip"] == "192.168.50.77", "der Taster folgt der neuen Adresse"
+r = A.post("/api/esphome/sensors/scan", json={"ip": "192.168.50.77"}); assert r.status_code == 200
+assert all(x["ip"] == "192.168.50.77" for x in homematic.load_sensors() if x["source"] == "esphome"), "die Messwerte folgen"
+wait(lambda: "192.168.50.9" not in esphome._hosts and "192.168.50.77" in esphome._hosts, 3.0, "Verbindung zieht auf die neue Adresse um")
+shelly.update("esphome-taster-taster", ip="192.168.50.9"); esphome.resync()
 
 # ---------------------------------------------------------------- IP aendern, Entfernen trennt die Verbindung
 r = A.patch("/api/shelly/esphome-taster-taster", json={"ip": "192.168.50.10"}); assert r.status_code == 200 and shelly.load_devices()[0]["ip"] == "192.168.50.10"
 assert A.delete("/api/shelly/esphome-taster-taster").status_code in (200, 204) and shelly.load_devices() == []
 wait(lambda: "192.168.50.9" not in esphome._hosts or True, 1.0, "")
-esphome.sync([]); assert esphome._hosts == {}, esphome._hosts
+for sid in list(sens):                                                                        # auch die Messwerte entfernen: danach haelt BlueNexus keine Verbindung mehr
+    homematic._save_sensors([x for x in homematic.load_sensors() if x["id"] != sid])
+esphome.resync(); assert esphome._hosts == {}, esphome._hosts
 stop_server(srv)
 print("ESPHOME OK", sys.argv[1].split("/")[-1])
