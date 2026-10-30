@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.31.0 – 30.10.2026
+- Neu: **Homematic-Rauchmelder** (z. B. HmIP-SWSD) erscheinen unter *Sensoren suchen*. Der Sensor zeigt **Alarm** oder **kein Alarm** (Rauch-, Einbruch- und Verbundalarm zählen als Alarm), ist in Regeln, auf dem Dashboard und im Logbuch nutzbar und wird bei Alarm sofort gemeldet, wenn der Push der CCU aktiv ist.
+- Intern: `t_homematic` um einen Rauchmelder erweitert.
+
 ## 1.30.2 – 30.10.2026
 - Fehlerbehebung: **ESPHome-Gerät neu geflasht – Eintrag blieb stumm oder wurde doppelt.** Meldet ein Gerät nach einer neuen Firmware einen Eingang oder Messwert unter einem anderen Namen, meldete der angelegte Eintrag nichts mehr, zeigte aber weiter „bereit“. Jetzt erkennt BlueNexus, dass das Gerät den Eintrag nicht mehr meldet, zeigt **„Eingang fehlt am Gerät“** und ordnet den Eintrag einem eindeutig passenden neuen Namen **von selbst** zu (Kennung, Regeln, Verlauf und Freigaben bleiben erhalten). Passt nichts eindeutig, wird nichts geraten: **Taster suchen** und **Hinzufügen** ordnen dann den einzelnen offenen Eintrag dem neuen Eingang zu, statt ihn doppelt anzulegen. Gilt für Taster und Messwerte.
 - Verbesserung: **Zeitmessung am ESPHome-Taster.** Dauert es länger als 1 Sekunde vom Druck bis zum Ende der Regelrunde, steht das im Protokoll des Servers („Druck bis Regelrunde … s, bis Runde fertig … s“). Damit lässt sich eine Verzögerung zwischen Druck und Aktion eingrenzen.

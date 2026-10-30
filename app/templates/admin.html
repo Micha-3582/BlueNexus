@@ -2735,10 +2735,10 @@ document.getElementById('hm-scan').addEventListener('click', async e => {
 });
 loadHomematicInfo();
 /* Sensoren */
-const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
+const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], smoke: ['Alarm', 'kein Alarm'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
 const INV_LABEL = { lock: 'TRUE = entriegelt', contact: 'TRUE = geschlossen', motion: 'TRUE = keine Bewegung', presence: 'TRUE = niemand da', input: 'TRUE = nicht aktiv' };
 const INV_ON = { lock: 'TRUE = entriegelt, FALSE = verriegelt', contact: 'TRUE = geschlossen, FALSE = offen', motion: 'TRUE = keine Bewegung', presence: 'TRUE = niemand anwesend', input: 'TRUE = nicht aktiv, FALSE = aktiv' };
-const INV_OFF = { lock: 'TRUE = verriegelt, FALSE = entriegelt', contact: 'TRUE = offen, FALSE = geschlossen', motion: 'TRUE = Bewegung erkannt', presence: 'TRUE = jemand anwesend', input: 'TRUE = aktiv, FALSE = nicht aktiv' };
+const INV_OFF = { lock: 'TRUE = verriegelt, FALSE = entriegelt', contact: 'TRUE = offen, FALSE = geschlossen', motion: 'TRUE = Bewegung erkannt', presence: 'TRUE = jemand anwesend', smoke: 'TRUE = Alarm', input: 'TRUE = aktiv, FALSE = nicht aktiv' };
 function sensorValueText(s) {
   if (s._pending) return 'wird gelesen …';
   if (s.value === null || s.value === undefined) return 'nicht lesbar';
@@ -2779,7 +2779,7 @@ async function sensorRenameSave(id) {
   try { await shellyApi('/api/sensors/' + encodeURIComponent(id), 'PATCH', { name: n }); savedToast(); } catch (e) { shellyMsg(e.message, true); }
   loadSensorsAdmin();
 }
-const SENSOR_ICON = { voltage: '🔋', signal: '📶', lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
+const SENSOR_ICON = { voltage: '🔋', signal: '📶', lock: '🔒', contact: '🚪', motion: '🏃', presence: '🧍', smoke: '🔥', input: '🔘', running: '💡', key_short: '🔘', key_long: '🔘', key_long_release: '🔘', temperature: '🌡️', humidity: '💧', brightness: '☀️', power: '⚡' };
 const SENSOR_EXTRA_ICONS = ['🚪', '🏠', '🏃', '🧍', '🚶', '👀', '🔑', '🚨', '📬', '🚗', '🚲', '🐕', '🐈', '🔥', '💦', '🌡️', '☀️', '⚡'];
 function sensorPickIcon(id) { const el = document.getElementById('sicons-' + id); el.style.display = el.style.display === 'none' ? 'flex' : 'none'; }
 async function sensorSetIcon(id, icon) {

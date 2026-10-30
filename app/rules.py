@@ -840,7 +840,7 @@ AT_GRACE_MIN = 30          # "Um HH:MM" loest bis zu 30 Minuten nach der Uhrzeit
 
 
 SENSOR_WORDS = {"lock": ("verriegelt", "entriegelt"), "contact": ("offen", "geschlossen"), "motion": ("Bewegung erkannt", "keine Bewegung"),
-                "presence": ("jemand anwesend", "niemand anwesend"), "input": ("aktiv", "nicht aktiv"), "running": ("an", "aus"),
+                "presence": ("jemand anwesend", "niemand anwesend"), "smoke": ("Alarm", "kein Alarm"), "input": ("aktiv", "nicht aktiv"), "running": ("an", "aus"),
                "key_short": ("kurz gedrückt", "nicht gedrückt"), "key_long": ("lang gedrückt", "nicht gedrückt"),
                "key_long_release": ("lang losgelassen", "nicht losgelassen")}
 

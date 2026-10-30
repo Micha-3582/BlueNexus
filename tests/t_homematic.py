@@ -35,6 +35,9 @@ DEVICES = [
     {"id": "8001", "name": "Flur Bewegung", "address": "NEQ0000008", "interface": "HmIP-RF", "type": "HmIP-SMI", "channels": [
         ch(8010, "NEQ0000008:0", "x:0", "MAINTENANCE", 0),
         ch(8011, "NEQ0000008:1", "NEQ0000008:1", "MOTION_DETECTOR", 1)]},
+    {"id": "9401", "name": "Rauchmelder Wohnzimmer", "address": "NEQ0000013", "interface": "HmIP-RF", "type": "HmIP-SWSD", "channels": [
+        ch(9410, "NEQ0000013:0", "x:0", "MAINTENANCE", 0),
+        ch(9411, "NEQ0000013:1", "NEQ0000013:1", "SMOKE_DETECTOR", 1)]},
     {"id": "9501", "name": "Fenstergriff Kueche", "address": "NEQ0000009", "interface": "HmIP-RF", "type": "HmIP-SRH", "channels": [
         ch(9510, "NEQ0000009:0", "x:0", "MAINTENANCE", 0),
         ch(9511, "NEQ0000009:1", "NEQ0000009:1", "ROTARY_HANDLE_SENSOR", 1)]},
@@ -64,6 +67,7 @@ PARAMS = {  # Kanal -> {NAME: (TYPE, OPERATIONS)}
     "NEQ0000007:1": {"STATE": ("BOOL", 5)},
     "NEQ0000008:1": {"MOTION": ("BOOL", 5), "ILLUMINATION": ("FLOAT", 5)},
     "NEQ0000009:1": {"STATE": ("ENUM", 5)},
+    "NEQ0000013:1": {"SMOKE_DETECTOR_ALARM_STATUS": ("ENUM", 5), "SMOKE_DETECTOR_COMMAND": ("ENUM", 2)},
     "NEQ0000010:1": {"SET_POINT_TEMPERATURE": ("FLOAT", 7), "ACTUAL_TEMPERATURE": ("FLOAT", 5)},
     "KEQ0000011:4": {"SET_TEMPERATURE": ("FLOAT", 7)},
     "NEQ0000012:1": {"LOCK_STATE": ("ENUM", 5), "LOCK_TARGET_LEVEL": ("ENUM", 7)},
@@ -81,7 +85,8 @@ class Mock:
                        ("NEQ0000007:1", "STATE"): False, ("NEQ0000008:1", "MOTION"): True, ("NEQ0000008:1", "ILLUMINATION"): 123.0,
                        ("NEQ0000009:1", "STATE"): 2, ("NEQ0000010:1", "SET_POINT_TEMPERATURE"): 21.0, ("KEQ0000011:4", "SET_TEMPERATURE"): 19.5,
                        ("NEQ0000010:0", "UNREACH"): False, ("NEQ0000012:1", "LOCK_STATE"): 1, ("OEQ0000001:1", "STATE"): False, ("OEQ0000001:0", "UNREACH"): False, ("NEQ0000012:0", "UNREACH"): False, ("KEQ0000011:0", "UNREACH"): False, ("NEQ0000006:0", "UNREACH"): False, ("NEQ0000007:0", "UNREACH"): False,
-                       ("NEQ0000008:0", "UNREACH"): True, ("NEQ0000009:0", "UNREACH"): False}
+                       ("NEQ0000008:0", "UNREACH"): True, ("NEQ0000009:0", "UNREACH"): False,
+                       ("NEQ0000013:1", "SMOKE_DETECTOR_ALARM_STATUS"): 0, ("NEQ0000013:0", "UNREACH"): False}
         self.sessions, self.log, self.logins = set(), [], 0
         self.strict_bool_string = False      # JSON-true/false ablehnen, nur "1"/"0" akzeptieren
         self.putparamset_fails = False
@@ -177,7 +182,7 @@ homematic._split_host = _real_split
 homematic.save_credentials("192.168.50.22", "Admin", "geheim")
 homematic._split_host = lambda host: ("http", "127.0.0.1")
 info = homematic.test_connection()
-assert info["devices"] == 12, info                  # ohne die VirtualDevices-Gruppe
+assert info["devices"] == 13, info                  # ohne die VirtualDevices-Gruppe
 print("2) Login (falsch/richtig) + Geraeteanzahl ohne Gruppen OK")
 
 # ------------------------------------------------------------------ 3) Suche
@@ -265,7 +270,8 @@ exp = {"hmS-NEQ0000006-1-ACTUAL_TEMPERATURE": ("temperature", "Wohnzimmer Thermo
        "hmS-NEQ0000001-6-POWER": ("power", "Steckdose Studio – Leistung", "W", False),
        "hmS-KEQ0000003-2-POWER": ("power", "Waschmaschine – Leistung", "W", False),
        "hmS-NEQ0000010-1-ACTUAL_TEMPERATURE": ("temperature", "Bad Heizkoerper – Temperatur", "°C", False),
-       "hmS-NEQ0000012-1-LOCK_STATE": ("lock", "Tuerschloss Hans – Türschloss", "", True)}
+       "hmS-NEQ0000012-1-LOCK_STATE": ("lock", "Tuerschloss Hans – Türschloss", "", True),
+       "hmS-NEQ0000013-1-SMOKE_DETECTOR_ALARM_STATUS": ("smoke", "Rauchmelder Wohnzimmer – Rauchmelder", "", True)}
 assert set(sby) == set(exp), set(sby) ^ set(exp)
 for sid_, (kind, name, unit, binary) in exp.items():
     f = sby[sid_]
@@ -285,7 +291,7 @@ ok_, txt_ = _r.eval_condition({"type": "sensor", "sensor_id": "x", "is": True}, 
 assert ok_ is True and txt_ == "Tuer: geschlossen (TRUE)", txt_            # Text passt zur Umkehr
 for sid_ in ("hmS-NEQ0000007-1-STATE", "hmS-NEQ0000009-1-STATE"):
     homematic.update_sensor(sid_, invert=False)                          # die uebrigen Pruefungen gehen vom Rohwert aus (TRUE = offen)
-assert len(added_s) == 10 and homematic.add_sensors(["hmS-NEQ0000007-1-STATE"]) == []
+assert len(added_s) == 11 and homematic.add_sensors(["hmS-NEQ0000007-1-STATE"]) == []
 try:
     homematic.add_sensors(["hmS-GIBT-ES-NICHT"])
     raise AssertionError("unbekannter Sensor muss abgelehnt werden")
@@ -299,6 +305,15 @@ assert vals["hmS-NEQ0000007-1-STATE"] is False                       # Fenster z
 assert vals["hmS-NEQ0000009-1-STATE"] is True                        # Drehgriff 2 = offen -> wahr
 assert vals["hmS-NEQ0000008-1-MOTION"] is None                       # Geraet nicht erreichbar (UNREACH) -> kein Wert
 assert vals["hmS-NEQ0000001-6-POWER"] == 12.3
+SM = "hmS-NEQ0000013-1-SMOKE_DETECTOR_ALARM_STATUS"
+for raw, want in ((0, False), (1, True), (2, True), (3, True), ("IDLE_OFF", False), ("PRIMARY_ALARM", True), ("INTRUSION_ALARM", True), ("0", False), ("2", True)):
+    mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_ALARM_STATUS")] = raw
+    homematic._value_cache.clear(); homematic._pushed.clear()
+    got = homematic.read_values([x for x in homematic.load_sensors() if x["id"] == SM])[SM]
+    assert got is want, (raw, got)
+mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_ALARM_STATUS")] = 0
+homematic._value_cache.clear(); homematic._pushed.clear()
+print("S2b) Rauchmelder: Ruhe=falsch, Alarmstufen (Zahl und Text)=wahr OK")
 print("S2) Sensorwerte: gerundet, Fenster zu=False, Drehgriff offen=True, nicht erreichbar=None OK")
 
 import rules

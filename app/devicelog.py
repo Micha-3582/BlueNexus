@@ -260,7 +260,7 @@ def _minutes(secs) -> str:
 
 
 SENSOR_WORDS = {"lock": ("verriegelt", "entriegelt"), "contact": ("offen", "geschlossen"), "motion": ("Bewegung erkannt", None),
-                "presence": ("anwesend", "niemand da"), "input": ("aktiv", "nicht aktiv"), "key_short": ("kurz gedrückt", None),
+                "presence": ("anwesend", "niemand da"), "smoke": ("Alarm", "kein Alarm"), "input": ("aktiv", "nicht aktiv"), "key_short": ("kurz gedrückt", None),
                 "running": ("an", "aus"), "key_long": ("lang gedrückt", None), "key_long_release": ("lang losgelassen", None)}
 _sens_last: dict = {}
 

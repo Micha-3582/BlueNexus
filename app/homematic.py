@@ -355,6 +355,16 @@ def _truthy(v) -> bool:
     return bool(v)
 
 
+def _alarm_on(v) -> bool:
+    """Alarmzustand des Rauchmelders: 0 / IDLE_OFF = ruhig, alles andere (PRIMARY_ALARM, INTRUSION_ALARM, SECONDARY_ALARM, 1-3) = Alarm."""
+    if isinstance(v, str):
+        t = v.strip().upper()
+        if t.lstrip("-").isdigit():
+            return int(t) != 0
+        return t not in ("", "FALSE", "NO", "OFF", "NULL", "NONE") and not t.startswith("IDLE")
+    return bool(v)
+
+
 def _unreach(d: dict) -> bool:
     dev_addr = str(d["address"]).split(":")[0]
     key = (d["interface"], dev_addr)
@@ -445,6 +455,7 @@ SENSOR_KINDS = {
     "key_long": ("Taste lang gedrückt", "", True, ["PRESS_LONG"]),
     "key_long_release": ("Taste lang losgelassen", "", True, ["PRESS_LONG_RELEASE"]),     # manche Taster melden bei langem Druck nur das Loslassen
     "input": ("Eingang", "", True, ["STATE"]),                             # Eingangsmodule (z. B. HM-MOD-EM-8 mit Lichtschranke/Kontakt): wahr = Eingang aktiv
+    "smoke": ("Rauchmelder", "", True, ["SMOKE_DETECTOR_ALARM_STATUS", "STATE"]),     # HmIP-SWSD u. a.: wahr = Alarm (Rauch, Einbruch oder Alarm eines verbundenen Melders)
     "lock": ("Türschloss", "", True, ["LOCK_STATE"]),                      # wahr = verriegelt (HmIP-DLD: LOCK_STATE 1 = verriegelt, 2 = entriegelt)
     "voltage": ("Spannung", "V", False, []),                               # nur Funkthermometer (Batterie)
     "signal": ("Funkstärke", "dBm", False, []),                            # nur Funkthermometer (WLAN-Empfang)
@@ -456,6 +467,7 @@ _SENSOR_HINTS = [
     (("MOTION_DETECTOR",), ("motion", "brightness")),
     (("PRESENCE_DETECTION",), ("presence", "brightness")),
     (("POWERMETER", "ENERGIE_METER", "ENERGY_METER"), ("power",)),
+    (("SMOKE_DETECTOR",), ("smoke",)),                                        # Rauchmelder (Kanaltyp SMOKE_DETECTOR)
     (("LOCK",), ("lock",)),                                                   # Tuerschlossantrieb (nur Zustand lesen, nicht schalten)
     (("SWITCH_INTERFACE",), ("input",)),                                      # Funk-Sendemodule: jeder Kanal meldet seinen Eingang als STATE
 ]
@@ -688,7 +700,9 @@ def _read_sensor_now(sen: dict):
         if unreach or v is None:
             val = None
         elif sen.get("binary"):
-            if sen.get("datapoint") == "LOCK_STATE":                       # Aufzaehlung: 0 unbekannt, 1 verriegelt, 2 entriegelt (auch als Text)
+            if sen.get("datapoint") == "SMOKE_DETECTOR_ALARM_STATUS":      # Aufzaehlung: 0 ruhig, 1 Rauchalarm, 2 Einbruchalarm, 3 Alarm eines verbundenen Melders (auch als Text)
+                val = _alarm_on(v)
+            elif sen.get("datapoint") == "LOCK_STATE":                     # Aufzaehlung: 0 unbekannt, 1 verriegelt, 2 entriegelt (auch als Text)
                 t = str(v).strip().upper()
                 val = True if t in ("1", "LOCKED") else False if t in ("2", "UNLOCKED") else None
             else:
@@ -1660,7 +1674,7 @@ def push_active() -> bool:
 
 
 _ext_state: dict = {}                                       # Geraete-ID -> letzter gemeldeter Zustand (fuer "von außen geschaltet")
-_LOG_KEYS = ("STATE", "MOTION", "LOCK_STATE", "PRESENCE_DETECTION_STATE", "PRESS_SHORT", "PRESS_LONG", "PRESS_LONG_RELEASE")
+_LOG_KEYS = ("STATE", "MOTION", "LOCK_STATE", "PRESENCE_DETECTION_STATE", "PRESS_SHORT", "PRESS_LONG", "PRESS_LONG_RELEASE", "SMOKE_DETECTOR_ALARM_STATUS")
 
 
 def _push_log(iface: str, address: str, key: str) -> None:
@@ -1712,7 +1726,7 @@ def _on_event(interface_id, address, key, value):
         _unreach_cache[(iface, base)] = (now + PUSH_VALUE_TTL_S, _truthy(value))
     if base in _watch and key not in NOISY_KEYS:
         _edge_seq += 1
-        _edges.setdefault((iface, address, key), {})["t" if _truthy(value) else "f"] = (now, _edge_seq)      # auch ein Impuls, der gleich wieder endet, bleibt fuer die Regeln sichtbar
+        _edges.setdefault((iface, address, key), {})["t" if (_alarm_on(value) if key == "SMOKE_DETECTOR_ALARM_STATUS" else _truthy(value)) else "f"] = (now, _edge_seq)      # auch ein Impuls, der gleich wieder endet, bleibt fuer die Regeln sichtbar
         _value_cache.clear()                              # Sensorwerte neu lesen (aus dem Push-Speicher)
         if now - _last_wake >= 0.3:
             _last_wake = now

@@ -279,6 +279,7 @@ _SENSOR_WORDS = {
     "contact": ("open", "closed", "offen", "geschlossen"),
     "motion": ("motion", "none", "Bewegung", "keine Bewegung"),
     "presence": ("present", "absent", "anwesend", "niemand da"),
+    "smoke": ("alarm", "ok", "Alarm", "kein Alarm"),
     "input": ("active", "inactive", "aktiv", "nicht aktiv"),
     "running": ("on", "off", "an", "aus"),
     "key_short": ("pressed", "idle", "kurz gedrückt", "nicht gedrückt"),
