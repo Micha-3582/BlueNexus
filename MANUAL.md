@@ -369,7 +369,7 @@ Jedes Gerät hat eine Zeile mit Symbol (antippen = anderes Symbol wählen), Name
 
 **Weitere Netze / VLANs:** Standardmäßig durchsucht die App nur das Netz des Servers. Weitere Netze (z. B. `192.168.178.0/24`, mehrere mit Komma) kann man für Shelly, Tasmota und Tuya zusätzlich eintragen. Der Server muss dorthin routen dürfen.
 
-**ESPHome-Taster:** Ein Taster mit ESPHome-Firmware erscheint unter **Aktoren** wie ein Gerät, ist aber **nicht schaltbar**: Er meldet nur Tastendrücke. Die Zeile zeigt „Taster · bereit“ oder „Taster · gedrückt“, auf dem Dashboard erscheint er als Kachel. Er steht getrennt von den **Eigenen Schaltern & Knöpfen (Software)**.
+**ESPHome-Taster:** Ein Taster mit ESPHome-Firmware erscheint unter **Aktoren** wie ein Gerät, ist aber **nicht schaltbar**: Er meldet nur Tastendrücke. Die Zeile zeigt „Taster · bereit“ oder für 3 Sekunden nach einem Druck „Taster · gedrückt“, auf dem Dashboard erscheint er als Kachel. Er steht getrennt von den **Eigenen Schaltern & Knöpfen (Software)**.
 - **Am Gerät nötig:** In der ESPHome-Konfiguration muss die Weboberfläche eingeschaltet sein, und der Taster ist ein Eingang (`binary_sensor`). Beispiel (Pin an den eigenen Aufbau anpassen):
   ```yaml
   web_server:
@@ -384,7 +384,7 @@ Jedes Gerät hat eine Zeile mit Symbol (antippen = anderes Symbol wählen), Name
         - delayed_on: 20ms
         - delayed_off: 20ms
   ```
-- **In Regeln:** Als Bedingung **„Meine Aktoren“** den Taster wählen und **„wird gedrückt“**; was dann geschehen soll (Meldung, Gerät schalten, Tür öffnen …), legst du in der Regel fest. Ein Druck gilt etwa **5 Sekunden** als „gedrückt“ und löst genau einen Ablauf aus; ein zweiter Druck innerhalb dieser Zeit zählt nicht noch einmal.
+- **In Regeln:** Als Bedingung **„Meine Aktoren“** den Taster wählen und **„wird gedrückt“**; was dann geschehen soll (Meldung, Gerät schalten, Tür öffnen …), legst du in der Regel fest. **Jeder Druck löst genau einen Ablauf aus**, auch bei schnell aufeinanderfolgenden Drücken: Die Regel sieht den Druck als kurzen Impuls (kein Warten, bis eine Zeit abgelaufen ist). Warten mehrere Drücke, arbeitet BlueNexus sie nacheinander ab (bis zu 5 gleichzeitig wartende).
 - **Verbindung:** BlueNexus hält eine dauerhafte Verbindung zum Gerät (Ereignis-Strom der Weboberfläche) und erkennt jeden Druck sofort, ohne ständig nachzufragen. Fällt das Gerät aus (WLAN, Strom), steht die Zeile auf „nicht erreichbar“ und verbindet sich von selbst wieder. Ein Druck, der **während des Ausfalls** geschieht, geht verloren und wird nach dem Verbinden nicht nachgeholt.
 - **IP-Adresse:** Ändert der Router die Adresse des Geräts, trägst du die neue im Stift-Bereich ✎ der Zeile ein. Haben mehrere Eingänge desselben Geräts dieselbe Adresse, wandern sie gemeinsam.
 - Es werden in dieser Version nur **Eingänge/Taster** (`binary_sensor`) eingebunden; Messwerte, Schalter und Klimaanlagen von ESPHome-Geräten folgen später.

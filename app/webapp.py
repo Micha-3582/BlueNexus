@@ -2090,6 +2090,7 @@ class Controller:
                     for r in all_rules:
                         need.update(rules.devices_of(r))
                         need.update(c["device_id"] for c in rules.all_conditions(r) if c.get("type") == "device")
+                    eph_seq = esphome.seqs()                                          # Taster-Druecke bis hierher werden in dieser Runde gesehen (danach consume)
                     devs = shelly.list_with_status(ids=need)
                     used_s = {c.get("sensor_id") for r in all_rules if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") == "sensor"}
                     homematic.set_watch([d["address"] for d in devs if d.get("kind") == "homematic" and d.get("address")]
@@ -2128,6 +2129,7 @@ class Controller:
                             log.warning("Ablauf-Schritt fehlgeschlagen: %s", e)         # ein kaputter Schritt darf die folgenden nicht verschlucken
                             autolog.log("rules", f"Regel „{act.get('rule', '')}“: Schritt fehlgeschlagen ({e})", dev=act.get("rule", ""), action="fail", dry=dry, rule=act.get("rule_id"))
                     virtual.consume(pressed)                                         # Knopfdruck war genau einen Durchlauf lang sichtbar
+                    esphome.consume(eph_seq)                                         # ebenso ein Druck am Hardware-Taster
                     notify_in.consume(tg_seq)                                        # ebenso ein Telegram-Wort
                     if time.time() - last_flush > 60:
                         rule_engine.flush()
@@ -2140,6 +2142,7 @@ class Controller:
                         self._log_flow_event(ev, False)
                     flow_engine.forget()
                     virtual.consume(virtual.pressed_ids())
+                    esphome.clear()
                     notify_in.consume(notify_in.max_seq())                           # Regeln aus: nichts bleibt liegen (ein altes Wort darf spaeter nichts ausloesen)
             except Exception as e:                       # noqa: BLE001
                 log.warning("Regel-Engine: %s", e)

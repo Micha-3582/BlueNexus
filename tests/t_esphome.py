@@ -73,7 +73,7 @@ def wait(cond, sek=6.0, what=""):
 
 srv = start_server(); PORT = srv.server_address[1]
 esphome._url = lambda ip, path: f"http://127.0.0.1:{PORT}{path}"
-esphome.HOLD_S, esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKOFF_MAX_S = 1.2, 0.5, 0.3, 0.6
+esphome.DISPLAY_S, esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKOFF_MAX_S = 1.2, 0.5, 0.3, 0.6
 
 # ---------------------------------------------------------------- Suchen (nur Binaersensoren, Titel, Kennung)
 info = esphome.probe("192.168.50.9")
@@ -126,27 +126,83 @@ wakes = []
 esphome.add_listener(lambda: wakes.append(time.time()))
 esphome.sync(shelly.load_devices())
 wait(lambda: esphome.status(e)["online"], what="verbunden")
-st = esphome.status(e); assert st == {"online": True, "on": False, "power": None}, st
+st = esphome.status(e); assert st == {"online": True, "on": False, "power": None, "shown": False}, st
+def rules_pass():
+    """So arbeitet eine Runde der Regelschleife: Stand merken, Zustand lesen, am Ende die gesehenen Druecke beenden."""
+    snap = esphome.seqs(); on = esphome.status(e)["on"]; esphome.consume(snap); return on
+
+
 n0 = len(wakes)
 push("Taster", True)
 wait(lambda: esphome.status(e)["on"] is True, what="Druck erkannt")
 assert len(wakes) == n0 + 1, "ein Druck weckt die Regelschleife genau einmal"
-push("Taster", False)                                                                         # Loslassen: kein neuer Druck, der Zustand "gedrueckt" haelt trotzdem seine Zeit
+assert esphome.status(e)["shown"] is True
+push("Taster", False)                                                                         # Loslassen: kein neuer Druck; der Impuls wartet, bis die Regeln ihn gesehen haben
 time.sleep(0.3); assert esphome.status(e)["on"] is True and len(wakes) == n0 + 1
-wait(lambda: esphome.status(e)["on"] is False, 3.0, "Zustand laeuft ab (HOLD_S)")
-push("Taster", True); wait(lambda: esphome.status(e)["on"] is True, what="zweiter Druck"); assert len(wakes) == n0 + 2
+assert rules_pass() is True and rules_pass() is False, "genau eine Runde lang an, dann wieder aus"
+assert esphome.status(e)["shown"] is True, "die Anzeige haelt noch kurz"
+wait(lambda: esphome.status(e)["shown"] is False, 3.0, "Anzeige laeuft ab (DISPLAY_S)")
+
+
+def presses(n):
+    for _ in range(n):
+        k = esphome._state[("192.168.50.9", "binary_sensor/Taster")]["seq"]
+        push("Taster", True); wait(lambda: esphome._state[("192.168.50.9", "binary_sensor/Taster")]["seq"] == k + 1, what="Druck eingegangen")
+        push("Taster", False); time.sleep(0.05)
+
+
+# Druecke mit Runden dazwischen: jeder Druck ist ein eigener Impuls
+for _ in range(3):
+    presses(1); assert rules_pass() is True and rules_pass() is False
+# schnell aufeinanderfolgende Druecke VOR der naechsten Runde: jeder wird einzeln gesehen (an, Luecke, an, Luecke ...), und die Regeln werden dafuer erneut geweckt
+w0 = len(wakes); presses(3)
+assert len(wakes) == w0 + 3
+seen = [rules_pass() for _ in range(6)]
+assert seen == [True, False, True, False, True, False], seen
+assert len(wakes) >= w0 + 3 + 2, "waehrend wartende Druecke uebrig sind, weckt das Ende einer Runde die Regeln wieder"
+# ein Druck waehrend einer laufenden Runde geht nicht verloren
+presses(1); snap = esphome.seqs(); assert esphome.status(e)["on"] is True
+presses(1)                                                                                    # kommt mitten in der Runde
+esphome.consume(snap)
+assert [rules_pass() for _ in range(3)] == [False, True, False], "zweiter Druck: erst eine Luecke, dann an"
+
+# Ablauf-Regel "WENN Taster gedrueckt": jeder schnelle Druck startet genau einen Ablauf (so wie die Regelschleife die Runden fuehrt)
+import flows
+from datetime import datetime
+body = {"name": "Klingel", "mode": "flow", "when": {"mode": "all", "conds": [{"type": "device", "device_id": e["id"], "is": "on"}]},
+        "then": [{"device_id": "a", "state": "on"}], "else": []}
+fr = rules.normalize_rule(body, "t1")
+flows.STATE_PATH = os.path.join(tmp, "fs2.json"); eng = flows.FlowEngine()
+tick = [1000.0]
+
+
+def flow_pass():
+    snap = esphome.seqs(); st = esphome.status(e); now = datetime(2026, 10, 30, 12, 0)
+    ctx = {"now": now, "devices": {e["id"]: {"id": e["id"], "name": "Klingel", "kind": "esphome", "online": True, "on": st["on"]}}}
+    ev = [x[0] for x in eng.step(now, ctx, [fr])]
+    tick[0] += 10; eng.advance(tick[0]); esphome.consume(snap)
+    return ev.count("start")
+
+
+assert sum(flow_pass() for _ in range(3)) == 0, "ohne Druck startet nichts"
+presses(1); assert [flow_pass() for _ in range(3)] == [1, 0, 0], "ein Druck, ein Ablauf"
+presses(3)
+starts = [flow_pass() for _ in range(8)]
+assert sum(starts) == 3, ("drei schnelle Druecke, drei Ablaeufe", starts)
+assert sum(flow_pass() for _ in range(3)) == 0, "danach ist Ruhe"
+n0 = len(wakes) - 1                                                                           # ab hier zaehlt nur der naechste Block neu
 push("Tuer", True); time.sleep(0.3)
-assert len(wakes) == n0 + 2, "ein anderer Eingang desselben Geraets weckt nichts, solange er nicht angelegt ist"
-push("Tuer", False); push("Taster", False)
-wait(lambda: esphome.status(e)["on"] is False, 3.0, "wieder bereit")
+assert len(wakes) == n0 + 1, "ein anderer Eingang desselben Geraets weckt nichts, solange er nicht angelegt ist"
+push("Tuer", False)
+assert esphome.status(e)["on"] is False
 
 # ueber die Geraeteliste der Seite (so sehen Regeln und Oberflaeche es)
 lst = {x["id"]: x for x in A.get("/api/shelly").get_json()}
 x = lst["esphome-taster-taster"]; assert x["kind"] == "esphome" and x["online"] is True and x["on"] is False and x["switchable"] is False and x["power"] is None, x
 push("Taster", True); wait(lambda: esphome.status(e)["on"], what="gedrueckt")
-x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["on"] is True
-push("Taster", False)
-wait(lambda: esphome.status(e)["on"] is False, 3.0, "bereit")
+x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["on"] is True and x["shown"] is True
+push("Taster", False); rules_pass(); rules_pass()
+x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["on"] is False
 
 # ---------------------------------------------------------------- nie schaltbar
 r = A.post("/api/shelly/esphome-taster-taster/switch", json={"on": True}); assert r.status_code >= 400 and "nicht schaltbar" in r.get_data(as_text=True), r.get_data(as_text=True)
@@ -168,7 +224,7 @@ dev["online"], dev["on"] = False, None; assert rules.eval_condition(c, cx())[0] 
 # ---------------------------------------------------------------- Ausfall und Wiederverbindung
 stop_server(srv)
 wait(lambda: esphome.status(e)["online"] is False, 5.0, "Ausfall erkannt")
-st = esphome.status(e); assert st == {"online": False, "on": None, "power": None}, st
+st = esphome.status(e); assert st == {"online": False, "on": None, "power": None, "shown": False}, st
 x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["online"] is False and x["on"] is None
 STATE["Taster"] = True                                                                        # waehrend des Ausfalls gedrueckt und gehalten
 srv = start_server(PORT)

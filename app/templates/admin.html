@@ -1967,7 +1967,7 @@ function savedToast(text = 'Gespeichert ✓') {
 function shellyMsg(t, err, id = 'shelly-msg') { const m = document.getElementById(id); m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; }
 function shellyStatText(d) {
   if (d.online === undefined) return 'wird abgefragt …';                       // Liste steht schon, Live-Werte kommen gleich
-  if (d.kind === 'esphome') return !d.online ? 'nicht erreichbar' : 'Taster · ' + (d.on ? 'gedrückt' : 'bereit');
+  if (d.kind === 'esphome') return !d.online ? 'nicht erreichbar' : 'Taster · ' + (d.shown ? 'gedrückt' : 'bereit');
   return !d.online ? 'nicht erreichbar' + (d.error ? ' – ' + d.error : '') : (d.on ? 'an' : 'aus') + (d.power != null ? ` · ${Math.round(d.power)} W` : '') + (d.info ? ' · ' + d.info : '');
 }
 /* Nur Status/Watt/Knopffarbe aktualisieren - Eingabefelder und offene Symbolauswahl bleiben unangetastet */

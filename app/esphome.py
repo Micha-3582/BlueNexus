@@ -4,8 +4,9 @@ ESPHome-Geraete (Hardware-Taster und aehnliches) - LOKAL ueber die Weboberflaech
 Ein Eintrag im Geraeteregister (shelly.py, kind "esphome") = ein Eingang (`binary_sensor`) eines ESPHome-Geraets, z. B. ein Taster.
 Die Weboberflaeche des Geraets liefert unter `GET /events` einen dauerhaften Strom (Server-Sent-Events): beim Verbinden den Zustand aller Eintraege
 (`event: state`), danach jede Aenderung sofort, alle 30 Sekunden ein `event: ping`. Pro Geraet (IP-Adresse) haelt BlueNexus eine solche Verbindung
-(Hintergrund-Thread, mit Wiederverbindung und wachsender Wartezeit). Springt ein Eingang von AUS auf AN, gilt das als Tastendruck:
-`status()` meldet dann HOLD_S Sekunden lang "an" (wie die Tasten der Homematic-Taster), die Regelschleife wird sofort geweckt.
+(Hintergrund-Thread, mit Wiederverbindung und wachsender Wartezeit). Springt ein Eingang von AUS auf AN, gilt das als Tastendruck: Er ist ein IMPULS, den die Regelschleife genau einmal sieht (`status()["on"]`,
+danach `consume()`, wie bei den eigenen Knoepfen in virtual.py) - so loest jeder Druck genau einen Ablauf aus, auch bei schnell aufeinanderfolgenden
+Druecken. Die Regelschleife wird sofort geweckt. Fuer die Anzeige (Liste, Dashboard) gilt ein Druck DISPLAY_S Sekunden als "gedrueckt" (`status()["shown"]`).
 
 Ein Druck, der zwischen zwei Verbindungen passiert (Geraet war offline), geht verloren: beim Verbinden gilt der Anfangszustand nie als Druck.
 """
@@ -22,7 +23,7 @@ import idsafe
 
 log = logging.getLogger("esphome")
 
-HOLD_S = 5.0                     # so lange gilt ein Tastendruck als "gedrueckt" (laenger als der Regel-Takt von 2 s, damit er nie verpasst wird)
+DISPLAY_S = 3.0                  # so lange zeigt die Oberflaeche "gedrueckt" (die Regeln sehen den Druck als Impuls, unabhaengig davon)
 PROBE_CONNECT_S = 8.0            # ein ESP8266 an schwachem WLAN nimmt Verbindungen manchmal erst nach einigen Sekunden an
 PROBE_QUIET_S = 1.5              # beim Suchen: so lange auf weitere Eintraege warten, nachdem nichts mehr kommt
 PROBE_MAX_S = 6.0
@@ -30,6 +31,7 @@ STREAM_READ_S = 45.0             # das Geraet pingt alle 30 s; 45 s Stille = Ver
 BACKOFF_START_S = 3.0
 BACKOFF_MAX_S = 60.0
 SYNC_EVERY_S = 5.0
+MAX_QUEUE = 5                    # so viele Druecke warten hoechstens darauf, von den Regeln gesehen zu werden (Schutz vor einem prellenden Taster)
 DOMAINS = ("binary_sensor",)     # erste Stufe: Eingaenge/Taster
 
 
@@ -96,7 +98,7 @@ def probe(ip: str) -> dict:
 # ---------------------------------------------------------------- Zustand und Verbindungen
 _lock = threading.RLock()
 _hosts: dict[str, dict] = {}                         # ip -> {"online", "stop" (Event), "thread"}
-_state: dict[tuple, dict] = {}                       # (ip, entity) -> {"value": bool|None, "pressed_at": float}
+_state: dict[tuple, dict] = {}                       # (ip, entity) -> {"value": bool|None, "pressed_at": float, "seq": Zaehler der Druecke, "consumed": von den Regeln gesehen}
 _wanted: dict[str, set] = {}                         # ip -> Eingaenge, die im Geraeteregister stehen (nur deren Druecke zaehlen und wecken die Regeln)
 _listeners: list = []
 _stop_all = threading.Event()
@@ -136,9 +138,11 @@ def _on_state(ip: str, j: dict) -> None:
     val = bool(j.get("value"))
     pressed = False
     with _lock:
-        st = _state.setdefault((ip, ent), {"value": None, "pressed_at": 0.0})
+        st = _state.setdefault((ip, ent), {"value": None, "pressed_at": 0.0, "seq": 0, "consumed": 0, "saw_on": False, "mask": False, "pass_on": False})
         if val and st["value"] is False and ent in _wanted.get(ip, ()):
             st["pressed_at"] = time.time()
+            if st["seq"] - st["consumed"] < MAX_QUEUE:
+                st["seq"] += 1
             pressed = True
         st["value"] = val
     if pressed:
@@ -239,8 +243,47 @@ def stop() -> None:
         _hosts.clear()
 
 
+def seqs() -> dict:
+    """Beginn einer Regelrunde: Zaehlerstand aller Taster merken; am Ende der Runde consume() damit aufrufen (ein Druck waehrend der Runde bleibt fuer die
+    naechste erhalten). Hat die vorige Runde den Taster schon als "an" gesehen und wartet schon der naechste Druck, zeigt DIESE Runde einmal "aus" (Luecke):
+    Regeln erkennen einen neuen Druck nur am Wechsel von aus nach an - ohne Luecke gingen schnell aufeinanderfolgende Druecke verloren."""
+    with _lock:
+        snap = {}
+        for k, st in _state.items():
+            pending = st["seq"] > st["consumed"]
+            st["mask"] = pending and st["saw_on"]
+            st["pass_on"] = pending and not st["mask"]
+            snap[k] = st["consumed"] if (st["mask"] or not pending) else st["consumed"] + 1          # pro Runde genau ein Druck: jeder Druck ein eigener Ablauf
+        return snap
+
+
+def consume(snapshot: dict) -> None:
+    """Die Regelschleife hat die Druecke bis zu diesem Stand gesehen - Impuls beenden. Wartet noch ein Druck, werden die Regeln gleich noch einmal geweckt."""
+    again = False
+    with _lock:
+        for k, n in snapshot.items():
+            st = _state.get(k)
+            if st is None:
+                continue
+            if n > st["consumed"]:
+                st["consumed"] = n
+            st["saw_on"], st["mask"], st["pass_on"] = st["pass_on"], False, False
+            if st["seq"] > st["consumed"]:
+                again = True
+    if again:
+        _notify()
+
+
+def clear() -> None:
+    """Alle wartenden Druecke verwerfen (Regeln sind aus: ein alter Druck darf spaeter nichts ausloesen)."""
+    with _lock:
+        for st in _state.values():
+            st["consumed"], st["saw_on"], st["mask"], st["pass_on"] = st["seq"], False, False, False
+
+
 def status(d: dict) -> dict:
-    """{'online': bool, 'on': bool|None, 'power': None}. 'on' = der Taster wurde in den letzten HOLD_S Sekunden gedrueckt (Geraet offline: None)."""
+    """{'online', 'on', 'power', 'shown'}. 'on' = ein Druck wartet darauf, von den Regeln gesehen zu werden (Impuls; Geraet offline: None);
+    'shown' = der letzte Druck liegt hoechstens DISPLAY_S Sekunden zurueck (nur fuer die Anzeige)."""
     ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
     with _lock:
         _wanted.setdefault(ip, set()).add(ent)             # auch ohne vorherigen Abgleich (z. B. gerade angelegt) zaehlt dieser Eingang
@@ -248,7 +291,8 @@ def status(d: dict) -> dict:
     with _lock:
         h = _hosts.get(ip)
         online = bool(h and h["online"])
-        pa = (_state.get((ip, ent)) or {}).get("pressed_at", 0.0)
+        st = _state.get((ip, ent)) or {}
+        pa, pending = st.get("pressed_at", 0.0), st.get("seq", 0) > st.get("consumed", 0) and not st.get("mask")
     if not online:
-        return {"online": False, "on": None, "power": None}
-    return {"online": True, "on": (time.time() - pa) < HOLD_S, "power": None}
+        return {"online": False, "on": None, "power": None, "shown": False}
+    return {"online": True, "on": pending, "power": None, "shown": (time.time() - pa) < DISPLAY_S}

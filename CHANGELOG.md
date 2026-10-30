@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.29.1 – 30.10.2026
+- Verbesserung: **ESPHome-Taster reagiert direkt.** Ein Druck war bisher 5 Sekunden lang „gedrückt“, in dieser Zeit konnte kein zweiter Druck erkannt werden. Jetzt ist ein Druck ein **kurzer Impuls**: Jeder Druck löst genau einen Ablauf aus, auch bei schnell aufeinanderfolgenden Drücken (bis zu 5 wartende Drücke werden nacheinander abgearbeitet). Die Anzeige in der Liste und auf dem Dashboard zeigt „gedrückt“ nur noch 3 Sekunden. Die Verbindung zum Gerät wartet länger auf die Annahme (schwaches WLAN).
+- Fehlerbehebung: Änderungsmeldungen eines ESPHome-Geräts enthalten keine Angabe zur Art des Eingangs; solche Meldungen wurden verworfen, Tastendrücke kamen nicht an (1.29.0 am echten Gerät aufgefallen und noch am selben Tag behoben).
+- Intern: Test `t_esphome` um schnelle Drücke und eine Ablauf-Regel erweitert.
+
 ## 1.29.0 – 30.10.2026
 - Neu: **ESPHome-Taster.** Ein Gerät mit ESPHome-Firmware und eingeschalteter Weboberfläche (`web_server`) lässt sich unter *Smart Home → Geräte suchen* über das neue System **ESPHome** (Häkchen bei „Welche Systeme hast du?“) einbinden: IP-Adresse eintragen, **Suchen**, Name und Symbol anpassen, **Hinzufügen**. Der Taster steht danach unter **Aktoren** (nicht schaltbar, Anzeige „bereit“ / „gedrückt“) und auf dem Dashboard und ist in Regeln unter **„Meine Aktoren“** als Bedingung **„wird gedrückt“** nutzbar. BlueNexus hält dafür eine dauerhafte Verbindung zum Gerät und erkennt jeden Druck sofort; nach einem Ausfall verbindet es sich von selbst wieder, ein Druck während des Ausfalls wird nicht nachgeholt. Ein Druck gilt etwa 5 Sekunden als „gedrückt“. Die Eigenen Schalter & Knöpfe (Software) bleiben davon getrennt.
 - Intern: Neues Modul `app/esphome.py`, neuer Test `tests/t_esphome.py` mit nachgebildetem ESPHome-Gerät (121 Tests).
