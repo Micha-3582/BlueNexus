@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.30.1 – 30.10.2026
+- Fehlerbehebung: **Falsche PIN im Bereich Smart Home** verhält sich jetzt wie am Dashboard. Bisher schloss sich das PIN-Fenster nach einer falschen Eingabe mit einer Meldung und einem großen roten Kreuz, und man musste den Knopf neu drücken. Jetzt bleibt das Fenster offen (roter Rahmen, „Falsche PIN – bitte erneut“, Wackeln) und die PIN kann gleich noch einmal eingegeben werden, bis sie stimmt, abgebrochen wird oder der Server nach zu vielen Fehlversuchen sperrt. Gilt für den Testschalter der Aktoren, Wake-on-LAN und die eigenen Schalter & Knöpfe.
+
 ## 1.30.0 – 30.10.2026
 - Neu: **ESPHome-Messwerte als Sensoren.** Im Fenster *ESPHome* (Geräte suchen) gibt es neben **Taster suchen** jetzt **Messwerte suchen**: Temperatur (°C, °F), Luftfeuchte (%), Leistung (W, kW), Luftdruck (hPa, mbar, kPa, Pa), Helligkeit (lx), Spannung (V) und Funkstärke (dBm) eines ESPHome-Geräts werden zu **Sensoren** mit Dashboard, Verlauf, Regeln und Teilen. Die Werte kommen über dieselbe dauerhafte Verbindung wie beim Taster; nach einem kurzen Abbruch gilt der letzte Wert noch 2 Minuten. Andere Einheiten (z. B. ppm, Akku in %) werden noch nicht angeboten, die Suche nennt ihre Zahl. Nur für Geräte mit Dauerstrom (nicht für Batteriegeräte im Tiefschlaf).
 - Neu: **Neue IP-Adresse eines ESPHome-Geräts:** die Suche mit der neuen Adresse wiederholen, die Einträge (Taster und Messwerte) ziehen um.
