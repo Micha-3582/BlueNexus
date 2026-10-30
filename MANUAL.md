@@ -445,7 +445,7 @@ Jeder Auslöser startet die Zeit neu; die Lampen gehen erst aus, wenn **3 Minute
 
 ### Sensoren (nur lesen)
 
-Von Homematic und Zigbee: Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Rauchmelder (Homematic IP, „Alarm“ / „kein Alarm“), Helligkeit, Leistung. Dazu die **Erkennung der Reolink-Kameras** (siehe unten). Pro Sensor einstellbar:
+Von Homematic und Zigbee: Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Rauchmelder (Homematic IP, „Alarm“ / „kein Alarm“; in den Einstellungen mit Knöpfen **Piepsen** und **Ruhe** von Hand auslösbar), Helligkeit, Leistung. Dazu die **Erkennung der Reolink-Kameras** (siehe unten). Pro Sensor einstellbar:
 
 - **Name** und **Symbol**
 - **Auf dem Dashboard zeigen** (eigener Schalter pro Sensor)

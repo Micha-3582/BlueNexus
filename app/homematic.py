@@ -1157,6 +1157,36 @@ def lock_action(lid: str, action: str, manual: bool = False) -> str:
     return x["name"]
 
 
+SMOKE_COMMANDS = {"on": "INTRUSION_ALARM", "off": "INTRUSION_ALARM_OFF"}      # Melder von Hand piepsen lassen bzw. wieder ruhig stellen (wie "Einbruch Alarm Ein/Aus" in der CCU)
+
+
+def smoke_alarm(sid: str, on: bool) -> str:
+    """Rauchmelder (HmIP-SWSD) ausloesen ("Einbruch Alarm" ein: der Melder piepst) bzw. den Alarm beenden. Rueckgabe: Name des Sensors.
+    Der Datenpunkt SMOKE_DETECTOR_COMMAND ist eine Aufzaehlung; die Reihenfolge der Werte liest BlueNexus bei der CCU nach (VALUE_LIST)."""
+    x = next((y for y in load_sensors() if y["id"] == sid), None)
+    if not x:
+        raise HomematicError("Sensor existiert nicht mehr")
+    if x.get("kind") != "smoke" or x.get("source") in ("remote", "zigbee", "camera", "esphome", "tasmota", "thermo", "device"):
+        raise HomematicError("Dieser Sensor ist kein Homematic-Rauchmelder")
+    name = SMOKE_COMMANDS["on" if on else "off"]
+    try:
+        vl = (_param_desc(x["interface"], x["address"]).get("SMOKE_DETECTOR_COMMAND") or {}).get("VALUE_LIST") or []
+    except HomematicError:
+        vl = []
+    base = {"interface": x["interface"], "address": x["address"], "valueKey": "SMOKE_DETECTOR_COMMAND"}
+    _pushed.pop((x["interface"], x["address"], "SMOKE_DETECTOR_ALARM_STATUS"), None)
+    _value_cache.pop(sid, None)
+    tries = ([{"type": "int", "value": vl.index(name)}, {"type": "integer", "value": vl.index(name)}] if name in vl else []) + [{"type": "string", "value": name}]
+    err = None
+    for t in tries:
+        try:
+            _call("Interface.setValue", {**base, **t})
+            return x["name"]
+        except HomematicError as e:
+            err = e
+    raise HomematicError(f"Rauchmelder nicht erreichbar oder Befehl abgelehnt: {err}")
+
+
 # ================================================================ Soundmodule (Funk-Gong / Signalaktor akustisch, z. B. HM-OU-CM-PCB, HM-OU-CFM-TW)
 # Eigenes Register. Abgespielt wird ueber den Datenpunkt SUBMIT des Tonkanals: "Lautstaerke,Wiederholungen,Dauer,Titelnummer"
 # (Lautstaerke 0..1, Dauer 108000 = Titel vollstaendig abspielen). Nur in Regeln der Art "Ablauf" und im Test-Knopf, nie im Trockenlauf.

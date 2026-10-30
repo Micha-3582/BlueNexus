@@ -336,7 +336,7 @@ ENDPOINT_AREA = {
     "api_zigbee_scan": "smarthome_einrichten", "api_zigbee_add": "smarthome_einrichten", "api_zigbee_sensor_scan": "smarthome_einrichten",
     "api_zigbee_sensor_add": "smarthome_einrichten", "api_zigbee_sp_scan": "smarthome_einrichten", "api_zigbee_sp_add": "smarthome_einrichten",
     "api_homematic_sensor_scan": "smarthome_einrichten", "api_homematic_sensor_add": "smarthome_einrichten",
-    "api_sensor_modify": "settings_geraete", "api_sensors_list": "dashboard",
+    "api_sensor_modify": "settings_geraete", "api_sensor_alarm": "smarthome_sicherheit", "api_sensors_list": "dashboard",
     "api_sensors_order": "settings_geraete", "api_virtual_order": "settings_geraete",
     "api_setpoints_order": "settings_geraete", "api_sounds_order": "settings_geraete", "api_blinds_order": "settings_geraete", "api_locks_order": "smarthome_sicherheit",
     "api_devicelog": "smarthome_logbuch", "api_wol_list": "smarthome_wol", "api_wol_wake": "smarthome_wol", "api_wol_add": "settings_geraete", "api_wol_modify": "settings_geraete",
@@ -6285,6 +6285,23 @@ def api_sensors_list():
     except Exception as e:                               # noqa: BLE001
         log.warning("Sensorliste: %s", e)
         return jsonify([])
+
+
+@app.route("/api/sensors/<sensor_id>/alarm", methods=["POST"])
+def api_sensor_alarm(sensor_id):
+    """Homematic-Rauchmelder von Hand ausloesen (piepst) oder den Alarm beenden: {action: on | off}. Braucht das Recht "Sicherheit: Schreiben"."""
+    hidden = _vis_guard("sensor", sensor_id)
+    if hidden:
+        return hidden
+    action = str((request.get_json(silent=True) or {}).get("action") or "")
+    if action not in homematic.SMOKE_COMMANDS:
+        return jsonify(error="Unbekannte Melder-Aktion"), 400
+    try:
+        name = homematic.smoke_alarm(sensor_id, action == "on")
+    except homematic.HomematicError as e:
+        return jsonify(error=str(e)), 400
+    opslog.log("rules", f"Rauchmelder {name}: von Hand {'ausgelöst (piepst)' if action == 'on' else 'beruhigt'} (Konto {g.user_display})")
+    return jsonify(ok=True, name=name)
 
 
 @app.route("/api/sensors/<sensor_id>", methods=["PATCH", "DELETE"])

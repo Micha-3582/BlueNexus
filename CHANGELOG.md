@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.32.0 – 30.10.2026
+- Neu: **Homematic-Rauchmelder von Hand auslösen.** In *Einstellungen → Sensoren* hat ein Rauchmelder die Knöpfe **🔔 Piepsen** (löst „Einbruch Alarm“ aus, der Melder piepst laut; vorher kommt eine Rückfrage) und **Ruhe** (beendet den Alarm). Braucht das Recht „Sicherheit: Schreiben“. Der Befehlswert wird bei der CCU nachgelesen, falls das nicht klappt, wird der Name gesendet.
+- Intern: `t_homematic` prüft Auslösen und Beenden.
+
 ## 1.31.0 – 30.10.2026
 - Neu: **Homematic-Rauchmelder** (z. B. HmIP-SWSD) erscheinen unter *Sensoren suchen*. Der Sensor zeigt **Alarm** oder **kein Alarm** (Rauch-, Einbruch- und Verbundalarm zählen als Alarm), ist in Regeln, auf dem Dashboard und im Logbuch nutzbar und wird bei Alarm sofort gemeldet, wenn der Push der CCU aktiv ist.
 - Intern: `t_homematic` um einen Rauchmelder erweitert.
