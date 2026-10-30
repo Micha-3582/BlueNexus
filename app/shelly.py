@@ -616,18 +616,67 @@ def esphome_scan(ip: str) -> list[dict]:
         info = esphome.probe(ip)
     except esphome.EsphomeError as e:
         raise ShellyError(str(e))
+    relinked = esphome_relink(ip, info["entities"], info["title"])          # nach einem Neuflashen: alter Eintrag, neuer Name am Geraet -> wieder zuordnen
+    if relinked:
+        esphome.resync()
     items = load_devices()
     have = {d["id"] for d in items}
+    reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
+    again = {ent for _, ent in relinked}
     out = []
     for e in info["entities"]:
         if e["domain"] != "binary_sensor":
             continue
         dev_id = esphome.entity_id(info["title"], e["entity"])
         out.append({"id": dev_id, "name": e["name"], "model": f"ESPHome · {info['title']}", "ip": ip, "entity": e["entity"],
-                    "icon": "🔘", "known": dev_id in have})
+                    "icon": "🔘", "known": dev_id in have or e["entity"] in reg, "relinked": e["entity"] in again})
     if _esphome_follow_ip(ip, {x["id"] for x in out if x["known"]}, set()):
         esphome.resync()
     return out
+
+
+def esphome_relink(ip: str, ents: list, title: str = "", fallback: bool = False, only=None) -> list:
+    """Ordnet angelegte ESPHome-Eintraege (Taster und Messwerte) dieser Adresse, die das Geraet nicht mehr meldet, einem eindeutig passenden neuen Eintrag
+    zu (z. B. nach neuer Firmware: "Taster" -> "Taster01 Taster"). Die Kennung bleibt - Regeln, Verlauf und Freigaben gehoeren weiter zu diesem Eintrag.
+    ents: Eintraege des Geraets [{entity, name, domain, (uom)}]. fallback=True: bleibt genau ein Taster-Eintrag und ein Kandidat uebrig, werden sie
+    gepaart (nur beim Hinzufuegen durch den Nutzer); only: nur diese Eintraege des Geraets kommen als Ziel in Frage. Gibt [(Kennung, neuer Eintrag)] zurueck."""
+    import homematic
+    done = []
+    present = {e["entity"] for e in ents}
+    items = load_devices()
+    mine = [d for d in items if d.get("kind") == "esphome" and d.get("ip") == ip]
+    stale = [d for d in mine if d.get("entity") not in present]
+    if stale:
+        used = {d.get("entity") for d in mine}
+        cands = [e for e in ents if e.get("domain") == "binary_sensor" and e["entity"] not in used and (only is None or e["entity"] in only)]
+        for st, c in esphome.match_stale([{"id": d["id"], "entity": d.get("entity"), "name": d.get("name", "")} for d in stale], cands, fallback):
+            for d in items:
+                if d["id"] == st["id"]:
+                    d["entity"] = c["entity"]
+                    if title:
+                        d["model"] = f"ESPHome · {title}"
+                    done.append((d["id"], c["entity"]))
+        if done:
+            _save(items)
+    sens = homematic.load_sensors()
+    smine = [x for x in sens if x.get("source") == "esphome" and x.get("ip") == ip]
+    sstale = [x for x in smine if x.get("datapoint") not in present]
+    if sstale:
+        sused = {x.get("datapoint") for x in smine}
+        scands = [e for e in ents if e.get("domain") == "sensor" and e["entity"] not in sused and (only is None or e["entity"] in only)
+                  and ("uom" not in e or esphome.sensor_kind(e.get("uom", ""), e.get("name", "")) is not None)]
+        changed = False
+        for st, c in esphome.match_stale([{"id": x["id"], "entity": x.get("datapoint"), "name": x.get("name", "")} for x in sstale], scands):
+            for x in sens:
+                if x["id"] == st["id"]:
+                    x["datapoint"] = c["entity"]
+                    changed = True
+                    done.append((x["id"], c["entity"]))
+        if changed:
+            homematic._save_sensors(sens)
+    if done:
+        log.info("ESPHome %s: %d Eintrag/Einträge neu zugeordnet (%s)", ip, len(done), ", ".join(f"{i} -> {e}" for i, e in done))
+    return done
 
 
 def _esphome_follow_ip(ip: str, dev_ids: set, sensor_ids: set) -> bool:
@@ -660,7 +709,12 @@ def esphome_sensor_scan(ip: str) -> list[dict]:
         info = esphome.probe(ip)
     except esphome.EsphomeError as e:
         raise ShellyError(str(e))
-    have = {s["id"] for s in homematic.load_sensors()}
+    relinked = esphome_relink(ip, info["entities"], info["title"])
+    if relinked:
+        esphome.resync()
+    sens_now = homematic.load_sensors()
+    have = {s["id"] for s in sens_now}
+    reg = {s.get("datapoint") for s in sens_now if s.get("source") == "esphome" and s.get("ip") == ip}
     out, skipped = [], 0
     for e in info["entities"]:
         if e["domain"] != "sensor":
@@ -676,7 +730,7 @@ def esphome_sensor_scan(ip: str) -> list[dict]:
             v = esphome._CONV[conv](v)
         out.append({"id": sid, "kind": kind, "address": info["title"], "interface": "ESPHome", "datapoint": e["entity"], "unit": unit, "binary": False,
                     "model": f"ESPHome · {info['title']}", "room": "", "ip": ip, "source": "esphome", "conv": conv or "",
-                    "name": e["name"], "known": sid in have, "value": None if v is None else round(v, 1), "skipped": skipped})
+                    "name": e["name"], "known": sid in have or e["entity"] in reg, "value": None if v is None else round(v, 1), "skipped": skipped})
     for x in out:
         x["skipped"] = skipped
     if _esphome_follow_ip(ip, set(), {x["id"] for x in out if x["known"]}):
@@ -713,14 +767,25 @@ def add_esphome_sensors(ids: list[str]) -> list[dict]:
 def add_esphome(ip: str, ids: list[str]) -> list[dict]:
     """Legt die gewaehlten Eingaenge (Kennungen aus esphome_scan) als Geraete an. Der Zustand wird dabei frisch vom Geraet gelesen."""
     found = {f["id"]: f for f in esphome_scan(ip)}
+    for dev_id in ids:
+        if dev_id not in found:
+            raise ShellyError("Dieser Eingang ist am Gerät nicht mehr zu finden – bitte noch einmal suchen")
     items = load_devices()
     have = {d["id"] for d in items}
+    reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
     added = []
+    want = [i for i in ids if i not in have and found[i]["entity"] not in reg]
+    if want:                                               # ein Eintrag, den das Geraet nicht mehr meldet, wird wieder verbunden statt doppelt angelegt
+        rel = esphome_relink(ip, [{"entity": f["entity"], "name": f["name"], "domain": "binary_sensor"} for f in found.values()], "", True, {found[i]["entity"] for i in want})
+        if rel:
+            items = load_devices()
+            have = {d["id"] for d in items}
+            reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
+            ids_re = {i for i, _ in rel}
+            added.extend(d for d in items if d["id"] in ids_re)
     for dev_id in ids:
-        f = found.get(dev_id)
-        if f is None:
-            raise ShellyError("Dieser Eingang ist am Gerät nicht mehr zu finden – bitte noch einmal suchen")
-        if dev_id in have:
+        f = found[dev_id]
+        if dev_id in have or f["entity"] in reg:
             continue
         entry = {"id": dev_id, "kind": "esphome", "ip": f["ip"], "entity": f["entity"], "gen": 0, "channel": 0, "model": f["model"], "name": f["name"],
                  "icon": "🔘", "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "user": "", "password": "",

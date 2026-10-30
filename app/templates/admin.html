@@ -1986,7 +1986,7 @@ function savedToast(text = 'Gespeichert ✓') {
 function shellyMsg(t, err, id = 'shelly-msg') { const m = document.getElementById(id); m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; }
 function shellyStatText(d) {
   if (d.online === undefined) return 'wird abgefragt …';                       // Liste steht schon, Live-Werte kommen gleich
-  if (d.kind === 'esphome') return !d.online ? 'nicht erreichbar' : 'Taster · ' + (d.shown ? 'gedrückt' : 'bereit');
+  if (d.kind === 'esphome') return !d.online ? 'nicht erreichbar' : d.missing ? 'Eingang fehlt am Gerät – neu suchen oder löschen' : 'Taster · ' + (d.shown ? 'gedrückt' : 'bereit');
   return !d.online ? 'nicht erreichbar' + (d.error ? ' – ' + d.error : '') : (d.on ? 'an' : 'aus') + (d.power != null ? ` · ${Math.round(d.power)} W` : '') + (d.info ? ' · ' + d.info : '');
 }
 /* Nur Status/Watt/Knopffarbe aktualisieren - Eingabefelder und offene Symbolauswahl bleiben unangetastet */
@@ -2659,7 +2659,7 @@ document.getElementById('esphome-scan').addEventListener('click', async e => {
   try {
     if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
     const found = await shellyApi('/api/esphome/scan', 'POST', { ip }), fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Eingang/Eingänge gefunden, ${fresh.length} noch nicht angelegt.` : 'Das Gerät meldet keine Eingänge (Taster). Ist im ESPHome-Setup ein binary_sensor eingetragen?');
+    shellyMsg(found.length ? `${found.length} Eingang/Eingänge gefunden, ${fresh.length} noch nicht angelegt.` + (found.some(f => f.relinked) ? ' Ein vorhandener Eintrag wurde dem Gerät wieder zugeordnet.' : '') : 'Das Gerät meldet keine Eingänge (Taster). Ist im ESPHome-Setup ein binary_sensor eingetragen?');
     foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · Taster`,
       add: (ids, edits) => shellyApi('/api/esphome/add', 'POST', { ip, ids, edits }) });
   } catch (err) { shellyMsg(err.message, true); }

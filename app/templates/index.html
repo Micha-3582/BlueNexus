@@ -1592,6 +1592,7 @@ let shellyDragActive = false;   // waehrend Verschieben: Neuaufbau pausieren
 function shellyTile(d, tid) {
     const btn = d.kind === 'esphome';                      // Hardware-Taster: gedrückt / bereit
     const stat = d.pending ? '…' : !d.online ? 'nicht erreichbar'
+      : btn && d.missing ? 'Eingang fehlt am Gerät'
       : btn ? 'Taster · ' + (d.shown ? 'gedrückt' : 'bereit')
       : (d.on ? 'an' : 'aus') + (d.power != null && d.switchable !== false ? ` · ${Math.round(d.power)} W` : '') + (d.automated ? ' · Auto' : '') + (d.switchable === false ? ' · Überwachung' : '');
     return `<div class="systile" data-tile-id="${escH(tid || d.id)}" ${d.online || d.pending ? '' : 'style="opacity:.55"'}>
@@ -1599,7 +1600,7 @@ function shellyTile(d, tid) {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span style="font-size:30px;line-height:1.1">${escH(d.icon)}</span>
         ${d.switchable === false
-          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${(btn ? d.shown : d.on) ? 'var(--on)' : 'var(--muted)'}">${d.pending ? '…' : d.online ? (btn ? (d.shown ? 'gedrückt' : 'bereit') : d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
+          ? `<span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${(btn ? d.shown : d.on) ? 'var(--on)' : 'var(--muted)'}">${d.pending ? '…' : d.online ? (btn ? (d.missing ? '–' : d.shown ? 'gedrückt' : 'bereit') : d.power != null ? Math.round(d.power) + ' W' : (d.on ? 'an' : 'aus')) : '–'}</span>`
           : `<label class="switch${d.pin_set ? ' pinned' : ''}" ${d.pin_set ? 'title="PIN-geschützt"' : ''}><input type="checkbox" ${d.on ? 'checked' : ''} ${d.online ? '' : 'disabled'}
           onchange="shellySwitch('${escH(d.id)}', this.checked, this)"><span class="slider"></span></label>`}
       </div>

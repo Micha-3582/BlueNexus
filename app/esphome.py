@@ -11,6 +11,10 @@ danach `consume()`, wie bei den eigenen Knoepfen in virtual.py) - so loest jeder
 Druecken. Die Regelschleife wird sofort geweckt. Fuer die Anzeige (Liste, Dashboard) gilt ein Druck DISPLAY_S Sekunden als "gedrueckt" (`status()["shown"]`).
 
 Ein Druck, der zwischen zwei Verbindungen passiert (Geraet war offline), geht verloren: beim Verbinden gilt der Anfangszustand nie als Druck.
+
+Neu geflasht (1.30.2): Aendert eine neue Firmware den Namen eines Eintrags (z. B. "Taster" -> "Taster01 Taster"), meldet das Geraet den alten nicht mehr,
+und der angelegte Eintrag bliebe stumm. BlueNexus merkt, was das Geraet seit dem Verbinden gemeldet hat (`missing()`), zeigt "Eingang fehlt am Geraet"
+und ordnet den Eintrag einem eindeutig passenden neuen zu (`match_stale()`, `heal()`), ohne die Kennung zu aendern (Regeln, Verlauf, Freigaben bleiben).
 """
 from __future__ import annotations
 
@@ -34,6 +38,8 @@ STREAM_READ_S = 25.0             # das Geraet pingt alle 10 s; 25 s Stille = Ver
 BACKOFF_START_S = 1.0            # nach einem Abbruch schnell neu verbinden: bis dahin gehen Druecke verloren
 BACKOFF_MAX_S = 30.0
 SYNC_EVERY_S = 5.0
+MISSING_GRACE_S = 10.0           # so lange nach dem Verbinden darf ein Eintrag noch fehlen (Anfangszustand kommt bei einem ESP8266 langsam)
+SLOW_PRESS_S = 1.0               # dauert es von Druck bis fertiger Regelrunde laenger, steht das im Protokoll (sonst nur im Debug-Protokoll)
 MAX_QUEUE = 5                    # so viele Druecke warten hoechstens darauf, von den Regeln gesehen zu werden (Schutz vor einem prellenden Taster)
 DOMAINS = ("binary_sensor", "sensor")        # Eingaenge/Taster (Aktoren) und Messwerte (Sensoren)
 VALUE_GRACE_S = 120.0            # ein Messwert gilt auch nach einem kurzen Verbindungsabbruch noch so lange (der ESP8266 verliert die Verbindung gelegentlich)
@@ -152,6 +158,8 @@ _lock = threading.RLock()
 _hosts: dict[str, dict] = {}                         # ip -> {"online", "stop" (Event), "thread"}
 _state: dict[tuple, dict] = {}                       # (ip, entity) -> {"value": bool|None, "pressed_at": float, "seq": Zaehler der Druecke, "consumed": von den Regeln gesehen}
 _wanted: dict[str, set] = {}                         # ip -> Eingaenge, die im Geraeteregister stehen (nur deren Druecke zaehlen und wecken die Regeln)
+_seen: dict[str, dict] = {}                          # ip -> {Eintrag: Anzeigename}: alles, was das Geraet seit dem Verbinden gemeldet hat
+_conn_at: dict[str, float] = {}                      # ip -> Zeit der letzten erfolgreichen Verbindung
 _values: dict[tuple, tuple] = {}                     # (ip, entity) -> (Zeit, Messwert|None) der angelegten Sensoren
 _listeners: list = []
 _stop_all = threading.Event()
@@ -184,6 +192,8 @@ def _set_online(ip: str, online: bool, stop=None) -> None:
             for k, st in _state.items():
                 if k[0] == ip:
                     st["value"] = None
+            _seen[ip] = {}                                                  # was das Geraet jetzt meldet, wird neu gesammelt (nach einem Neuflashen ggf. andere Namen)
+            _conn_at[ip] = time.time()
 
 
 def _on_state(ip: str, j: dict) -> None:
@@ -191,6 +201,9 @@ def _on_state(ip: str, j: dict) -> None:
     dom = str(j.get("domain") or ent.split("/", 1)[0])                 # Aenderungsmeldungen tragen kein "domain", nur "id", "value", "state" - die Art steht im Praefix der Kennung
     if not ent or dom not in DOMAINS:
         return
+    with _lock:
+        seen = _seen.setdefault(ip, {})
+        seen[ent] = str(j.get("name") or seen.get(ent) or ent.split("/", 1)[-1])      # Aenderungsmeldungen tragen keinen Namen: der aus dem Anfangszustand bleibt
     if dom == "sensor":                                                # Messwert: nur merken, wenn ein Sensor ihn braucht
         with _lock:
             if ent in _wanted.get(ip, ()):
@@ -199,11 +212,12 @@ def _on_state(ip: str, j: dict) -> None:
     val = bool(j.get("value"))
     pressed = False
     with _lock:
-        st = _state.setdefault((ip, ent), {"value": None, "pressed_at": 0.0, "seq": 0, "consumed": 0, "saw_on": False, "mask": False, "pass_on": False})
+        st = _state.setdefault((ip, ent), {"value": None, "pressed_at": 0.0, "seq": 0, "consumed": 0, "saw_on": False, "mask": False, "pass_on": False, "stamps": [], "round_mono": 0.0})
         if val and st["value"] is False and ent in _wanted.get(ip, ()):
             st["pressed_at"] = time.time()
             if st["seq"] - st["consumed"] < MAX_QUEUE:
                 st["seq"] += 1
+                st["stamps"].append(time.monotonic())                      # fuer die Zeitmessung Druck -> Regelrunde
             pressed = True
         st["value"] = val
     if pressed:
@@ -272,6 +286,8 @@ def release(ip: str) -> None:
         for k in [k for k in _state if k[0] == ip]:
             _state.pop(k, None)
         _wanted.pop(ip, None)
+        _seen.pop(ip, None)
+        _conn_at.pop(ip, None)
         for k in [k for k in _values if k[0] == ip]:
             _values.pop(k, None)
     if h:
@@ -329,6 +345,7 @@ def start(wake_cb, enabled_cb=None, load_entries=None) -> None:
             try:
                 if enabled():
                     sync((load_entries or entries)())
+                    heal()
                 else:
                     sync([])
             except Exception:                                               # noqa: BLE001
@@ -344,6 +361,91 @@ def stop() -> None:
         for h in _hosts.values():
             h["stop"].set()
         _hosts.clear()
+
+
+def missing(ip: str, ent: str) -> bool:
+    """Das Geraet ist verbunden, hat seinen Anfangszustand laengst geschickt, aber diesen Eintrag nicht gemeldet (z. B. nach einem Firmware-Wechsel umbenannt)."""
+    with _lock:
+        h = _hosts.get(ip)
+        if not (h and h["online"]):
+            return False
+        if time.time() - _conn_at.get(ip, 0.0) < MISSING_GRACE_S:
+            return False
+        return ent not in _seen.get(ip, {})
+
+
+def _norm(s) -> str:
+    return "".join(ch for ch in str(s or "").casefold() if ch.isalnum())
+
+
+def match_stale(stale: list, cands: list, fallback: bool = False) -> list:
+    """Ordnet Eintraege, die das Geraet nicht mehr meldet (stale: [{id, entity, name}]), neuen Eintraegen des Geraets (cands: [{entity, name}]) zu.
+    Nur eindeutige Paare: gleicher Name (nach Grossschreibung/Sonderzeichen) = starker Treffer, ein Name steckt im anderen (mind. 4 Zeichen,
+    z. B. "Taster" -> "Taster01 Taster") = schwacher Treffer; gibt es mehrere Kandidaten, wird nichts zugeordnet. fallback=True: bleibt am Ende genau ein
+    Eintrag und genau ein Kandidat uebrig, gehoeren sie zusammen (nur, wenn der Nutzer den Kandidaten gerade selbst hinzufuegt)."""
+    def keys(x):
+        return {k for k in (_norm(str(x.get("entity") or "").split("/", 1)[-1]), _norm(x.get("name"))) if k}
+
+    def likes(a, b):
+        ka, kb = keys(a), keys(b)
+        if ka & kb:
+            return 2
+        for x in ka:
+            for y in kb:
+                if len(x) >= 4 and len(y) >= 4 and (x in y or y in x):
+                    return 1
+        return 0
+    pairs, used_s, used_c = [], set(), set()
+    for score in (2, 1):
+        for i, s in enumerate(stale):
+            if i in used_s:
+                continue
+            ms = [j for j, c in enumerate(cands) if j not in used_c and likes(s, c) == score]
+            if len(ms) != 1:
+                continue
+            j = ms[0]
+            if len([k for k, s2 in enumerate(stale) if k not in used_s and likes(s2, cands[j]) >= score]) != 1:
+                continue
+            pairs.append((s, cands[j])); used_s.add(i); used_c.add(j)
+    rest_s = [s for i, s in enumerate(stale) if i not in used_s]
+    rest_c = [c for j, c in enumerate(cands) if j not in used_c]
+    if fallback and len(rest_s) == 1 and len(rest_c) == 1:
+        pairs.append((rest_s[0], rest_c[0]))
+    return pairs
+
+
+def heal() -> int:
+    """Hintergrund (alle paar Sekunden): Eintraege, die ein verbundenes Geraet nicht mehr meldet, werden einem eindeutig passenden neuen Eintrag desselben
+    Geraets zugeordnet (starker/schwacher Namens-Treffer, nie geraten). Gibt die Zahl der neu zugeordneten Eintraege zurueck."""
+    import shelly
+    with _lock:
+        now = time.time()
+        todo = {}
+        for ip, h in _hosts.items():
+            if not h["online"] or now - _conn_at.get(ip, now) < MISSING_GRACE_S:
+                continue
+            seen = _seen.get(ip, {})
+            if any(e not in seen for e in _wanted.get(ip, ())):
+                todo[ip] = dict(seen)
+    n = 0
+    for ip, seen in todo.items():
+        ents = [{"entity": e, "name": nm, "domain": e.split("/", 1)[0]} for e, nm in seen.items()]
+        n += len(shelly.esphome_relink(ip, ents))
+    if n:
+        resync()
+    return n
+
+
+def _log_timing(k: tuple, st: dict, done: int) -> None:
+    """Eine Regelrunde hat `done` Druecke abgearbeitet: Zeit von Druck bis Rundenbeginn und bis Rundenende ins Protokoll (nur lange Zeiten als Info)."""
+    now = time.monotonic()
+    for _ in range(done):
+        if not st["stamps"]:
+            return
+        t0 = st["stamps"].pop(0)
+        total = now - t0
+        began = (st["round_mono"] - t0) if st["round_mono"] >= t0 else 0.0
+        (log.info if total >= SLOW_PRESS_S else log.debug)("ESPHome %s %s: Druck bis Regelrunde %.2f s, bis Runde fertig %.2f s", k[0], k[1], began, total)
 
 
 def read_value(sen: dict):
@@ -371,6 +473,8 @@ def seqs() -> dict:
             pending = st["seq"] > st["consumed"]
             st["mask"] = pending and st["saw_on"]
             st["pass_on"] = pending and not st["mask"]
+            if pending:
+                st["round_mono"] = time.monotonic()
             snap[k] = st["consumed"] if (st["mask"] or not pending) else st["consumed"] + 1          # pro Runde genau ein Druck: jeder Druck ein eigener Ablauf
         return snap
 
@@ -384,6 +488,7 @@ def consume(snapshot: dict) -> None:
             if st is None:
                 continue
             if n > st["consumed"]:
+                _log_timing(k, st, n - st["consumed"])
                 st["consumed"] = n
             st["saw_on"], st["mask"], st["pass_on"] = st["pass_on"], False, False
             if st["seq"] > st["consumed"]:
@@ -397,10 +502,11 @@ def clear() -> None:
     with _lock:
         for st in _state.values():
             st["consumed"], st["saw_on"], st["mask"], st["pass_on"] = st["seq"], False, False, False
+            st["stamps"].clear()
 
 
 def status(d: dict) -> dict:
-    """{'online', 'on', 'power', 'shown'}. 'on' = ein Druck wartet darauf, von den Regeln gesehen zu werden (Impuls; Geraet offline: None);
+    """{'online', 'on', 'power', 'shown'} (+ 'missing' = True, wenn das Geraet diesen Eingang nicht meldet). 'on' = ein Druck wartet darauf, von den Regeln gesehen zu werden (Impuls; Geraet offline: None);
     'shown' = der letzte Druck liegt hoechstens DISPLAY_S Sekunden zurueck (nur fuer die Anzeige)."""
     ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
     _want(ip, ent)                                          # auch ohne vorherigen Abgleich (z. B. gerade angelegt) zaehlt dieser Eingang
@@ -412,4 +518,7 @@ def status(d: dict) -> dict:
         pa, pending = st.get("pressed_at", 0.0), st.get("seq", 0) > st.get("consumed", 0) and not st.get("mask")
     if not online:
         return {"online": False, "on": None, "power": None, "shown": False}
-    return {"online": True, "on": pending, "power": None, "shown": (time.time() - pa) < DISPLAY_S}
+    out = {"online": True, "on": pending, "power": None, "shown": (time.time() - pa) < DISPLAY_S}
+    if missing(ip, ent):
+        out["missing"] = True                               # das Geraet meldet diesen Eingang nicht mehr (neue Firmware?) - der Eintrag bliebe sonst stumm
+    return out

@@ -1,4 +1,4 @@
-"""ESPHome-Hardware-Taster (1.29.0): Suchen, Anlegen unter Aktoren, Tastendruck als kurzer Zustand "an", Ausfall und Wiederverbindung, nie schaltbar.
+"""ESPHome-Hardware-Taster (1.29.0; 1.30.2: nach dem Neuflashen anderer Name am Geraet, Zeitmessung): Suchen, Anlegen unter Aktoren, Tastendruck als kurzer Zustand "an", Ausfall und Wiederverbindung, nie schaltbar.
 Das Geraet wird mit einem kleinen Web-Server nachgebildet, der wie die Weboberflaeche von ESPHome einen Strom `GET /events` liefert."""
 import sys, os, json, time, threading, queue
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -84,6 +84,7 @@ def wait(cond, sek=6.0, what=""):
 srv = start_server(); PORT = srv.server_address[1]
 esphome._url = lambda ip, path: f"http://127.0.0.1:{PORT}{path}"
 esphome.DISPLAY_S, esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKOFF_MAX_S = 1.2, 0.5, 0.3, 0.6
+esphome.MISSING_GRACE_S = 0.6
 
 # ---------------------------------------------------------------- Suchen (nur Binaersensoren, Titel, Kennung)
 info = esphome.probe("192.168.50.9")
@@ -278,6 +279,97 @@ assert "esphome-sensor-scan" in pg and "/api/esphome/sensors/scan" in pg and "Me
 
 # ein nicht angelegter Messwert wird nicht mitgefuehrt
 assert ("192.168.50.9", "sensor/WLAN Signal") not in esphome._values
+
+# ---------------------------------------------------------------- Zuordnung nach dem Neuflashen (rein): nur eindeutige Paare
+ms = esphome.match_stale
+S = lambda i, ent, name="": {"id": i, "entity": ent, "name": name}
+C = lambda ent, name="": {"entity": ent, "name": name or ent.split("/", 1)[-1]}
+assert [(a["id"], b["entity"]) for a, b in ms([S("t", "binary_sensor/Taster", "Klingel")], [C("binary_sensor/Taster01 Taster"), C("binary_sensor/Tuer")])] == [("t", "binary_sensor/Taster01 Taster")], "Name steckt im neuen Namen"
+assert [(a["id"], b["entity"]) for a, b in ms([S("t", "binary_sensor/Taster")], [C("binary_sensor/taster")])] == [("t", "binary_sensor/taster")], "Gross-/Kleinschreibung egal"
+assert ms([S("t", "sensor/Temperatur")], [C("sensor/Temperatur Flur"), C("sensor/Temperatur Kessel")]) == [], "zwei Kandidaten: nie raten"
+assert ms([S("a", "binary_sensor/Taster"), S("b", "binary_sensor/Taster")], [C("binary_sensor/Taster neu")]) == [], "zwei Eintraege wollen denselben: nie raten"
+assert ms([S("t", "binary_sensor/Taster")], [C("binary_sensor/Pin D2")]) == [], "nichts Aehnliches: ohne fallback keine Paarung"
+assert [(a["id"], b["entity"]) for a, b in ms([S("t", "binary_sensor/Taster")], [C("binary_sensor/Pin D2")], fallback=True)] == [("t", "binary_sensor/Pin D2")], "genau ein Eintrag, genau ein Kandidat: mit fallback gepaart"
+assert ms([S("t", "binary_sensor/Taster")], [C("binary_sensor/Pin D2"), C("binary_sensor/Pin D3")], fallback=True) == [], "auch mit fallback nie bei mehreren Kandidaten"
+assert ms([S("t", "binary_sensor/Abc")], [C("binary_sensor/Abcdef")]) == [], "kurze Namen (unter 4 Zeichen) zaehlen nicht als aehnlich"
+
+# ---------------------------------------------------------------- Zeitmessung Druck -> Regelrunde
+class Rec:
+    def __init__(self):
+        self.lines = []
+
+    def _add(self, *a, **k):
+        self.lines.append(a[0] % a[1:] if len(a) > 1 else a[0])
+    info = debug = warning = _add
+
+
+real_log, esphome.log = esphome.log, Rec()
+esphome.SLOW_PRESS_S = 0.0
+presses(1); time.sleep(0.25)
+snap = esphome.seqs(); assert esphome.status(e)["on"] is True; esphome.consume(snap)
+assert any("Druck bis Regelrunde" in l and "Runde fertig" in l for l in esphome.log.lines), esphome.log.lines
+assert esphome._state[("192.168.50.9", "binary_sensor/Taster")]["stamps"] == [], "alle Zeitstempel abgearbeitet"
+esphome.log, esphome.SLOW_PRESS_S = real_log, 1.0
+rules_pass()
+
+# ---------------------------------------------------------------- neu geflasht: der Eintrag heisst am Geraet anders (1.30.2)
+TK = lambda: {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]
+
+
+def reflash(old, new, table=None):
+    t = STATE if table is None else table
+    t[new] = t.pop(old)
+    for q in list(STREAMS):                                                                 # Verbindung zu: BlueNexus verbindet neu und sieht die neue Liste
+        q.put(None)
+
+
+reflash("Taster", "Taster01 Taster")
+wait(lambda: esphome.missing("192.168.50.9", "binary_sensor/Taster"), 8.0, "fehlender Eintrag erkannt")
+x = TK(); assert x["missing"] is True and x["online"] is True, x
+assert esphome.status(shelly.load_devices()[0]).get("missing") is True
+assert esphome.heal() == 1, "der Hintergrund ordnet den Eintrag dem neuen Namen zu"
+d1 = shelly.load_devices()
+assert len(d1) == 1 and d1[0]["id"] == "esphome-taster-taster" and d1[0]["entity"] == "binary_sensor/Taster01 Taster" and d1[0]["name"] == "Klingel", d1
+e = d1[0]
+wait(lambda: esphome.status(e)["online"] and "missing" not in esphome.status(e), 6.0, "wieder zugeordnet")
+assert "missing" not in TK()
+n0 = len(wakes); push("Taster01 Taster", True)
+wait(lambda: esphome.status(e)["on"] is True, 4.0, "Druck am umbenannten Eingang erkannt")
+push("Taster01 Taster", False); rules_pass(); rules_pass()
+assert len(wakes) == n0 + 1
+assert esphome.heal() == 0, "nichts mehr zuzuordnen"
+r = A.post("/api/esphome/scan", json={"ip": "192.168.50.9"}); assert r.status_code == 200
+fl = {f["name"]: f for f in r.get_json()}
+assert fl["Taster01 Taster"]["known"] is True and len(shelly.load_devices()) == 1, "die Suche zeigt den zugeordneten Eintrag als bekannt, kein Doppel"
+r = A.post("/api/esphome/add", json={"ip": "192.168.50.9", "ids": [fl["Taster01 Taster"]["id"]]}); assert r.status_code == 201 and len(shelly.load_devices()) == 1, "Hinzufuegen legt kein Doppel an"
+
+# Messwert umbenannt: Zusatz im Namen
+reflash("Temperatur", "Temperatur Flur", SENSORS)
+wait(lambda: esphome.missing("192.168.50.9", "sensor/Temperatur"), 8.0, "fehlender Messwert erkannt")
+assert esphome.heal() == 1
+sm = {x["id"]: x for x in homematic.load_sensors()}
+assert sm["espS-taster-temperatur"]["datapoint"] == "sensor/Temperatur Flur" and sm["espS-taster-temperatur"]["name"] == "Flur Temperatur", sm["espS-taster-temperatur"]
+# alles zurueck
+reflash("Temperatur Flur", "Temperatur", SENSORS); reflash("Taster01 Taster", "Taster")
+wait(lambda: esphome.missing("192.168.50.9", "binary_sensor/Taster01 Taster") and esphome.missing("192.168.50.9", "sensor/Temperatur Flur"), 8.0, "wieder fehlend")
+assert esphome.heal() == 2
+e = shelly.load_devices()[0]; assert e["entity"] == "binary_sensor/Taster"
+sens = {x["id"]: x for x in homematic.load_sensors()}; assert sens["espS-taster-temperatur"]["datapoint"] == "sensor/Temperatur"
+
+# nichts Aehnliches: nie geraten; erst das Hinzufuegen durch den Nutzer ordnet den einzigen Eintrag zu
+reflash("Taster", "Pin D2")
+wait(lambda: esphome.missing("192.168.50.9", "binary_sensor/Taster"), 8.0, "fehlt")
+assert esphome.heal() == 0 and shelly.load_devices()[0]["entity"] == "binary_sensor/Taster", "ohne Aehnlichkeit wird nichts geraten"
+r = A.post("/api/esphome/scan", json={"ip": "192.168.50.9"}); fl = {f["name"]: f for f in r.get_json()}
+assert fl["Pin D2"]["known"] is False and shelly.load_devices()[0]["entity"] == "binary_sensor/Taster", "die Suche allein ordnet nichts Unsicheres zu"
+r = A.post("/api/esphome/add", json={"ip": "192.168.50.9", "ids": [fl["Pin D2"]["id"]]}); assert r.status_code == 201, r.get_data(as_text=True)
+d2 = shelly.load_devices(); assert len(d2) == 1 and d2[0]["id"] == "esphome-taster-taster" and d2[0]["entity"] == "binary_sensor/Pin D2" and d2[0]["name"] == "Klingel", d2
+assert [a["id"] for a in r.get_json()["added"]] == ["esphome-taster-taster"], "der wieder verbundene Eintrag steht in der Antwort"
+dd = shelly.load_devices(); dd[0]["entity"] = "binary_sensor/Taster"; shelly._save(dd)                     # zurueck fuer die weiteren Pruefungen
+reflash("Pin D2", "Taster")
+esphome.resync()
+e = shelly.load_devices()[0]
+wait(lambda: esphome.status(e)["online"] and "missing" not in esphome.status(e), 6.0, "wie vorher")
 
 # ---------------------------------------------------------------- Ausfall und Wiederverbindung
 stop_server(srv)

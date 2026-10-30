@@ -4,6 +4,12 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.30.2 – 30.10.2026
+- Fehlerbehebung: **ESPHome-Gerät neu geflasht – Eintrag blieb stumm oder wurde doppelt.** Meldet ein Gerät nach einer neuen Firmware einen Eingang oder Messwert unter einem anderen Namen, meldete der angelegte Eintrag nichts mehr, zeigte aber weiter „bereit“. Jetzt erkennt BlueNexus, dass das Gerät den Eintrag nicht mehr meldet, zeigt **„Eingang fehlt am Gerät“** und ordnet den Eintrag einem eindeutig passenden neuen Namen **von selbst** zu (Kennung, Regeln, Verlauf und Freigaben bleiben erhalten). Passt nichts eindeutig, wird nichts geraten: **Taster suchen** und **Hinzufügen** ordnen dann den einzelnen offenen Eintrag dem neuen Eingang zu, statt ihn doppelt anzulegen. Gilt für Taster und Messwerte.
+- Verbesserung: **Zeitmessung am ESPHome-Taster.** Dauert es länger als 1 Sekunde vom Druck bis zum Ende der Regelrunde, steht das im Protokoll des Servers („Druck bis Regelrunde … s, bis Runde fertig … s“). Damit lässt sich eine Verzögerung zwischen Druck und Aktion eingrenzen.
+- Handbuch: Hinweise zu `api:` in der ESPHome-Konfiguration (Neustart alle 15 Minuten ohne Home Assistant) und zum Neuflashen eines Geräts.
+- Intern: `t_esphome` um Zuordnung, Zeitmessung und Neuflashen (Taster und Messwert) erweitert.
+
 ## 1.30.1 – 30.10.2026
 - Fehlerbehebung: **Falsche PIN im Bereich Smart Home** verhält sich jetzt wie am Dashboard. Bisher schloss sich das PIN-Fenster nach einer falschen Eingabe mit einer Meldung und einem großen roten Kreuz, und man musste den Knopf neu drücken. Jetzt bleibt das Fenster offen (roter Rahmen, „Falsche PIN – bitte erneut“, Wackeln) und die PIN kann gleich noch einmal eingegeben werden, bis sie stimmt, abgebrochen wird oder der Server nach zu vielen Fehlversuchen sperrt. Gilt für den Testschalter der Aktoren, Wake-on-LAN und die eigenen Schalter & Knöpfe.
 
