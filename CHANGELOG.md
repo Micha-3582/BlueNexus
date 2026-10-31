@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.32.2 – 31.10.2026
+- Fehlerbehebung: **Rauchmelder piepste nicht.** Die CCU liefert die Befehlsliste des Melders als Text; BlueNexus nahm die Zeichenposition statt der Listenstelle und schickte so einen falschen Wert (19 statt 2). Jetzt wird die Liste richtig gelesen, **Piepsen** und **Ruhe** senden die passenden Werte.
+
 ## 1.32.1 – 31.10.2026
 - Fehlerbehebung: Der Knopf **🔔 Piepsen** meldete „Melder piepst“, sobald die CCU den Befehl annahm, auch wenn der Melder nichts tat. Jetzt steht ein Fenster mit dem tatsächlich gesendeten Befehl (Name, Wert, Kanal und die Werteliste der CCU), damit sich ein abgelehnter oder wirkungsloser Befehl eingrenzen lässt. Das Protokoll enthält dieselben Angaben.
 

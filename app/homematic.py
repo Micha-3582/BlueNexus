@@ -1177,6 +1177,8 @@ def smoke_alarm_detail(sid: str, on: bool) -> dict:
         vl = (_param_desc(x["interface"], x["address"]).get("SMOKE_DETECTOR_COMMAND") or {}).get("VALUE_LIST") or []
     except HomematicError:
         vl = []
+    if isinstance(vl, str):                                                    # die CCU liefert die Werteliste als Text mit Leerzeichen ("A B C"), nicht als Liste
+        vl = vl.split()
     base = {"interface": x["interface"], "address": x["address"], "valueKey": "SMOKE_DETECTOR_COMMAND"}
     _pushed.pop((x["interface"], x["address"], "SMOKE_DETECTOR_ALARM_STATUS"), None)
     _value_cache.pop(sid, None)

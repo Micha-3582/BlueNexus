@@ -108,7 +108,7 @@ class Mock:
             return ROOMS, None
         if method == "Interface.getParamsetDescription":
             d = PARAMS.get(p["address"], {})
-            return [{"NAME": n, "TYPE": t, "OPERATIONS": o, **({"VALUE_LIST": ["RESERVED_ALARM_OFF", "INTRUSION_ALARM", "INTRUSION_ALARM_OFF", "SMOKE_TEST"]} if n == "SMOKE_DETECTOR_COMMAND" else {})} for n, (t, o) in d.items()], None
+            return [{"NAME": n, "TYPE": t, "OPERATIONS": o, **({"VALUE_LIST": "RESERVED_ALARM_OFF INTRUSION_ALARM_OFF INTRUSION_ALARM SMOKE_TEST COMMUNICATION_TEST COMMUNICATION_TEST_REPEATED"} if n == "SMOKE_DETECTOR_COMMAND" else {})} for n, (t, o) in d.items()], None
         if method == "Interface.getValue":
             return self.values.get((p["address"], p["valueKey"])), None
         if method == "Interface.setValue":
@@ -315,9 +315,9 @@ mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_ALARM_STATUS")] = 0
 homematic._value_cache.clear(); homematic._pushed.clear()
 mock.log.clear()
 assert homematic.smoke_alarm(SM, True) == "Rauchmelder Wohnzimmer – Rauchmelder"
-assert mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND")] == 1, mock.values.get(("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND"))       # INTRUSION_ALARM = Index in der VALUE_LIST
+assert mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND")] == 2, mock.values.get(("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND"))       # INTRUSION_ALARM = Index in der VALUE_LIST (echte Liste des HmIP-SWSD, als Text geliefert)
 homematic.smoke_alarm(SM, False)
-assert mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND")] == 2
+assert mock.values[("NEQ0000013:1", "SMOKE_DETECTOR_COMMAND")] == 1
 try:
     homematic.smoke_alarm("hmS-NEQ0000007-1-STATE", True); raise AssertionError("kein Rauchmelder muss abgelehnt werden")
 except homematic.HomematicError:
