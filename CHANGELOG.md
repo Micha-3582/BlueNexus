@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.32.1 – 31.10.2026
+- Fehlerbehebung: Der Knopf **🔔 Piepsen** meldete „Melder piepst“, sobald die CCU den Befehl annahm, auch wenn der Melder nichts tat. Jetzt steht ein Fenster mit dem tatsächlich gesendeten Befehl (Name, Wert, Kanal und die Werteliste der CCU), damit sich ein abgelehnter oder wirkungsloser Befehl eingrenzen lässt. Das Protokoll enthält dieselben Angaben.
+
 ## 1.32.0 – 30.10.2026
 - Neu: **Homematic-Rauchmelder von Hand auslösen.** In *Einstellungen → Sensoren* hat ein Rauchmelder die Knöpfe **🔔 Piepsen** (löst „Einbruch Alarm“ aus, der Melder piepst laut; vorher kommt eine Rückfrage) und **Ruhe** (beendet den Alarm). Braucht das Recht „Sicherheit: Schreiben“. Der Befehlswert wird bei der CCU nachgelesen, falls das nicht klappt, wird der Name gesendet.
 - Intern: `t_homematic` prüft Auslösen und Beenden.

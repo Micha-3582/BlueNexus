@@ -1161,6 +1161,10 @@ SMOKE_COMMANDS = {"on": "INTRUSION_ALARM", "off": "INTRUSION_ALARM_OFF"}      # 
 
 
 def smoke_alarm(sid: str, on: bool) -> str:
+    return smoke_alarm_detail(sid, on)["name"]
+
+
+def smoke_alarm_detail(sid: str, on: bool) -> dict:
     """Rauchmelder (HmIP-SWSD) ausloesen ("Einbruch Alarm" ein: der Melder piepst) bzw. den Alarm beenden. Rueckgabe: Name des Sensors.
     Der Datenpunkt SMOKE_DETECTOR_COMMAND ist eine Aufzaehlung; die Reihenfolge der Werte liest BlueNexus bei der CCU nach (VALUE_LIST)."""
     x = next((y for y in load_sensors() if y["id"] == sid), None)
@@ -1181,10 +1185,10 @@ def smoke_alarm(sid: str, on: bool) -> str:
     for t in tries:
         try:
             _call("Interface.setValue", {**base, **t})
-            return x["name"]
+            return {"name": x["name"], "sent": t["value"], "type": t["type"], "command": name, "value_list": vl, "address": x["address"]}
         except HomematicError as e:
             err = e
-    raise HomematicError(f"Rauchmelder nicht erreichbar oder Befehl abgelehnt: {err}")
+    raise HomematicError(f"Rauchmelder nicht erreichbar oder Befehl abgelehnt: {err} (Kanal {x['address']}, Werteliste {vl or 'nicht lesbar'})")
 
 
 # ================================================================ Soundmodule (Funk-Gong / Signalaktor akustisch, z. B. HM-OU-CM-PCB, HM-OU-CFM-TW)

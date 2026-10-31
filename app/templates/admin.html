@@ -2777,7 +2777,7 @@ async function loadSensorsAdmin(light) {
 }
 async function smokeAlarm(id, on, name) {
   if (on && !await uiDialog({ title: 'Melder piepsen lassen?', message: `„${name}“ löst einen Einbruch-Alarm aus und piepst laut, bis du „Ruhe“ drückst.`, okText: 'Piepsen lassen' })) return;
-  try { await shellyApi('/api/sensors/' + encodeURIComponent(id) + '/alarm', 'POST', { action: on ? 'on' : 'off' }); savedToast(on ? 'Melder piepst ✓' : 'Alarm beendet ✓'); } catch (e) { shellyMsg(e.message, true); }
+  try { const r = await shellyApi('/api/sensors/' + encodeURIComponent(id) + '/alarm', 'POST', { action: on ? 'on' : 'off' }); await uiDialog({ title: on ? 'Befehl „Piepsen“ gesendet' : 'Befehl „Ruhe“ gesendet', message: (r && r.info) || 'An die CCU gesendet.', info: true }); } catch (e) { await uiDialog({ title: 'Melder nicht ausgelöst', message: e.message, info: true }); }
   setTimeout(() => loadSensorsAdmin(), 1500);
 }
 async function sensorRenameSave(id) {

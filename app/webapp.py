@@ -6297,11 +6297,14 @@ def api_sensor_alarm(sensor_id):
     if action not in homematic.SMOKE_COMMANDS:
         return jsonify(error="Unbekannte Melder-Aktion"), 400
     try:
-        name = homematic.smoke_alarm(sensor_id, action == "on")
+        d = homematic.smoke_alarm_detail(sensor_id, action == "on")
     except homematic.HomematicError as e:
+        opslog.log("rules", f"Rauchmelder {sensor_id}: Befehl fehlgeschlagen: {e}")
         return jsonify(error=str(e)), 400
-    opslog.log("rules", f"Rauchmelder {name}: von Hand {'ausgelöst (piepst)' if action == 'on' else 'beruhigt'} (Konto {g.user_display})")
-    return jsonify(ok=True, name=name)
+    name = d["name"]
+    info = f"Befehl {d['command']} als {d['type']} {d['sent']!r} an Kanal {d['address']} gesendet, Werteliste {d['value_list'] or 'nicht lesbar'}"
+    opslog.log("rules", f"Rauchmelder {name}: von Hand {'ausgelöst' if action == 'on' else 'beruhigt'} (Konto {g.user_display}); {info}")
+    return jsonify(ok=True, name=name, info=info)
 
 
 @app.route("/api/sensors/<sensor_id>", methods=["PATCH", "DELETE"])
