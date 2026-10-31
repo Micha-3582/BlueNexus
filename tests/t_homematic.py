@@ -322,6 +322,16 @@ try:
     homematic.smoke_alarm("hmS-NEQ0000007-1-STATE", True); raise AssertionError("kein Rauchmelder muss abgelehnt werden")
 except homematic.HomematicError:
     pass
+import rules
+_nr = lambda step: rules.normalize_rule({"name": "RM", "mode": "flow", "when": {"mode": "all", "conds": [{"type": "time", "from": "00:00", "to": "24:00"}]}, "then": [step], "else": []}, "rm1")["then"][0]
+assert _nr({"type": "smoke", "id": SM, "state": "ON"}) == {"type": "smoke", "id": SM, "state": "on"}
+assert _nr({"type": "smoke", "id": SM}) == {"type": "smoke", "id": SM, "state": "on"}
+for _bad in ({"type": "smoke", "id": ""}, {"type": "smoke", "id": SM, "state": "piepsen"}):
+    try:
+        _nr(_bad); raise AssertionError("ungueltiger Rauchmelder-Schritt muss abgelehnt werden")
+    except rules.RuleError:
+        pass
+print("S2d) Regelschritt Rauchmelder (Alarm/Stop) normalisiert OK")
 print("S2c) Rauchmelder ausloesen/beenden (Befehlswert aus VALUE_LIST) OK")
 print("S2b) Rauchmelder: Ruhe=falsch, Alarmstufen (Zahl und Text)=wahr OK")
 print("S2) Sensorwerte: gerundet, Fenster zu=False, Drehgriff offen=True, nicht erreichbar=None OK")

@@ -2756,7 +2756,7 @@ async function loadSensorsAdmin(light) {
       <button class="ghost icon-pick" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="sensorPickIcon('${sid}')">${escH(s.icon || SENSOR_ICON[s.kind] || '📡')}</button>
       <div style="flex:1;min-width:150px"><b>${escH(s.name)}</b>${shareMark('sensor', sid, s.source === 'remote')}<div class="muted">${escH(s.model)}${s.source === 'zigbee' ? ' · Zigbee' : s.source === 'camera' ? ' · Kamera' : ''}${s.room ? ' · ' + escH(s.room) : ''} · <b>${escH(sensorValueText(s))}</b></div></div>
       ${eyeBtn('sensor', sid)}${favBtn('sensor', sid)}
-      ${s.kind === 'smoke' && s.datapoint === 'SMOKE_DETECTOR_ALARM_STATUS' && !s.source ? `<button class="ghost" title="Melder piepsen lassen („Einbruch Alarm“ ein)" onclick="smokeAlarm('${sid}', true, this.dataset.name)" data-name="${escH(s.name)}">🔔 Piepsen</button><button class="ghost" title="Alarm beenden („Einbruch Alarm“ aus)" onclick="smokeAlarm('${sid}', false, this.dataset.name)" data-name="${escH(s.name)}">Ruhe</button>` : ''}
+      ${s.kind === 'smoke' && s.datapoint === 'SMOKE_DETECTOR_ALARM_STATUS' && !s.source ? `<button class="ghost" title="Melder piepsen lassen („Einbruch Alarm“ ein)" onclick="smokeAlarm('${sid}', true, this.dataset.name)" data-name="${escH(s.name)}">🚨 Alarm</button><button class="ghost" title="Alarm beenden („Einbruch Alarm“ aus)" onclick="smokeAlarm('${sid}', false, this.dataset.name)" data-name="${escH(s.name)}">🛑 Stop</button>` : ''}
       <button class="ghost admin-only" onclick="editToggle('sedit-${sid}')" title="Bearbeiten: Name, Dashboard, Umkehren, Entfernen">✎</button></div>
       <div class="edit-panel" id="sedit-${sid}">
         <div class="edit-row"><input id="sname-${sid}" value="${escH(s.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')sensorRenameSave('${sid}')">
@@ -2776,8 +2776,8 @@ async function loadSensorsAdmin(light) {
   if (list.length) { if (seCard) seCard.classList.remove('fam-off'); if (seHint) seHint.classList.add('fam-off'); }        // auch nur geteilte Sensoren zeigen die Liste (ohne eigene CCU/Zigbee)
 }
 async function smokeAlarm(id, on, name) {
-  if (on && !await uiDialog({ title: 'Melder piepsen lassen?', message: `„${name}“ löst einen Einbruch-Alarm aus und piepst laut, bis du „Ruhe“ drückst.`, okText: 'Piepsen lassen' })) return;
-  try { const r = await shellyApi('/api/sensors/' + encodeURIComponent(id) + '/alarm', 'POST', { action: on ? 'on' : 'off' }); await uiDialog({ title: on ? 'Befehl „Piepsen“ gesendet' : 'Befehl „Ruhe“ gesendet', message: (r && r.info) || 'An die CCU gesendet.', info: true }); } catch (e) { await uiDialog({ title: 'Melder nicht ausgelöst', message: e.message, info: true }); }
+  if (on && !await uiDialog({ title: 'Alarm am Melder auslösen?', message: `„${name}“ löst einen Einbruch-Alarm aus und piepst laut, bis du „Stop“ drückst.`, okText: 'Alarm auslösen' })) return;
+  try { const r = await shellyApi('/api/sensors/' + encodeURIComponent(id) + '/alarm', 'POST', { action: on ? 'on' : 'off' }); await uiDialog({ title: on ? 'Befehl „Alarm“ gesendet' : 'Befehl „Stop“ gesendet', message: (r && r.info) || 'An die CCU gesendet.', info: true }); } catch (e) { await uiDialog({ title: 'Melder nicht ausgelöst', message: e.message, info: true }); }
   setTimeout(() => loadSensorsAdmin(), 1500);
 }
 async function sensorRenameSave(id) {

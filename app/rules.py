@@ -262,7 +262,7 @@ def normalize_condition(c: dict) -> dict:
 AC_MODES = ("auto", "cool", "dry", "heat", "fan_only", "smart_dry")
 AC_FANS = ("auto", "silent", "low", "medium", "high", "max")
 VIDEO_FILTERS = ("animal", "person", "vehicle", "motion")                      # Ereignisarten fuer "Video zum Ereignis" (leer = jede Aufnahme)
-STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime", "rule")
+STEP_TYPES = ("switch", "toggle", "wait", "setpoint", "notify", "photo", "video", "pushover", "sound", "virtual", "lock", "wol", "blind", "wled", "ac", "http", "chime", "rule", "smoke")
 MAX_WAIT_S = 7 * 86400
 SETPOINT_MIN, SETPOINT_MAX = 5.0, 30.0              # Solltemperatur der Thermostate (°C), gilt fuer Regeln und beim Setzen
 
@@ -290,6 +290,12 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
         tr = int(_num(a.get("track", 1), 1, 255, "Titelnummer"))
         return {"type": t, "id": sid, "track": tr, "volume": int(_num(a.get("volume", 100), 0, 100, "Lautstärke (%)")),
                 "repeats": int(_num(a.get("repeats", 1), 1, 20, "Wiederholungen"))}
+    if t == "smoke":                                 # Homematic-Rauchmelder: Alarm ausloesen (piepst) bzw. beenden (homematic.smoke_alarm)
+        sid = str(a.get("id") or "").strip()
+        st = str(a.get("state", "on")).strip().lower()
+        if not sid or st not in ("on", "off"):
+            raise RuleError("Rauchmelder: Melder und Aktion wählen")
+        return {"type": t, "id": sid, "state": st}
     if t == "ac":                                    # Midea-Klimaanlage: Ein/Aus, Modus, Solltemperatur, Luefter - nur die gesetzten Felder (midea.py)
         aid = str(a.get("id") or "").strip()
         if not aid:
@@ -539,6 +545,8 @@ def used_by(kind: str, rid: str) -> list[str]:
                     hit = True
                 elif kind == "virtual" and t == "virtual" and a.get("id") == rid:
                     hit = True
+                elif kind == "sensor" and t == "smoke" and a.get("id") == rid:
+                    hit = True
                 elif kind == "camera" and t in _CAMERA_STEPS and a.get("id") == rid:
                     hit = True
                 elif kind in _ACTION_OF and kind != "camera" and t == _ACTION_OF[kind] and a.get("id") == rid:
@@ -780,7 +788,7 @@ def remove_device(dev_id: str):
     d = load()
     keep, changed = [], False
     for r in d["rules"]:
-        if "when" in r and (dev_id in devices_of(r) or any(dev_id in (a.get("device_ids") or []) or (a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac") and a.get("id") == dev_id)
+        if "when" in r and (dev_id in devices_of(r) or any(dev_id in (a.get("device_ids") or []) or (a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac", "smoke") and a.get("id") == dev_id)
                                                             or (a.get("type") == "pushover" and a.get("camera") == dev_id) for a in r["then"] + r["else"])):
             def strip(lst):
                 out = []
@@ -789,7 +797,7 @@ def remove_device(dev_id: str):
                         ids = [i for i in a["device_ids"] if i != dev_id]
                         if ids:
                             out.append({**a, "device_ids": ids})
-                    elif a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac") and a.get("id") == dev_id:
+                    elif a.get("type") in ("lock", "wol", "photo", "video", "chime", "sound", "blind", "wled", "ac", "smoke") and a.get("id") == dev_id:
                         continue
                     elif a.get("type") == "pushover" and a.get("camera") == dev_id:
                         out.append({k: v for k, v in a.items() if k != "camera"})              # Kamera entfernt: die Nachricht geht ohne Bild raus

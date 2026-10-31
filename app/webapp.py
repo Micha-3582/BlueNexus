@@ -2255,6 +2255,19 @@ class Controller:
                                         (lambda cam=cam: camera.snapshot(cam, max_age=0.0)) if cam else None)
                 jobs.append(("notify", "Pushover", f"Pushover-Nachricht{who}{with_img} {'wird gesendet' if sent else 'NICHT gesendet (Pushover nicht eingerichtet)'}: {st['text']}",
                              None if sent else "Pushover nicht eingerichtet"))
+        elif t == "smoke":
+            sen = next((x for x in homematic.load_sensors() if x["id"] == st["id"]), None)
+            what = "ausgelöst (piepst)" if st["state"] == "on" else "beruhigt"
+            if sen is None:
+                jobs.append(("fail", st["id"], "Rauchmelder existiert nicht mehr", "weg"))
+            elif dry:
+                jobs.append(("smoke", sen["name"], f"Rauchmelder {sen['name']} würde {what}", None))
+            else:
+                try:
+                    homematic.smoke_alarm(st["id"], st["state"] == "on")
+                    jobs.append(("smoke", sen["name"], f"Rauchmelder {sen['name']} {what}", None))
+                except homematic.HomematicError as e:
+                    jobs.append(("fail", sen["name"], f"Rauchmelder {sen['name']}: {e}", str(e)))
         elif t == "sound":
             sname = next((x["name"] for x in homematic.load_sounds() if x["id"] == st["id"]), None)
             what = f"Titel {st['track']}, {st['volume']} %" + (f", {st['repeats']}×" if st["repeats"] > 1 else "")
@@ -3799,6 +3812,7 @@ def api_automation_save():
             locks = {k["id"]: k for k in homematic.load_locks()}
             cam_ids = {c["id"] for c in camera.load()}
             sound_ids = {s_["id"] for s_ in homematic.load_sounds()}
+            smoke_ids = {s_["id"] for s_ in homematic.load_sensors() if s_.get("kind") == "smoke" and not s_.get("source")}
             blind_ids = {b_["id"] for b_ in homematic.load_blinds()}
             wled_ids = {w_["id"] for w_ in shelly.load_devices() if w_.get("kind") == "wled"}
             ac_ids = {w_["id"] for w_ in shelly.load_devices() if w_.get("kind") == "midea" or w_.get("rkind") == "midea"}
@@ -3812,6 +3826,9 @@ def api_automation_save():
                 for a in x.get("then", []) + x.get("else", []):
                     if a.get("type") == "blind" and a["id"] not in blind_ids:
                         raise rules.RuleError(f"Regel „{x['name']}“: Der Rollladen existiert nicht (mehr)")
+                for a in x.get("then", []) + x.get("else", []):
+                    if a.get("type") == "smoke" and a["id"] not in smoke_ids:
+                        raise rules.RuleError(f"Regel „{x['name']}“: Der Rauchmelder existiert nicht (mehr)")
                 for a in x.get("then", []) + x.get("else", []):
                     if a.get("type") == "sound" and a["id"] not in sound_ids:
                         raise rules.RuleError(f"Regel „{x['name']}“: Das Soundmodul existiert nicht (mehr)")

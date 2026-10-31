@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.33.0 – 31.10.2026
+- Neu: **Regelschritt „Rauchmelder: Alarm auslösen / beenden (Homematic)“.** Eine Regel kann den Alarm an einem Homematic-Rauchmelder auslösen (der Melder piepst laut) oder wieder beenden. Der Schritt erscheint, sobald ein Rauchmelder angelegt ist. Ein Rauchmelder, den eine eingeschaltete Regel benutzt, lässt sich nicht löschen; wird er trotzdem entfernt, verschwindet der Schritt aus den Regeln.
+- Geändert: Die Knöpfe am Rauchmelder heißen jetzt **🚨 Alarm** und **🛑 Stop** (vorher Piepsen und Ruhe).
+- Intern: `t_homematic` prüft den neuen Regelschritt.
+
 ## 1.32.2 – 31.10.2026
 - Fehlerbehebung: **Rauchmelder piepste nicht.** Die CCU liefert die Befehlsliste des Melders als Text; BlueNexus nahm die Zeichenposition statt der Listenstelle und schickte so einen falschen Wert (19 statt 2). Jetzt wird die Liste richtig gelesen, **Piepsen** und **Ruhe** senden die passenden Werte.
 
