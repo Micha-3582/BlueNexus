@@ -1190,7 +1190,8 @@ def smoke_alarm_detail(sid: str, on: bool) -> dict:
             return {"name": x["name"], "sent": t["value"], "type": t["type"], "command": name, "value_list": vl, "address": x["address"]}
         except HomematicError as e:
             err = e
-    raise HomematicError(f"Rauchmelder nicht erreichbar oder Befehl abgelehnt: {err} (Kanal {x['address']}, Werteliste {vl or 'nicht lesbar'})")
+    log.warning("Rauchmelder %s: Befehl abgelehnt: %s (Kanal %s, Werteliste %s)", x["name"], err, x["address"], vl or "nicht lesbar")
+    raise HomematicError("Der Melder ist nicht erreichbar oder hat den Befehl nicht angenommen.")
 
 
 # ================================================================ Soundmodule (Funk-Gong / Signalaktor akustisch, z. B. HM-OU-CM-PCB, HM-OU-CFM-TW)

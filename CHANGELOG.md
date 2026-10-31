@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.33.1 – 31.10.2026
+- Geändert: **Rauchmelder-Knöpfe melden sich verständlich.** Nach **🚨 Alarm** erscheint kurz „Alarm am Melder ausgelöst“, nach **🛑 Stop** „Alarm beendet“. Das Fenster mit den technischen Angaben entfällt; sie stehen weiter im Protokoll des Servers. Bei einem Fehler steht nur noch, dass der Melder nicht erreichbar ist oder den Befehl nicht angenommen hat.
+
 ## 1.33.0 – 31.10.2026
 - Neu: **Regelschritt „Rauchmelder: Alarm auslösen / beenden (Homematic)“.** Eine Regel kann den Alarm an einem Homematic-Rauchmelder auslösen (der Melder piepst laut) oder wieder beenden. Der Schritt erscheint, sobald ein Rauchmelder angelegt ist. Ein Rauchmelder, den eine eingeschaltete Regel benutzt, lässt sich nicht löschen; wird er trotzdem entfernt, verschwindet der Schritt aus den Regeln.
 - Geändert: Die Knöpfe am Rauchmelder heißen jetzt **🚨 Alarm** und **🛑 Stop** (vorher Piepsen und Ruhe).
