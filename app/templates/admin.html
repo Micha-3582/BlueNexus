@@ -894,7 +894,7 @@
 
 <div class="card fam-card msg-host" id="fam-acs" data-tab="aktoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v20M4.9 7l14.2 10M19.1 7 4.9 17"/><path d="m9 3.5 3 2 3-2M9 20.5l3-2 3 2"/></svg>Klimaanlagen <span class="qhelp" role="button" tabindex="0" data-help="<b>❄ Klima</b> öffnet Modus, Solltemperatur, Lüfter und Schwenken; der Schalter schaltet ein und aus. In Regeln gibt es den Schritt <b>Klimaanlage einstellen</b>. Neue Anlagen findest du unter <b>Geräte suchen</b>.">?</span></h2>
-  <div class="sub">Midea-Klimaanlagen bedienen.</div>
+  <div class="sub" id="ac-sub">Klimaanlagen bedienen.</div>
   <div id="ac-devs" style="display:flex;flex-direction:column;gap:10px"></div>
 </div>
 
@@ -2150,6 +2150,8 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
   const acBox = document.getElementById('ac-devs');
   if (acBox) {
     acBox.innerHTML = acs.length ? acs.map(rowOf).join('') : '<div class="muted">Noch keine Klimaanlage angelegt.</div>';
+    const acSub = document.getElementById('ac-sub');                                  // Zeile unter der Überschrift nennt nur die Modelle, die wirklich eingebunden sind
+    if (acSub) { const kinds = []; if (acs.some(d => d.kind === 'midea' || d.rkind === 'midea' && d.kind !== 'esphome_ac')) kinds.push('Midea'); if (acs.some(d => d.kind === 'esphome_ac')) kinds.push('ESPHome'); acSub.textContent = kinds.length ? kinds.join(' und ') + '-Klimaanlagen bedienen.' : 'Klimaanlagen bedienen.'; }
     window.AC_COUNT = acs.length; const acCard = document.getElementById('fam-acs');
     if (acCard) acCard.classList.toggle('fam-off', !(acs.length || window.FAM_MIDEA));
   }
