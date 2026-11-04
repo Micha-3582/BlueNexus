@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.6 – 04.11.2026
+- Geändert: Der Ein/Aus-Knopf in der Aktorenliste hieß beim Daraufzeigen „Testschalten“, obwohl dort alles normal bedient wird. Jetzt steht dort **„Einschalten“** oder **„Ausschalten“**, je nach Zustand, bei reiner Überwachung „Nur Überwachung – nicht schaltbar“.
+
 ## 1.34.5 – 04.11.2026
 - Geändert: **Bezeichnungen passen sich den eingebundenen Systemen an.** Der Regelschritt heißt „Klimaanlage einstellen (Midea)“, „(ESPHome)“ oder „(Midea, ESPHome)“, je nachdem, was vorhanden ist; die Zeile bei den **Thermostaten** nennt nur Homematic und/oder Zigbee, wenn sie genutzt werden. Der Hinweis bei leeren **Sensoren** nennt auch Tasmota und ESPHome, die Hilfe zum Smart-Home-Modul auch ESPHome.
 

@@ -1998,7 +1998,7 @@ async function refreshShellyStatus() {
       if (row.dataset.dev !== d.id) return;
       row.querySelector('.dev-stat').textContent = shellyStatText(d);
       const b = row.querySelector('.dev-power');
-      if (b) { b.dataset.on = d.on ? '1' : '0'; b.disabled = !d.online || d.switchable === false; b.style.cssText = d.on ? POWER_ON_STYLE : ''; }
+      if (b) { b.dataset.on = d.on ? '1' : '0'; b.disabled = !d.online || d.switchable === false; b.style.cssText = d.on ? POWER_ON_STYLE : ''; b.title = d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten'); }
     });
   }
 }
@@ -2120,7 +2120,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
         ${eyeBtn('shelly', id)}${favBtn('shelly', id)}
-        ${d.kind === 'esphome' ? '' : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : 'Testschalten'}">${PWR_ICON}</button>`}
+        ${d.kind === 'esphome' ? '' : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten')}">${PWR_ICON}</button>`}
         </div>
       </div>
       ${isAc(d) && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
