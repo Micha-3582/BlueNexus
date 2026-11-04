@@ -512,8 +512,8 @@ def _midea_dev(dev_id: str) -> dict:
     d = _find(dev_id)
     if not d:
         raise ShellyError("Gerät nicht gefunden")
-    if d.get("kind") != "midea" and not (d.get("kind") == "remote" and d.get("rkind") == "midea"):
-        raise ShellyError("Das gibt es nur bei Klimaanlagen (Midea)")
+    if d.get("kind") not in ("midea", "esphome_ac") and not (d.get("kind") == "remote" and d.get("rkind") == "midea"):
+        raise ShellyError("Das gibt es nur bei Klimaanlagen")
     return d
 
 
@@ -523,8 +523,10 @@ def midea_details(dev_id: str) -> dict:
         if d.get("kind") == "remote":                      # Klimaanlage einer fremden Instanz: der Geber fuehrt es mit seinem Zugang aus
             import share
             return share.ac_details(d)
+        if d.get("kind") == "esphome_ac":
+            return esphome.climate_details(d)
         return midea.details(d)
-    except (midea.MideaError, ValueError) as e:
+    except (midea.MideaError, esphome.EsphomeError, ValueError) as e:
         raise ShellyError(str(e))
     except Exception as e:                                 # noqa: BLE001
         if e.__class__.__name__ == "ShareError":
@@ -541,8 +543,11 @@ def midea_set(dev_id: str, **kw) -> dict:
         if d.get("kind") == "remote":
             import share
             return share.ac_set(d, **kw)
+        if d.get("kind") == "esphome_ac":
+            return esphome.climate_set(d, power=kw.get("power"), mode=kw.get("mode") or None, target=kw.get("target"), fan=kw.get("fan") or None,
+                                       swing=kw.get("swing") or None, eco=kw.get("eco"))
         return midea.set_params(d, **kw)
-    except midea.MideaError as e:
+    except (midea.MideaError, esphome.EsphomeError) as e:
         raise ShellyError(str(e))
     except Exception as e:                                 # noqa: BLE001
         if e.__class__.__name__ == "ShareError":
@@ -621,15 +626,16 @@ def esphome_scan(ip: str) -> list[dict]:
         esphome.resync()
     items = load_devices()
     have = {d["id"] for d in items}
-    reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
+    reg = {d.get("entity") for d in items if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") == ip}
     again = {ent for _, ent in relinked}
     out = []
     for e in info["entities"]:
-        if e["domain"] != "binary_sensor":
+        if e["domain"] not in ("binary_sensor", "climate"):
             continue
         dev_id = esphome.entity_id(info["title"], e["entity"])
+        ac = e["domain"] == "climate"
         out.append({"id": dev_id, "name": e["name"], "model": f"ESPHome · {info['title']}", "ip": ip, "entity": e["entity"],
-                    "icon": "🔘", "known": dev_id in have or e["entity"] in reg, "relinked": e["entity"] in again})
+                    "icon": "❄️" if ac else "🔘", "domain": e["domain"], "known": dev_id in have or e["entity"] in reg, "relinked": e["entity"] in again})
     if _esphome_follow_ip(ip, {x["id"] for x in out if x["known"]}, set()):
         esphome.resync()
     return out
@@ -772,24 +778,29 @@ def add_esphome(ip: str, ids: list[str]) -> list[dict]:
             raise ShellyError("Dieser Eingang ist am Gerät nicht mehr zu finden – bitte noch einmal suchen")
     items = load_devices()
     have = {d["id"] for d in items}
-    reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
+    reg = {d.get("entity") for d in items if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") == ip}
     added = []
-    want = [i for i in ids if i not in have and found[i]["entity"] not in reg]
+    want = [i for i in ids if i not in have and found[i]["entity"] not in reg and found[i].get("domain") != "climate"]
     if want:                                               # ein Eintrag, den das Geraet nicht mehr meldet, wird wieder verbunden statt doppelt angelegt
         rel = esphome_relink(ip, [{"entity": f["entity"], "name": f["name"], "domain": "binary_sensor"} for f in found.values()], "", True, {found[i]["entity"] for i in want})
         if rel:
             items = load_devices()
             have = {d["id"] for d in items}
-            reg = {d.get("entity") for d in items if d.get("kind") == "esphome" and d.get("ip") == ip}
+            reg = {d.get("entity") for d in items if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") == ip}
             ids_re = {i for i, _ in rel}
             added.extend(d for d in items if d["id"] in ids_re)
     for dev_id in ids:
         f = found[dev_id]
         if dev_id in have or f["entity"] in reg:
             continue
-        entry = {"id": dev_id, "kind": "esphome", "ip": f["ip"], "entity": f["entity"], "gen": 0, "channel": 0, "model": f["model"], "name": f["name"],
-                 "icon": "🔘", "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "user": "", "password": "",
-                 "switchable": False}
+        if f.get("domain") == "climate":              # Klimaanlage: schaltbarer Aktor, im Klimafenster/Regeln wie eine Midea-Anlage (rkind), aber lokal ueber ESPHome
+            entry = {"id": dev_id, "kind": "esphome_ac", "rkind": "midea", "ip": f["ip"], "entity": f["entity"], "gen": 0, "channel": 0, "model": f["model"], "name": f["name"],
+                     "icon": "❄️", "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "user": "", "password": "",
+                     "switchable": True}
+        else:
+            entry = {"id": dev_id, "kind": "esphome", "ip": f["ip"], "entity": f["entity"], "gen": 0, "channel": 0, "model": f["model"], "name": f["name"],
+                     "icon": "🔘", "show": False, "auto": False, "power_w": 0, "min_on_min": 5, "min_off_min": 5, "user": "", "password": "",
+                     "switchable": False}
         entry["users"] = []                         # neu angelegt: zunaechst nur fuer Administratoren sichtbar (siehe visibility.py)
         items.append(entry)
         added.append(entry)
@@ -862,7 +873,7 @@ def update(dev_id: str, name: str | None = None, icon: str | None = None,
                 if d.get("kind") == "remote" or d.get("cloud") or not d.get("ip"):
                     raise ShellyError("Dieses Gerät hat keine eigene IP-Adresse (Cloud, Gateway oder geteilt) – hier gibt es nichts zu ändern")
                 same = [x for x in items if x is d or (d.get("mac") and x.get("mac") == d.get("mac") and x.get("kind") == d.get("kind"))
-                        or (d.get("kind") == "esphome" and x.get("kind") == "esphome" and x.get("ip") == d.get("ip"))]       # mehrere Kanaele eines Geraets teilen die Adresse
+                        or (d.get("kind") in ("esphome", "esphome_ac") and x.get("kind") in ("esphome", "esphome_ac") and x.get("ip") == d.get("ip"))]       # mehrere Kanaele eines Geraets teilen die Adresse
                 for x in same:
                     x["ip"] = new_ip
                 if d.get("kind") == "tasmota" and d.get("mac"):               # Messwert-Sensoren desselben Geraets folgen der neuen Adresse
@@ -977,6 +988,11 @@ def status(d: dict) -> dict:
     """{'online': bool, 'on': bool|None, 'power': W|None}. Ein Geraet, das gerade nicht geantwortet hat, wird fuer DOWN_BACKOFF_S Sekunden nicht erneut
     abgefragt (sonst wartet JEDER Abruf - Dashboard, Geraeteliste, Regeln - jedes Mal die ganze Zeitueberschreitung ab)."""
     key = d.get("id")
+    if d.get("kind") == "esphome_ac":                      # Klimaanlage: Zustand kommt aus der gehaltenen Verbindung (esphome.py)
+        st = esphome.climate_status(d)
+        if key is not None:
+            _st_cache[key] = (time.time(), dict(st))
+        return st
     if d.get("kind") == "esphome":                         # Taster: Zustand kommt aus der gehaltenen Verbindung (esphome.py), nichts abzufragen; ein Druck gilt nur kurz
         st = esphome.status(d)
         if key is not None:
@@ -1022,7 +1038,7 @@ def status_cached(d: dict, max_age: float = 5.0) -> dict:
     wird er genommen; ist er aelter (bis STALE_OK_S), kommt er sofort und das Geraet wird im Hintergrund aufgefrischt (die naechste Anzeige ist aktuell);
     erst ohne brauchbaren Stand wird wirklich gewartet. Regeln und Automatik fragen weiter live ab (status)."""
     key, now = d.get("id"), time.time()
-    if d.get("kind") == "esphome":                         # Taster: liest nur den Speicher (esphome.py) - kein Zwischenspeicher, sonst waere ein kurzer Druck nicht zu sehen
+    if d.get("kind") in ("esphome", "esphome_ac"):         # Taster/Klima: liest nur den Speicher (esphome.py) - kein Zwischenspeicher, sonst waere ein kurzer Druck nicht zu sehen
         return status(d)
     hit = _st_cache.get(key)
     if hit and now - hit[0] <= max_age:
@@ -1078,6 +1094,12 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     _st_cache.pop(dev_id, None)                              # und der gemerkte Zustand gilt nicht mehr (naechste Anzeige fragt neu)
     if d.get("switchable") is False or d.get("kind") == "esphome":
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
+    if d.get("kind") == "esphome_ac":
+        try:
+            esphome.climate_set(d, power=bool(on))
+        except esphome.EsphomeError as e:
+            raise ShellyError(str(e))
+        return status(d)
     if d.get("kind") == "remote":
         import share
         try:

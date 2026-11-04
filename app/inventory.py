@@ -11,7 +11,7 @@ import logging
 
 log = logging.getLogger("inventory")
 
-KIND_NAMES = {"shelly": "Shelly", "tasmota": "Tasmota", "wled": "WLED", "tuya": "Tuya / Smart Life", "midea": "Klimaanlage (Midea)", "esphome": "ESPHome (Taster)"}
+KIND_NAMES = {"shelly": "Shelly", "tasmota": "Tasmota", "wled": "WLED", "tuya": "Tuya / Smart Life", "midea": "Klimaanlage (Midea)", "esphome": "ESPHome (Taster)", "esphome_ac": "Klimaanlage (ESPHome)"}
 # Geraete HINTER einer Zentrale: keine eigene IP-Adresse (Zigbee ueber das Gateway, Homematic ueber die CCU)
 BEHIND = {"zigbee": ("Zigbee (über Gateway)", "über Gateway"), "homematic": ("Homematic (über CCU)", "Adresse")}
 

@@ -4715,7 +4715,7 @@ def _families() -> dict:
             "homematic": "homematic" in kinds or bool(homematic.credentials_public().get("configured")),
             "zigbee": "zigbee" in kinds or bool(zigbee.credentials_public().get("configured")),
             "midea": "midea" in kinds,
-            "esphome": "esphome" in kinds,
+            "esphome": "esphome" in kinds or "esphome_ac" in kinds,
             "wol": bool(wol.load())}
 
 

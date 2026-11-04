@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.0 – 04.11.2026
+- Neu: **ESPHome-Klimaanlage.** Ein ESPHome-Gerät mit Klima-Entität (z. B. ein Midea-WLAN-Stick mit ESPHome) wird unter *Geräte suchen → ESPHome → Taster & Klima suchen* als Klimaanlage angelegt, lokal und ohne Cloud. Es steht bei den Klimaanlagen und bedient sich wie eine Midea-Anlage: Kachel, Klima-Fenster (Modus, Solltemperatur, Lüfter, Schwenken, Eco), Regelschritt „Klimaanlage einstellen“ und Überschuss-Automatik. Die Midea-Anbindung bleibt daneben unverändert.
+- Fehlerbehebung: **Neuere ESPHome-Staende wurden nicht erkannt** („antwortet kein ESPHome-Gerät“). Kennungen wie `sensor-name` statt `sensor/Name`, eine Leerzeile zwischen `event:` und `data:` im Ereignisstrom und die Einheit °C als Ersatzzeichen werden jetzt gelesen. Ältere Geräte funktionieren weiter.
+- Intern: neuer Test `t_esphome_ac` (nachgebildeter Stick).
+
 ## 1.33.1 – 31.10.2026
 - Geändert: **Rauchmelder-Knöpfe melden sich verständlich.** Nach **🚨 Alarm** erscheint kurz „Alarm am Melder ausgelöst“, nach **🛑 Stop** „Alarm beendet“. Das Fenster mit den technischen Angaben entfällt; sie stehen weiter im Protokoll des Servers. Bei einem Fehler steht nur noch, dass der Melder nicht erreichbar ist oder den Befehl nicht angenommen hat.
 

@@ -41,7 +41,7 @@ SYNC_EVERY_S = 5.0
 MISSING_GRACE_S = 10.0           # so lange nach dem Verbinden darf ein Eintrag noch fehlen (Anfangszustand kommt bei einem ESP8266 langsam)
 SLOW_PRESS_S = 1.0               # dauert es von Druck bis fertiger Regelrunde laenger, steht das im Protokoll (sonst nur im Debug-Protokoll)
 MAX_QUEUE = 5                    # so viele Druecke warten hoechstens darauf, von den Regeln gesehen zu werden (Schutz vor einem prellenden Taster)
-DOMAINS = ("binary_sensor", "sensor")        # Eingaenge/Taster (Aktoren) und Messwerte (Sensoren)
+DOMAINS = ("binary_sensor", "sensor", "climate")        # Eingaenge/Taster (Aktoren), Messwerte (Sensoren) und Klimaanlagen (Aktor, Art "esphome_ac")
 VALUE_GRACE_S = 120.0            # ein Messwert gilt auch nach einem kurzen Verbindungsabbruch noch so lange (der ESP8266 verliert die Verbindung gelegentlich)
 
 
@@ -53,6 +53,30 @@ def _url(ip: str, path: str) -> str:
     return f"http://{ip}{path}"
 
 
+def split_id(ent) -> tuple:
+    """(Art, Name) aus der Kennung, die das Geraet meldet. Aeltere ESPHome-Staende: "binary_sensor/Taster"; neuere: "binary_sensor-taster" (Bindestrich, Objektname)."""
+    e = str(ent or "")
+    if "/" in e:
+        a, b = e.split("/", 1)
+        return a, b
+    if "-" in e:
+        a, b = e.split("-", 1)
+        return a, b
+    return e, e
+
+
+def _lines(r):
+    """Zeilen eines Stroms als Text. Manche Geraete schicken die Einheit als Einzelbyte (° als 0xB0, kein gueltiges UTF-8): dann gilt Windows-1252."""
+    for raw in r.iter_lines(chunk_size=1):
+        if isinstance(raw, bytes):
+            try:
+                yield raw.decode("utf-8")
+            except UnicodeDecodeError:
+                yield raw.decode("cp1252", "replace")
+        else:
+            yield raw
+
+
 # ---------------------------------------------------------------- Suchen
 def _parse_sse(lines):
     """Erzeugt (event, daten-text) aus den Zeilen eines SSE-Stroms."""
@@ -62,7 +86,8 @@ def _parse_sse(lines):
         if line == "":
             if data:
                 yield event, "\n".join(data)
-            event, data = "message", []
+                event, data = "message", []
+            # eine Leerzeile ohne Daten (neuere ESPHome-Staende setzen sie zwischen "event:" und "data:") behaelt den Ereignisnamen
         elif line.startswith("event:"):
             event = line[6:].strip()
         elif line.startswith("data:"):
@@ -83,7 +108,7 @@ def _num(v):
 
 # ESPHome-Einheit -> (Art, Einheit in BlueNexus, Umrechnung) fuer die Sensorarten, die BlueNexus kennt (homematic.SENSOR_KINDS). Alles andere wird (noch) nicht angeboten.
 def sensor_kind(uom: str, name: str):
-    u, n = (uom or "").strip(), (name or "").lower()
+    u, n = (uom or "").strip().replace("�", "°"), (name or "").lower()          # manche Geraete schicken das Gradzeichen schon als Ersatzzeichen
     if u in ("°C", "ºC", "C"):
         return "temperature", "°C", None
     if u in ("°F", "ºF", "F"):
@@ -119,7 +144,7 @@ def sensor_id(title: str, entity: str) -> str:
 
 def entity_id(title: str, entity: str) -> str:
     """Kennung im Geraeteregister: esphome-<geraetename>-<eintrag>, z. B. esphome-taster-taster."""
-    name = entity.split("/", 1)[-1]
+    name = split_id(entity)[1]
     return "esphome-" + idsafe.safe_id(title.lower().replace(" ", "_")) + "-" + idsafe.safe_id(name.lower().replace(" ", "_"))
 
 
@@ -131,16 +156,16 @@ def probe(ip: str) -> dict:
         with requests.get(_url(ip, "/events"), stream=True, timeout=(PROBE_CONNECT_S, PROBE_QUIET_S)) as r:
             r.raise_for_status()
             try:
-                for event, data in _parse_sse(r.iter_lines(chunk_size=1, decode_unicode=True)):
+                for event, data in _parse_sse(_lines(r)):
                     try:
                         j = json.loads(data)
                     except ValueError:
                         continue
                     if event == "ping" and isinstance(j, dict) and j.get("title") is not None:
                         title = str(j["title"])
-                    elif event == "state" and isinstance(j, dict) and j.get("id") and (j.get("domain") or str(j["id"]).split("/", 1)[0]) in DOMAINS:
-                        dom = str(j.get("domain") or str(j["id"]).split("/", 1)[0])
-                        ents[str(j["id"])] = {"entity": str(j["id"]), "name": str(j.get("name") or str(j["id"]).split("/", 1)[-1]), "domain": dom,
+                    elif event == "state" and isinstance(j, dict) and j.get("id") and (j.get("domain") or split_id(j["id"])[0]) in DOMAINS:
+                        dom = str(j.get("domain") or split_id(j["id"])[0])
+                        ents[str(j["id"])] = {"entity": str(j["id"]), "name": str(j.get("name") or split_id(j["id"])[1]), "domain": dom,
                                               "value": bool(j.get("value")) if dom == "binary_sensor" else _num(j.get("value")), "uom": str(j.get("uom") or "")}
                     if time.time() - start > PROBE_MAX_S:
                         break
@@ -161,6 +186,9 @@ _wanted: dict[str, set] = {}                         # ip -> Eingaenge, die im G
 _seen: dict[str, dict] = {}                          # ip -> {Eintrag: Anzeigename}: alles, was das Geraet seit dem Verbinden gemeldet hat
 _conn_at: dict[str, float] = {}                      # ip -> Zeit der letzten erfolgreichen Verbindung
 _values: dict[tuple, tuple] = {}                     # (ip, entity) -> (Zeit, Messwert|None) der angelegten Sensoren
+_climate: dict[tuple, tuple] = {}                    # (ip, entity) -> (Zeit, zuletzt gemeldete Felder der Klimaanlage)
+_sens_all: dict[tuple, float] = {}                   # (ip, entity) -> letzter Messwert, auch von nicht angelegten Sensoren (z. B. Aussentemperatur der Klimaanlage)
+_last_mode: dict[tuple, str] = {}                    # (ip, entity) -> zuletzt benutzter Modus ausser OFF (fuer "einschalten" ohne Modus)
 _listeners: list = []
 _stop_all = threading.Event()
 _sup: threading.Thread | None = None
@@ -198,13 +226,25 @@ def _set_online(ip: str, online: bool, stop=None) -> None:
 
 def _on_state(ip: str, j: dict) -> None:
     ent = str(j.get("id") or "")
-    dom = str(j.get("domain") or ent.split("/", 1)[0])                 # Aenderungsmeldungen tragen kein "domain", nur "id", "value", "state" - die Art steht im Praefix der Kennung
+    dom = str(j.get("domain") or split_id(ent)[0])                 # Aenderungsmeldungen tragen kein "domain", nur "id", "value", "state" - die Art steht im Praefix der Kennung
     if not ent or dom not in DOMAINS:
         return
     with _lock:
         seen = _seen.setdefault(ip, {})
-        seen[ent] = str(j.get("name") or seen.get(ent) or ent.split("/", 1)[-1])      # Aenderungsmeldungen tragen keinen Namen: der aus dem Anfangszustand bleibt
+        seen[ent] = str(j.get("name") or seen.get(ent) or split_id(ent)[1])      # Aenderungsmeldungen tragen keinen Namen: der aus dem Anfangszustand bleibt
+    if dom == "climate":                                               # Klimaanlage: Felder zusammenfuehren (Aenderungsmeldungen koennen nur einen Teil enthalten)
+        with _lock:
+            old = _climate.get((ip, ent), (0.0, {}))[1]
+            new = {**old, **{k: v for k, v in j.items() if k not in ("id", "domain", "name", "icon", "entity_category")}}
+            _climate[(ip, ent)] = (time.time(), new)
+            m = str(new.get("mode") or "").upper()
+            if m and m != "OFF":
+                _last_mode[(ip, ent)] = m
+        _notify()
+        return
     if dom == "sensor":                                                # Messwert: nur merken, wenn ein Sensor ihn braucht
+        with _lock:
+            _sens_all[(ip, ent)] = _num(j.get("value"))
         with _lock:
             if ent in _wanted.get(ip, ()):
                 _values[(ip, ent)] = (time.time(), _num(j.get("value")))
@@ -232,7 +272,7 @@ def _watch(ip: str, stop: threading.Event) -> None:
                 r.raise_for_status()
                 _set_online(ip, True, stop)
                 backoff = BACKOFF_START_S
-                for event, data in _parse_sse(r.iter_lines(chunk_size=1, decode_unicode=True)):
+                for event, data in _parse_sse(_lines(r)):
                     if stop.is_set() or _stop_all.is_set():
                         break
                     if event == "state":
@@ -290,6 +330,9 @@ def release(ip: str) -> None:
         _conn_at.pop(ip, None)
         for k in [k for k in _values if k[0] == ip]:
             _values.pop(k, None)
+        for dct in (_climate, _sens_all, _last_mode):
+            for k in [k for k in dct if k[0] == ip]:
+                dct.pop(k, None)
     if h:
         h["stop"].set()
 
@@ -301,7 +344,7 @@ def sync(devices: list[dict]) -> None:
         old = {ip: set(v) for ip, v in _wanted.items()}
         _wanted.clear()
         for d in devices:
-            if d.get("kind") == "esphome" and d.get("ip") and d.get("entity"):               # Taster (Geraeteregister)
+            if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") and d.get("entity"):               # Taster und Klimaanlagen (Geraeteregister)
                 ip, ent = str(d["ip"]), str(d["entity"])
             elif d.get("source") == "esphome" and d.get("ip") and d.get("datapoint"):        # Messwert (Sensorregister)
                 ip, ent = str(d["ip"]), str(d["datapoint"])
@@ -384,7 +427,7 @@ def match_stale(stale: list, cands: list, fallback: bool = False) -> list:
     z. B. "Taster" -> "Taster01 Taster") = schwacher Treffer; gibt es mehrere Kandidaten, wird nichts zugeordnet. fallback=True: bleibt am Ende genau ein
     Eintrag und genau ein Kandidat uebrig, gehoeren sie zusammen (nur, wenn der Nutzer den Kandidaten gerade selbst hinzufuegt)."""
     def keys(x):
-        return {k for k in (_norm(str(x.get("entity") or "").split("/", 1)[-1]), _norm(x.get("name"))) if k}
+        return {k for k in (_norm(split_id(x.get("entity"))[1]), _norm(x.get("name"))) if k}
 
     def likes(a, b):
         ka, kb = keys(a), keys(b)
@@ -429,7 +472,7 @@ def heal() -> int:
                 todo[ip] = dict(seen)
     n = 0
     for ip, seen in todo.items():
-        ents = [{"entity": e, "name": nm, "domain": e.split("/", 1)[0]} for e, nm in seen.items()]
+        ents = [{"entity": e, "name": nm, "domain": split_id(e)[0]} for e, nm in seen.items()]
         n += len(shelly.esphome_relink(ip, ents))
     if n:
         resync()
@@ -522,3 +565,122 @@ def status(d: dict) -> dict:
     if missing(ip, ent):
         out["missing"] = True                               # das Geraet meldet diesen Eingang nicht mehr (neue Firmware?) - der Eintrag bliebe sonst stumm
     return out
+
+
+# ---------------------------------------------------------------- Klimaanlage (Aktor, Art "esphome_ac"): ESPHome-Entitaet "climate"
+# Begriffe wie bei der Midea-Anbindung (midea.py), damit Kachel, Regeln, Automatik und Klimafenster ohne Umbau funktionieren.
+CLIMATE_MODES = {"HEAT_COOL": "auto", "COOL": "cool", "HEAT": "heat", "FAN_ONLY": "fan_only", "DRY": "dry"}
+CLIMATE_FANS = {"AUTO": "auto", "LOW": "low", "MEDIUM": "medium", "HIGH": "high"}
+CLIMATE_CUSTOM_FANS = {"silent": "silent", "turbo": "max"}
+CLIMATE_SWINGS = {"OFF": "off", "BOTH": "both", "VERTICAL": "vertical", "HORIZONTAL": "horizontal"}
+SET_WAIT_S = 4.0                                     # so lange auf die Rueckmeldung des Geraets nach einem Befehl warten
+
+
+def _rev(table: dict, key):
+    return next((k for k, v in table.items() if v == key), None)
+
+
+def _climate_fields(ip: str, ent: str):
+    with _lock:
+        h = _hosts.get(ip)
+        online = bool(h and h["online"])
+        ts, c = _climate.get((ip, ent), (0.0, {}))
+    return online, ts, dict(c)
+
+
+def climate_status(d: dict) -> dict:
+    """Zustand der Klimaanlage im Format der Midea-Anbindung: online, on, mode, target_c, indoor_c, outdoor_c, fan, swing, info."""
+    import midea
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    _want(ip, ent)
+    ensure(ip)
+    online, ts, c = _climate_fields(ip, ent)
+    if not c or not (online or time.time() - ts < VALUE_GRACE_S):
+        return {"online": False, "on": None, "power": None}
+    mode = str(c.get("mode") or "OFF").upper()
+    on = mode != "OFF"
+    with _lock:
+        shown = mode if on else _last_mode.get((ip, ent), "COOL")
+        out = next((v for (i, e), v in _sens_all.items() if i == ip and "outdoor" in e.lower() and v is not None), None)
+    fan = CLIMATE_CUSTOM_FANS.get(str(c.get("custom_fan_mode") or "").lower()) or CLIMATE_FANS.get(str(c.get("fan_mode") or "").upper())
+    snap = {"online": True, "on": on, "mode": CLIMATE_MODES.get(shown, "auto"), "target_c": _num(c.get("target_temperature")), "indoor_c": _num(c.get("current_temperature")),
+            "outdoor_c": out, "fan": fan, "swing": CLIMATE_SWINGS.get(str(c.get("swing_mode") or "").upper(), "off"), "eco": str(c.get("preset") or "").upper() == "ECO"}
+    return {**snap, "power": None, "info": midea.info_text(snap)}
+
+
+def climate_details(d: dict) -> dict:
+    """Auswahl fuer das Klimafenster (Modi, Luefter, Schwenken, Temperaturbereich) aus dem, was das Geraet selbst meldet."""
+    import midea
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    st = climate_status(d)
+    if not st.get("online"):
+        raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
+    online, ts, c = _climate_fields(ip, ent)
+    lab = lambda table, labels, keys: [{"key": table[k], "label": labels.get(table[k], table[k])} for k in keys if k in table]
+    fans = lab(CLIMATE_FANS, midea.FAN_LABELS, [str(x).upper() for x in c.get("fan_modes") or []])
+    fans += [{"key": CLIMATE_CUSTOM_FANS[k], "label": midea.FAN_LABELS.get(CLIMATE_CUSTOM_FANS[k], k)} for k in (str(x).lower() for x in c.get("custom_fan_modes") or []) if k in CLIMATE_CUSTOM_FANS]
+    return {"state": st, "min": _num(c.get("min_temp")) or 16.0, "max": _num(c.get("max_temp")) or 30.0, "step": _num(c.get("step")) or 0.5,
+            "modes": lab(CLIMATE_MODES, midea.MODE_LABELS, [str(x).upper() for x in c.get("modes") or []]), "fans": fans,
+            "swings": lab(CLIMATE_SWINGS, midea.SWING_LABELS, [str(x).upper() for x in c.get("swing_modes") or []]),
+            "supports_eco": "ECO" in [str(x).upper() for x in c.get("presets") or []]}
+
+
+def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=None, eco=None) -> dict:
+    """Setzt nur die genannten Werte (Ein/Aus, Modus, Solltemperatur, Luefter, Schwenken, Eco) per POST /climate/<name>/set. Rueckgabe: neuer Zustand."""
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    _want(ip, ent)
+    ensure(ip)
+    online, ts, c = _climate_fields(ip, ent)
+    if not online or not c:
+        raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
+    q = {}
+    if power is False:
+        q["mode"] = "OFF"
+    elif mode is not None or power is True:
+        m = _rev(CLIMATE_MODES, mode) if mode is not None else None
+        if mode is not None and m is None:
+            raise EsphomeError(f"Unbekannter Modus: {mode}")
+        if m is None:
+            with _lock:
+                m = _last_mode.get((ip, ent)) or "HEAT_COOL"
+        q["mode"] = m
+    if target is not None:
+        lo, hi = _num(c.get("min_temp")) or 16.0, _num(c.get("max_temp")) or 30.0
+        t = _num(target)
+        if t is None or not lo <= t <= hi:
+            raise EsphomeError(f"Solltemperatur zwischen {lo:g} und {hi:g} °C wählen")
+        q["target_temperature"] = f"{t:g}"
+    if fan is not None:
+        f = _rev(CLIMATE_FANS, fan)
+        cf = _rev(CLIMATE_CUSTOM_FANS, fan)
+        if f:
+            q["fan_mode"] = f
+        elif cf:
+            q["custom_fan_mode"] = cf
+        else:
+            raise EsphomeError(f"Unbekannte Lüfterstufe: {fan}")
+    if swing is not None:
+        sw = _rev(CLIMATE_SWINGS, swing)
+        if not sw:
+            raise EsphomeError(f"Unbekannte Schwenkart: {swing}")
+        q["swing_mode"] = sw
+    if eco is not None:
+        q["preset"] = "ECO" if eco else "NONE"
+    if not q:
+        raise EsphomeError("Nichts zu setzen")
+    obj = split_id(ent)[1]
+    t0 = time.time()
+    try:
+        r = requests.post(_url(ip, "/climate/" + requests.utils.quote(obj, safe="") + "/set"), params=q, timeout=(PROBE_CONNECT_S, 8.0))
+        r.raise_for_status()
+    except requests.RequestException as e:
+        log.warning("ESPHome-Klima %s: Befehl %s fehlgeschlagen: %s", ip, q, e)
+        raise EsphomeError("Die Klimaanlage hat den Befehl nicht angenommen oder ist nicht erreichbar.")
+    log.info("ESPHome-Klima %s: Befehl %s gesendet", ip, q)
+    want = {"mode": q.get("mode"), "target_temperature": q.get("target_temperature")}
+    while time.time() - t0 < SET_WAIT_S:                                    # die neue Meldung des Geraets abwarten, damit die Anzeige gleich stimmt
+        _o, ts2, c2 = _climate_fields(ip, ent)
+        if ts2 > t0 and all(v is None or str(c2.get(k) or "").upper() == v.upper() or (_num(c2.get(k)) is not None and _num(c2.get(k)) == _num(v)) for k, v in want.items()):
+            break
+        time.sleep(0.15)
+    return climate_status(d)
