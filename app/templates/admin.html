@@ -2659,8 +2659,8 @@ document.getElementById('esphome-scan').addEventListener('click', async e => {
   try {
     if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
     const found = await shellyApi('/api/esphome/scan', 'POST', { ip }), fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Eingang/Eingänge gefunden, ${fresh.length} noch nicht angelegt.` + (found.some(f => f.relinked) ? ' Ein vorhandener Eintrag wurde dem Gerät wieder zugeordnet.' : '') : 'Das Gerät meldet keine Eingänge (Taster). Ist im ESPHome-Setup ein binary_sensor eingetragen?');
-    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · Taster`,
+    shellyMsg(found.length ? `${found.length} Taster/Klimaanlage(n) gefunden, ${fresh.length} noch nicht angelegt.` + (found.some(f => f.relinked) ? ' Ein vorhandener Eintrag wurde dem Gerät wieder zugeordnet.' : '') : 'Das Gerät meldet keine Taster und keine Klimaanlage. Ist im ESPHome-Setup ein binary_sensor oder eine Klima eingetragen?');
+    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · ${f.domain === 'climate' ? 'Klimaanlage' : 'Taster'}`,
       add: (ids, edits) => shellyApi('/api/esphome/add', 'POST', { ip, ids, edits }) });
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;

@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.3 – 04.11.2026
+- Fehlerbehebung: **Suche nach einem ESPHome-Gerät mit langsamer Weboberfläche** (z. B. der Klima-Stick) klappte oft nicht oder fand nur einen Teil der Einträge. Die Suche versucht es jetzt bis zu dreimal, wartet länger auf die Einträge und findet sie vollständig.
+- Geändert: In der Trefferliste steht bei einer Klimaanlage „Klimaanlage“ statt „Taster“; die Meldungen der Suche nennen Taster und Klimaanlagen.
+
 ## 1.34.2 – 04.11.2026
 - Fehlerbehebung: **ESPHome-Klimaanlage nach dem Neuflashen.** Meldet das Gerät nach einer neuen Firmware die Klima unter einer anderen Kennung, ordnet BlueNexus den Eintrag wie bei Tastern und Messwerten **von selbst neu zu** (Regeln, Verlauf und Freigaben bleiben). Bis dahin zeigt die Anlage „Klima fehlt am Gerät“ und schaltet nicht ins Leere.
 - Fehlerbehebung: Lüfterstufen wie **Silent/Turbo** werden in der Schreibweise des Geräts gesendet (neuere Firmware schreibt sie groß).

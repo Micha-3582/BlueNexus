@@ -32,8 +32,9 @@ log = logging.getLogger("esphome")
 
 DISPLAY_S = 3.0                  # so lange zeigt die Oberflaeche "gedrueckt" (die Regeln sehen den Druck als Impuls, unabhaengig davon)
 PROBE_CONNECT_S = 8.0            # ein ESP8266 an schwachem WLAN nimmt Verbindungen manchmal erst nach einigen Sekunden an
-PROBE_QUIET_S = 1.5              # beim Suchen: so lange auf weitere Eintraege warten, nachdem nichts mehr kommt
-PROBE_MAX_S = 6.0
+PROBE_TRIES = 3                  # der Stick der Klimaanlage nimmt nur jede zweite/dritte Verbindung an: beim Suchen bis zu so viele Versuche
+PROBE_QUIET_S = 3.0              # beim Suchen: so lange auf weitere Eintraege warten, nachdem nichts mehr kommt (der Stick schickt sie langsam)
+PROBE_MAX_S = 14.0
 STREAM_READ_S = 25.0             # das Geraet pingt alle 10 s; 25 s Stille = Verbindung tot (ein ESP8266 mit WLAN-Aussetzer schliesst sie oft nicht sauber; bis dahin gehen Druecke verloren)
 BACKOFF_START_S = 1.0            # nach einem Abbruch schnell neu verbinden: bis dahin gehen Druecke verloren
 BACKOFF_MAX_S = 30.0
@@ -149,7 +150,19 @@ def entity_id(title: str, entity: str) -> str:
 
 
 def probe(ip: str) -> dict:
-    """Liest den Anfangszustand eines ESPHome-Geraets: {"title", "entities": [{entity, name, domain, value}]}. Wirft EsphomeError."""
+    """Liest den Anfangszustand eines ESPHome-Geraets: {"title", "entities": [{entity, name, domain, value}]}. Wirft EsphomeError.
+    Ein ueberlastetes Geraet (ESP8266) nimmt nicht jede Verbindung an: bis zu PROBE_TRIES Versuche."""
+    err = None
+    for attempt in range(PROBE_TRIES):
+        try:
+            return _probe_once(ip)
+        except EsphomeError as e:
+            err = e
+            time.sleep(0.5)
+    raise err
+
+
+def _probe_once(ip: str) -> dict:
     title, ents = None, {}
     start = time.time()
     try:
