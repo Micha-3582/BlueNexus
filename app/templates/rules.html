@@ -826,6 +826,8 @@ async function loadServer() {                    // alles gleichzeitig und ohne 
     get('/api/wol?light=1', []), get('/api/cameras', {}), get('/api/homematic/sounds', []), get('/api/homematic/blinds?light=1', []), get('/api/notify/recipients', []), get('/api/pushover/recipients', []), get('/api/rules/accounts', [])]);
   const arr = v => Array.isArray(v) ? v : [];
   S = { devs: arr(devs), A, sensors: arr(sensors), virtual: arr(virt), setpoints: arr(sps), locks: arr(lks), wol: arr(wols), cameras: arr(camj.cameras), sounds: arr(snds), blinds: arr(blds), recipients: arr(recs), prec: arr(prec), accounts: arr(accs) };
+  const acStep = STEP_TYPES.find(x => x[0] === 'ac');                          // Bezeichnung nennt nur die Modelle, die wirklich eingebunden sind
+  if (acStep) { const ks = []; if (S.devs.some(d => d.kind === 'midea' || d.rkind === 'midea' && d.kind !== 'esphome_ac')) ks.push('Midea'); if (S.devs.some(d => d.kind === 'esphome_ac')) ks.push('ESPHome'); acStep[1] = 'Klimaanlage einstellen' + (ks.length ? ' (' + ks.join(', ') + ')' : ''); }
 }
 async function refresh() {                        // alle 10 s: Status auffrischen, den Entwurf nie anfassen
   try { await loadServer(); } catch (e) { return; }

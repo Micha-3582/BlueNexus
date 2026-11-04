@@ -876,7 +876,7 @@
 
 <div class="card fam-card msg-host" id="fam-setpoints" data-tab="thermostate">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Thermostate <span class="qhelp" role="button" tabindex="0" data-help="In Regeln der Art „Ablauf“ nutzbar, z. B. „alle Thermostate auf 25 °C“. Der Wert wird auf den Bereich des Geräts begrenzt (0 °C = aus, meist 4,5 °C).">?</span></h2>
-  <div class="sub">Solltemperatur von Hand einstellen oder per Regel setzen (Homematic, Zigbee).</div>
+  <div class="sub" id="sub-thermostate">Solltemperatur von Hand einstellen oder per Regel setzen.</div>
     <div id="hm-setpoints" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
@@ -904,7 +904,7 @@
     <div id="hm-locks" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
-<div class="card fam-hint-card fam-off" id="hint-sensoren" data-tab="sensoren"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
+<div class="card fam-hint-card fam-off" id="hint-sensoren" data-tab="sensoren"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> ein System mit Sensoren an („Homematic“, „Zigbee“, „Tasmota“ oder „ESPHome“) und suche die Geräte.</div></div>
 
 <div class="card fam-hint-card fam-off" id="hint-thermostate" data-tab="thermostate"><div class="muted">Wähle unter <a href="/smarthome#suchen" style="color:var(--accent-t);font-weight:600">Geräte suchen</a> „Homematic“ oder „Zigbee“ an und suche die Geräte.</div></div>
 
@@ -2642,6 +2642,7 @@ function applyFamilies(f) {
   { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
     set('sub-aktoren', window.IS_ADMIN ? 'Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.' : 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.');
     const src = [f.homematic && 'Homematic', f.zigbee && 'Zigbee', f.tasmota && 'Tasmota', f.esphome && 'ESPHome', f.camera && 'Kameras'].filter(Boolean);
+    { const ts = [f.homematic && 'Homematic', f.zigbee && 'Zigbee'].filter(Boolean); set('sub-thermostate', 'Solltemperatur von Hand einstellen oder per Regel setzen' + (window.IS_ADMIN && ts.length ? ' (' + ts.join(', ') + ')' : '') + '.'); }
     set('sub-sensoren', 'Messwerte und Zustände' + (window.IS_ADMIN && src.length ? ' von ' + (src.length > 1 ? src.slice(0, -1).join(', ') + ' und ' + src[src.length - 1] : src[0]) : '') + ' (nur lesen).'); }
   show('hint-sensoren', !(f.homematic || f.zigbee || window.SENS_COUNT > 0)); show('hint-thermostate', !(f.homematic || f.zigbee || window.SP_COUNT > 0)); show('hint-sicherheit', !(f.homematic || famN('fam-locks')));
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
