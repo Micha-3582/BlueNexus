@@ -201,6 +201,7 @@ _conn_at: dict[str, float] = {}                      # ip -> Zeit der letzten er
 _values: dict[tuple, tuple] = {}                     # (ip, entity) -> (Zeit, Messwert|None) der angelegten Sensoren
 _climate: dict[tuple, tuple] = {}                    # (ip, entity) -> (Zeit, zuletzt gemeldete Felder der Klimaanlage)
 _sens_all: dict[tuple, float] = {}                   # (ip, entity) -> letzter Messwert, auch von nicht angelegten Sensoren (z. B. Aussentemperatur der Klimaanlage)
+_pre: dict[tuple, dict] = {}                         # (ip, entity) -> Vorwahl bei ausgeschalteter Anlage {mode,target,fan,swing,eco} (BlueNexus-Begriffe); geht erst beim Einschalten an die Anlage
 _last_mode: dict[tuple, str] = {}                    # (ip, entity) -> zuletzt benutzter Modus ausser OFF (fuer "einschalten" ohne Modus)
 _listeners: list = []
 _stop_all = threading.Event()
@@ -253,6 +254,7 @@ def _on_state(ip: str, j: dict) -> None:
             m = str(new.get("mode") or "").upper()
             if m and m != "OFF":
                 _last_mode[(ip, ent)] = m
+                _pre.pop((ip, ent), None)                                  # Anlage laeuft (auch per Fernbedienung eingeschaltet): die Vorwahl ist erledigt
         _notify()
         return
     if dom == "sensor":                                                # Messwert: nur merken, wenn ein Sensor ihn braucht
@@ -343,7 +345,7 @@ def release(ip: str) -> None:
         _conn_at.pop(ip, None)
         for k in [k for k in _values if k[0] == ip]:
             _values.pop(k, None)
-        for dct in (_climate, _sens_all, _last_mode):
+        for dct in (_climate, _sens_all, _last_mode, _pre):
             for k in [k for k in dct if k[0] == ip]:
                 dct.pop(k, None)
     if h:
@@ -623,6 +625,11 @@ def climate_status(d: dict) -> dict:
     fan = CLIMATE_CUSTOM_FANS.get(str(c.get("custom_fan_mode") or "").lower()) or CLIMATE_FANS.get(str(c.get("fan_mode") or "").upper())
     snap = {"online": True, "on": on, "mode": CLIMATE_MODES.get(shown, "auto"), "target_c": _num(c.get("target_temperature")), "indoor_c": _num(c.get("current_temperature")),
             "outdoor_c": out, "fan": fan, "swing": CLIMATE_SWINGS.get(str(c.get("swing_mode") or "").upper(), "off"), "eco": str(c.get("preset") or "").upper() == "ECO"}
+    with _lock:
+        pre = dict(_pre.get((ip, ent)) or {}) if not on else {}
+    for k_pre, k_snap in (("mode", "mode"), ("target", "target_c"), ("fan", "fan"), ("swing", "swing"), ("eco", "eco")):       # bei ausgeschalteter Anlage zeigt BlueNexus, was beim Einschalten gelten wird
+        if k_pre in pre:
+            snap[k_snap] = pre[k_pre]
     return {**snap, "power": None, "info": midea.info_text(snap)}
 
 
@@ -643,6 +650,39 @@ def climate_details(d: dict) -> dict:
             "supports_eco": "ECO" in [str(x).upper() for x in c.get("presets") or []]}
 
 
+def _climate_query(c: dict, given: dict) -> dict:
+    """Parameter fuer POST /climate/<name>/set aus BlueNexus-Werten ({mode, target, fan, swing, eco}); wirft EsphomeError bei ungueltigen Werten."""
+    q = {}
+    if given.get("mode") is not None:
+        m = _rev(CLIMATE_MODES, given["mode"])
+        if m is None:
+            raise EsphomeError(f"Unbekannter Modus: {given['mode']}")
+        q["mode"] = m
+    if given.get("target") is not None:
+        lo, hi = _num(c.get("min_temp")) or 16.0, _num(c.get("max_temp")) or 30.0
+        t = _num(given["target"])
+        if t is None or not lo <= t <= hi:
+            raise EsphomeError(f"Solltemperatur zwischen {lo:g} und {hi:g} °C wählen")
+        q["target_temperature"] = f"{t:g}"
+    if given.get("fan") is not None:
+        f = _rev(CLIMATE_FANS, given["fan"])
+        cf = _rev(CLIMATE_CUSTOM_FANS, given["fan"])
+        if f:
+            q["fan_mode"] = f
+        elif cf:
+            q["custom_fan_mode"] = next((x for x in c.get("custom_fan_modes") or [] if str(x).lower() == cf), cf)          # Schreibweise des Geraets (Silent/Turbo oder silent/turbo)
+        else:
+            raise EsphomeError(f"Unbekannte Lüfterstufe: {given['fan']}")
+    if given.get("swing") is not None:
+        sw = _rev(CLIMATE_SWINGS, given["swing"])
+        if not sw:
+            raise EsphomeError(f"Unbekannte Schwenkart: {given['swing']}")
+        q["swing_mode"] = sw
+    if given.get("eco") is not None:
+        q["preset"] = "ECO" if given["eco"] else "NONE"
+    return q
+
+
 def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=None, eco=None) -> dict:
     """Setzt nur die genannten Werte (Ein/Aus, Modus, Solltemperatur, Luefter, Schwenken, Eco) per POST /climate/<name>/set. Rueckgabe: neuer Zustand."""
     ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
@@ -653,39 +693,34 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
         raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
     if missing(ip, ent):
         raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Taster & Klima suchen“ noch einmal ausführen.")
-    q = {}
+    given = {k: v for k, v in (("mode", mode), ("target", target), ("fan", fan), ("swing", swing), ("eco", eco)) if v is not None}
+    cur_off = str(c.get("mode") or "OFF").upper() == "OFF"
+    q = _climate_query(c, given)                                    # prueft die Werte (wirft EsphomeError)
     if power is False:
-        q["mode"] = "OFF"
-    elif mode is not None or power is True:
-        m = _rev(CLIMATE_MODES, mode) if mode is not None else None
-        if mode is not None and m is None:
-            raise EsphomeError(f"Unbekannter Modus: {mode}")
-        if m is None:
+        with _lock:
+            _pre.pop((ip, ent), None)
+        q = {"mode": "OFF"}
+    elif cur_off and power is not True:
+        # Bei ESPHome ist der Modus zugleich der Ein/Aus-Schalter: einen Modus waehlen heisst einschalten. Ist die Anlage aus, wird nur vorgemerkt
+        # und erst beim Einschalten gemeinsam gesendet (wie bei den Midea-Anlagen, dort bleibt die Anlage beim Einstellen aus).
+        if not given:
+            raise EsphomeError("Nichts zu setzen")
+        with _lock:
+            _pre.setdefault((ip, ent), {}).update(given)
+        log.info("ESPHome-Klima %s: Vorwahl %s gemerkt (Anlage ist aus)", ip, given)
+        return climate_status(d)
+    elif cur_off:                                                   # einschalten: Vorwahl und neue Angaben zusammen senden
+        with _lock:
+            pre = _pre.pop((ip, ent), {})
+        q = _climate_query(c, {**pre, **given})
+        if "mode" not in q:
             with _lock:
-                m = _last_mode.get((ip, ent)) or "HEAT_COOL"
-        q["mode"] = m
-    if target is not None:
-        lo, hi = _num(c.get("min_temp")) or 16.0, _num(c.get("max_temp")) or 30.0
-        t = _num(target)
-        if t is None or not lo <= t <= hi:
-            raise EsphomeError(f"Solltemperatur zwischen {lo:g} und {hi:g} °C wählen")
-        q["target_temperature"] = f"{t:g}"
-    if fan is not None:
-        f = _rev(CLIMATE_FANS, fan)
-        cf = _rev(CLIMATE_CUSTOM_FANS, fan)
-        if f:
-            q["fan_mode"] = f
-        elif cf:
-            q["custom_fan_mode"] = next((x for x in c.get("custom_fan_modes") or [] if str(x).lower() == cf), cf)          # Schreibweise des Geraets (Silent/Turbo oder silent/turbo)
-        else:
-            raise EsphomeError(f"Unbekannte Lüfterstufe: {fan}")
-    if swing is not None:
-        sw = _rev(CLIMATE_SWINGS, swing)
-        if not sw:
-            raise EsphomeError(f"Unbekannte Schwenkart: {swing}")
-        q["swing_mode"] = sw
-    if eco is not None:
-        q["preset"] = "ECO" if eco else "NONE"
+                q["mode"] = _last_mode.get((ip, ent)) or "HEAT_COOL"
+    else:
+        with _lock:
+            _pre.pop((ip, ent), None)
+        if not q and power is True:
+            return climate_status(d)                                # laeuft schon
     if not q:
         raise EsphomeError("Nichts zu setzen")
     obj = split_id(ent)[1]

@@ -136,6 +136,26 @@ assert POSTS[0][1] == {"mode": "OFF"} and r["on"] is False and r["mode"] == "hea
 POSTS.clear(); shelly.set_state(dev_id, True)
 assert POSTS[0][1] == {"mode": "HEAT"}, POSTS                                                                                # einschalten ohne Modus: der zuletzt benutzte
 assert shelly.status(d)["on"] is True
+# Vorwahl bei ausgeschalteter Anlage: ein Modus waere bei ESPHome zugleich "einschalten" - es wird nur vorgemerkt und erst beim Einschalten gesendet
+shelly.midea_set(dev_id, power=False)
+POSTS.clear(); r = shelly.midea_set(dev_id, mode="cool", fan="high", target=26.0)
+assert POSTS == [] and r["on"] is False and r["mode"] == "cool" and r["fan"] == "high" and r["target_c"] == 26.0, (POSTS, r)
+r = shelly.midea_set(dev_id, swing="both"); assert POSTS == [] and r["swing"] == "both" and r["mode"] == "cool", (POSTS, r)
+assert shelly.status(d)["on"] is False and shelly.status(d)["mode"] == "cool"
+try:
+    shelly.midea_set(dev_id, mode="kaputt"); raise AssertionError("ungueltige Vorwahl muss abgelehnt werden")
+except shelly.ShellyError:
+    pass
+POSTS.clear(); shelly.set_state(dev_id, True)
+assert POSTS[0][1] == {"mode": "COOL", "fan_mode": "HIGH", "target_temperature": "26", "swing_mode": "BOTH"}, POSTS          # Vorwahl geht gemeinsam beim Einschalten raus
+assert shelly.status(d)["on"] is True and esphome._pre == {}, esphome._pre
+shelly.midea_set(dev_id, power=False)
+shelly.midea_set(dev_id, mode="dry")
+POSTS.clear(); shelly.midea_set(dev_id, power=True, target=24.0)                                                           # Einschalten mit eigenen Angaben ergaenzt die Vorwahl
+assert POSTS[0][1] == {"mode": "DRY", "target_temperature": "24"}, POSTS
+shelly.midea_set(dev_id, power=False); POSTS.clear(); shelly.midea_set(dev_id, mode="heat"); shelly.midea_set(dev_id, power=False)
+assert esphome._pre == {} and POSTS[-1][1] == {"mode": "OFF"}, (esphome._pre, POSTS)                                        # Ausschalten verwirft die Vorwahl
+shelly.set_state(dev_id, True)
 POSTS.clear(); shelly.midea_set(dev_id, fan="max")
 assert POSTS[0][1] == {"custom_fan_mode": "turbo"}, POSTS
 CLIMATE["custom_fan_modes"] = ["Silent", "Turbo"]                                            # neuere Firmware: grosse Anfangsbuchstaben
