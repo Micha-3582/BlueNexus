@@ -650,18 +650,22 @@ def esphome_relink(ip: str, ents: list, title: str = "", fallback: bool = False,
     done = []
     present = {e["entity"] for e in ents}
     items = load_devices()
-    mine = [d for d in items if d.get("kind") == "esphome" and d.get("ip") == ip]
+    mine = [d for d in items if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") == ip]
     stale = [d for d in mine if d.get("entity") not in present]
     if stale:
         used = {d.get("entity") for d in mine}
-        cands = [e for e in ents if e.get("domain") == "binary_sensor" and e["entity"] not in used and (only is None or e["entity"] in only)]
-        for st, c in esphome.match_stale([{"id": d["id"], "entity": d.get("entity"), "name": d.get("name", "")} for d in stale], cands, fallback):
-            for d in items:
-                if d["id"] == st["id"]:
-                    d["entity"] = c["entity"]
-                    if title:
-                        d["model"] = f"ESPHome · {title}"
-                    done.append((d["id"], c["entity"]))
+        for dkind, dom in (("esphome", "binary_sensor"), ("esphome_ac", "climate")):         # Taster -> Eingang, Klimaanlage -> Klima-Entitaet
+            sk = [d for d in stale if d.get("kind") == dkind]
+            if not sk:
+                continue
+            cands = [e for e in ents if e.get("domain") == dom and e["entity"] not in used and (only is None or e["entity"] in only)]
+            for st, c in esphome.match_stale([{"id": d["id"], "entity": d.get("entity"), "name": d.get("name", "")} for d in sk], cands, fallback):
+                for d in items:
+                    if d["id"] == st["id"]:
+                        d["entity"] = c["entity"]
+                        if title:
+                            d["model"] = f"ESPHome · {title}"
+                        done.append((d["id"], c["entity"]))
         if done:
             _save(items)
     sens = homematic.load_sensors()

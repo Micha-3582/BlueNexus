@@ -598,6 +598,8 @@ def climate_status(d: dict) -> dict:
     _want(ip, ent)
     ensure(ip)
     online, ts, c = _climate_fields(ip, ent)
+    if online and missing(ip, ent):                         # das Geraet meldet diese Klima-Entitaet nicht mehr (neue Firmware?): BlueNexus ordnet sie selbst neu zu, bis dahin nicht anzeigen
+        return {"online": True, "on": None, "power": None, "missing": True, "info": "Klima fehlt am Gerät – neu suchen oder löschen"}
     if not c or not (online or time.time() - ts < VALUE_GRACE_S):
         return {"online": False, "on": None, "power": None}
     mode = str(c.get("mode") or "OFF").upper()
@@ -636,6 +638,8 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
     online, ts, c = _climate_fields(ip, ent)
     if not online or not c:
         raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
+    if missing(ip, ent):
+        raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Taster & Klima suchen“ noch einmal ausführen.")
     q = {}
     if power is False:
         q["mode"] = "OFF"
@@ -659,7 +663,7 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
         if f:
             q["fan_mode"] = f
         elif cf:
-            q["custom_fan_mode"] = cf
+            q["custom_fan_mode"] = next((x for x in c.get("custom_fan_modes") or [] if str(x).lower() == cf), cf)          # Schreibweise des Geraets (Silent/Turbo oder silent/turbo)
         else:
             raise EsphomeError(f"Unbekannte Lüfterstufe: {fan}")
     if swing is not None:

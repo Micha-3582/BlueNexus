@@ -30,7 +30,7 @@ class Dev(BaseHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         POSTS.append((u.path, {k: v[0] for k, v in parse_qs(u.query).items()}))
-        if u.path != "/climate/air_conditioner/set":
+        if u.path not in ("/climate/air_conditioner/set", "/climate/Air%20Conditioner/set"):
             self.send_response(404); self.end_headers(); return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         drop = DROP["n"] > 0
@@ -138,6 +138,13 @@ assert POSTS[0][1] == {"mode": "HEAT"}, POSTS                                   
 assert shelly.status(d)["on"] is True
 POSTS.clear(); shelly.midea_set(dev_id, fan="max")
 assert POSTS[0][1] == {"custom_fan_mode": "turbo"}, POSTS
+CLIMATE["custom_fan_modes"] = ["Silent", "Turbo"]                                            # neuere Firmware: grosse Anfangsbuchstaben
+for q in list(STREAMS):
+    q.put(None)
+wait(lambda: shelly.status(shelly.load_devices()[0]).get("online") and "Turbo" in esphome._climate_fields("192.168.50.9", "climate-air_conditioner")[2].get("custom_fan_modes", []), 6.0, "neu verbunden")
+POSTS.clear(); shelly.midea_set(dev_id, fan="max")
+assert POSTS[0][1] == {"custom_fan_mode": "Turbo"}, POSTS
+CLIMATE["custom_fan_modes"] = ["silent", "turbo"]
 for bad in (dict(target=5), dict(target=40), dict(mode="kaputt"), dict(fan="kaputt"), dict(swing="kaputt"), dict()):
     try:
         shelly.midea_set(dev_id, **bad); raise AssertionError(f"haette abgelehnt werden muessen: {bad}")
@@ -162,6 +169,23 @@ DROP.update(n=0, apply=False)
 base = {"name": "Klima", "mode": "flow", "when": {"mode": "all", "conds": [{"type": "time", "from": "00:00", "to": "24:00"}]}, "else": []}
 n = rules.normalize_rule({**base, "then": [{"type": "ac", "id": dev_id, "power": "on", "mode": "cool", "target": 24}]}, "k1")["then"][0]
 assert n["type"] == "ac" and n["id"] == dev_id
+
+# ---------------------------------------------------------------- Neu geflasht: das Geraet meldet die Klima unter anderer Kennung ("climate/Air Conditioner")
+esphome.MISSING_GRACE_S = 0.6
+CLIMATE["id"] = "climate/Air Conditioner"
+for q in list(STREAMS):
+    q.put(None)                                                                              # Verbindung bricht ab, BlueNexus verbindet neu und sieht nur noch die neue Kennung
+wait(lambda: "climate/Air Conditioner" in esphome._seen.get("192.168.50.9", {}), 6.0, "neue Kennung gemeldet")
+wait(lambda: esphome.missing("192.168.50.9", "climate-air_conditioner"), 3.0, "alter Eintrag fehlt am Geraet")
+assert shelly.status(shelly.load_devices()[0]).get("missing") is True
+try:
+    shelly.midea_set(dev_id, power=True); raise AssertionError("fehlende Klima darf nicht schalten")
+except shelly.ShellyError as e:
+    assert "meldet diese Klimaanlage nicht mehr" in str(e), e
+assert esphome.heal() >= 1 and shelly.load_devices()[0]["entity"] == "climate/Air Conditioner" and shelly.load_devices()[0]["id"] == dev_id, shelly.load_devices()
+wait(lambda: shelly.status(shelly.load_devices()[0]).get("online") and shelly.status(shelly.load_devices()[0]).get("target_c") is not None, 6.0, "Klima nach der Zuordnung wieder da")
+POSTS.clear(); r = shelly.midea_set(dev_id, target=21.0)
+assert POSTS[0][0] == "/climate/Air%20Conditioner/set" and r["target_c"] == 21.0, (POSTS, r)          # Pfad nach dem Namen (neue Kennung)
 
 # ---------------------------------------------------------------- Ausfall: nicht erreichbar, Befehl abgelehnt
 for q in list(STREAMS):
