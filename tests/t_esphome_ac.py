@@ -18,6 +18,7 @@ SENS = [("sensor-air_conditioner_outdoor_temperature", "Air Conditioner Outdoor 
         ("sensor-air_conditioner_wi-fi_signal", "Air Conditioner Wi-Fi Signal", -58, "dBm"),
         ("sensor-air_conditioner_indoor_humidity", "Air Conditioner Indoor Humidity", 0, "%")]
 STREAMS, POSTS = [], []
+DROP = {"n": 0, "apply": False}                 # naechste n Befehle ohne Antwort beenden (wie der echte Stick bei Last); apply: Befehl wird vorher trotzdem ausgefuehrt
 
 
 class Dev(BaseHTTPRequestHandler):
@@ -32,11 +33,18 @@ class Dev(BaseHTTPRequestHandler):
         if u.path != "/climate/air_conditioner/set":
             self.send_response(404); self.end_headers(); return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        drop = DROP["n"] > 0
+        if drop:
+            DROP["n"] -= 1
+        if drop and not DROP["apply"]:
+            return                                                       # Verbindung ohne Antwort schliessen
         for k, v in q.items():
             CLIMATE[k] = v
         j = {"id": CLIMATE["id"], **{k: v for k, v in CLIMATE.items() if k in q}, "state": CLIMATE["target_temperature"]}       # Aenderung: nur die geaenderten Felder
         for s in list(STREAMS):
             s.put("event: state\n\ndata: " + json.dumps(j) + "\n\n")
+        if drop:
+            return
         self.send_response(200); self.end_headers()
 
     def do_GET(self):
@@ -77,6 +85,7 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 PORT = srv.server_address[1]
 esphome._url = lambda ip, path: f"http://127.0.0.1:{PORT}{path}"
 esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKOFF_MAX_S, esphome.SET_WAIT_S = 0.5, 0.3, 0.6, 2.0
+esphome.CLIMATE_CHECK_S, esphome.CLIMATE_RETRY_S = 0.6, 0.1
 
 # ---------------------------------------------------------------- Kennungen und Parser
 assert esphome.split_id("binary_sensor/Taster") == ("binary_sensor", "Taster") and esphome.split_id("sensor-air_conditioner_wi-fi_signal") == ("sensor", "air_conditioner_wi-fi_signal")
@@ -134,6 +143,20 @@ for bad in (dict(target=5), dict(target=40), dict(mode="kaputt"), dict(fan="kapu
         shelly.midea_set(dev_id, **bad); raise AssertionError(f"haette abgelehnt werden muessen: {bad}")
     except shelly.ShellyError:
         pass
+
+# ---------------------------------------------------------------- Stick schliesst ohne Antwort
+POSTS.clear(); DROP.update(n=1, apply=False)
+r = shelly.midea_set(dev_id, target=23.5)
+assert len(POSTS) == 2 and r["target_c"] == 23.5, (POSTS, r)                                  # erster Versuch verloren: neu versucht
+POSTS.clear(); DROP.update(n=1, apply=True)
+r = shelly.midea_set(dev_id, target=24.0)
+assert len(POSTS) == 1 and r["target_c"] == 24.0, (POSTS, r)                                  # Befehl kam an, Antwort fehlte: Zustand zeigt es, kein zweiter Versuch
+POSTS.clear(); DROP.update(n=3, apply=False)
+try:
+    shelly.midea_set(dev_id, target=25.0); raise AssertionError("drei verlorene Versuche muessen scheitern")
+except shelly.ShellyError as e:
+    assert "nicht angenommen" in str(e) and len(POSTS) == 3, (e, POSTS)
+DROP.update(n=0, apply=False)
 
 # ---------------------------------------------------------------- Regelschritt "Klimaanlage einstellen" nimmt das Geraet an
 base = {"name": "Klima", "mode": "flow", "when": {"mode": "all", "conds": [{"type": "time", "from": "00:00", "to": "24:00"}]}, "else": []}

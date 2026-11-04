@@ -574,6 +574,9 @@ CLIMATE_FANS = {"AUTO": "auto", "LOW": "low", "MEDIUM": "medium", "HIGH": "high"
 CLIMATE_CUSTOM_FANS = {"silent": "silent", "turbo": "max"}
 CLIMATE_SWINGS = {"OFF": "off", "BOTH": "both", "VERTICAL": "vertical", "HORIZONTAL": "horizontal"}
 SET_WAIT_S = 4.0                                     # so lange auf die Rueckmeldung des Geraets nach einem Befehl warten
+CLIMATE_TRIES = 3                                    # der Stick schliesst bei Last manchmal ohne Antwort: bis zu so viele Versuche
+CLIMATE_CHECK_S = 2.5                                # nach einem Abbruch so lange auf die Meldung warten, ob der Befehl doch angekommen ist
+CLIMATE_RETRY_S = 1.0
 
 
 def _rev(table: dict, key):
@@ -669,18 +672,38 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
     if not q:
         raise EsphomeError("Nichts zu setzen")
     obj = split_id(ent)[1]
-    t0 = time.time()
-    try:
-        r = requests.post(_url(ip, "/climate/" + requests.utils.quote(obj, safe="") + "/set"), params=q, timeout=(PROBE_CONNECT_S, 8.0))
-        r.raise_for_status()
-    except requests.RequestException as e:
-        log.warning("ESPHome-Klima %s: Befehl %s fehlgeschlagen: %s", ip, q, e)
+    want = {"mode": q.get("mode"), "target_temperature": q.get("target_temperature"), "fan_mode": q.get("fan_mode"), "swing_mode": q.get("swing_mode"), "preset": q.get("preset")}
+    want = {k: v for k, v in want.items() if v is not None}
+
+    def applied() -> bool:
+        _o, ts2, c2 = _climate_fields(ip, ent)
+        return ts2 > t0 and all(str(c2.get(k) or "").upper() == v.upper() or (_num(c2.get(k)) is not None and _num(c2.get(k)) == _num(v)) for k, v in want.items())
+
+    def wait_applied(sek: float) -> bool:
+        end = time.time() + sek
+        while time.time() < end:
+            if want and applied():
+                return True
+            time.sleep(0.15)
+        return want != {} and applied()
+    t0, err, ok = time.time(), None, False
+    for attempt in range(1, CLIMATE_TRIES + 1):
+        try:
+            r = requests.post(_url(ip, "/climate/" + requests.utils.quote(obj, safe="") + "/set"), params=q, timeout=(PROBE_CONNECT_S, 8.0),
+                              headers={"Connection": "close", "Accept-Encoding": "identity"})
+            r.raise_for_status()
+            ok = True
+            break
+        except requests.RequestException as e:                      # der Stick schliesst bei Last manchmal ohne Antwort - der Befehl kann trotzdem angekommen sein: Zustand pruefen
+            err = e
+            log.info("ESPHome-Klima %s: Versuch %d/%d ohne Antwort (%s)", ip, attempt, CLIMATE_TRIES, e.__class__.__name__)
+            if wait_applied(CLIMATE_CHECK_S):
+                ok = True
+                break
+            time.sleep(CLIMATE_RETRY_S)
+    if not ok:
+        log.warning("ESPHome-Klima %s: Befehl %s fehlgeschlagen: %s", ip, q, err)
         raise EsphomeError("Die Klimaanlage hat den Befehl nicht angenommen oder ist nicht erreichbar.")
     log.info("ESPHome-Klima %s: Befehl %s gesendet", ip, q)
-    want = {"mode": q.get("mode"), "target_temperature": q.get("target_temperature")}
-    while time.time() - t0 < SET_WAIT_S:                                    # die neue Meldung des Geraets abwarten, damit die Anzeige gleich stimmt
-        _o, ts2, c2 = _climate_fields(ip, ent)
-        if ts2 > t0 and all(v is None or str(c2.get(k) or "").upper() == v.upper() or (_num(c2.get(k)) is not None and _num(c2.get(k)) == _num(v)) for k, v in want.items()):
-            break
-        time.sleep(0.15)
+    wait_applied(SET_WAIT_S)                                        # die neue Meldung des Geraets abwarten, damit die Anzeige gleich stimmt
     return climate_status(d)
