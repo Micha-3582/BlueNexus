@@ -122,7 +122,7 @@ assert "außen 10 °C" in shelly.status(d)["info"]
 
 # ---------------------------------------------------------------- Klimafenster
 det = shelly.midea_details(dev_id)
-assert [m["key"] for m in det["modes"]] == ["auto", "cool", "heat", "fan_only", "dry"] and [f["key"] for f in det["fans"]] == ["auto", "low", "medium", "high", "silent", "max"], det
+assert [m["key"] for m in det["modes"]] == ["auto", "cool", "heat", "fan_only", "dry"] and [f["key"] for f in det["fans"]] == ["auto", "low", "medium", "high"], det
 assert [s["key"] for s in det["swings"]] == ["off", "both", "vertical", "horizontal"] and det["min"] == 17.0 and det["max"] == 30.0 and det["step"] == 0.5 and det["supports_eco"] is True
 assert det["modes"][1]["label"] == "Kühlen"
 

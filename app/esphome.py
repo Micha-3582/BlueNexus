@@ -643,7 +643,8 @@ def climate_details(d: dict) -> dict:
     online, ts, c = _climate_fields(ip, ent)
     lab = lambda table, labels, keys: [{"key": table[k], "label": labels.get(table[k], table[k])} for k in keys if k in table]
     fans = lab(CLIMATE_FANS, midea.FAN_LABELS, [str(x).upper() for x in c.get("fan_modes") or []])
-    fans += [{"key": CLIMATE_CUSTOM_FANS[k], "label": midea.FAN_LABELS.get(CLIMATE_CUSTOM_FANS[k], k)} for k in (str(x).lower() for x in c.get("custom_fan_modes") or []) if k in CLIMATE_CUSTOM_FANS]
+    # Die Sonderstufen "silent"/"turbo" meldet die ESPHome-Midea-Komponente immer, auch wenn die Anlage sie nicht kann -> nicht anbieten
+    # (gesetzt werden koennen sie weiter, z. B. aus einer alten Regel; Anzeige bleibt dann "Flüster"/"maximal").
     return {"state": st, "min": _num(c.get("min_temp")) or 16.0, "max": _num(c.get("max_temp")) or 30.0, "step": _num(c.get("step")) or 0.5,
             "modes": lab(CLIMATE_MODES, midea.MODE_LABELS, [str(x).upper() for x in c.get("modes") or []]), "fans": fans,
             "swings": lab(CLIMATE_SWINGS, midea.SWING_LABELS, [str(x).upper() for x in c.get("swing_modes") or []]),

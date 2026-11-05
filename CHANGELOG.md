@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.8 – 05.11.2026
+- Fehlerbehebung: Bei der ESPHome-Klimaanlage bot das Klima-Fenster die Lüfterstufen **„Flüster“ und „maximal“** an, obwohl die Anlage sie nicht kann (die ESPHome-Komponente meldet sie immer). Jetzt erscheinen nur noch Automatik, niedrig, mittel und hoch wie bei den Midea-Anlagen.
+
 ## 1.34.7 – 04.11.2026
 - Fehlerbehebung: **ESPHome-Klimaanlage schaltete sich beim Einstellen ein.** Bei ESPHome ist der Modus zugleich der Ein/Aus-Schalter; wer bei ausgeschalteter Anlage „Heizen“ oder einen Lüfter wählte, startete sie damit. Jetzt gilt wie bei den Midea-Anlagen: **Ist die Anlage aus, wird nur vorgemerkt** (Modus, Soll, Lüfter, Schwenken, Eco); das Klima-Fenster zeigt die Vorwahl, und erst **Einschalten** schickt alles gemeinsam an die Anlage. Ausschalten verwirft die Vorwahl, ebenso das Einschalten per Fernbedienung. Ein Neustart von BlueNexus vergisst die Vorwahl.
 - Intern: `t_esphome_ac` prüft Vorwahl, Einschalten mit und ohne eigene Angaben und das Verwerfen.
