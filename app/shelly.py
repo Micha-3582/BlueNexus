@@ -21,6 +21,7 @@ from concurrent.futures import TimeoutError as FutTimeout
 
 import requests
 
+import bambu
 import esphome
 import homematic
 import pins
@@ -64,6 +65,7 @@ ICONS += ["🏠", "🏡", "🏘️", "🏗️", "🏭", "🏪", "🏫", "🏥", 
           "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦆", "🦉", "🐴", "🐢", "🐟", "🐠", "🐝", "🐞", "🦋",
           "🎉", "🎈", "🎁", "🎄", "🎃", "🎆", "🎇", "🧨", "🎂", "🎵", "🎶", "🎼", "🎲", "🎯", "🎮", "🕹️", "🧩", "♟️", "🎨", "🖼️", "📚", "📖", "📝", "📅", "📆", "📋", "📁", "📂", "🗂️", "🗄️", "📦", "📮", "📫",
           "❤️", "💙", "💚", "💛", "🧡", "💜", "🖤", "🤍", "⚠️", "⛔", "🚫", "✅", "❌", "❗", "❓", "ℹ️", "🔔", "🔕", "⏰", "⏳", "⌛", "🔃", "🔄", "➕", "➖", "🔴", "🔵", "⚪", "⚫", "🔶", "🔷", "🔺", "🔻", "💠", "🔲", "🔳", "▪️", "◾", "🏁", "🚩", "🏳️", "🏴"]
+ICONS += ["🖨️"]
 ICONS[:] = list(dict.fromkeys(ICONS))
 DEFAULT_ICON = ICONS[0]
 
@@ -695,7 +697,7 @@ def update(dev_id: str, name: str | None = None, icon: str | None = None,
             if min_off_min is not None:
                 d["min_off_min"] = _num(min_off_min, 0, 1440, "Mindest-Pause")
             sw = d.get("switchable", True) if switchable is None else bool(switchable)
-            if d.get("kind") == "esphome":
+            if d.get("kind") in ("esphome", "bambu"):
                 sw = False                      # ein Taster meldet nur Druecke, es gibt nichts zu schalten
             if auto and not sw:
                 raise ShellyError("Nur-Überwachung: ein nicht schaltbares Gerät kann nicht in der Automatik verwendet werden")
@@ -771,6 +773,7 @@ def remove(dev_id: str) -> bool:
         return False
     _save(keep)
     esphome.resync()                                        # nicht mehr benoetigte Verbindung zu einem ESPHome-Geraet trennen
+    bambu.sync(keep)                                        # ebenso zu einem Bambu-Lab-Drucker
     return True
 
 
@@ -797,6 +800,11 @@ def status(d: dict) -> dict:
     key = d.get("id")
     if d.get("kind") == "esphome_ac":                      # Klimaanlage: Zustand kommt aus der gehaltenen Verbindung (esphome.py)
         st = esphome.climate_status(d)
+        if key is not None:
+            _st_cache[key] = (time.time(), dict(st))
+        return st
+    if d.get("kind") == "bambu":                           # Bambu-Lab-Drucker: Zustand kommt aus der gehaltenen Verbindung (bambu.py)
+        st = bambu.status(d)
         if key is not None:
             _st_cache[key] = (time.time(), dict(st))
         return st
@@ -869,7 +877,7 @@ def status_cached(d: dict, max_age: float = 5.0) -> dict:
     wird er genommen; ist er aelter (bis STALE_OK_S), kommt er sofort und das Geraet wird im Hintergrund aufgefrischt (die naechste Anzeige ist aktuell);
     erst ohne brauchbaren Stand wird wirklich gewartet. Regeln und Automatik fragen weiter live ab (status)."""
     key, now = d.get("id"), time.time()
-    if d.get("kind") in ("esphome", "esphome_ac", "esphome_sw"):         # Taster/Klima/Schalter: liest nur den Speicher (esphome.py) - kein Zwischenspeicher, sonst waere ein kurzer Druck nicht zu sehen
+    if d.get("kind") in ("esphome", "esphome_ac", "esphome_sw", "bambu"):         # Taster/Klima/Schalter/Drucker: liest nur den Speicher (esphome.py) - kein Zwischenspeicher, sonst waere ein kurzer Druck nicht zu sehen
         return status(d)
     hit = _st_cache.get(key)
     if hit and now - hit[0] <= max_age:
@@ -935,7 +943,7 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
         raise ShellyError("Gerät nicht gefunden")
     _down.pop(dev_id, None)                                  # wer schaltet, will den echten Zustand sehen: Ruhezeit nach einem Offline-Befund aufheben
     _st_cache.pop(dev_id, None)                              # und der gemerkte Zustand gilt nicht mehr (naechste Anzeige fragt neu)
-    if d.get("switchable") is False or d.get("kind") == "esphome":
+    if d.get("switchable") is False or d.get("kind") in ("esphome", "bambu"):
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
     if d.get("kind") == "esphome_sw":
         try:
@@ -1053,6 +1061,11 @@ DEVICE_METRICS = {                                                    # Schluess
     "outdoor_c": ("Außentemperatur", "°C", "temperature"),
     "target_c": ("Solltemperatur", "°C", "temperature"),
     "power": ("Leistung", "W", "power"),
+    "nozzle_c": ("Düsentemperatur", "°C", "temperature"),                 # Bambu-Lab-Drucker
+    "bed_c": ("Betttemperatur", "°C", "temperature"),
+    "chamber_c": ("Kammertemperatur", "°C", "temperature"),
+    "progress": ("Druckfortschritt", "%", "progress"),
+    "remaining_min": ("Restzeit des Drucks", "min", "duration"),
 }
 
 

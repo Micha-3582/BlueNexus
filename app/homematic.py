@@ -458,7 +458,9 @@ SENSOR_KINDS = {
     "smoke": ("Rauchmelder", "", True, ["SMOKE_DETECTOR_ALARM_STATUS", "STATE"]),     # HmIP-SWSD u. a.: wahr = Alarm (Rauch, Einbruch oder Alarm eines verbundenen Melders)
     "lock": ("Türschloss", "", True, ["LOCK_STATE"]),                      # wahr = verriegelt (HmIP-DLD: LOCK_STATE 1 = verriegelt, 2 = entriegelt)
     "voltage": ("Spannung", "V", False, []),                               # nur Funkthermometer (Batterie)
-    "signal": ("Funkstärke", "dBm", False, []),                            # nur Funkthermometer (WLAN-Empfang)
+    "signal": ("Funkstärke", "dBm", False, []),
+    "progress": ("Fortschritt", "%", False, []),                           # nur Geraete-Messwert (Bambu-Lab-Druckfortschritt)
+    "duration": ("Dauer", "min", False, []),                               # nur Geraete-Messwert (Restzeit eines Drucks)                            # nur Funkthermometer (WLAN-Empfang)
 }
 # Welche kanaltypen zu welchen Sensorarten gehoeren koennen (Teilstrings des channelType)
 _SENSOR_HINTS = [

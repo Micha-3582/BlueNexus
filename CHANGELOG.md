@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.39.0 – 06.11.2026
+- Neu: **Bambu-Lab-Drucker (Druckstatus).** Unter *Einstellungen → Geräte* (Auswahl „Bambu Lab“) lässt sich ein 3D-Drucker von Bambu Lab (X1C, P1, A1 …) mit Adresse, Seriennummer und Zugangscode anlegen. BlueNexus hält eine Verbindung zum Drucker und zeigt in der Aktorenliste den Zustand („druckt 42 % · noch 1 h 15 min · Düse 220 °C · Bett 60 °C“, „fertig“, „pausiert“, „Fehlermeldung am Drucker“). In Regeln gibt es die Bedingung **druckt / druckt nicht**, ein Druckende („druckt“ wird „druckt nicht“) weckt die Regeln sofort, sodass zum Beispiel ein Chime läuten oder eine Meldung kommen kann. Düsen-, Bett- und Kammertemperatur, Druckfortschritt und Restzeit lassen sich über **Messwert als Sensor** einzeln als Sensoren anlegen. BlueNexus liest nur; der Drucker wird nicht gesteuert. Die Kamera folgt in einem späteren Schritt.
+
 ## 1.38.1 – 06.11.2026
 - Verbessert: Die Knöpfe der **Eigenen Schalter & Knöpfe (Software)** haben jetzt dieselbe zierliche Symbolgröße wie die der Geräte (Ein/Aus und Drücken), sodass alle Knöpfe einheitlich aussehen.
 

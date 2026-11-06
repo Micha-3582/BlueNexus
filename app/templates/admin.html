@@ -699,6 +699,7 @@
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="zigbee"> Zigbee (Phoscon / deCONZ) <span class="qhelp" role="button" tabindex="0" data-help="Zigbee-Geräte über ein Phoscon/deCONZ-Gateway (ConBee/RaspBee), auch mehrere Gateways.">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="midea"> Klimaanlage (Midea / MSmartHome) <span class="qhelp" role="button" tabindex="0" data-help="Klimaanlagen mit Midea-Technik (MSmartHome, NetHome Plus, Comfee, Inventor, Pioneer u. a.).">?</span></label>
       <label class="chk"><input type="checkbox" class="fam-cb" data-fam="esphome"> ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (web_server), zum Beispiel ein selbstgebauter Taster. Der Taster erscheint unter Aktoren und lässt sich in Regeln als Auslöser nutzen.">?</span></label>
+      <label class="chk"><input type="checkbox" class="fam-cb" data-fam="bambu"> Bambu Lab <span class="qhelp" role="button" tabindex="0" data-help="3D-Drucker von Bambu Lab (X1C, P1, A1 …) im Heimnetz. BlueNexus liest den Druckstatus (Fortschritt, Temperaturen, Restzeit, Fehler) und kann damit Regeln auslösen, zum Beispiel eine Meldung, wenn der Druck fertig ist. Dafür braucht der Drucker den LAN-Zugriff und seinen Zugangscode.">?</span></label>
     </div>
     <div class="muted" id="fam-hint" style="margin-top:8px" hidden>Noch kein System gewählt.</div>
   </div>
@@ -747,6 +748,18 @@
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
     <button id="esphome-scan" class="ghost">Gerät suchen</button>
+  </div>
+</div>
+
+<div class="card fam-card" id="fam-bambu" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Bambu Lab (3D-Drucker)</h2>
+  <div class="sub">Druckstatus eines Bambu-Lab-Druckers lesen (Fortschritt, Temperaturen, Restzeit, Fehler). Adresse, Seriennummer und Zugangscode findest du am Drucker unter Einstellungen → WLAN bzw. Geräteinfo.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="bambu-ip" placeholder="IP, z.B. 192.168.178.50" inputmode="decimal" autocomplete="off" style="flex:1;min-width:170px">
+    <input type="text" id="bambu-serial" placeholder="Seriennummer" autocomplete="off" style="flex:1;min-width:170px">
+    <input type="password" id="bambu-code" placeholder="Zugangscode" autocomplete="off" style="flex:1;min-width:140px">
+    <input type="text" id="bambu-name" placeholder="Name (optional)" maxlength="60" autocomplete="off" style="flex:1;min-width:150px">
+    <button id="bambu-add" class="ghost">Drucker hinzufügen</button>
   </div>
 </div>
 
@@ -2143,7 +2156,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
           <button type="button" class="tgl" title="IP-Adresse speichern (z. B. wenn der Router dem Gerät eine neue vergeben hat)" aria-label="IP-Adresse speichern" onclick="shellyIpSave('${id}')">${I_CHECK}</button></div>` : ''}
         <div class="edit-row" style="margin-top:10px">
           ${tglBtn(!!d.show, I_EYE, 'Auf dem Dashboard anzeigen', `tglField(this,'shelly','${id}','show','Dashboard')`)}
-          ${d.kind === 'esphome' ? '' : tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
+          ${d.kind === 'esphome' || d.kind === 'bambu' ? '' : tglBtn(d.switchable !== false, I_SWITCH, 'Schaltbar (aus = nur Überwachung: Leistung und Status anzeigen, nicht schalten)', `tglField(this,'shelly','${id}','switchable','Schaltbar')`)}
           ${d.kind !== 'remote' && d.kind !== 'esphome' ? `<button type="button" class="tgl${d.as_sensor ? ' on' : ''}" title="${d.as_sensor ? 'Es gibt einen Sensor zu diesem Gerät – hier ändern (Bedeutung, Name) oder entfernen' : 'Zustand zusätzlich als Sensor anzeigen (z. B. Torstatus: offen / geschlossen)'}" aria-label="Zustand als Sensor" data-name="${escH(d.name)}" data-sensor="${escH(d.as_sensor || '')}" onclick="devAsSensor('${id}', this.dataset.name, this.dataset.sensor)">${I_SENSORDEV}</button>` : ''}
           ${d.kind !== 'remote' && d.kind !== 'esphome' ? `<button type="button" class="tgl" title="Einen Messwert dieses Geräts als eigenen Sensor anlegen (z. B. die Außentemperatur der Klimaanlage oder die Leistung) – lässt sich einzeln teilen" aria-label="Messwert als Sensor" data-name="${escH(d.name)}" onclick="devMetric('${id}', this.dataset.name)">${I_METRIC}</button>` : ''}
           ${d.kind === 'tasmota' ? tglBtn(!!d.hook, I_BELL, 'Schaltvorgänge von außen im Logbuch (z. B. Lichtschranke, Taster am Gerät, eigener Timer): das Gerät meldet jedes Schalten an BlueNexus. Trägt eine Regel in das Gerät ein (Regel 3).', `tasHook('${id}', ${!!d.hook})`) : ''}
@@ -2654,10 +2667,10 @@ document.getElementById('devlog-q')?.addEventListener('input', () => { clearTime
 setInterval(() => { const c = document.getElementById('fam-devlog'); if (c && c.offsetParent !== null && !document.hidden && document.activeElement !== document.getElementById('devlog-q')) loadDevLog(); }, 3000);
 loadDevLog();
 function applyFamilies(f) {
-  const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea', 'esphome'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
+  const any = ['shelly', 'tasmota', 'tuya', 'homematic', 'zigbee', 'midea', 'esphome', 'bambu'].some(k => f[k]);      // Wake-on-LAN ist immer verfuegbar
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
-  show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); show('fam-esphome', f.esphome); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
+  show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); show('fam-esphome', f.esphome); show('fam-bambu', f.bambu); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
   window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || f.esphome || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
   { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
@@ -2697,6 +2710,17 @@ document.getElementById('esphome-scan').addEventListener('click', async e => {  
         if (pick('dev').length) await shellyApi('/api/esphome/add', 'POST', { ip, ids: pick('dev'), edits: pe('dev') });
         if (pick('sen').length) await shellyApi('/api/esphome/sensors/add', 'POST', { ids: pick('sen'), edits: pe('sen') });
       } });
+  } catch (err) { shellyMsg(err.message, true); }
+  b.disabled = false;
+});
+document.getElementById('bambu-add').addEventListener('click', async e => {
+  const b = e.target, g = id => document.getElementById(id), body = { ip: g('bambu-ip').value.trim(), serial: g('bambu-serial').value.trim(), code: g('bambu-code').value.trim(), name: g('bambu-name').value.trim() };
+  if (!body.ip || !body.serial || !body.code) { shellyMsg('Adresse, Seriennummer und Zugangscode eintragen.', true); return; }
+  b.disabled = true; shellyMsg('Verbinde mit dem Drucker … (bis zu 15 Sekunden)');
+  try {
+    await shellyApi('/api/bambu/add', 'POST', body);
+    ['bambu-ip', 'bambu-serial', 'bambu-code', 'bambu-name'].forEach(i => { g(i).value = ''; });
+    shellyMsg('Drucker angelegt – er steht unter Aktoren.'); loadShellyAdmin();
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });

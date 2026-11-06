@@ -33,6 +33,7 @@ import json
 import os
 
 import share
+import bambu
 import esphome
 import esphome_devices
 import shelly
@@ -349,7 +350,7 @@ ENDPOINT_AREA = {
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
-    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten", "api_esphome_scan": "smarthome_einrichten", "api_esphome_add": "smarthome_einrichten", "api_esphome_sensor_scan": "smarthome_einrichten", "api_esphome_sensor_add": "smarthome_einrichten",
+    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten", "api_esphome_scan": "smarthome_einrichten", "api_esphome_add": "smarthome_einrichten", "api_bambu_add": "smarthome_einrichten", "api_esphome_sensor_scan": "smarthome_einrichten", "api_esphome_sensor_add": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
@@ -2464,6 +2465,8 @@ class Controller:
             store.repair_fixed_costs_once()
         threading.Thread(target=_fixed_price_housekeeping, daemon=True).start()
         homematic.add_listener(self._rules_wake.set)               # Meldung der CCU -> Regeln sofort pruefen
+        bambu.set_wake(self._rules_wake.set)                       # Bambu-Drucker: Druck fertig/Fehler weckt die Regeln sofort
+        threading.Thread(target=lambda: bambu.sync(shelly.load_devices()) if store.module_on("smarthome") and not (demo.ACTIVE or sandbox.ACTIVE) else None, daemon=True).start()
         esphome.start(self._rules_wake.set, lambda: store.module_on("smarthome") and not (demo.ACTIVE or sandbox.ACTIVE))        # ESPHome-Taster: Druck weckt die Regeln sofort
         notify_in.start(_telegram_words, self._rules_wake.set, lambda: not (demo.ACTIVE or sandbox.ACTIVE))        # Telegram-Befehle (Triggerworte)
         homematic.push_start()
@@ -4703,7 +4706,7 @@ def api_homematic_sensor_add():
     return jsonify({"added": len(added)}), 201
 
 
-FAMILIES = ("shelly", "tasmota", "tuya", "homematic", "zigbee", "midea", "esphome", "wol")
+FAMILIES = ("shelly", "tasmota", "tuya", "homematic", "zigbee", "midea", "esphome", "bambu", "wol")
 
 
 def _families() -> dict:
@@ -4718,6 +4721,7 @@ def _families() -> dict:
             "zigbee": "zigbee" in kinds or bool(zigbee.credentials_public().get("configured")),
             "midea": "midea" in kinds,
             "esphome": "esphome" in kinds or "esphome_ac" in kinds or "esphome_sw" in kinds,
+            "bambu": "bambu" in kinds,
             "wol": bool(wol.load())}
 
 
@@ -6424,6 +6428,19 @@ def api_esphome_sensor_add():
         return jsonify(error=str(e)), 400
     _apply_edits(added, _edits(), "sensor")
     return jsonify({"added": len(added)}), 201
+
+
+@app.route("/api/bambu/add", methods=["POST"])
+def api_bambu_add():
+    """Bambu-Lab-Drucker anlegen (Adresse, Seriennummer, Zugangscode): prueft die Verbindung und legt ihn als Geraet an (nur Status, nicht schaltbar)."""
+    b = request.get_json(silent=True) or {}
+    if not all(isinstance(b.get(k), str) for k in ("ip", "serial", "code")):
+        return jsonify(error="Adresse, Seriennummer und Zugangscode fehlen"), 400
+    try:
+        dev = bambu.add_device(b["ip"], b["serial"], b["code"], b.get("name") if isinstance(b.get("name"), str) else "")
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(added=[dev]), 201
 
 
 @app.route("/api/esphome/add", methods=["POST"])
