@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.40.1 – 06.11.2026
+- Behoben: **Trefferlisten verschiedener Systeme vermischten sich.** Wer unter *Geräte suchen* zuerst bei einem System (z. B. Tuya) und dann bei einem anderen (z. B. Zigbee) suchte, sah die Treffer beider Systeme in derselben Liste, und „Hinzufügen“ konnte beim falschen System landen. Jetzt behält jedes System-Fenster **seine eigene Trefferliste und Meldung**: beim Wechsel in ein anderes Fenster wird die Liste beiseitegelegt und beim Zurückkehren wieder angezeigt. Wechselt man während einer laufenden Suche das Fenster, werden die späteren Treffer nicht mehr in das andere Fenster geschrieben.
+
 ## 1.40.0 – 06.11.2026
 - Neu: **Ein Suchknopf je System.** Unter *Smart Home → Geräte suchen* gibt es pro System genau einen Knopf („Shellys suchen“, „Tasmota / WLED suchen“, „Homematic suchen“, „Zigbee suchen“ …). Er findet alles, was das System liefert, und zeigt es **gruppiert in einer Liste**: bei Homematic Geräte, Sensoren, Thermostate, Türschlösser, Soundmodule und Rollläden, bei Zigbee Lichter/Steckdosen, Sensoren und Thermostate, bei Tasmota Geräte und Messwerte. Die zusätzlichen Knöpfe („Homematic-Sensoren suchen“, „Zigbee-Thermostate suchen“, „Tasmota-Messwerte suchen“ …) und das getrennte IP-Feld samt zweitem „Suchen“-Knopf bei Shelly und Tasmota entfallen: Steht eine IP im Feld, wird nur dieses Gerät gesucht.
 - Verschoben: **Kamera-Bewegung** und **Tasmota-Messwerte** stehen nicht mehr im Reiter *Sensoren*, sondern bei *Geräte suchen* (neues Fenster **Kameras** mit „Kameras suchen“). Der Reiter *Sensoren* zeigt nur noch die Sensorliste.

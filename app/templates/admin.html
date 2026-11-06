@@ -2660,10 +2660,19 @@ function applyFamilies(f) {
   show('fam-vlan', f.shelly || f.tasmota || f.tuya);
   document.getElementById('fam-hint').hidden = any;
 }
-/* Meldung + Suchergebnisse wandern zu dem System-Fenster, in dem gerade geklickt wurde */
+/* Meldung + Suchergebnisse wandern zu dem System-Fenster, in dem gerade geklickt wurde. Jedes Fenster behält dabei SEINE Ergebnisse:
+   beim Verlassen werden Liste und Meldung (samt den zugehörigen Hinzufügen-Funktionen) beiseitegelegt und beim Zurückkehren wiederhergestellt -
+   so landen Tuya-Treffer nie in der Zigbee-Liste und umgekehrt. */
+const SEARCH_STASH = new Map();                       // Fenster -> { html, specs }
 document.addEventListener('click', e => {
   const c = e.target.closest('.fam-card, .msg-host'), out = document.getElementById('search-out');
-  if (c && out && out.parentNode !== c) c.appendChild(out);
+  if (!c || !out || out.parentNode === c) return;
+  SEARCH_STASH.set(out.parentNode, { html: out.innerHTML, specs: { ...FOUND_SPECS } });       // Ergebnisse des bisherigen Fensters merken
+  Object.keys(FOUND_SPECS).forEach(k => delete FOUND_SPECS[k]);
+  const mine = SEARCH_STASH.get(c);
+  out.innerHTML = mine ? mine.html : '<div class="muted" id="shelly-msg" style="margin-top:8px"></div><div id="shelly-found" style="display:flex;flex-direction:column;gap:2px;margin-top:8px"></div>';
+  if (mine) Object.assign(FOUND_SPECS, mine.specs);
+  c.appendChild(out);
 }, true);
 document.getElementById('esphome-scan').addEventListener('click', async e => {      // ein Knopf für alles: Taster, Klimaanlagen, Schalter und Messwerte
   const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
@@ -3524,23 +3533,29 @@ const idsAdd = url => (ids, edits) => shellyApi(url, 'POST', { ids, edits });
 function listSource(o) {          // eine Suche, deren Treffer als eigener Abschnitt der Liste erscheinen
   return { name: o.label, run: async () => {
     const found = await shellyApi(o.url, 'POST', o.body ? o.body() : undefined), fresh = found.filter(f => !f.known);
+    if (searchMoved()) return null;                              // anderes Fenster geöffnet: Treffer nicht dort hineinschreiben
     foundList(fresh, { key: o.key || (f => f.id), icons: o.icons || null, reload: o.reload, sub: o.sub, add: o.add, section: o.sec, title: o.title });
     return { n: found.length, fresh: fresh.length, label: o.label };
   } };
 }
 async function familySearch(btn, sources, busy, empty) {
+  SEARCH_HOME = document.getElementById('search-out').parentNode;
   btn.disabled = true; shellyMsg(busy);
   document.getElementById('shelly-found').innerHTML = '';
   if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (e) { /* egal */ } }
   const parts = [], failed = []; let firstErr = null;
   for (const src of sources) {                                   // nacheinander: schont Geräte und Gateways
+    if (searchMoved()) break;
     try { const r = await src.run(); if (r) parts.push(r); } catch (err) { failed.push(src.name); if (!firstErr) firstErr = err; }
   }
+  if (searchMoved()) { btn.disabled = false; return; }
   const n = parts.reduce((a, p) => a + p.n, 0), fresh = parts.reduce((a, p) => a + p.fresh, 0);
   if (!parts.length && firstErr) shellyMsg(firstErr.message, true);
   else shellyMsg(n ? `Gefunden: ${parts.filter(p => p.n).map(p => p.n + ' ' + p.label).join(', ')} – ${fresh} noch nicht angelegt.` + (failed.length ? ` (Nicht abfragbar: ${failed.join(', ')}.)` : '') : (empty || 'Nichts gefunden.'), !n && !!failed.length);
   btn.disabled = false;
 }
+let SEARCH_HOME = null;                                          // Fenster, in dem die laufende Suche gestartet wurde
+const searchMoved = () => !!SEARCH_HOME && document.getElementById('search-out').parentNode !== SEARCH_HOME;      // Nutzer ist inzwischen in einem anderen Fenster
 const foundRows = () => document.querySelectorAll('#shelly-found > [data-key]').length;
 const tasmotaIp = () => document.getElementById('tasmota-ip').value.trim();
 document.getElementById('shelly-scan').addEventListener('click', e => {
