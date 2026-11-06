@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.40.0 – 06.11.2026
+- Neu: **Ein Suchknopf je System.** Unter *Smart Home → Geräte suchen* gibt es pro System genau einen Knopf („Shellys suchen“, „Tasmota / WLED suchen“, „Homematic suchen“, „Zigbee suchen“ …). Er findet alles, was das System liefert, und zeigt es **gruppiert in einer Liste**: bei Homematic Geräte, Sensoren, Thermostate, Türschlösser, Soundmodule und Rollläden, bei Zigbee Lichter/Steckdosen, Sensoren und Thermostate, bei Tasmota Geräte und Messwerte. Die zusätzlichen Knöpfe („Homematic-Sensoren suchen“, „Zigbee-Thermostate suchen“, „Tasmota-Messwerte suchen“ …) und das getrennte IP-Feld samt zweitem „Suchen“-Knopf bei Shelly und Tasmota entfallen: Steht eine IP im Feld, wird nur dieses Gerät gesucht.
+- Verschoben: **Kamera-Bewegung** und **Tasmota-Messwerte** stehen nicht mehr im Reiter *Sensoren*, sondern bei *Geräte suchen* (neues Fenster **Kameras** mit „Kameras suchen“). Der Reiter *Sensoren* zeigt nur noch die Sensorliste.
+
 ## 1.39.3 – 06.11.2026
 - Behoben: Das **Smart-Home-Menü** passte mit den Symbolen am Computer nicht mehr in die Leiste, der letzte Knopf („Sonstiges“) war abgeschnitten. Die Knöpfe sind etwas schmaler, und reicht die Breite trotzdem nicht, rutscht der Rest in eine zweite Zeile, sodass alles sichtbar ist und nichts gescrollt werden muss. Auf dem Handy bleibt es bei einer Zeile mit Symbolen.
 

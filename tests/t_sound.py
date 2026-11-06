@@ -91,5 +91,6 @@ assert c.delete("/api/homematic/sounds/hmA-OEQ0009001-1").status_code == 200
 r = c.post("/api/homematic/sounds/add", json={"ids": ["hmA-OEQ0009001-1"], "edits": {"hmA-OEQ0009001-1": {"icon": "nix"}}}); assert r.status_code == 400 and c.get("/api/homematic/sounds").get_json() == []
 assert c.post("/api/homematic/sounds/scan").get_json()[0]["icon"] == "🔔"
 page = c.get("/rules").get_data(as_text=True); assert "Sound abspielen" in page
-assert "hm-sound-scan" in c.get("/smarthome").get_data(as_text=True)
+page = c.get("/smarthome").get_data(as_text=True)
+assert "hm-sound-scan" not in page and "/api/homematic/sounds/scan" in page, "ein Homematic-Knopf sucht auch die Soundmodule"
 print("SOUND OK")

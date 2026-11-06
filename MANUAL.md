@@ -347,9 +347,9 @@ Admin legt fest, welche Kacheln global sichtbar sind und in welcher Reihenfolge.
 | **Wake-on-LAN** | Rechner zum Aufwecken (Kapitel 11). |
 | **Sonstiges** | Homematic-Push sowie Verweise auf Dashboard-Kacheln, Telegram und Logbücher. |
 
-Die Reiter passen sich der Bildschirmbreite an: Am **PC** (breites Fenster) stehen die **Namen** als Text, am **Handy** (schmal) nur **Symbole**, deren Name beim Darüberfahren erscheint und in der Überschrift der Karte steht. Trennstriche gruppieren die Leiste vor und nach „Regeln“.
+Die Reiter passen sich der Bildschirmbreite an: Am **PC** (breites Fenster) stehen **Symbol und Name**, reicht die Breite nicht, rutscht der Rest in eine zweite Zeile; am **Handy** (schmal) stehen nur **Symbole**, deren Name beim Darüberfahren erscheint und in der Überschrift der Karte steht. Trennstriche gruppieren die Leiste vor und nach „Regeln“.
 
-Zum Einrichten: Unter **Geräte suchen** per Häkchen wählen, **welche Systeme du hast**. Für jedes angekreuzte System erscheint ein eigenes Fenster zum Suchen und Einrichten. Bereits eingerichtete Geräte bleiben immer sichtbar. Wer keine Rechte für „Smart Home“ hat, sieht nur die Reiter, die ihm freigegeben sind (z. B. nur „Regeln“).
+Zum Einrichten: Unter **Geräte suchen** per Häkchen wählen, **welche Systeme du hast**. Für jedes angekreuzte System erscheint ein eigenes Fenster zum Suchen und Einrichten, **mit genau einem Suchknopf** (zum Beispiel „Homematic suchen“): Er findet alles, was das System liefert (Geräte, Sensoren, Thermostate …), und zeigt es gruppiert in einer Trefferliste. Die Fenster stehen in der Reihenfolge der Häkchen: Shelly, Tasmota / WLED, Tuya, Homematic, Zigbee, Klimaanlage, ESPHome, Bambu Lab, Kameras. Bereits eingerichtete Geräte bleiben immer sichtbar. Wer keine Rechte für „Smart Home“ hat, sieht nur die Reiter, die ihm freigegeben sind (z. B. nur „Regeln“).
 
 **Treffer erst ansehen, dann hinzufügen (alle Systeme):** Ob Shelly, Tasmota (auch per eingetippter IP-Adresse), Tuya, Homematic oder Zigbee – gefundene Geräte landen **nicht sofort** in der Geräteliste, sondern erscheinen unter dem jeweiligen System. Dort kannst du den **Namen** (bei Geräten und Sensoren auch das **Symbol**) schon anpassen und erst dann auf **Hinzufügen** klicken; „Alle hinzufügen“ übernimmt alle Zeilen mit ihren Namen. Passwortgeschützte Shelly/Tasmota fragen vorher nach dem Passwort.
 
@@ -359,11 +359,11 @@ Jedes Gerät hat eine Zeile mit Symbol (antippen = anderes Symbol wählen), Name
 
 | System | Einrichtung |
 |---|---|
-| **Shelly** (Gen1–Gen3) | „Shellys suchen“ durchsucht das Heimnetz, oder IP einzeln eintragen. |
-| **Tasmota / WLED** | „Tasmota / WLED suchen“ (eine Suche für beide) oder IP einzeln eintragen. **WLED**-Lampen/-Streifen werden an der JSON-Schnittstelle erkannt, lassen sich ein-/ausschalten (auch in Regeln, per Alexa, auf dem Dashboard) und in der Geräteliste mit einem **Helligkeits-Regler** dimmen (ganz links 0 % = aus, ganz rechts 100 %; beim Loslassen übernommen). Über den Knopf **🎨** unter einer WLED-Lampe (Geräteliste, Reiter Aktoren) stellst du **Farbe**, **Effekt**, **Farbpalette** und eine **Voreinstellung** (Preset aus WLED) direkt ein; jede Änderung schaltet die Lampe ein. Beim Einschalten durch Regeln/Dashboard/Alexa behält WLED seine zuletzt eingestellte Helligkeit, Farbe und den Effekt. Mit **„💾 Aktuelle Einstellung speichern …“** speicherst du, wie die Lampe gerade leuchtet (Farbe, Effekt, Palette, Helligkeit), unter einem Namen als **Voreinstellung in WLED** (gleicher Name überschreibt; es werden die kleinsten freien Plätze 1–250 belegt). **In Regeln** (Art „Ablauf“) gibt es den Schritt **„WLED: Voreinstellung / Farbe setzen“**: entweder eine Voreinstellung der Lampe aufrufen (die Liste wird aus der Lampe geladen) oder eine Farbe (mit optionaler Helligkeit in %) setzen. Ein- und Ausschalten geht wie bei jedem Gerät über „Gerät ein-/ausschalten“. Tipp: Lampe in der Geräteliste einstellen, als Voreinstellung speichern und diese in der Regel aufrufen (z. B. „bei Sonnenuntergang Voreinstellung Warmweiß“). Die Lampe lässt sich nicht entfernen, solange eine eingeschaltete Regel sie benutzt. Einen eingebauten Rückschalt-Timer gibt es bei WLED hier nicht. **Messwerte:** Tasmota-Geräte mit Fühlern (DS18B20, DHT, BME280 …) oder Strommessung – auch **ohne Relais**, z. B. ein Selbstbau mit zwei Temperaturfühlern – erscheinen unter *Sensoren* → **„Tasmota-Messwerte suchen“**. Pro Messwert (Temperatur, Luftfeuchte, Luftdruck, Helligkeit, Leistung) wird ein Sensor angelegt, mit Dashboard, Verlauf und Regeln wie jeder andere. Findet die Suche ein Gerät nicht (z. B. weil es langsam antwortet), die **IP daneben eintragen** – dann wird genau dieses Gerät abgefragt und eine Fehlermeldung nennt den Grund (nicht erreichbar, passwortgeschützt, kein Fühler erkannt). Fahrenheit wird in °C umgerechnet; ändert sich die IP des Geräts, folgen die Sensoren. |
+| **Shelly** (Gen1–Gen3) | „Shellys suchen“ durchsucht das Heimnetz; steht eine IP im Feld, wird nur dieses Gerät gesucht. |
+| **Tasmota / WLED** | „Tasmota / WLED suchen“ (eine Suche für Geräte und Messwerte; steht eine IP im Feld, wird nur dieses Gerät gesucht). **WLED**-Lampen/-Streifen werden an der JSON-Schnittstelle erkannt, lassen sich ein-/ausschalten (auch in Regeln, per Alexa, auf dem Dashboard) und in der Geräteliste mit einem **Helligkeits-Regler** dimmen (ganz links 0 % = aus, ganz rechts 100 %; beim Loslassen übernommen). Über den Knopf **🎨** unter einer WLED-Lampe (Geräteliste, Reiter Aktoren) stellst du **Farbe**, **Effekt**, **Farbpalette** und eine **Voreinstellung** (Preset aus WLED) direkt ein; jede Änderung schaltet die Lampe ein. Beim Einschalten durch Regeln/Dashboard/Alexa behält WLED seine zuletzt eingestellte Helligkeit, Farbe und den Effekt. Mit **„💾 Aktuelle Einstellung speichern …“** speicherst du, wie die Lampe gerade leuchtet (Farbe, Effekt, Palette, Helligkeit), unter einem Namen als **Voreinstellung in WLED** (gleicher Name überschreibt; es werden die kleinsten freien Plätze 1–250 belegt). **In Regeln** (Art „Ablauf“) gibt es den Schritt **„WLED: Voreinstellung / Farbe setzen“**: entweder eine Voreinstellung der Lampe aufrufen (die Liste wird aus der Lampe geladen) oder eine Farbe (mit optionaler Helligkeit in %) setzen. Ein- und Ausschalten geht wie bei jedem Gerät über „Gerät ein-/ausschalten“. Tipp: Lampe in der Geräteliste einstellen, als Voreinstellung speichern und diese in der Regel aufrufen (z. B. „bei Sonnenuntergang Voreinstellung Warmweiß“). Die Lampe lässt sich nicht entfernen, solange eine eingeschaltete Regel sie benutzt. Einen eingebauten Rückschalt-Timer gibt es bei WLED hier nicht. **Messwerte:** Tasmota-Geräte mit Fühlern (DS18B20, DHT, BME280 …) oder Strommessung – auch **ohne Relais**, z. B. ein Selbstbau mit zwei Temperaturfühlern – erscheinen unter *Sensoren* → **„Tasmota-Messwerte suchen“**. Pro Messwert (Temperatur, Luftfeuchte, Luftdruck, Helligkeit, Leistung) wird ein Sensor angelegt, mit Dashboard, Verlauf und Regeln wie jeder andere. Findet die Suche ein Gerät nicht (z. B. weil es langsam antwortet), die **IP daneben eintragen** – dann wird genau dieses Gerät abgefragt und eine Fehlermeldung nennt den Grund (nicht erreichbar, passwortgeschützt, kein Fühler erkannt). Fahrenheit wird in °C umgerechnet; ändert sich die IP des Geräts, folgen die Sensoren. |
 | **ESPHome** | Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (`web_server`), zum Beispiel ein selbstgebauter **Taster** oder ein Sensor. IP-Adresse des Geräts eintragen, **Gerät suchen** klicken (ein Knopf findet alles: Taster, Klimaanlagen, Schalter und Messwerte), Name und Symbol anpassen, **Hinzufügen**. Taster, Klimaanlagen und Schalter stehen danach unter **Aktoren** (siehe unten „ESPHome-Taster“), Messwerte unter **Sensoren** (siehe „ESPHome-Messwerte“). |
 | **Tuya / Smart Life** (z. B. Gosund) | Einmalig Zugang (Region, Access ID, Access Secret) von iot.tuya.com eintragen; die Cloud wird nur zum Abholen der Geräteschlüssel gebraucht, geschaltet wird lokal. |
-| **Homematic / HomematicIP (OpenCCU)** | CCU-Adresse, Benutzer, Passwort eintragen (Benutzer mit Schreibrechten). Dann Geräte, Sensoren, Thermostate und Türschlösser suchen. Das Passwort bleibt auf dem Server und wird nie wieder angezeigt. |
+| **Homematic / HomematicIP (OpenCCU)** | CCU-Adresse, Benutzer, Passwort eintragen (Benutzer mit Schreibrechten). Dann **Homematic suchen**: ein Knopf findet Geräte, Sensoren, Thermostate, Türschlösser, Soundmodule und Rollläden und zeigt sie gruppiert in einer Liste. Das Passwort bleibt auf dem Server und wird nie wieder angezeigt. |
 | **Zigbee (Phoscon / deCONZ)** | In Phoscon *Einstellungen → Gateway → Erweitert → „App autorisieren“* drücken, dann hier innerhalb einer Minute „Mit Gateway verbinden“. Danach Geräte, Sensoren und Thermostate suchen. **Mehrere Gateways** (z. B. eins pro Haus) sind möglich: Name und Adresse eintragen, verbinden, dann „Weiteres Gateway hinzufügen“. Die Treffer aller Gateways erscheinen gemeinsam (mit dem Gateway-Namen dahinter). |
 | **Wake-on-LAN** | Siehe [Kapitel 11](#11-wake-on-lan). |
 
@@ -558,7 +558,7 @@ Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entr
 
 *Smart Home → Aktoren (Karte „Rollläden“).* Homematic-Rollladenaktoren (z. B. HM-LC-Bl1PBU-FM, HmIP-BROLL), die eine **Position** kennen: **0 % = ganz zu, 100 % = ganz auf**.
 
-- **Anlegen:** *Geräte suchen → Homematic → „Homematic-Rollläden suchen“*. Name und Symbol lassen sich schon in der Trefferliste ändern. Neu angelegte Rollläden sind zunächst nur für Administratoren sichtbar.
+- **Anlegen:** *Geräte suchen → Homematic → „Homematic suchen“ (die Rollläden erscheinen als eigener Abschnitt der Trefferliste)*. Name und Symbol lassen sich schon in der Trefferliste ändern. Neu angelegte Rollläden sind zunächst nur für Administratoren sichtbar.
 - **Bedienen:** **▲ Auf**, **■ Stopp**, **▼ Zu** oder der Regler (Position in 5-%-Schritten; beim Loslassen fährt der Rollladen dorthin). Die aktuelle Position steht daneben („ganz auf“, „ganz zu“, „45 % auf“; „Position unbekannt“, wenn der Aktor nicht erreichbar ist). Die Anzeige aktualisiert sich alle 15 Sekunden.
 - **In Regeln:** Schritt **„Rollladen fahren / anhalten (Homematic)“** in Abläufen: Rollladen wählen, dann *fahren auf* **x %** oder *anhalten*. Im Trockenlauf wird nur „würde fahren“ protokolliert.
 - **Verwalten:** Symbol, Umbenennen, Entfernen und die **Sichtbarkeit pro Benutzer** wie bei den Soundmodulen. Ein Rollladen lässt sich nicht entfernen, solange eine eingeschaltete Regel ihn braucht.
@@ -567,7 +567,7 @@ Der Zustand (verriegelt/entriegelt) erscheint als Sensor. Zum **Verriegeln, Entr
 
 *Smart Home → Aktoren (Karte „Soundmodule“).* Homematic-Funk-Gongs und Signalgeber (z. B. HM-OU-CM-PCB, HM-OU-CFM-TW) spielen auf Befehl einen **Titel von ihrer Karte** ab.
 
-- **Anlegen:** *Geräte suchen → Homematic → „Homematic-Soundmodule suchen“*. Name und Symbol lassen sich schon in der Trefferliste ändern, dann **Hinzufügen**.
+- **Anlegen:** *Geräte suchen → Homematic → „Homematic suchen“* (Abschnitt Soundmodule). Name und Symbol lassen sich schon in der Trefferliste ändern, dann **Hinzufügen**.
 - **Ausprobieren:** In der Karte Titelnummer und Lautstärke (in Prozent) eintragen und **▶** drücken. Die Eingaben bleiben beim Auffrischen der Seite erhalten.
 - **In Regeln:** Schritt **„Sound abspielen (Homematic Gong)“** in Abläufen: Modul, Titel (1–255), Lautstärke, Wiederholungen. Gesendet wird intern `Lautstärke,Wiederholungen,108000,Titel` an den Tonkanal – der Titel wird vollständig abgespielt. Im Trockenlauf wird nichts abgespielt.
 - **Verwalten:** Symbol, Umbenennen, Entfernen und die **Sichtbarkeit pro Benutzer** (neu angelegte Module sind zunächst nur für Administratoren sichtbar) gibt es nur für Administratoren. Wer kein Soundmodul sehen darf, sieht auch die Karte nicht.
@@ -1142,7 +1142,7 @@ Unter *Einstellungen → System → Geräteübersicht (IP-Adressen)* – nur fü
 
 ### Kamera-Bewegung als Sensor (Reolink)
 
-Unter *Smart Home → Sensoren* (sichtbar, sobald eine Kamera angelegt ist) gibt es **„Kamera-Bewegung suchen“**. Pro Reolink-Kamera werden angeboten:
+Unter *Smart Home → Geräte suchen* (Fenster **Kameras**, sichtbar, sobald eine Kamera angelegt ist) gibt es **„Kameras suchen“**. Pro Reolink-Kamera werden angeboten:
 
 - **Bewegung** (die normale Bewegungserkennung der Kamera),
 - **Person, Fahrzeug, Tier** – nur wenn die Kamera diese KI-Erkennung kann und sie in der Kamera eingeschaltet ist (in der Reolink-App/Weboberfläche unter *Alarm/Erkennung*).
@@ -1156,7 +1156,7 @@ Eine Kamera lässt sich nicht löschen, solange eine Regel einen ihrer Sensoren 
 
 ### 16.3c Wandtaster als Auslöser (kurzer und langer Druck)
 
-Ein Homematic-Wandtaster hat je Taste zwei Ereignisse: **kurz** und **lang** gedrückt. Bei der Sensorsuche (*Smart Home → Geräte suchen → Homematic-Sensoren suchen*) erscheinen sie als Sensoren **„Taste kurz gedrückt“** und **„Taste lang gedrückt“**.
+Ein Homematic-Wandtaster hat je Taste zwei Ereignisse: **kurz** und **lang** gedrückt. Bei der Sensorsuche (*Smart Home → Geräte suchen → Homematic suchen*, Abschnitt Sensoren) erscheinen sie als Sensoren **„Taste kurz gedrückt“** und **„Taste lang gedrückt“**.
 
 1. Regel, Art **Ablauf**, WENN *Sensor* „Flur oben – Taste lang gedrückt“ ist *TRUE*.
 2. DANN: Geräte **einschalten** → **Warten** 120 Sekunden → Geräte **ausschalten** (Zeit nach Bedarf).
@@ -1166,7 +1166,7 @@ Wichtig: Tasten funktionieren **nur mit aktivem Push** der CCU (Smart Home → S
 
 ### 16.3d Türklingel mit Gong
 
-1. Soundmodul anlegen (Geräte suchen → Homematic-Soundmodule suchen) und den gewünschten Titel mit ▶ ausprobieren.
+1. Soundmodul anlegen (Geräte suchen → Homematic suchen, Abschnitt Soundmodule) und den gewünschten Titel mit ▶ ausprobieren.
 2. Regel, Art **Ablauf**: WENN der Auslöser (Klingeltaste als Sensor, eigener Knopf oder Taster) → DANN **Sound abspielen**: Modul, Titelnummer, Lautstärke.
 3. Optional **Sperrzeit** setzen, damit wildes Klingeln nicht jede Sekunde den Gong auslöst.
 
@@ -1183,7 +1183,7 @@ Warum nicht mit „Nacht“ und Wochentag: Die Nacht reicht über Mitternacht; d
 
 Ziel: Nur wenn die Kamera ein **Tier** erkannt hat, kommt ein Video aufs Handy – das Standbild kann sofort mitkommen.
 
-1. Unter *Smart Home → Geräte suchen* mit „Kamera-Bewegung suchen“ den Kamera-Sensor **Tier** anlegen (Voraussetzung: Tiererkennung in der Kamera aktiv).
+1. Unter *Smart Home → Geräte suchen* mit „Kameras suchen“ den Kamera-Sensor **Tier** anlegen (Voraussetzung: Tiererkennung in der Kamera aktiv).
 2. Neue Regel, Art **Ablauf**. WENN: Sensor „Hof – Tier“ ist wahr.
 3. DANN: **Telegram: Kamera-Standbild senden** (sofort) und **Telegram: Video zum Ereignis senden** mit Filter **Tier**.
 

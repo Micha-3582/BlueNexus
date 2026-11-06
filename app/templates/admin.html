@@ -728,8 +728,7 @@
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <button id="shelly-scan" class="ghost">Shellys suchen</button>
     <input type="text" id="shelly-ip" placeholder="oder IP, z.B. 192.168.2.55" style="flex:1;min-width:190px"> <span class="qhelp" role="button" tabindex="0" data-help="IP-Adresse eines einzelnen Shelly- oder Tasmota-Geräts, falls die Suche es nicht findet. Das Gerät erscheint darunter in der Trefferliste – dort Name und Symbol anpassen und auf Hinzufügen klicken.">?</span>
-    <button id="shelly-add" class="ghost">Suchen</button>
-  </div>
+      </div>
 </div>
 
 <div class="card fam-card" id="fam-tasmota" data-tab="suchen">
@@ -738,8 +737,7 @@
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <button id="tasmota-scan" class="ghost">Tasmota / WLED suchen</button>
     <input type="text" id="tasmota-ip" placeholder="oder IP, z.B. 192.168.2.55" style="flex:1;min-width:190px"> <span class="qhelp" role="button" tabindex="0" data-help="IP-Adresse eines einzelnen Shelly- oder Tasmota-Geräts, falls die Suche es nicht findet. Das Gerät erscheint darunter in der Trefferliste – dort Name und Symbol anpassen und auf Hinzufügen klicken.">?</span>
-    <button id="tasmota-add" class="ghost">Suchen</button>
-  </div>
+      </div>
 </div>
 
 <div class="card fam-card" id="fam-tuya" data-tab="suchen">
@@ -773,12 +771,7 @@
       </div>
     </details>
     <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
-      <button id="hm-scan" class="ghost">Homematic-Geräte suchen</button>
-      <button id="hm-sensor-scan" class="ghost">Homematic-Sensoren suchen</button>
-      <button id="hm-sp-scan" class="ghost">Homematic-Thermostate suchen</button>
-      <button id="hm-lock-scan" class="ghost">Homematic-Türschlösser suchen</button>
-      <button id="hm-sound-scan" class="ghost">Homematic-Soundmodule suchen</button>
-      <button id="hm-blind-scan" class="ghost">Homematic-Rollläden suchen</button></div>
+      <button id="hm-scan" class="ghost">Homematic suchen</button></div>
 
   
 </div>
@@ -798,9 +791,7 @@
       <button id="zb-new" class="ghost" style="display:none">Weiteres Gateway hinzufügen</button><span class="muted" id="zb-edit-note"></span></div>
   </details>
   <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
-    <button id="zb-scan" class="ghost">Zigbee-Geräte suchen</button>
-    <button id="zb-sensor-scan" class="ghost">Zigbee-Sensoren suchen</button>
-    <button id="zb-sp-scan" class="ghost">Zigbee-Thermostate suchen</button></div>
+    <button id="zb-scan" class="ghost">Zigbee suchen</button></div>
   <div class="muted" style="margin-top:8px">Sensoren und Thermostate erscheinen in ihren eigenen Reitern.</div>
 </div>
 
@@ -835,6 +826,14 @@
     <input type="password" id="bambu-code" placeholder="Zugangscode" autocomplete="off" style="flex:1;min-width:140px">
     <input type="text" id="bambu-name" placeholder="Name (optional)" maxlength="60" autocomplete="off" style="flex:1;min-width:150px">
     <button id="bambu-add" class="ghost">Drucker hinzufügen</button>
+  </div>
+</div>
+
+<div class="card fam-card" id="fam-camera" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Kameras <span class="qhelp" role="button" tabindex="0" data-help="Die Erkennungen deiner Reolink-Kameras (Bewegung, Person, Fahrzeug, Tier, Besucher …) lassen sich als Sensoren anlegen und in Regeln nutzen. Die Kameras selbst richtest du unter Kameras ein.">?</span></h2>
+  <div class="sub">Erkennungen der Kameras (Bewegung, Person, Fahrzeug …) als Sensoren hinzufügen.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <button id="cam-motion-scan" class="ghost">Kameras suchen</button>
   </div>
 </div>
 
@@ -879,11 +878,6 @@
 <div class="card fam-card msg-host" id="fam-sensors" data-tab="sensoren">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Sensoren <span class="qhelp" role="button" tabindex="0" data-help="Temperatur, Luftfeuchte, Fenster/Tür, Bewegung, Anwesenheit, Helligkeit und Leistung. In <a href=&quot;/rules&quot;>Regeln</a> als Bedingung nutzbar („Sensor wahr/falsch“ bzw. „unter/über“).">?</span></h2>
   <div class="sub" id="sub-sensoren">Messwerte und Zustände von Homematic und Zigbee (nur lesen).</div>
-    <div id="cam-motion-row" class="admin-only" style="margin:0 0 8px" hidden><button id="cam-motion-scan" class="ghost">Kamera-Bewegung suchen</button>
-      <span class="muted">Reolink-Erkennungen als Sensor.</span></div>
-    <div id="tas-sensor-row" class="admin-only" style="margin:0 0 8px" hidden><button id="tas-sensor-scan" class="ghost">Tasmota-Messwerte suchen</button>
-      <input type="text" id="tas-sensor-ip" placeholder="oder IP, z.B. 192.168.2.55" style="width:210px;margin-left:8px" autocomplete="off" inputmode="decimal">
-      <span class="muted">Temperatur, Luftfeuchte, Luftdruck, Leistung.</span></div>
     <div id="hm-sensors" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
 
@@ -2462,9 +2456,16 @@ function foundPut(ip, inner) {
 function foundIconGrid(btn) { const g = btn.closest('[data-dev]').querySelector('.fi-grid'); g.style.display = g.style.display === 'none' ? 'flex' : 'none'; }
 function foundPickIcon(btn, icon) { const d = btn.closest('[data-dev]'), ic = d.querySelector('.fi-ico'); ic.textContent = icon; ic.dataset.changed = '1'; d.querySelector('.fi-grid').style.display = 'none'; }
 /* Allgemeine Trefferliste (Tuya, Homematic, Zigbee): Name – und wo es sinnvoll ist das Symbol – vor dem Hinzufügen ändern. */
-let FOUND_SPEC = null;
+const FOUND_SPECS = {};                      // Abschnitt -> Beschreibung der Trefferliste (Hinzufügen, Neuladen); '' = ohne Abschnitt
+function foundBox(sec) {                      // Abschnitt der Trefferliste ('' = die ganze Liste)
+  const box = document.getElementById('shelly-found');
+  if (!sec) return box;
+  let el = [...box.children].find(x => x.dataset.sec === sec);
+  if (!el) { el = document.createElement('div'); el.dataset.sec = sec; box.appendChild(el); }
+  return el;
+}
 function foundList(fresh, spec) {
-  FOUND_SPEC = spec;
+  const sec = spec.section || ''; FOUND_SPECS[sec] = spec;
   const iconsFor = f => { const t = typeof spec.icons === 'function' ? spec.icons(f) : spec.icons; return t === 'sensor' ? [...new Set([...SENSOR_EXTRA_ICONS, ...shellyIcons])] : t ? shellyIcons : []; };
   const row = f => { const k = spec.key(f), icons = iconsFor(f); return `<div data-key="${escH(k)}" data-dev="${escH(k)}" style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px"><div style="display:flex;align-items:center;gap:8px">
@@ -2472,25 +2473,26 @@ function foundList(fresh, spec) {
       <input class="fi-name" value="${escH(f.name)}" maxlength="60" style="flex:1;min-width:150px"></div>
       <div class="muted" style="margin-top:3px">${spec.sub(f)}</div>
       ${icons.length ? `<div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:6px">${icons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div>` : ''}</div>
-    ${spec.action ? spec.action(f, k) : `<button onclick="foundListAdd(['${escH(k)}'])">Hinzufügen</button>`}</div>`; };
+    ${spec.action ? spec.action(f, k) : `<button onclick="foundListAdd(['${escH(k)}'], '${sec}')">Hinzufügen</button>`}</div>`; };
   const addable = fresh.filter(f => !spec.action);
-  const all = !spec.noAll && addable.length > 1 ? `<div data-all="1" style="margin-bottom:6px"><button class="ghost" onclick='foundListAdd(${JSON.stringify(addable.map(spec.key)).replace(/'/g, "&#39;")})'>Alle ${addable.length} hinzufügen</button></div>` : '';
-  document.getElementById('shelly-found').innerHTML = all + fresh.map(row).join('');
+  const all = !spec.noAll && addable.length > 1 ? `<div data-all="1" style="margin-bottom:6px"><button class="ghost" onclick='foundListAdd(${JSON.stringify(addable.map(spec.key)).replace(/'/g, "&#39;")}, "${sec}")'>Alle ${addable.length} hinzufügen</button></div>` : '';
+  const head = sec && fresh.length && spec.title ? `<div class="muted" style="font-weight:600;margin:12px 0 6px">${escH(spec.title)}</div>` : '';
+  foundBox(sec).innerHTML = fresh.length ? head + all + fresh.map(row).join('') : '';
 }
-function foundEdits(keys) {
+function foundEdits(keys, sec) {
   const out = {};
   keys.forEach(k => {
-    const d = [...document.querySelectorAll('#shelly-found [data-dev]')].find(x => x.dataset.dev === k); if (!d) return;
+    const d = [...foundBox(sec || '').querySelectorAll('[data-dev]')].find(x => x.dataset.dev === k); if (!d) return;
     const ic = d.querySelector('.fi-ico'); out[k] = { name: d.querySelector('.fi-name').value.trim() };
     if (ic && ic.dataset.changed === '1') out[k].icon = ic.textContent.trim();
   });
   return out;
 }
-async function foundListAdd(keys) {
-  const sp = FOUND_SPEC;
-  try { await sp.add(keys, foundEdits(keys)); } catch (e) { shellyMsg(e.message, true); return; }
-  keys.forEach(k => foundAdded(k));
-  document.querySelectorAll('#shelly-found [data-all]').forEach(r => r.remove());
+async function foundListAdd(keys, sec) {
+  sec = sec || ''; const sp = FOUND_SPECS[sec];
+  try { await sp.add(keys, foundEdits(keys, sec)); } catch (e) { shellyMsg(e.message, true); return; }
+  keys.forEach(k => foundAdded(k, sec));
+  foundBox(sec).querySelectorAll('[data-all]').forEach(r => r.remove());
   sp.reload();
 }
 async function foundAdd(btn, ip, password) {
@@ -2505,19 +2507,6 @@ async function foundAdd(btn, ip, password) {
   document.getElementById('shelly-ip').value = ''; document.getElementById('tasmota-ip').value = ''; foundAdded(ip);
   loadShellyAdmin();
 }
-document.getElementById('shelly-add').addEventListener('click', () => {
-  const ip = document.getElementById('shelly-ip').value.trim(); if (ip) { shellyMsg('Suche …'); foundShow(ip, '', true).then(() => shellyMsg('')); }
-});
-document.getElementById('shelly-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Suche läuft … (einige Sekunden)');
-  try {
-    const found = await shellyApi('/api/shelly/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Shelly gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Shelly-Geräte gefunden.');
-    document.getElementById('shelly-found').innerHTML = ''; await Promise.all(fresh.map(f => foundShow(f.ip, '', false)));
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 /* --- Tuya (lokal) --- */
 async function loadTuyaInfo() {
   let t; try { t = await (await fetch('/api/tuya')).json(); } catch (e) { return; }
@@ -2538,16 +2527,6 @@ document.getElementById('tuya-save').addEventListener('click', async () => {
   } catch (e) { shellyMsg(e.message, true); }
 });
 /* --- Tasmota + gemeinsame Netzeinstellung --- */
-document.getElementById('tasmota-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Tasmota-/WLED-Suche läuft … (bei weiteren Netzen bis zu 30 Sekunden)');
-  try {
-    const found = await shellyApi('/api/tasmota/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Tasmota-/WLED-Gerät(e) gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Tasmota-/WLED-Geräte gefunden (passwortgeschützte per IP + Passwort hinzufügen).');
-    document.getElementById('shelly-found').innerHTML = ''; await Promise.all(fresh.map(f => foundShow(f.ip, '', false)));
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 (async () => {
   try {
     const cfg = await (await fetch('/api/config')).json();
@@ -2575,10 +2554,9 @@ document.getElementById('tuya-scan').addEventListener('click', async e => {
   b.disabled = false;
 });
 /* Nach dem Anlegen bleibt die Trefferliste stehen - nur die erledigte Zeile verschwindet. */
-function foundAdded(key) {
-  const box = document.getElementById('shelly-found');
-  box.querySelectorAll('[data-key]').forEach(r => { if (r.dataset.key === key) r.remove(); });
-  const left = box.querySelectorAll('[data-key]').length;
+function foundAdded(key, sec) {
+  foundBox(sec || '').querySelectorAll('[data-key]').forEach(r => { if (r.dataset.key === key) r.remove(); });
+  const left = document.getElementById('shelly-found').querySelectorAll('[data-key]').length;
   shellyMsg(left ? `Hinzugefügt ✓ – noch ${left} weitere in der Liste.` : 'Hinzugefügt ✓ – keine weiteren Treffer.');
   savedToast('Hinzugefügt ✓');
 }
@@ -2671,7 +2649,7 @@ function applyFamilies(f) {
   document.querySelectorAll('.fam-cb').forEach(cb => { cb.checked = !!f[cb.dataset.fam]; });
   const show = (id, v) => { const el = document.getElementById(id); if (el) el.classList.toggle('fam-off', !v); };
   show('fam-shelly', f.shelly); show('fam-tasmota', f.tasmota); show('fam-tuya', f.tuya); show('fam-homematic', f.homematic); show('fam-zigbee', f.zigbee); show('fam-midea', f.midea); show('fam-esphome', f.esphome); show('fam-bambu', f.bambu); window.FAM_MIDEA = !!f.midea; show('fam-acs', f.midea || window.AC_COUNT > 0);
-  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || f.esphome || window.SENS_COUNT > 0); const cmr = document.getElementById('cam-motion-row'); if (cmr) cmr.hidden = !f.camera; const tsr = document.getElementById('tas-sensor-row'); if (tsr) tsr.hidden = !f.tasmota; show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
+  window.FAM_HM = !!(f.homematic || f.zigbee); show('fam-sensors', f.homematic || f.zigbee || f.camera || f.tasmota || f.esphome || window.SENS_COUNT > 0); show('fam-camera', f.camera); show('fam-setpoints', f.homematic || f.zigbee || window.SP_COUNT > 0); show('fam-locks', f.homematic || famN('fam-locks')); show('fam-sounds', f.homematic || famN('fam-sounds')); show('fam-blinds', f.homematic || famN('fam-blinds')); show('fam-wol', true);
   show('hm-push-card', f.homematic);
   { const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };      // Untertitel passend zur Rolle und zu den eingerichteten Paketen
     set('sub-aktoren', window.IS_ADMIN ? 'Geräte benennen, sortieren, mit PIN schützen und auf dem Dashboard zeigen.' : 'Geräte bedienen und sortieren; mit dem Auge entscheidest du, was auf deinem Dashboard erscheint.');
@@ -2687,9 +2665,6 @@ document.addEventListener('click', e => {
   const c = e.target.closest('.fam-card, .msg-host'), out = document.getElementById('search-out');
   if (c && out && out.parentNode !== c) c.appendChild(out);
 }, true);
-document.getElementById('tasmota-add').addEventListener('click', () => {
-  const ip = document.getElementById('tasmota-ip').value.trim(); if (ip) { shellyMsg('Suche …'); foundShow(ip, '', true).then(() => shellyMsg('')); }
-});
 document.getElementById('esphome-scan').addEventListener('click', async e => {      // ein Knopf für alles: Taster, Klimaanlagen, Schalter und Messwerte
   const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
   b.disabled = true; shellyMsg('Frage ' + ip + ' ab … (einige Sekunden)');
@@ -2768,18 +2743,6 @@ document.getElementById('hm-save').addEventListener('click', async e => {
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });
-document.getElementById('hm-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Homematic-Suche läuft … (bei vielen Geräten einige Sekunden)');
-  try {
-    const found = await shellyApi('/api/homematic/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} schaltbare Kanäle gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine schaltbaren Homematic-Geräte gefunden.');
-    foundList(fresh, { key: f => f.address, icons: 'device', reload: loadShellyAdmin,
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}${f.datapoint === 'LEVEL' ? ' · Dimmer' : ''}${f.power_addr ? ' · misst Leistung' : ''}`,
-      add: (addresses, edits) => shellyApi('/api/homematic/add', 'POST', { addresses, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadHomematicInfo();
 /* Sensoren */
 const SENSOR_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], smoke: ['Alarm', 'kein Alarm'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
@@ -2844,18 +2807,6 @@ async function sensorRemove(id) {
   if (!await uiDialog({ title: 'Sensor entfernen?', message: 'Der Sensor wird nur aus dieser Liste entfernt. Regeln, die ihn benutzen, gelten dann als nicht erfüllt, bis du sie anpasst.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/sensors/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadSensorsAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('hm-sensor-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Sensor-Suche läuft … (bei vielen Geräten einige Sekunden)');
-  try {
-    const found = await shellyApi('/api/homematic/sensors/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Sensoren gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Sensoren gefunden.');
-    foundList(fresh, { key: f => f.id, icons: 'sensor', reload: loadSensorsAdmin,
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}${f.binary ? ' · Ja/Nein' : (f.unit ? ' · ' + escH(f.unit) : '')}`,
-      add: (ids, edits) => shellyApi('/api/homematic/sensors/add', 'POST', { ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadSensorsAdmin(true).then(() => loadSensorsAdmin()); setInterval(() => { if (![...document.querySelectorAll('[id^=sicons-]')].some(e => e.style.display === 'flex') && !openEdits('sedit-').length) loadSensorsAdmin(); }, 15000);
 
 /* --- Wake-on-LAN --- */
@@ -3249,18 +3200,6 @@ async function spRemove(id) {
   if (!await uiDialog({ title: 'Thermostat entfernen?', message: 'Nur aus dieser Liste – am Gerät ändert sich nichts. Es wird auch aus Regeln entfernt.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/homematic/setpoints/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadSetpointsAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('hm-sp-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Thermostat-Suche läuft … (bei vielen Geräten einige Sekunden)');
-  try {
-    const found = await shellyApi('/api/homematic/setpoints/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Thermostate gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Thermostate gefunden.');
-    foundList(fresh, { key: f => f.id, icons: null, reload: loadSetpointsAdmin,
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}`,
-      add: (ids, edits) => shellyApi('/api/homematic/setpoints/add', 'POST', { ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadSetpointsAdmin(true).then(() => loadSetpointsAdmin());
 
 /* --- Homematic-Tuerschloesser (Aktion fuer Regeln) --- */
@@ -3310,18 +3249,6 @@ async function lockRemove(id) {
   if (!await uiDialog({ title: 'Türschloss entfernen?', message: 'Nur aus dieser Liste – am Schloss ändert sich nichts. Es wird auch aus Regeln entfernt.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/homematic/locks/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); loadLocksAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('hm-lock-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Türschloss-Suche läuft …');
-  try {
-    const found = await shellyApi('/api/homematic/locks/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Türschlösser gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Türschlösser gefunden.');
-    foundList(fresh, { key: f => f.id, icons: null, reload: loadLocksAdmin,
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}`,
-      add: (ids, edits) => shellyApi('/api/homematic/locks/add', 'POST', { ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadLocksAdmin(true).then(() => loadLocksAdmin()); setInterval(() => loadLocksAdmin(), 20000);
 
 /* --- Homematic-Soundmodule (Aktion fuer Regeln) --- */
@@ -3379,18 +3306,6 @@ async function soundRemove(id) {
   if (!await uiDialog({ title: 'Soundmodul entfernen?', message: 'Nur aus dieser Liste – am Modul ändert sich nichts. Der Schritt wird auch aus Regeln entfernt.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/homematic/sounds/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); SND_SIG = ''; loadSoundsAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('hm-sound-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Soundmodul-Suche läuft …');
-  try {
-    const found = await shellyApi('/api/homematic/sounds/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Soundmodule gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Soundmodule gefunden.');
-    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => { SND_SIG = ''; loadSoundsAdmin(); },
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}`,
-      add: (ids, edits) => shellyApi('/api/homematic/sounds/add', 'POST', { ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadSoundsAdmin(); setInterval(loadSoundsAdmin, 30000);
 /* --- Homematic-Rollläden (Bedienung + Aktion fuer Regeln) --- */
 let BL_SIG = '';
@@ -3454,18 +3369,6 @@ async function blindRemove(id) {
   if (!await uiDialog({ title: 'Rollladen entfernen?', message: 'Nur aus dieser Liste – am Aktor ändert sich nichts. Der Schritt wird auch aus Regeln entfernt.', okText: 'Entfernen' })) return;
   try { await shellyApi('/api/homematic/blinds/' + encodeURIComponent(id), 'DELETE'); savedToast('Entfernt ✓'); BL_SIG = ''; loadBlindsAdmin(); } catch (e) { shellyMsg(e.message, true); }
 }
-document.getElementById('hm-blind-scan').addEventListener('click', async e => {
-  const b = e.target; b.disabled = true; shellyMsg('Rollladen-Suche läuft …');
-  try {
-    const found = await shellyApi('/api/homematic/blinds/scan', 'POST');
-    const fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Rollläden gefunden, ${fresh.length} noch nicht angelegt.` : 'Keine Rollläden gefunden.');
-    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => { BL_SIG = ''; loadBlindsAdmin(); },
-      sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}`,
-      add: (ids, edits) => shellyApi('/api/homematic/blinds/add', 'POST', { ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
 loadBlindsAdmin(); setInterval(loadBlindsAdmin, 15000);
 /* --- Reihenfolge per langem Druecken und Ziehen (Standard fuer alle Listen; nur Administratoren) --- */
 if (window.IS_ADMIN && window.sortableList) {
@@ -3612,37 +3515,72 @@ document.getElementById('zb-connect').addEventListener('click', async e => {
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });
-const ZB_KINDS = {
-  devices: { url: '/api/zigbee/add', icons: 'device', reload: () => loadShellyAdmin() },
-  sensors: { url: '/api/zigbee/sensors/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
-  setpoints: { url: '/api/zigbee/setpoints/add', icons: null, reload: () => loadSetpointsAdmin() },
-  camMotion: { url: '/api/cameras/motion/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
-  tasSensors: { url: '/api/tasmota/sensors/add', icons: 'sensor', reload: () => loadSensorsAdmin() },
-};
-function zbFoundList(found, kind, label, meta) {
-  const fresh = found.filter(f => !f.known), k = ZB_KINDS[kind];
-  shellyMsg(found.length ? `${found.length} ${label} gefunden, ${fresh.length} noch nicht angelegt.` : `Keine ${label} gefunden.`);
-  foundList(fresh, { key: f => f.id, icons: k.icons, reload: k.reload,
-    sub: f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''}${meta ? ' · ' + escH(meta(f)) : ''}${f.gwname ? ' · ' + escH(f.gwname) : ''}`,
-    add: (ids, edits) => shellyApi(k.url, 'POST', { ids, edits }) });
-}
-function zbScanButton(btnId, url, label, busy, kind, meta) {
-  document.getElementById(btnId).addEventListener('click', async e => {
-    const b = e.target; b.disabled = true; shellyMsg(busy);
-    try { zbFoundList(await shellyApi(url, 'POST'), kind, label, meta); } catch (err) { shellyMsg(err.message, true); }
-    b.disabled = false;
-  });
-}
-zbScanButton('zb-scan', '/api/zigbee/scan', 'Lichter/Steckdosen', 'Suche läuft …', 'devices', f => f.dimmable ? 'dimmbar' : 'Schalter');
-zbScanButton('zb-sensor-scan', '/api/zigbee/sensors/scan', 'Sensoren', 'Sensor-Suche läuft …', 'sensors', f => f.binary ? 'Ja/Nein' : (f.unit || ''));
-zbScanButton('cam-motion-scan', '/api/cameras/motion/scan', 'Kamera-Sensoren', 'Suche läuft …', 'camMotion', null);
-document.getElementById('tas-sensor-scan').addEventListener('click', async e => {
-  const b = e.target, ip = document.getElementById('tas-sensor-ip').value.trim(); b.disabled = true; shellyMsg(ip ? 'Frage ' + ip + ' ab …' : 'Suche läuft …');
-  try { zbFoundList(await shellyApi('/api/tasmota/sensors/scan', 'POST', ip ? { ip } : undefined), 'tasSensors', 'Messwerte', f => (f.value != null ? f.value + ' ' + f.unit : f.unit)); } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
-zbScanButton('zb-sp-scan', '/api/zigbee/setpoints/scan', 'Thermostate', 'Thermostat-Suche läuft …', 'setpoints', null);
 loadZigbeeInfo();
+
+/* --- Suche: EIN Knopf je System. Alles, was das System liefert (Geräte, Sensoren, Thermostate …), erscheint gruppiert in einer Liste. --- */
+const hmSub = f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''} · ${escH(f.address)}`;
+const zbSub = meta => f => `${escH(f.model)}${f.room ? ' · ' + escH(f.room) : ''}${meta ? ' · ' + escH(meta(f)) : ''}${f.gwname ? ' · ' + escH(f.gwname) : ''}`;
+const idsAdd = url => (ids, edits) => shellyApi(url, 'POST', { ids, edits });
+function listSource(o) {          // eine Suche, deren Treffer als eigener Abschnitt der Liste erscheinen
+  return { name: o.label, run: async () => {
+    const found = await shellyApi(o.url, 'POST', o.body ? o.body() : undefined), fresh = found.filter(f => !f.known);
+    foundList(fresh, { key: o.key || (f => f.id), icons: o.icons || null, reload: o.reload, sub: o.sub, add: o.add, section: o.sec, title: o.title });
+    return { n: found.length, fresh: fresh.length, label: o.label };
+  } };
+}
+async function familySearch(btn, sources, busy, empty) {
+  btn.disabled = true; shellyMsg(busy);
+  document.getElementById('shelly-found').innerHTML = '';
+  if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (e) { /* egal */ } }
+  const parts = [], failed = []; let firstErr = null;
+  for (const src of sources) {                                   // nacheinander: schont Geräte und Gateways
+    try { const r = await src.run(); if (r) parts.push(r); } catch (err) { failed.push(src.name); if (!firstErr) firstErr = err; }
+  }
+  const n = parts.reduce((a, p) => a + p.n, 0), fresh = parts.reduce((a, p) => a + p.fresh, 0);
+  if (!parts.length && firstErr) shellyMsg(firstErr.message, true);
+  else shellyMsg(n ? `Gefunden: ${parts.filter(p => p.n).map(p => p.n + ' ' + p.label).join(', ')} – ${fresh} noch nicht angelegt.` + (failed.length ? ` (Nicht abfragbar: ${failed.join(', ')}.)` : '') : (empty || 'Nichts gefunden.'), !n && !!failed.length);
+  btn.disabled = false;
+}
+const foundRows = () => document.querySelectorAll('#shelly-found > [data-key]').length;
+const tasmotaIp = () => document.getElementById('tasmota-ip').value.trim();
+document.getElementById('shelly-scan').addEventListener('click', e => {
+  const ip = document.getElementById('shelly-ip').value.trim();
+  familySearch(e.target, [{ name: 'Shelly', run: async () => {
+    if (ip) { await foundShow(ip, '', true); return { n: foundRows(), fresh: foundRows(), label: 'Shelly' }; }
+    const found = await shellyApi('/api/shelly/scan', 'POST'), fresh = found.filter(f => !f.known);
+    await Promise.all(fresh.map(f => foundShow(f.ip, '', false)));
+    return { n: found.length, fresh: fresh.length, label: 'Shelly' };
+  } }], ip ? 'Frage ' + ip + ' ab …' : 'Suche läuft … (einige Sekunden)', 'Keine Shelly-Geräte gefunden.');
+});
+document.getElementById('tasmota-scan').addEventListener('click', e => {
+  const ip = tasmotaIp();
+  familySearch(e.target, [{ name: 'Geräte', run: async () => {
+    if (ip) { await foundShow(ip, '', true); return { n: foundRows(), fresh: foundRows(), label: 'Geräte' }; }
+    const found = await shellyApi('/api/tasmota/scan', 'POST'), fresh = found.filter(f => !f.known);
+    await Promise.all(fresh.map(f => foundShow(f.ip, '', false)));
+    return { n: found.length, fresh: fresh.length, label: 'Tasmota-/WLED-Geräte' };
+  } }, listSource({ url: '/api/tasmota/sensors/scan', body: () => tasmotaIp() ? { ip: tasmotaIp() } : undefined, sec: 'tas-sen', title: 'Messwerte', label: 'Messwerte', icons: 'sensor', reload: () => loadSensorsAdmin(),
+    sub: zbSub(f => (f.value != null ? f.value + ' ' + f.unit : f.unit)), add: idsAdd('/api/tasmota/sensors/add') })],
+    ip ? 'Frage ' + ip + ' ab …' : 'Tasmota-/WLED-Suche läuft … (bei weiteren Netzen bis zu 30 Sekunden)', 'Keine Tasmota-/WLED-Geräte gefunden (passwortgeschützte per IP + Passwort hinzufügen).');
+});
+document.getElementById('hm-scan').addEventListener('click', e => familySearch(e.target, [
+  listSource({ url: '/api/homematic/scan', sec: 'hm-dev', title: 'Schaltbare Geräte', label: 'schaltbare Kanäle', key: f => f.address, icons: 'device', reload: loadShellyAdmin,
+    sub: f => `${hmSub(f)}${f.datapoint === 'LEVEL' ? ' · Dimmer' : ''}${f.power_addr ? ' · misst Leistung' : ''}`, add: (addresses, edits) => shellyApi('/api/homematic/add', 'POST', { addresses, edits }) }),
+  listSource({ url: '/api/homematic/sensors/scan', sec: 'hm-sen', title: 'Sensoren', label: 'Sensoren', icons: 'sensor', reload: loadSensorsAdmin,
+    sub: f => `${hmSub(f)}${f.binary ? ' · Ja/Nein' : (f.unit ? ' · ' + escH(f.unit) : '')}`, add: idsAdd('/api/homematic/sensors/add') }),
+  listSource({ url: '/api/homematic/setpoints/scan', sec: 'hm-sp', title: 'Thermostate', label: 'Thermostate', reload: loadSetpointsAdmin, sub: hmSub, add: idsAdd('/api/homematic/setpoints/add') }),
+  listSource({ url: '/api/homematic/locks/scan', sec: 'hm-lock', title: 'Türschlösser', label: 'Türschlösser', reload: loadLocksAdmin, sub: hmSub, add: idsAdd('/api/homematic/locks/add') }),
+  listSource({ url: '/api/homematic/sounds/scan', sec: 'hm-snd', title: 'Soundmodule', label: 'Soundmodule', icons: 'device', reload: () => { SND_SIG = ''; loadSoundsAdmin(); }, sub: hmSub, add: idsAdd('/api/homematic/sounds/add') }),
+  listSource({ url: '/api/homematic/blinds/scan', sec: 'hm-bl', title: 'Rollläden', label: 'Rollläden', icons: 'device', reload: () => { BL_SIG = ''; loadBlindsAdmin(); }, sub: hmSub, add: idsAdd('/api/homematic/blinds/add') }),
+], 'Homematic-Suche läuft … (bei vielen Geräten einige Sekunden)', 'Auf der CCU wurde nichts Passendes gefunden.'));
+document.getElementById('zb-scan').addEventListener('click', e => familySearch(e.target, [
+  listSource({ url: '/api/zigbee/scan', sec: 'zb-dev', title: 'Lichter und Steckdosen', label: 'Lichter/Steckdosen', icons: 'device', reload: () => loadShellyAdmin(), sub: zbSub(f => f.dimmable ? 'dimmbar' : 'Schalter'), add: idsAdd('/api/zigbee/add') }),
+  listSource({ url: '/api/zigbee/sensors/scan', sec: 'zb-sen', title: 'Sensoren', label: 'Sensoren', icons: 'sensor', reload: () => loadSensorsAdmin(), sub: zbSub(f => f.binary ? 'Ja/Nein' : (f.unit || '')), add: idsAdd('/api/zigbee/sensors/add') }),
+  listSource({ url: '/api/zigbee/setpoints/scan', sec: 'zb-sp', title: 'Thermostate', label: 'Thermostate', reload: () => loadSetpointsAdmin(), sub: zbSub(null), add: idsAdd('/api/zigbee/setpoints/add') }),
+], 'Zigbee-Suche läuft …', 'Das Gateway meldet nichts Passendes.'));
+document.getElementById('cam-motion-scan').addEventListener('click', e => familySearch(e.target, [
+  listSource({ url: '/api/cameras/motion/scan', sec: 'cam', title: 'Erkennungen der Kameras', label: 'Kamera-Sensoren', icons: 'sensor', reload: () => loadSensorsAdmin(), sub: zbSub(null), add: idsAdd('/api/cameras/motion/add') }),
+], 'Suche läuft …', 'Keine Kamera-Erkennungen gefunden (Kameras unter Kameras einrichten).'));
 
 /* --- VRM-Zugang (Solar-Prognose) --- */
 function vrmMsg(t, err) { const m = document.getElementById('vrm-msg'); m.textContent = t; m.style.color = err ? '#e5544a' : ''; }
