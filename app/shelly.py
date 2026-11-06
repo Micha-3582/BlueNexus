@@ -1111,6 +1111,18 @@ def _status_live(d: dict) -> dict:
         return {"online": False, "on": None, "power": None}
 
 
+def press(dev_id: str) -> dict:
+    """Tastendruck eines ESPHome-Tasters aus der Oberflaeche ausloesen (siehe esphome.simulate_press)."""
+    d = _find(dev_id)
+    if not d:
+        raise ShellyError("Gerät nicht gefunden")
+    if d.get("kind") != "esphome":
+        raise ShellyError("Drücken gibt es nur bei Tastern")
+    if not esphome.simulate_press(d):
+        raise ShellyError("Der Taster ist gerade nicht erreichbar")
+    return {"ok": True}
+
+
 def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
     """Schaltet ein Geraet. `timer_s` (nur beim Einschalten; Shelly, Tasmota, Homematic): eingebauter Rueckschalt-Timer des
     Geraets in Sekunden - nach Ablauf schaltet das Geraet von selbst wieder aus (0 = laufenden Timer aufheben)."""

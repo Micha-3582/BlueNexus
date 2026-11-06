@@ -333,6 +333,25 @@ def _on_state(ip: str, j: dict) -> None:
         _notify()
 
 
+def simulate_press(d: dict) -> bool:
+    """Loest einen Tastendruck in BlueNexus aus, als haette jemand den Taster am Geraet gedrueckt (Test-Knopf in der Aktorenliste): Regeln, die auf
+    den Taster reagieren, laufen los. Am Geraet selbst wird nichts gesendet. False, wenn das Geraet gerade nicht verbunden ist."""
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    _want(ip, ent)
+    ensure(ip)
+    with _lock:
+        h = _hosts.get(ip)
+        if not (h and h["online"]):
+            return False
+        st = _state.setdefault((ip, ent), {"value": None, "pressed_at": 0.0, "seq": 0, "consumed": 0, "saw_on": False, "mask": False, "pass_on": False, "stamps": [], "round_mono": 0.0})
+        st["pressed_at"] = time.time()
+        if st["seq"] - st["consumed"] < MAX_QUEUE:
+            st["seq"] += 1
+            st["stamps"].append(time.monotonic())
+    _notify()
+    return True
+
+
 def _watch(ip: str, stop: threading.Event) -> None:
     backoff = BACKOFF_START_S
     while not stop.is_set() and not _stop_all.is_set():

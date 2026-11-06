@@ -164,6 +164,13 @@ time.sleep(0.3); assert esphome.status(e)["on"] is True and len(wakes) == n0 + 1
 assert rules_pass() is True and rules_pass() is False, "genau eine Runde lang an, dann wieder aus"
 assert esphome.status(e)["shown"] is True, "die Anzeige haelt noch kurz"
 wait(lambda: esphome.status(e)["shown"] is False, 3.0, "Anzeige laeuft ab (DISPLAY_S)")
+# Test-Knopf in der Aktorenliste: ausloesen wie ein echter Druck (Regeln laufen los), ohne etwas ans Geraet zu senden
+n1 = len(wakes)
+r = A.post("/api/shelly/" + e["id"] + "/press", json={}); assert r.status_code == 200 and r.get_json()["ok"] is True, r.get_data(as_text=True)
+assert esphome.status(e)["on"] is True and len(wakes) == n1 + 1, "Knopf = ein Druck, weckt die Regelschleife"
+assert rules_pass() is True and rules_pass() is False
+assert webapp.app.test_client().post("/api/shelly/" + e["id"] + "/press", json={}).status_code in (401, 403)
+assert A.post("/api/shelly/gibt-es-nicht/press", json={}).status_code in (400, 404)
 
 
 def presses(n):

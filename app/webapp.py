@@ -295,7 +295,7 @@ ENDPOINT_AREA = {
     "api_battery_cycles": "dashboard", "api_status": "dashboard", "api_history": "dashboard",
     "api_week": "dashboard", "api_month": "dashboard", "api_live": "dashboard",
     "api_version": "dashboard", "api_override": "dashboard", "api_ev_add": "dashboard",
-    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
+    "api_ev_modify": "dashboard", "api_shelly_list": "dashboard", "api_shelly_switch": "dashboard", "api_shelly_press": "dashboard", "api_shelly_brightness": "dashboard", "api_shelly_wled": "dashboard", "api_shelly_midea": "dashboard", "api_midea_scan": "smarthome_einrichten", "api_midea_cloud": "smarthome_einrichten", "api_midea_local": "smarthome_einrichten", "api_midea_rekey": "smarthome_einrichten", "api_midea_add": "smarthome_einrichten",
     "report_page": "dashboard", "api_report": "dashboard", "api_hardware": "dashboard", "api_thermo_list": "settings_system", "api_thermo_wifi": "settings_system", "api_thermo_item": "settings_system", "api_thermo_status": "settings_system", "api_thermo_calibrate": "settings_system", "api_savings": "dashboard",
     "api_plan_sim": "dashboard", "api_price_history": "dashboard", "api_weather": "dashboard",
     "api_vrm_forecast": "dashboard", "api_vrm_forecast_history": "dashboard",
@@ -6523,6 +6523,23 @@ def api_shelly_switch(dev_id):
     cfg_ = store.load_config()
     surplus_ctrl.note_manual(dev_id, hold_min=surplus.settings(cfg_)["manual_hold_min"])      # Ueberschuss-Automatik pausiert fuer dieses Geraet
     rule_engine.note_manual(dev_id, hold_min=rules.settings(cfg_)["manual_hold_min"])         # Regeln pausieren ebenfalls (eigene Einstellung)
+    return jsonify(result)
+
+
+@app.route("/api/shelly/<dev_id>/press", methods=["POST"])
+def api_shelly_press(dev_id):
+    """Tastendruck eines ESPHome-Tasters in BlueNexus ausloesen (Test-Knopf); PIN und Sichtbarkeit wie beim Schalten."""
+    hidden = _vis_guard("shelly", dev_id)
+    if hidden:
+        return hidden
+    blocked = _pin_gate(dev_id, shelly.has_pin, shelly.check_pin)
+    if blocked:
+        return blocked
+    try:
+        result = shelly.press(dev_id)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    opslog.log("rules", f"Taster {next((d['name'] for d in shelly.load_devices() if d['id'] == dev_id), dev_id)} per Knopf ausgelöst", dry=False)
     return jsonify(result)
 
 

@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.36.0 – 06.11.2026
+- Neu: **Test-Knopf für ESPHome-Taster.** In der Aktorenliste hat jeder Taster rechts einen Abspielen-Knopf („Tastendruck auslösen“). Er löst in BlueNexus einen Tastendruck aus, als hätte jemand den Taster gedrückt, sodass Regeln, die auf ihn reagieren, laufen; am Taster selbst wird nichts gesendet. Bei einem Taster ohne Verbindung ist der Knopf grau. PIN, Sichtbarkeit und Rechte wie beim Schalten.
+
 ## 1.35.0 – 06.11.2026
 - Neu: **Verbindungsmessung für ESPHome-Geräte (Taster).** BlueNexus zählt seit seinem Start, wie oft die Verbindung zu einem Taster abgerissen ist, wie lange er insgesamt und am längsten weg war und wann und warum der letzte Abbruch war (z. B. „Stille“ oder „Verbindung getrennt“). Die Zahlen stehen in der Aktorenliste hinter dem Gerät („3 Abbrüche in 2 h (zusammen 8 s weg, längster 4 s, zuletzt vor 12 min: Stille)“ oder „Verbindung stabil seit 5 h“) und jeder Abbruch im Protokoll. Zusätzlich erkennt BlueNexus **Neustarts des Geräts selbst** an der Betriebszeit, die der Taster in seinen Ping-Meldungen mitschickt („1 Neustart des Geräts (zuletzt vor 20 min)“). Der Zähler beginnt bei jedem Neustart von BlueNexus von vorn.
 

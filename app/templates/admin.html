@@ -34,7 +34,7 @@
   .tgl.del { color: var(--red); }
   .icon-pick.fixed { cursor: default; } .icon-pick.fixed:hover { border-color: var(--border); filter: none; }      /* Symbol fest (NFC-Knopf): gleiche Groesse wie die anderen, aber ohne Hover-Wirkung */
   /* Alle kleinen Aktionsknoepfe einer Zeile (PIN, Sichtbarkeit, Bearbeiten, Ein/Aus, Test) gleich gross */
-  .tgl, .dev-power, button[onclick*="editToggle("], button[onclick*="soundTest("], button[onclick*="ntRecipientTest("], button[onclick*="poTest("] {
+  .tgl, .dev-power, .dev-press, button[onclick*="editToggle("], button[onclick*="soundTest("], button[onclick*="ntRecipientTest("], button[onclick*="poTest("] {
     box-sizing: border-box; width: 44px; height: 44px; min-width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
     border-radius: 10px; font-size: 17px; line-height: 1; flex: none; }
   /* Verwalten (umbenennen, Symbol, Sichtbarkeit, entfernen, anlegen) nur fuer Administratoren; Bedienen darf jeder mit Recht */
@@ -2004,6 +2004,8 @@ async function refreshShellyStatus() {
     document.querySelectorAll('#shelly-devs [data-dev], #ac-devs [data-dev], #surplus-devs [data-dev]').forEach(row => {
       if (row.dataset.dev !== d.id) return;
       row.querySelector('.dev-stat').textContent = shellyStatText(d);
+      const pb = row.querySelector('.dev-press');
+      if (pb) pb.disabled = !d.online;
       const b = row.querySelector('.dev-power');
       if (b) { b.dataset.on = d.on ? '1' : '0'; b.disabled = !d.online || d.switchable === false; b.style.cssText = d.on ? POWER_ON_STYLE : ''; b.title = d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten'); }
     });
@@ -2127,7 +2129,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
         ${eyeBtn('shelly', id)}${favBtn('shelly', id)}
-        ${d.kind === 'esphome' ? '' : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten')}">${PWR_ICON}</button>`}
+        ${d.kind === 'esphome' ? `<button class="ghost dev-press" onclick="shellyPress('${id}', this)" ${d.online ? '' : 'disabled'} title="Tastendruck auslösen – wie ein Druck am Taster (Regeln, die auf ihn reagieren, laufen los)">${I_PLAY}</button>` : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten')}">${PWR_ICON}</button>`}
         </div>
       </div>
       ${isAc(d) && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}
@@ -2380,6 +2382,16 @@ async function shellyTest(id, btn) {
   refreshShellyStatus();
   // Der Leistungsmesser des Shelly braucht einen Moment - Anzeige kurz danach nachziehen
   setTimeout(refreshShellyStatus, 1500); setTimeout(refreshShellyStatus, 4000);
+}
+async function shellyPress(id, btn) {
+  const dev = (await (await fetch('/api/shelly')).json().catch(() => [])).find?.(x => x.id === id) || {};
+  try {
+    const g = await pinGuard(!!dev.pin_set, dev.name, pin => shellyApi('/api/shelly/' + encodeURIComponent(id) + '/press', 'POST', pin === undefined ? {} : { pin }));
+    if (g.cancelled) return;
+    shellyMsg('');
+    savedToast('Taster ausgelöst ✓');
+  } catch (e) { shellyMsg(e.message, true); }
+  refreshShellyStatus();
 }
 async function shellyRemove(id) {
   if (await inUseBlock('device', id)) return;
