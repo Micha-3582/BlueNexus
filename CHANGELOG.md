@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.41.4 – 06.11.2026
+- Behoben: **Druckerkamera: Live-Bild blieb nach wenigen Sekunden stehen.** Der Drucker erlaubt nur eine Kameraverbindung zugleich. Die Standbild-Abrufe der Kameraseite (alle paar Sekunden) öffneten eine zweite Verbindung und beendeten damit die Live-Ansicht. Solange eine Live-Ansicht der Druckerkamera läuft, gibt es jetzt keine neuen Abrufe mehr (das letzte Standbild bleibt stehen); ein gerade laufender Abruf darf vor dem Live-Start noch fertig werden.
+- Der Versuch aus 1.41.2 (Zeitstempel aus der Serveruhr) bleibt drin, schadet nicht.
+
 ## 1.41.3 – 06.11.2026
 - Neu (Fehlersuche): Endet ein Kamera-Livestrom unerwartet früh, schreibt BlueNexus Dauer, Rückgabecode und die letzten ffmpeg-Meldungen ins Server-Log (`pm2 logs`, Zeile mit `[camera]`). Dient zur Suche nach dem Live-Bild der Druckerkamera, das nach wenigen Sekunden stehen bleibt.
 

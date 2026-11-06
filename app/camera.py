@@ -48,6 +48,8 @@ _motion_cache: dict[str, tuple[float, object]] = {}      # Kamera-ID -> (Zeit, Z
 _motion_locks: dict[str, threading.Lock] = {}
 _events_ok: dict[str, bool] = {}                          # Kamera -> kennt GetEvents (True) oder nur GetAiState (False)
 _slots = threading.BoundedSemaphore(MAX_STREAMS)
+_live: dict[str, int] = {}                                              # Kamera-ID -> Zahl laufender Live-Stroeme (nur fuer verschluesselte Druckerkameras gefuehrt)
+_live_lock = threading.Lock()
 
 
 class CameraError(ValueError):
@@ -531,6 +533,10 @@ def snapshot(item: dict, max_age: float | None = None) -> bytes:
     `max_age` (Sekunden) ueberschreibt das: 0 = immer ein frisches Bild (Regeln: Foto soll den Moment des Ausloesers zeigen)."""
     cid = item["id"]
     hit = _snap_cache.get(cid)
+    if item.get("tls") and _live.get(cid):                             # Druckerkamera erlaubt nur EINE Verbindung: eine zweite wuerde die Live-Ansicht abwuergen
+        if hit:
+            return hit[1]
+        raise CameraError("Die Live-Ansicht läuft gerade – das Standbild gibt es danach wieder")
     ttl = max_age if max_age is not None else (RTSP_SNAP_TTL_S if item.get("kind") == "rtsp" else SNAP_TTL_S)
     if hit and time.time() - hit[0] < ttl:
         return hit[1]
@@ -539,6 +545,10 @@ def snapshot(item: dict, max_age: float | None = None) -> bytes:
             hit = _snap_cache.get(cid)
             if hit and time.time() - hit[0] < ttl:
                 return hit[1]
+            if item.get("tls") and _live.get(cid):
+                if cid in _snap_cache:
+                    return _snap_cache[cid][1]
+                raise CameraError("Die Live-Ansicht läuft gerade – das Standbild gibt es danach wieder")
             data = rtsp_grab(item)
             _snap_cache[cid] = (time.time(), data)
             return data
@@ -664,6 +674,7 @@ class _Stream:
 
     def __init__(self, proc):
         self.proc, self.started, self._done = proc, time.time(), False
+        self.live_cid = None                                       # gesetzt bei Druckerkameras: beim Schliessen den Live-Zaehler senken
         self._q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=32)
         self._first = threading.Event()
         self.got = False                                           # wirklich Bilddaten empfangen (nicht nur Ende/Fehler)
@@ -755,6 +766,8 @@ class _Stream:
             pass
         if release:
             _slots.release()
+            if self.live_cid:
+                _live_done(self.live_cid)
 
 
 START_WAIT_S = 14                    # so lange auf das erste Bild warten (RTSP-Aufbau, Kamera wacht auf)
@@ -769,6 +782,30 @@ def stream(item: dict, quality: str = DEFAULT_QUALITY):
     if not _slots.acquire(blocking=False):
         raise CameraError("Zu viele gleichzeitige Live-Ansichten – bitte später noch einmal")
     last = "Die Kamera liefert kein Live-Bild"
+    cid = item.get("id") if item.get("tls") else None
+    if cid:
+        with _live_lock:
+            _live[cid] = _live.get(cid, 0) + 1                         # ab jetzt keine neuen Standbild-Abrufe mehr (siehe snapshot)
+        with _snap_locks.setdefault(cid, threading.Lock()):            # ein gerade laufender Abruf darf noch fertig werden
+            pass
+    try:
+        return _stream_start(item, quality, last, cid)
+    except BaseException:
+        if cid:
+            _live_done(cid)
+        raise
+
+
+def _live_done(cid):
+    with _live_lock:
+        n = _live.get(cid, 0) - 1
+        if n > 0:
+            _live[cid] = n
+        else:
+            _live.pop(cid, None)
+
+
+def _stream_start(item, quality, last, cid=None):
     for attempt in range(START_TRIES):
         try:
             proc = subprocess.Popen(ffmpeg_cmd(item, quality), stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
@@ -776,6 +813,7 @@ def stream(item: dict, quality: str = DEFAULT_QUALITY):
             _slots.release()
             raise CameraError(f"ffmpeg konnte nicht gestartet werden: {e}")
         st = _Stream(proc)
+        st.live_cid = cid
         if st._first.wait(START_WAIT_S) and st.got:
             return st                                              # Platz bleibt belegt, bis st.close()
         st.close(release=False)                                    # kein Bild: ffmpeg sauber beenden (Kamera-Sitzung abmelden), Platz behalten, nochmal versuchen
