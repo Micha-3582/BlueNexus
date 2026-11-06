@@ -30,6 +30,7 @@ PING_S = 25.0
 PUSHALL_S = 300.0                     # alle 5 min den vollstaendigen Stand anfordern (Teilmeldungen reichen sonst nicht bei jedem Modell)
 BACKOFF_START_S, BACKOFF_MAX_S = 2.0, 30.0
 GRACE_S = 120.0                       # nach einem Abbruch gilt der letzte Stand noch so lange (WLAN-Aussetzer des Druckers)
+CAMERA_PORT, CAMERA_PATH = 322, "/streaming/live/1"      # Kamera der X1-Modelle: rtsps://bblp:<Zugangscode>@<IP>:322/streaming/live/1
 PROBE_S = 10.0                        # Pruefen beim Anlegen: so lange auf die erste Meldung warten
 ACTIVE = ("PREPARE", "RUNNING", "PAUSE")
 STATE_TEXT = {"IDLE": "bereit", "PREPARE": "bereitet vor", "RUNNING": "druckt", "PAUSE": "pausiert", "FINISH": "fertig", "FAILED": "Fehler"}
@@ -379,3 +380,20 @@ def add_device(ip: str, serial: str, code: str, name: str = "") -> dict:
     shelly._save(items)
     ensure(entry)
     return {k: v for k, v in entry.items() if k not in ("password", "user")}
+
+
+def add_camera(dev_id: str) -> dict:
+    """Legt die Kamera eines X1-Druckers (RTSPS-Strom, Port 322, gleicher Zugangscode) als Kamera an. Wirft shelly.ShellyError mit klarer Meldung."""
+    import camera
+    import shelly
+    d = shelly._find(dev_id)
+    if not d or d.get("kind") != "bambu":
+        raise shelly.ShellyError("Drucker nicht gefunden")
+    if any(c.get("kind") == "rtsp" and c.get("host") == d.get("ip") and int(c.get("port") or 0) == CAMERA_PORT for c in camera.load()):
+        raise shelly.ShellyError("Für diesen Drucker gibt es schon eine Kamera (Kameras)")
+    try:
+        item = camera.add(f"{d.get('name') or 'Drucker'} – Kamera", d["ip"], USER, d.get("password") or "", CAMERA_PORT, 0, False, "rtsp", CAMERA_PATH, "", True)
+    except camera.CameraError as e:
+        raise shelly.ShellyError(f"{e}. Am Drucker muss die Live-Ansicht im LAN freigegeben sein (Einstellungen → Allgemein → „LAN-Modus Liveview“). "
+                                 "Einen RTSP-Strom bieten die Modelle X1C, X1E und H2D; P1 und A1 verwenden ein anderes Verfahren, das BlueNexus noch nicht kann.")
+    return item

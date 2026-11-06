@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.41.0 – 06.11.2026
+- Neu: **Kamera des Bambu-Lab-Druckers.** In der Bearbeiten-Ansicht der Drucker-Zeile (Aktoren) gibt es einen **Kamera-Knopf**, der die Kamera des Druckers (X1C, X1E, H2D) unter *Kameras* anlegt. BlueNexus nutzt dafür den verschlüsselten Kamerastrom des Druckers (Port 322, Benutzer `bblp`, derselbe Zugangscode) und prüft beim Anlegen, ob ein Bild kommt. Danach läuft die Kamera wie jede andere (Standbild, Live-Ansicht, Freigaben, Sichtbarkeit). Am Drucker muss dafür die **Live-Ansicht im LAN** freigegeben sein; bei einem Fehler nennt BlueNexus diesen Hinweis. P1 und A1 senden ihr Bild auf anderem Weg, das ist noch nicht unterstützt.
+- Intern: RTSP-Kameras können einen verschlüsselten Strom (`rtsps`) nutzen.
+
 ## 1.40.1 – 06.11.2026
 - Behoben: **Trefferlisten verschiedener Systeme vermischten sich.** Wer unter *Geräte suchen* zuerst bei einem System (z. B. Tuya) und dann bei einem anderen (z. B. Zigbee) suchte, sah die Treffer beider Systeme in derselben Liste, und „Hinzufügen“ konnte beim falschen System landen. Jetzt behält jedes System-Fenster **seine eigene Trefferliste und Meldung**: beim Wechsel in ein anderes Fenster wird die Liste beiseitegelegt und beim Zurückkehren wieder angezeigt. Wechselt man während einer laufenden Suche das Fenster, werden die späteren Treffer nicht mehr in das andere Fenster geschrieben.
 

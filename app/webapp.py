@@ -350,7 +350,7 @@ ENDPOINT_AREA = {
     "api_setpoint_scan": "smarthome_einrichten", "api_setpoint_add": "smarthome_einrichten", "api_setpoint_list": "dashboard",
     "api_setpoint_modify": "settings_geraete", "api_setpoint_value": "dashboard",
     "api_shelly_icons": "settings_geraete", "api_shelly_order": "settings_geraete",
-    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten", "api_esphome_scan": "smarthome_einrichten", "api_esphome_add": "smarthome_einrichten", "api_bambu_add": "smarthome_einrichten", "api_esphome_sensor_scan": "smarthome_einrichten", "api_esphome_sensor_add": "smarthome_einrichten",
+    "api_shelly_scan": "smarthome_einrichten", "api_tasmota_scan": "smarthome_einrichten", "api_esphome_scan": "smarthome_einrichten", "api_esphome_add": "smarthome_einrichten", "api_bambu_add": "smarthome_einrichten", "api_bambu_camera": "kameras", "api_esphome_sensor_scan": "smarthome_einrichten", "api_esphome_sensor_add": "smarthome_einrichten",
     "api_shelly_add": "smarthome_einrichten", "api_shelly_preview": "smarthome_einrichten", "api_shelly_modify": "settings_geraete",
     "api_check_update": "settings_system", "api_recovery_key": "account", "api_system_time": "settings_system", "api_system_testmode": "settings_system", "api_welcome_done": "settings_system", "api_update": "settings_system", "api_system_timezone": "settings_system",
     "api_backup_export": "user_management", "api_backup_import": "user_management",
@@ -6428,6 +6428,19 @@ def api_esphome_sensor_add():
         return jsonify(error=str(e)), 400
     _apply_edits(added, _edits(), "sensor")
     return jsonify({"added": len(added)}), 201
+
+
+@app.route("/api/bambu/<dev_id>/camera", methods=["POST"])
+def api_bambu_camera(dev_id):
+    """Kamera eines Bambu-Lab-Druckers (X1) als Kamera anlegen."""
+    denied = _admin_only()
+    if denied:
+        return denied
+    try:
+        item = bambu.add_camera(dev_id)
+    except shelly.ShellyError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(camera.public(item, True)), 201
 
 
 @app.route("/api/bambu/add", methods=["POST"])

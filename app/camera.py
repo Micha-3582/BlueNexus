@@ -639,7 +639,8 @@ def rtsp_url(item: dict, quality: str = DEFAULT_QUALITY, path: str | None = None
     user, pw = quote(item.get("user", ""), safe=""), quote(item.get("password", ""), safe="")
     if item.get("kind") == "rtsp":
         p = path if path is not None else ((item.get("path_sub") if norm_quality(quality) == "fluessig" else "") or item.get("path_main") or "")
-        return f"rtsp://{user}:{pw}@{item['host']}:{int(item.get('port') or 554)}{p if p.startswith('/') else '/' + p}"
+        scheme = "rtsps" if item.get("tls") else "rtsp"                                  # verschluesselter Strom (z. B. Bambu-Lab-Drucker, Port 322); das Zertifikat ist selbst signiert, ffmpeg prueft es nicht
+        return f"{scheme}://{user}:{pw}@{item['host']}:{int(item.get('port') or 554)}{p if p.startswith('/') else '/' + p}"
     ch = int(item.get("channel") or 0) + 1
     return f"rtsp://{user}:{pw}@{item['host']}:554/Preview_{ch:02d}_{QUALITIES[norm_quality(quality)]['stream']}"
 
@@ -775,7 +776,7 @@ def _check_host(host: str) -> None:
         raise CameraError("Adresse: nur IP oder Rechnername, ohne http:// und ohne Pfad")
 
 
-def add(name: str, host: str, user: str, password: str, port=None, channel=0, https=False, kind: str = "reolink", path_main: str = "", path_sub: str = "") -> dict:
+def add(name: str, host: str, user: str, password: str, port=None, channel=0, https=False, kind: str = "reolink", path_main: str = "", path_sub: str = "", tls: bool = False) -> dict:
     name = (name or "").strip()[:60]
     host = (host or "").strip()
     kind = "rtsp" if kind == "rtsp" else "reolink"
@@ -792,6 +793,8 @@ def add(name: str, host: str, user: str, password: str, port=None, channel=0, ht
     item = {"id": "cam-" + uuid.uuid4().hex[:8], "kind": kind, "name": name, "host": host, "user": (user or "").strip(), "password": password or "",
             "port": port, "channel": channel, "https": bool(https), "show": True, "users": []}
     if kind == "rtsp":
+        if tls:
+            item["tls"] = True
         item["path_main"] = (path_main or "").strip()
         item["path_sub"] = (path_sub or "").strip()
         for k in ("path_main", "path_sub"):
