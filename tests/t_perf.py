@@ -114,9 +114,9 @@ assert all(d["on"] for d in shelly.list_with_status())                          
 # Schalten verwirft den gemerkten Zustand
 shelly._st_cache["t1"] = (time.time(), {"online": True, "on": False, "power": None}); shelly.set_state("t1", True); assert "t1" not in shelly._st_cache
 # 8) Offline: Ruhezeit wird laenger (12 -> 24 -> 48 -> 60 s)
-shelly._down.clear(); tasmota._cmd = lambda ip, cmnd, timeout, auth=None: (_ for _ in ()).throw(tasmota.requests.ConnectionError("weg"))
+shelly._down.clear(); shelly._last_ok.clear(); tasmota._cmd = lambda ip, cmnd, timeout, auth=None: (_ for _ in ()).throw(tasmota.requests.ConnectionError("weg"))
 d1 = shelly._find("t2"); shelly.status(d1); u1 = shelly._down["t2"]; assert u1[2] == 1 and 10 < u1[0] - time.time() <= 12.1
-shelly._down["t2"] = (time.time() - 1, u1[1], 1); shelly.status(d1); u2 = shelly._down["t2"]; assert u2[2] == 2 and 22 < u2[0] - time.time() <= 24.1
-shelly._down["t2"] = (time.time() - 1, u2[1], 4); shelly.status(d1); assert shelly._down["t2"][0] - time.time() <= 60.1
+shelly._last_ok.clear(); shelly._down["t2"] = (time.time() - 1, u1[1], 1); shelly.status(d1); u2 = shelly._down["t2"]; assert u2[2] == 2 and 22 < u2[0] - time.time() <= 24.1
+shelly._last_ok.clear(); shelly._down["t2"] = (time.time() - 1, u2[1], 4); shelly.status(d1); assert shelly._down["t2"][0] - time.time() <= 60.1
 print("7+8) Hintergrund-Zustand und Backoff OK")
 print("GESCHWINDIGKEIT OK")

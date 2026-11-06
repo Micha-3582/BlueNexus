@@ -92,7 +92,7 @@ val = lambda: next(s for s in A.get("/api/sensors").get_json() if s["id"] == sn[
 shelly._st_cache.clear(); homematic._value_cache.clear(); shelly._down.clear()
 assert val() is True                                                                                   # Relais AN -> Tor geschlossen: TRUE = geschlossen (wie bei Fenstern/Tueren ueblich)
 state["on"] = "OFF"; shelly._st_cache.clear(); homematic._value_cache.clear(); assert val() is False   # AUS -> offen
-state["fail"] = True; shelly._st_cache.clear(); shelly._down.clear(); homematic._value_cache.clear(); assert val() is None   # nicht erreichbar -> unbekannt
+state["fail"] = True; shelly._st_cache.clear(); shelly._down.clear(); shelly._last_ok.clear(); homematic._value_cache.clear(); assert val() is None   # nicht erreichbar -> unbekannt
 state["fail"] = False; shelly._down.clear()
 # Meldung von aussen steht mit den Worten des Sensors im Logbuch (statt "eingeschaltet")
 shelly.tasmota_hook_set("tasmota-AA11-1", "192.168.50.40:5005")
@@ -165,7 +165,7 @@ sid = "devS-tasmota-AA11-2"; sn = next(s for s in homematic.load_sensors() if s[
 def rd(w=None, **kw):
     pw.update(kw); 
     if w is not None: pw["w"] = w
-    shelly._st_cache.clear(); homematic._value_cache.clear(); shelly._down.clear()
+    shelly._st_cache.clear(); homematic._value_cache.clear(); shelly._down.clear(); (shelly._last_ok.clear() if kw.get("fail") else None)
     return next(x for x in A.get("/api/sensors").get_json() if x["id"] == sid)["value"]
 assert rd(0.0) is False and rd(5.5) is False and rd(5.6) is True and rd(120.0) is True and rd(2.0) is False                  # Schwelle: mehr als 5,5 W
 assert rd(fail=True) is None; pw["fail"] = False                                                                                 # nicht erreichbar -> unbekannt

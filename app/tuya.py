@@ -23,7 +23,7 @@ REGIONS = {"eu": "Europa (Zentral)", "eu-w": "Europa (West)", "us": "USA (West)"
            "us-e": "USA (Ost)", "in": "Indien", "cn": "China"}
 CALL_TIMEOUT = 3
 STATUS_TTL_S = 3.0                # kurz zwischenspeichern: Tuya-Steckdosen vertragen nur 1 Verbindung
-OFFLINE_TTL_S = 15.0              # nicht erreichbare Geraete seltener anfragen (Timeout dauert ~2 s)
+OFFLINE_TTL_S = 6.0               # nicht erreichbare Geraete seltener anfragen (Timeout dauert ~2 s)
 
 _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
@@ -263,7 +263,12 @@ def status(d: dict) -> dict:
     if hit and now < hit[0]:
         return hit[1]
     try:
-        dps = _raw_status(d)["dps"]
+        try:
+            raw = _raw_status(d)
+        except TuyaError:                              # einzelner Aussetzer der Steckdose: kurz warten und noch einmal fragen
+            time.sleep(0.4)
+            raw = _raw_status(d)
+        dps = raw["dps"]
         on = dps.get(d.get("dp", "1"))
         if on is None:
             raise TuyaError("Schalt-Datenpunkt fehlt")

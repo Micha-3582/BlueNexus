@@ -982,6 +982,9 @@ def _auth(d: dict):
 _down: dict = {}                       # Geraete-ID -> (Ruhe bis, letzter Offline-Zustand, Fehlversuche in Folge): kurz nicht neu versuchen
 DOWN_BACKOFF_S = 12.0                  # nach dem 1. Fehlschlag; verdoppelt sich je weiterem Fehlschlag bis DOWN_BACKOFF_MAX_S
 DOWN_BACKOFF_MAX_S = 60.0
+BLIP_GRACE_S = 45.0                   # so lange nach der letzten guten Antwort gilt ein einzelner Aussetzer noch nicht als "nicht erreichbar"
+BLIP_NOT_FOR = ("zigbee", "homematic", "remote", "midea", "virtual")   # nur WLAN-Geraete mit eigenem Abruf (Tasmota, Tuya, Shelly, WLED); die anderen melden ihren Zustand ohnehin selbst
+_last_ok: dict = {}                    # Geraete-ID -> (Zeit, Zustand) der letzten erfolgreichen Abfrage
 _st_cache: dict = {}                   # Geraete-ID -> (Zeit, Zustand): letzter bekannter Zustand fuer die Oberflaeche
 _st_bg: set = set()                    # Geraete, die gerade im Hintergrund aufgefrischt werden
 _st_lock = threading.Lock()
@@ -1006,6 +1009,25 @@ def status(d: dict) -> dict:
     if hit and hit[0] > time.time():
         return dict(hit[1])
     st = _status_live(d)
+    ok = _last_ok.get(key) if key is not None and d.get("kind") not in BLIP_NOT_FOR else None
+    if st.get("online") is False and ok and time.time() - ok[0] <= BLIP_GRACE_S:
+        # Das Geraet hat eben noch geantwortet: WLAN-Steckdosen (Tuya, Tasmota, ...) haben kurze Aussetzer. Sofort noch einmal fragen und, falls auch das
+        # nicht klappt, den letzten bekannten Zustand weiter zeigen, statt gleich "nicht erreichbar" zu melden.
+        st = _status_live(d)
+        if st.get("online") is False:
+            last = dict(ok[1])
+            last["stale"] = True
+            hold = last
+        else:
+            hold = None
+    else:
+        hold = None
+    if key is not None and st.get("online") is not False:
+        _last_ok[key] = (time.time(), dict(st))
+    if hold is not None:
+        if key is not None:
+            _st_cache[key] = (time.time(), dict(hold))
+        return hold                                          # kein Ruhezustand: beim naechsten Abruf wird das Geraet wieder gefragt
     if key is not None:
         if st.get("online") is False:
             fails = (hit[2] if hit else 0) + 1
