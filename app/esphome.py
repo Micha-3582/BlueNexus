@@ -223,12 +223,66 @@ def _notify() -> None:
             log.warning("ESPHome-Listener fehlgeschlagen", exc_info=True)
 
 
+_link: dict[str, dict] = {}                          # ip -> Messung der Verbindung seit dem Start: {since, drops, down_s, longest_s, down_at, last_drop, last_reason}
+_last_err: dict[str, str] = {}                       # ip -> Grund des letzten Abbruchs (Fehlerart)
+
+
+def _note_link(ip: str, was_online: bool, online: bool) -> None:
+    """Fuehrt Buch ueber die Verbindung zu einem Geraet (Abbrueche, Ausfallzeit); der Aufrufer haelt _lock."""
+    now = time.time()
+    m = _link.setdefault(ip, {"since": now, "drops": 0, "down_s": 0.0, "longest_s": 0.0, "down_at": None, "last_drop": None, "last_reason": "", "restarts": 0, "uptime": None, "last_restart": None})
+    if was_online and not online:
+        m["drops"] += 1
+        m["down_at"] = now
+        m["last_drop"] = now
+        m["last_reason"] = _last_err.get(ip, "")
+        log.info("ESPHome %s: Verbindung abgebrochen (%s), bisher %d Abbrüche", ip, m["last_reason"] or "ohne Fehler", m["drops"])
+    elif online and m["down_at"]:
+        d = now - m["down_at"]
+        m["down_s"] += d
+        m["longest_s"] = max(m["longest_s"], d)
+        m["down_at"] = None
+        log.info("ESPHome %s: wieder verbunden nach %.1f s", ip, d)
+
+
+def _note_uptime(ip: str, up) -> None:
+    """Betriebszeit aus den Ping-Meldungen des Geraets: faellt sie zurueck, hat sich der Chip neu gestartet (Absturz, Stromausfall, Update)."""
+    try:
+        up = float(up)
+    except (TypeError, ValueError):
+        return
+    with _lock:
+        m = _link.setdefault(ip, {"since": time.time(), "drops": 0, "down_s": 0.0, "longest_s": 0.0, "down_at": None, "last_drop": None, "last_reason": "",
+                                  "restarts": 0, "uptime": None, "last_restart": None})
+        prev = m.get("uptime")
+        m["uptime"] = up
+        if prev is not None and up + 5 < prev:
+            m["restarts"] += 1
+            m["last_restart"] = time.time()
+            log.info("ESPHome %s: Gerät hat neu gestartet (Betriebszeit %.0f s statt zuletzt %.0f s), bisher %d Neustarts", ip, up, prev, m["restarts"])
+
+
+def link_stats(ip: str) -> dict | None:
+    """Messung der Verbindung seit dem Start von BlueNexus: Abbrueche, gesamte Ausfallzeit, laengster Ausfall, letzter Abbruch (None, wenn noch nichts gemessen)."""
+    with _lock:
+        m = _link.get(ip)
+        if not m:
+            return None
+        now = time.time()
+        cur = (now - m["down_at"]) if m["down_at"] else 0.0
+        return {"drops": m["drops"], "down_s": round(m["down_s"] + cur, 1), "longest_s": round(max(m["longest_s"], cur), 1), "since_s": int(now - m["since"]),
+                "last_drop_ago_s": None if m["last_drop"] is None else int(now - m["last_drop"]), "last_reason": m["last_reason"], "down_now": bool(m["down_at"]),
+                "restarts": m.get("restarts", 0), "last_restart_ago_s": None if not m.get("last_restart") else int(now - m["last_restart"]),
+                "uptime_s": None if m.get("uptime") is None else int(m["uptime"])}
+
+
 def _set_online(ip: str, online: bool, stop=None) -> None:
     with _lock:
         h = _hosts.get(ip)
         if stop is not None and (h is None or h["stop"] is not stop):       # eine abgeloeste (neu gestartete) Verbindung darf den Zustand der neuen nicht stoeren
             return
         if h is not None:
+            _note_link(ip, bool(h["online"]), online)
             h["online"] = online
         if online:                                                          # frische Verbindung: Anfangszustand zaehlt nie als Druck
             for k, st in _state.items():
@@ -290,6 +344,14 @@ def _watch(ip: str, stop: threading.Event) -> None:
                 for event, data in _parse_sse(_lines(r)):
                     if stop.is_set() or _stop_all.is_set():
                         break
+                    if event == "ping":                                    # enthaelt (je nach Stand) die Betriebszeit des Geraets
+                        try:
+                            pj = json.loads(data)
+                        except ValueError:
+                            pj = None
+                        if isinstance(pj, dict) and "uptime" in pj:
+                            _note_uptime(ip, pj["uptime"])
+                        continue
                     if event == "state":
                         try:
                             j = json.loads(data)
@@ -299,6 +361,10 @@ def _watch(ip: str, stop: threading.Event) -> None:
                             _on_state(ip, j)
         except (requests.RequestException, OSError, ValueError) as e:
             log.debug("ESPHome %s: Verbindung beendet (%s: %s)", ip, e.__class__.__name__, e)
+            _last_err[ip] = {"ReadTimeout": "Stille (25 s ohne Meldung)", "ConnectTimeout": "keine Antwort beim Verbinden", "ConnectionError": "Verbindung getrennt oder abgelehnt",
+                             "ChunkedEncodingError": "Verbindung getrennt"}.get(e.__class__.__name__, e.__class__.__name__)
+        else:
+            _last_err[ip] = "vom Gerät beendet"
         _set_online(ip, False, stop)
         stop.wait(backoff)
         backoff = min(BACKOFF_MAX_S, backoff * 2)
@@ -574,9 +640,10 @@ def status(d: dict) -> dict:
         online = bool(h and h["online"])
         st = _state.get((ip, ent)) or {}
         pa, pending = st.get("pressed_at", 0.0), st.get("seq", 0) > st.get("consumed", 0) and not st.get("mask")
+    link = link_stats(ip)
     if not online:
-        return {"online": False, "on": None, "power": None, "shown": False}
-    out = {"online": True, "on": pending, "power": None, "shown": (time.time() - pa) < DISPLAY_S}
+        return {"online": False, "on": None, "power": None, "shown": False, "link": link}
+    out = {"online": True, "on": pending, "power": None, "shown": (time.time() - pa) < DISPLAY_S, "link": link}
     if missing(ip, ent):
         out["missing"] = True                               # das Geraet meldet diesen Eingang nicht mehr (neue Firmware?) - der Eintrag bliebe sonst stumm
     return out

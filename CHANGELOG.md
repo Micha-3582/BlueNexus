@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.35.0 – 06.11.2026
+- Neu: **Verbindungsmessung für ESPHome-Geräte (Taster).** BlueNexus zählt seit seinem Start, wie oft die Verbindung zu einem Taster abgerissen ist, wie lange er insgesamt und am längsten weg war und wann und warum der letzte Abbruch war (z. B. „Stille“ oder „Verbindung getrennt“). Die Zahlen stehen in der Aktorenliste hinter dem Gerät („3 Abbrüche in 2 h (zusammen 8 s weg, längster 4 s, zuletzt vor 12 min: Stille)“ oder „Verbindung stabil seit 5 h“) und jeder Abbruch im Protokoll. Zusätzlich erkennt BlueNexus **Neustarts des Geräts selbst** an der Betriebszeit, die der Taster in seinen Ping-Meldungen mitschickt („1 Neustart des Geräts (zuletzt vor 20 min)“). Der Zähler beginnt bei jedem Neustart von BlueNexus von vorn.
+
 ## 1.34.11 – 06.11.2026
 - Fehlerbehebung: **Regeln reagierten mal sofort, mal erst nach bis zu 5 Sekunden** (z. B. Software-Knopf löst Chime aus). Die Regelrunde wartete vor jedem Auslösen auf das **langsamste** der beteiligten Geräte; ein WLAN-Gerät mit kurzem Aussetzer hielt so alle Regeln auf. Jetzt wartet die Runde **höchstens 0,6 Sekunden** auf die Geräte. Wer bis dahin nicht geantwortet hat, zählt mit seinem letzten bekannten Zustand (die Abfrage läuft im Hintergrund weiter). Ein Gerät ohne bekannten Zustand wird weiterhin abgewartet.
 

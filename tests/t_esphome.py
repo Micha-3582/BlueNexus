@@ -148,7 +148,7 @@ wakes = []
 esphome.add_listener(lambda: wakes.append(time.time()))
 esphome.sync(shelly.load_devices())
 wait(lambda: esphome.status(e)["online"], what="verbunden")
-st = esphome.status(e); assert st == {"online": True, "on": False, "power": None, "shown": False}, st
+st = esphome.status(e); assert {k: v for k, v in st.items() if k != "link"} == {"online": True, "on": False, "power": None, "shown": False} and st["link"]["drops"] == 0, st
 def rules_pass():
     """So arbeitet eine Runde der Regelschleife: Stand merken, Zustand lesen, am Ende die gesehenen Druecke beenden."""
     snap = esphome.seqs(); on = esphome.status(e)["on"]; esphome.consume(snap); return on
@@ -374,7 +374,7 @@ wait(lambda: esphome.status(e)["online"] and "missing" not in esphome.status(e),
 # ---------------------------------------------------------------- Ausfall und Wiederverbindung
 stop_server(srv)
 wait(lambda: esphome.status(e)["online"] is False, 5.0, "Ausfall erkannt")
-st = esphome.status(e); assert st == {"online": False, "on": None, "power": None, "shown": False}, st
+st = esphome.status(e); assert {k: v for k, v in st.items() if k != "link"} == {"online": False, "on": None, "power": None, "shown": False} and st["link"]["drops"] >= 1 and st["link"]["down_now"], st
 x = {y["id"]: y for y in A.get("/api/shelly").get_json()}["esphome-taster-taster"]; assert x["online"] is False and x["on"] is None
 assert rd("espS-taster-temperatur") == 22.3, "kurzer Ausfall: der letzte Messwert gilt noch (Schonfrist)"
 esphome.VALUE_GRACE_S = 0.2; time.sleep(0.4)
