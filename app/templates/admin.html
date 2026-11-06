@@ -742,34 +742,6 @@
   </div>
 </div>
 
-<div class="card fam-card" id="fam-esphome" data-tab="suchen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf <b>Taster suchen</b> (Eingänge) oder <b>Messwerte suchen</b> (Temperatur, Luftfeuchte, Leistung, Druck, Helligkeit, Spannung, Funkstärke) klicken. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren („wird gedrückt“ in Regeln), Messwerte unter Sensoren. Bekommt das Gerät eine neue IP-Adresse, die Suche mit der neuen Adresse wiederholen: Die Einträge ziehen um.">?</span></h2>
-  <div class="sub">Alles, was ein ESPHome-Gerät bietet (Taster, Klimaanlagen, Schalter, Messwerte), per IP-Adresse finden und hinzufügen.</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
-    <button id="esphome-scan" class="ghost">Gerät suchen</button>
-  </div>
-</div>
-
-<div class="card fam-card" id="fam-bambu" data-tab="suchen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Bambu Lab (3D-Drucker)</h2>
-  <div class="sub">Druckstatus eines Bambu-Lab-Druckers lesen (Fortschritt, Temperaturen, Restzeit, Fehler). Adresse, Seriennummer und Zugangscode findest du am Drucker unter Einstellungen → WLAN bzw. Geräteinfo.</div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input type="text" id="bambu-ip" placeholder="IP, z.B. 192.168.178.50" inputmode="decimal" autocomplete="off" style="flex:1;min-width:170px">
-    <input type="text" id="bambu-serial" placeholder="Seriennummer" autocomplete="off" style="flex:1;min-width:170px">
-    <input type="password" id="bambu-code" placeholder="Zugangscode" autocomplete="off" style="flex:1;min-width:140px">
-    <input type="text" id="bambu-name" placeholder="Name (optional)" maxlength="60" autocomplete="off" style="flex:1;min-width:150px">
-    <button id="bambu-add" class="ghost">Drucker hinzufügen</button>
-  </div>
-</div>
-
-<div class="card fam-card" id="fam-vlan" data-tab="suchen">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Suche in weiteren Netzen</h2>
-  <div class="sub">Zusätzliche Netze für die Gerätesuche (optional).</div>
-  <label>Weitere Netze / VLANs für die Suche (optional) <span class="qhelp" role="button" tabindex="0" data-help="Zusätzliche Netze für die Gerätesuche, zum Beispiel 192.168.178.0/24, mehrere durch Komma getrennt. Standardmäßig wird nur das Netz des Servers durchsucht. Nur nötig, wenn Geräte in einem anderen VLAN stehen; gilt für Shelly, Tasmota und Tuya. Der Server muss dorthin routen dürfen, die Suche dauert dann länger.">?</span></label>
-    <input id="scan-networks" placeholder="z.B. 192.168.178.0/24, 192.168.48.0/21" autocomplete="off">
-</div>
-
 <div class="card fam-card" id="fam-tuya" data-tab="suchen">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Tuya / Smart Life (z.B. Gosund) <span class="qhelp" role="button" tabindex="0" data-help="Die Geräte werden <b>lokal im Heimnetz</b> geschaltet. Die Tuya-Cloud wird nur einmal gebraucht, um die Geräteschlüssel abzuholen.<ol><li>Auf <a href=&quot;https://iot.tuya.com&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;>iot.tuya.com</a> ein kostenloses Konto anlegen → Cloud → Development → <i>Create Cloud Project</i> (Industry „Smart Home“, Data Center passend zur Region).</li><li>Im Projekt die Dienste <i>IoT Core</i> und <i>Authorization Token Management</i> hinzufügen.</li><li>Unter <i>Devices → Link App Account</i> die Smart-Life-/Tuya-App per QR-Code verknüpfen.</li><li>Auf der Projekt-Übersicht <i>Access ID</i> und <i>Access Secret</i> kopieren und hier eintragen.</li></ol>">?</span></h2>
   <div class="sub">Geräte lokal schalten – die Cloud liefert nur einmal die Schlüssel.</div>
@@ -843,6 +815,34 @@
   <details style="margin-top:10px" open><summary>MSmartHome-Konto (für den Schlüssel)</summary>
     <div class="grid2"><div><label>E-Mail <span class="qhelp" role="button" tabindex="0" data-help="E-Mail-Adresse des MSmartHome-Kontos, in dem die Klimaanlagen eingetragen sind. Nur für das einmalige Holen der Schlüssel, wird nicht gespeichert.">?</span></label><input id="midea-account" autocomplete="off"></div><div><label>Passwort <span class="qhelp" role="button" tabindex="0" data-help="Passwort des MSmartHome-Kontos. Wird nicht gespeichert.">?</span></label><div class="pw-wrap"><input id="midea-pass" type="password" autocomplete="new-password"><button type="button" class="pw-toggle" data-for="midea-pass" aria-label="Passwort anzeigen" title="Passwort anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div></div>
   </details>
+</div>
+
+<div class="card fam-card" id="fam-esphome" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf <b>Taster suchen</b> (Eingänge) oder <b>Messwerte suchen</b> (Temperatur, Luftfeuchte, Leistung, Druck, Helligkeit, Spannung, Funkstärke) klicken. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren („wird gedrückt“ in Regeln), Messwerte unter Sensoren. Bekommt das Gerät eine neue IP-Adresse, die Suche mit der neuen Adresse wiederholen: Die Einträge ziehen um.">?</span></h2>
+  <div class="sub">Alles, was ein ESPHome-Gerät bietet (Taster, Klimaanlagen, Schalter, Messwerte), per IP-Adresse finden und hinzufügen.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
+    <button id="esphome-scan" class="ghost">Gerät suchen</button>
+  </div>
+</div>
+
+<div class="card fam-card" id="fam-bambu" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Bambu Lab (3D-Drucker)</h2>
+  <div class="sub">Druckstatus eines Bambu-Lab-Druckers lesen (Fortschritt, Temperaturen, Restzeit, Fehler). Adresse, Seriennummer und Zugangscode findest du am Drucker unter Einstellungen → WLAN bzw. Geräteinfo.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="bambu-ip" placeholder="IP, z.B. 192.168.178.50" inputmode="decimal" autocomplete="off" style="flex:1;min-width:170px">
+    <input type="text" id="bambu-serial" placeholder="Seriennummer" autocomplete="off" style="flex:1;min-width:170px">
+    <input type="password" id="bambu-code" placeholder="Zugangscode" autocomplete="off" style="flex:1;min-width:140px">
+    <input type="text" id="bambu-name" placeholder="Name (optional)" maxlength="60" autocomplete="off" style="flex:1;min-width:150px">
+    <button id="bambu-add" class="ghost">Drucker hinzufügen</button>
+  </div>
+</div>
+
+<div class="card fam-card" id="fam-vlan" data-tab="suchen">
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Suche in weiteren Netzen</h2>
+  <div class="sub">Zusätzliche Netze für die Gerätesuche (optional).</div>
+  <label>Weitere Netze / VLANs für die Suche (optional) <span class="qhelp" role="button" tabindex="0" data-help="Zusätzliche Netze für die Gerätesuche, zum Beispiel 192.168.178.0/24, mehrere durch Komma getrennt. Standardmäßig wird nur das Netz des Servers durchsucht. Nur nötig, wenn Geräte in einem anderen VLAN stehen; gilt für Shelly, Tasmota und Tuya. Der Server muss dorthin routen dürfen, die Suche dauert dann länger.">?</span></label>
+    <input id="scan-networks" placeholder="z.B. 192.168.178.0/24, 192.168.48.0/21" autocomplete="off">
 </div>
 
 <div class="card msg-host" id="fam-wol" data-tab="wol">
