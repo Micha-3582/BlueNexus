@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.42.2 – 06.11.2026
+- Geändert: **Regel-Editor: Auswahl der Bedingungsarten sinnvoll sortiert.** Erst Zeit (Uhrzeit, Wochentag, Sonne), dann Sensoren, Aktoren und Auslöser (Sensor, Wert ändert sich, Aktoren, Eigener Schalter, Telegram-Wort, Regel), zuletzt Energie (Strompreis, Laufzeit, Akku, Sonne morgen). Der Eintrag „Sensor“ heißt jetzt „Sensor (Wert oder Ja/Nein)“.
+
 ## 1.42.1 – 06.11.2026
 - Behoben: **„Wert ändert sich um …“ fand den Sensor nicht** („keine Daten … nicht mehr vorhanden“). Die Regel-Abfrage las nur Sensoren aus Bedingungen der Art „Sensor“, nicht aus der neuen Bedingung. Jetzt werden auch deren Sensoren gelesen.
 
