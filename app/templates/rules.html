@@ -42,6 +42,21 @@
   <div id="rule-wizard" style="margin-top:12px"></div>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" id="fab-add" title="Neue Regel" onclick="wizStart()" style="width:48px;height:48px;border-radius:50%;padding:0;font-size:28px;line-height:1;display:flex;align-items:center;justify-content:center">+</button></div>
   <div class="muted" id="rules-msg" style="margin-top:8px"></div>
+  <details style="margin-top:14px" id="ph-help">
+    <summary>Platzhalter in Nachrichten (Telegram, Pushover, Bild- und Videotext)</summary>
+    <div class="muted" style="margin-top:8px">Im Text einer Nachricht werden diese Platzhalter beim Senden durch die aktuellen Werte ersetzt. Die Werte hält der Ablauf in dem Moment fest, in dem er startet.</div>
+    <table style="margin-top:8px;border-collapse:collapse"><tbody>
+      <tr><td style="padding:3px 14px 3px 0"><b>[WERT]</b></td><td>aktueller Wert des Sensors mit Einheit, z. B. „43 %“ oder „219,5 °C“</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[ZAHL]</b></td><td>aktueller Wert ohne Einheit, z. B. „43“</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[ALT]</b></td><td>Wert bei der letzten Meldung (nur bei der Bedingung „Sensor: Wert ändert sich um …“), sonst „–“</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[SENSOR]</b></td><td>Name des Sensors, z. B. „Druckfortschritt“</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[UHR]</b></td><td>Uhrzeit beim Senden, z. B. „14:35“</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[REGEL]</b></td><td>Name der Regel</td></tr>
+      <tr><td style="padding:3px 14px 3px 0"><b>[WER]</b></td><td>Konto, das den Auslöser (Gerät oder Schalter in WENN) zuletzt bedient hat, sonst „unbekannt“</td></tr>
+    </tbody></table>
+    <div class="muted" style="margin-top:8px">[WERT], [ZAHL], [ALT] und [SENSOR] kommen vom <b>ersten Sensor in der Bedingung WENN</b> – bei „Wert ändert sich um …“ von dem, der ausgelöst hat. Gibt es keinen Sensor, steht dort „–“.</div>
+    <div style="margin-top:8px"><b>Beispiel</b> – Druckfortschritt bei jedem Prozent per Telegram: Bedingung „Sensor: Druckfortschritt ändert sich um mindestens 1 %“, Aktion „Telegram-Nachricht“ mit dem Text <i>🖨️ [SENSOR]: [WERT] (vorher [ALT])</i> → „🖨️ Druckfortschritt: 43 % (vorher 42 %)“.</div>
+  </details>
   <details style="margin-top:14px">
     <summary>Feineinstellungen (Pause nach Handschaltung, Sicherheits-Timer)</summary>
     <div id="rules-settings" class="grid2" style="margin-top:10px"></div>
@@ -210,9 +225,9 @@ function renderSettings() {
 const MODULES = {{ modules | tojson }};                         // Module der Installation: ausgeschaltete blenden ihre Bedingungen/Aktionen im Editor aus
 const FAMS = {{ families | tojson }};                                // gewaehlte Smart-Home-Systeme (Einstellungen -> Geraete): nicht vorhandene blenden ihre Schritte aus
 const ENERGY_CONDS = ['price', 'budget', 'soc', 'sun_tomorrow'];           // brauchen das Modul Energie (Strompreis, Akku, Prognose)
-const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf'], ['telegram', 'Telegram-Wort (Befehl an den Bot)'], ['rule', 'Regel (an/aus)']];
+const TYPES = [['time', 'Uhrzeit von–bis'], ['at', 'Uhrzeit (einmal pro Tag)'], ['weekday', 'Wochentag'], ['sun', 'Sonnenaufgang / Sonnenuntergang'], ['sunwin', 'Nacht / Tag (Sonnenstand)'], ['price', 'Strompreis'], ['budget', 'Laufzeit pro Tag'], ['soc', 'Akkustand'], ['sun_tomorrow', 'Sonne morgen (Prognose)'], ['sensor', 'Sensor'], ['device', 'Meine Aktoren (an/aus, Leistung)'], ['virtual', 'Eigener Schalter / Knopf'], ['telegram', 'Telegram-Wort (Befehl an den Bot)'], ['change', 'Sensor: Wert ändert sich um …'], ['rule', 'Regel (an/aus)']];
 let CUR_FLOW = false;                           // gerade gezeichnete Regel ist ein Ablauf (kein 'Laufzeit pro Tag')
-const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'telegram' && !(S.recipients || []).length) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
+const allowed = (fixed, keep) => TYPES.filter(([t]) => t === keep || (MODULES.energy || !ENERGY_CONDS.includes(t)) && (!(fixed && (t === 'price' || t === 'budget')) && !(t === 'sensor' && !(S.sensors || []).length) && !(t === 'virtual' && !(S.virtual || []).length) && !(t === 'telegram' && !(S.recipients || []).length) && !(t === 'change' && !(S.sensors || []).some(x => !x.binary)) && !(t === 'device' && !(S.devs || []).length) && !(CUR_FLOW && t === 'budget')));        // bei festem Tarif ohne Preis-Bedingungen (eine schon vorhandene bleibt sichtbar)
 const switchable = () => S.devs.filter(d => d.switchable !== false && !d.auto);
 const COND_DEFAULT = {
   weekday: { type: 'weekday', days: [0, 1, 2, 3, 4] }, at: { type: 'at', time: '23:30', days: [] }, sun: { type: 'sun', event: 'sunset', offset: 0, days: [] }, sunwin: { type: 'sunwin', phase: 'night', start: 0, end: 0 }, time: { type: 'time', from: '09:00', to: '16:00', days: [] }, price: { type: 'price', op: 'below', ct: 25 },
@@ -220,6 +235,10 @@ const COND_DEFAULT = {
 };
 const BIN_WORDS = { lock: ['verriegelt', 'entriegelt'], contact: ['offen', 'geschlossen'], motion: ['Bewegung erkannt', 'keine Bewegung'], presence: ['jemand anwesend', 'niemand anwesend'], smoke: ['Alarm', 'kein Alarm'], input: ['aktiv', 'nicht aktiv'], running: ['an', 'aus'], key_short: ['kurz gedrückt', 'nicht gedrückt'], key_long: ['lang gedrückt', 'nicht gedrückt'], key_long_release: ['lang losgelassen', 'nicht losgelassen'] };
 const SENSOR_DEFAULT_VALUE = { temperature: 20, humidity: 60, brightness: 100, power: 100 };
+function changeDefault(sid) {                      // neue Bedingung "Wert aendert sich": erster Messwert-Sensor (kein Ja/Nein), Schrittweite 1
+  const s = (S.sensors || []).find(x => x.id === sid && !x.binary) || (S.sensors || []).find(x => !x.binary) || {};
+  return { type: 'change', sensor_id: s.id || '', step: 1, dir: 'any' };
+}
 function sensorDefault(sid) {                      // neue Sensor-Bedingung: Ja/Nein-Sensor -> TRUE, Messwert -> "ueber" Standardwert
   const s = (S.sensors || []).find(x => x.id === sid) || (S.sensors || [])[0];
   if (!s) return { type: 'sensor', sensor_id: '', is: true };
@@ -230,7 +249,7 @@ const deviceDefault = () => ({ type: 'device', device_id: (S.devs[0] || {}).id |
 const virtualDefault = vid => { const v = (S.virtual || []).find(x => x.id === vid) || (S.virtual || [])[0]; return v ? { type: 'virtual', id: v.id, is: v.kind === 'button' ? 'pressed' : 'on' } : { type: 'virtual', id: '', is: 'on' }; };
 const savedRules = () => R.filter(x => !String(x.id).startsWith('new-'));                // nur gespeicherte Regeln lassen sich auswaehlen (neue haben noch keine feste ID)
 const ruleDefault = () => ({ type: 'rule', id: (savedRules()[0] || {}).id || '', is: 'off' });
-const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : t === 'rule' ? ruleDefault() : t === 'telegram' ? { type: 'telegram', word: '', shown: '', who: [], confirm: false, reply: '' } : clone(COND_DEFAULT[t]);
+const condDefault = t => t === 'sensor' ? sensorDefault() : t === 'device' ? deviceDefault() : t === 'virtual' ? virtualDefault() : t === 'rule' ? ruleDefault() : t === 'telegram' ? { type: 'telegram', word: '', shown: '', who: [], confirm: false, reply: '' } : t === 'change' ? changeDefault() : clone(COND_DEFAULT[t]);
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 let FIXED = false;
 const optHtml = (list, val) => list.map(([v, t]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${t}</option>`).join('');
@@ -281,6 +300,11 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
       let w = BIN_WORDS[sen && sen.kind] || ['wahr', 'falsch']; if (sen && sen.invert && BIN_WORDS[sen.kind]) w = [w[1], w[0]];
       body = `${pick} ist ${sel('c-is', c.is ? '1' : '0', [['1', 'TRUE – ' + w[0]], ['0', 'FALSE – ' + w[1]]])}`;
     } else body = `${pick} ${cmp('c-op', c.op)} ${num('c-val', c.value, 80)} ${escH(sen ? sen.unit : '')}`;
+  } else if (c.type === 'change') {
+    const list = (S.sensors || []).filter(x => !x.binary || x.id === c.sensor_id), sen = list.find(x => x.id === c.sensor_id);
+    const opts = list.map(x => [x.id, escH(x.name)]); if (!sen) opts.unshift([c.sensor_id, '(Sensor nicht mehr vorhanden)']);
+    body = `${sel('c-sensor', c.sensor_id, opts).replace('onchange="ruleEdited(this)"', 'onchange="changeSensor(this)"')} ${sel('c-cdir', c.dir || 'any', [['any', 'ändert sich'], ['up', 'steigt'], ['down', 'fällt']])} um mindestens ${num('c-cstep', c.step ?? 1, 80)} ${escH(sen ? sen.unit : '')}`
+      + `<span class="qhelp" role="button" tabindex="0" data-help="Löst jedes Mal einmal aus, wenn der Wert seit der letzten Auslösung um mindestens diese Schrittweite gestiegen oder gefallen ist (z. B. Druckfortschritt um 1 %). Der neue Wert gilt danach als Bezug. Den aktuellen Wert schickst du im Nachrichtentext mit <b>[WERT]</b>. Beim allerersten Durchlauf wird nur der Startwert gemerkt. „steigt“ bzw. „fällt“ beachten nur diese Richtung (bei „steigt“ setzt ein Rückgang, z. B. neuer Druck, den Bezug neu).">?</span>`;
   } else if (c.type === 'virtual') {
     const list = S.virtual || [], v = list.find(x => x.id === c.id);
     const opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!v) opts.unshift([escH(c.id), '(Schalter fehlt)']);
@@ -331,6 +355,7 @@ function collectCond(row) {
   if (t === 'soc') return { type: t, op: v('c-op'), pct: v('c-pct') };
   if (t === 'sensor') return row.querySelector('.c-is') ? { type: t, sensor_id: v('c-sensor'), is: v('c-is') === '1' }
                                                           : { type: t, sensor_id: v('c-sensor'), op: v('c-op'), value: v('c-val') };
+  if (t === 'change') return { type: t, sensor_id: v('c-sensor'), dir: v('c-cdir'), step: v('c-cstep') };
   if (t === 'virtual') return { type: t, id: v('c-virt'), is: row.querySelector('.c-vis') ? v('c-vis') : 'pressed', by: byOf(row) };
   if (t === 'telegram') return { type: t, word: v('c-tgw'), shown: v('c-tgw'), who: [...row.querySelectorAll('.c-tgwho:checked')].map(x => x.value), confirm: !!row.querySelector('.c-tgc:checked'), reply: v('c-tgr') };
   if (t === 'rule') return { type: t, id: v('c-rule'), is: v('c-rst') };
@@ -341,6 +366,8 @@ const smokeSensors = () => (S.sensors || []).filter(x => x.kind === 'smoke' && !
 const STEP_TYPES = [['switch', 'Gerät ein-/ausschalten'], ['toggle', 'Gerät umschalten (an ↔ aus)'], ['wait', 'Warten'], ['setpoint', 'Thermostate: Solltemperatur setzen'], ['notify', 'Telegram-Nachricht senden'], ['photo', 'Telegram: Kamera-Standbild senden'], ['video', 'Telegram: Video zum Ereignis senden (SD-Karte)'], ['pushover', 'Pushover-Nachricht senden (mit Priorität, optional Bild)'], ['sound', 'Sound abspielen (Homematic Gong)'], ['smoke', 'Rauchmelder: Alarm auslösen / beenden (Homematic)'], ['blind', 'Rollladen fahren / anhalten (Homematic)'], ['wled', 'WLED: Voreinstellung / Farbe setzen'], ['ac', 'Klimaanlage einstellen (Midea)'], ['virtual', 'Eigenen Schalter setzen / Knopf drücken'], ['lock', 'Türschloss: öffnen / entriegeln / verriegeln'], ['wol', 'Rechner aufwecken (Wake-on-LAN)'], ['http', 'Adresse aufrufen (GET / POST, z. B. Webhook)'], ['chime', 'Chime läuten (Türklingel-Gong, Reolink)'], ['rule', 'Regel ein-/ausschalten']];
 const CHIME_TONES = ['Vogelgezwitscher', 'Originalmelodie', 'Klaviertöne', 'Schleife', 'Attraktion', 'Hüpfer', 'Guten Tag', 'Operette', 'Mondlicht', 'Heimweg'];
 const videoCams = () => (S.cameras || []).filter(x => (x.kind || 'reolink') === 'reolink');
+const PH_HELP = 'Platzhalter im Text: <b>[WERT]</b> aktueller Wert des Sensors mit Einheit (z. B. „43 %“), <b>[ZAHL]</b> ohne Einheit, <b>[ALT]</b> vorheriger Wert, <b>[SENSOR]</b> Name des Sensors, <b>[UHR]</b> Uhrzeit, <b>[REGEL]</b> Name der Regel, <b>[WER]</b> Konto, das den Auslöser bedient hat. Beispiel: „🖨️ Druck bei [WERT]“. Alle Platzhalter stehen weiter unten unter „Platzhalter in Nachrichten“.';
+const phHelp = `<span class="qhelp" role="button" tabindex="0" data-help="${PH_HELP}">?</span>`;
 function toRow(a, rs) {                              // "Senden an": nur wenn es mehr als einen Empfaenger gibt (Telegram: S.recipients, Pushover: S.prec)
   rs = rs || S.recipients || [];
   if (rs.length < 2) return '';
@@ -391,7 +418,7 @@ function actRow(a, branch, flow) {
         ${list.map(x => `<label class="chk"><input type="checkbox" class="a-sp" value="${escH(x.id)}" ${all || (a.device_ids || []).includes(x.id) ? 'checked' : ''} ${all ? 'disabled' : ''} onchange="ruleEdited(this)"> ${escH(x.name)}</label>`).join('')}
         ${list.length ? '' : '<span class="muted">Noch keine Thermostate – unter Smart Home → Geräte suchen → Homematic „Thermostate suchen“.</span>'}</div>`;
   } else if (t === 'notify') {
-    body = `<b>✉ Telegram</b> <input class="a-text" placeholder="Nachricht, z.B. Warmwasser ist fertig" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)"><span class="qhelp" role="button" tabindex="0" data-help="Platzhalter: <b>[WER]</b> wird durch den Namen ersetzt, der den Auslöser zuletzt bedient hat – bei einem Konto der Kontoname (z. B. „Toröffner betätigt von [WER]“). Gilt für Geräte und Schalter in der Bedingung WENN; wurde nichts von Hand bedient, steht dort die Quelle (z. B. Regel oder Alexa) bzw. „unbekannt“.">?</span>${toRow(a)}`;
+    body = `<b>✉ Telegram</b> <input class="a-text" placeholder="Nachricht, z.B. Warmwasser ist fertig" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)"><span class="qhelp" role="button" tabindex="0" data-help="${PH_HELP} Zu <b>[WER]</b>: wird durch den Namen ersetzt, der den Auslöser zuletzt bedient hat – bei einem Konto der Kontoname (z. B. „Toröffner betätigt von [WER]“). Gilt für Geräte und Schalter in der Bedingung WENN; wurde nichts von Hand bedient, steht dort die Quelle (z. B. Regel oder Alexa) bzw. „unbekannt“.">?</span>${toRow(a)}`;
   } else if (t === 'smoke') {
     const list = smokeSensors(), opts = list.map(x => [escH(x.id), '🚨 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Rauchmelder fehlt)']);
     body = `<b>🚨 Rauchmelder</b> ${sel('a-smid', a.id, opts)} ${sel('a-smst', a.state, [['on', 'Alarm auslösen (piepst laut)'], ['off', 'Alarm beenden']])}${list.length ? '' : '<span class="muted">Noch kein Rauchmelder angelegt – Smart Home → Geräte suchen → Homematic-Sensoren suchen.</span>'}`;
@@ -423,12 +450,12 @@ function actRow(a, branch, flow) {
       <span class="a-blv"><input class="a-blvl" type="number" min="0" max="100" step="1" value="${escH(a.level ?? 0)}" style="width:78px" oninput="ruleEdited(this)"> <span class="muted">% (0 = zu, 100 = auf; bei „anhalten“ egal)</span></span>${list.length ? '' : '<span class="muted">Noch kein Rollladen angelegt – Smart Home → Geräte suchen → Homematic-Rollläden suchen.</span>'}`;
   } else if (t === 'photo') {
     const list = S.cameras || [], opts = list.map(x => [escH(x.id), '📷 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Kamera fehlt)']);
-    body = `<b>📷 Standbild per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Bild (optional), z.B. Bewegung im Hof" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">${list.length ? '' : '<span class="muted">Noch keine Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
+    body = `<b>📷 Standbild per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Bild (optional), z.B. Bewegung im Hof" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">${phHelp}${list.length ? '' : '<span class="muted">Noch keine Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
   } else if (t === 'video') {
     const list = videoCams(), opts = list.map(x => [escH(x.id), '🎥 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Kamera fehlt)']);
     const flt = Array.isArray(a.filter) ? a.filter : [];
     const kinds = [['animal', 'Tier'], ['person', 'Person'], ['vehicle', 'Fahrzeug'], ['motion', 'Bewegung']];
-    body = `<b>🎥 Video per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Video (optional)" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">
+    body = `<b>🎥 Video per Telegram</b> ${sel('a-cid', a.id, opts)} <input class="a-text" placeholder="Text zum Video (optional)" value="${escH(a.text || '')}" style="flex:1;min-width:200px" oninput="ruleEdited(this)">${phHelp}
       <span class="a-vf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;width:100%"><span class="muted">Nur senden bei ${helpQ('Das Video wird nur gesendet, wenn die Aufnahme der Kamera eine dieser Ereignisarten enthält. Nichts angehakt = bei jeder Aufnahme. Gesendet werden 10 Sekunden in 720p, ab 3 Sekunden vor dem Auslösen; das Video kommt erst, wenn die Aufnahme fertig ist (meist 1 bis 2 Minuten). Nur für Reolink-Kameras mit SD-Karte.')}:</span>${kinds.map(([k, l]) => `<label class="chk" style="margin:0"><input type="checkbox" value="${k}" ${flt.includes(k) ? 'checked' : ''} onchange="ruleEdited(this)"> ${l}</label>`).join('')}</span>${list.length ? '' : '<span class="muted">Keine Reolink-Kamera angelegt – Menü Kameras.</span>'}${toRow(a)}`;
   } else if (t === 'rule') {
     const list = savedRules(), opts = list.map(x => [escH(x.id), escH(x.name || '(ohne Namen)')]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Regel fehlt)']);
@@ -442,7 +469,7 @@ function actRow(a, branch, flow) {
     if (a.camera && !cams.some(x => x.id === a.camera)) camOpts.push([escH(a.camera), '(Kamera fehlt)']);
     const prio = [['0', 'normal'], ['-1', 'leise'], ['1', 'hoch (durchbricht Ruhezeiten)'], ['2', 'Notfall (wiederholt, bis bestätigt)']];
     const snd = [['', 'Standardton'], ['siren', 'Sirene'], ['spacealarm', 'Weltraumalarm'], ['alien', 'Alien'], ['persistent', 'Dauerton'], ['bugle', 'Signalhorn'], ['cashregister', 'Kasse'], ['magic', 'Magic'], ['vibrate', 'nur Vibration'], ['none', 'lautlos']];
-    body = `<b>🔔 Pushover</b> <input class="a-text" placeholder="Nachricht, z.B. Bewegung auf dem Hof" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)">
+    body = `<b>🔔 Pushover</b> <input class="a-text" placeholder="Nachricht, z.B. Bewegung auf dem Hof" value="${escH(a.text || '')}" style="flex:1;min-width:220px" oninput="ruleEdited(this)">${phHelp}
       <input class="a-title" placeholder="Titel (optional)" value="${escH(a.title || '')}" style="width:170px" oninput="ruleEdited(this)">
       <span class="muted">Priorität</span> ${sel('a-prio', String(a.priority || 0), prio)} ${sel('a-snd', a.sound || '', snd)}
       ${MODULES.cameras ? `<span class="muted">Bild</span> ${sel('a-pcam', a.camera || '', camOpts)}` : ''}${toRow(a, S.prec)}`;
@@ -491,7 +518,7 @@ function collectRule(box) {
   const mode = box.querySelector('.r-mode'), acts = b => [...box.querySelectorAll(`.act[data-branch="${b}"]`)].map(collectAct);
   const conds = [...box.querySelectorAll('.cond')].map(collectCond), then = acts('then'), other = acts('else');
   let kind = box.querySelector('.r-kind').value;
-  if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
+  if (kind !== 'flow' && (then.concat(other).some(a => a.type && a.type !== 'switch') || conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram' || c.type === 'change'))) kind = 'flow';       // Warten/Nachricht/Knopf gehen nur im Ablauf
   return { name: box.querySelector('.r-name').value, enabled: box.querySelector('.r-en').checked, mode: kind, abort_on_fall: !!(box.querySelector('.r-abort') || {}).checked, run_now: !!(box.querySelector('.r-runnow') || {}).checked, keep_trigger: !!box.querySelector('.r-reset') && !box.querySelector('.r-reset').checked, cooldown_s: +((box.querySelector('.r-cool') || {}).value) || 0, when: { mode: mode ? mode.value : 'all', conds }, then, else: other };
 }
 const ruleBox = el => el.closest('[data-rule]');
@@ -526,6 +553,7 @@ function condTypeChanged(sel, replacement) {      // Typ gewechselt: Bedingung b
   r.when.conds = rows.map(rw => rw === row ? (replacement || condDefault(sel.value)) : collectCond(rw));
   touch(); renderRules();
 }
+function changeSensor(sel) { condTypeChanged(sel, { ...collectCond(sel.closest('.cond')), sensor_id: sel.value }); }          // anderer Sensor: Einheit neu zeichnen, Schrittweite und Richtung bleiben
 function condDel(btn) {
   const box = ruleBox(btn); btn.closest('.cond').remove(); const r = syncRule(box);
   touch(); renderRules();
@@ -539,11 +567,11 @@ function actMove(btn, dir) {
 }
 // Standard fuer neue Ablaeufe: bei Wegfall der Bedingung sofort beenden - ausser bei Impuls-Ausloesern (Knopf, 'Um HH:MM'), die gleich wieder wegfallen
 const isKeySensor = c => c.type === 'sensor' && /^key_/.test(((S.sensors || []).find(x => x.id === c.sensor_id) || {}).kind || '');
-const flowAbortDefault = r => !r.when.conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram' || c.type === 'at' || c.type === 'sun' || isKeySensor(c));
+const flowAbortDefault = r => !r.when.conds.some(c => (c.type === 'virtual' && c.is === 'pressed') || c.type === 'telegram' || c.type === 'change' || c.type === 'at' || c.type === 'sun' || isKeySensor(c));
 function kindChanged(sel) {
   const box = ruleBox(sel), r = R.find(x => x.id === box.dataset.rule), c = collectRule(box);
-  if (sel.value === 'state' && (c.then.concat(c.else).some(a => a.type && a.type !== 'switch') || c.when.conds.some(x => (x.type === 'virtual' && x.is === 'pressed') || x.type === 'telegram'))) {
-    sel.value = 'flow'; savedToast('Erst Warten, Nachricht, Sollwert, eigenen Schalter, „wird gedrückt“ und Telegram-Wort entfernen'); return;
+  if (sel.value === 'state' && (c.then.concat(c.else).some(a => a.type && a.type !== 'switch') || c.when.conds.some(x => (x.type === 'virtual' && x.is === 'pressed') || x.type === 'telegram' || x.type === 'change'))) {
+    sel.value = 'flow'; savedToast('Erst Warten, Nachricht, Sollwert, eigenen Schalter, „wird gedrückt“, Telegram-Wort und „Wert ändert sich“ entfernen'); return;
   }
   const wasFlow = r.mode === 'flow'; Object.assign(r, c, { mode: sel.value }); if (sel.value === 'flow' && !wasFlow) r.abort_on_fall = flowAbortDefault(r); touch(); renderRules();
 }
@@ -667,6 +695,7 @@ function condSummary(c) {
     const sen = (S.sensors || []).find(x => x.id === c.sensor_id), n = sen ? sen.name : '(Sensor fehlt)';
     return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
   }
+  if (c.type === 'change') { const sen = (S.sensors || []).find(x => x.id === c.sensor_id); return `${sen ? sen.name : '(Sensor fehlt)'} ${c.dir === 'up' ? 'steigt' : c.dir === 'down' ? 'fällt' : 'ändert sich'} um ${c.step}${sen && sen.unit ? ' ' + sen.unit : ''}`; }
   if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return (c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`) + byText(c); }
   if (c.type === 'telegram') return `Telegram „${c.shown || c.word}“${(c.who || []).length ? ' von ' + c.who.map(i => ((S.recipients || []).find(r => r.id === i) || {}).name || '?').join(', ') : ''}${c.confirm ? ' (mit Rückfrage)' : ''}`;
   if (c.type === 'rule') { const k = R.find(x => x.id === c.id); return `Regel ${k ? '„' + k.name + '“' : '?'} ist ${c.is === 'on' ? 'an' : 'aus'}`; }

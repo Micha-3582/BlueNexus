@@ -36,6 +36,7 @@ class FlowEngine:
     def __init__(self):
         self._lock = threading.RLock()
         self.last: dict[str, bool] = {}              # regel -> letzter bekannter Wert der WENN-Bedingung
+        self.base: dict[str, float] = {}             # "Wert aendert sich": Regel:Nr:Sensor -> Bezugswert der letzten Ausloesung
         self.cool: dict[str, float] = {}                 # regel -> Zeitpunkt des letzten Starts (fuer die Sperrzeit)
         self.runs: list[dict] = []                   # laufende Ablaeufe
         self.status: dict[str, dict] = {}
@@ -50,13 +51,14 @@ class FlowEngine:
             d = _store()._load_json_recovering(STATE_PATH, lambda: {})
             if isinstance(d, dict):
                 self.last = {k: bool(v) for k, v in (d.get("last") or {}).items()}
+                self.base = {k: float(v) for k, v in (d.get("base") or {}).items() if isinstance(v, (int, float))}
                 self.runs = [x for x in (d.get("runs") or []) if isinstance(x, dict) and isinstance(x.get("steps"), list)]
         except Exception:                            # noqa: BLE001
             pass
 
     def _save(self):
         try:
-            _store()._dump_json(STATE_PATH, {"last": self.last, "runs": self.runs}, indent=None)
+            _store()._dump_json(STATE_PATH, {"last": self.last, "base": self.base, "runs": self.runs}, indent=None)
         except Exception:                            # noqa: BLE001
             pass
 
@@ -76,6 +78,26 @@ class FlowEngine:
             self.runs.remove(run)
             events.append(("cancel", {"id": run["rule_id"], "name": run.get("rule", "")}, "Regel wurde gelöscht – Ablauf abgebrochen"))
             changed = True
+        changes: dict[int, dict] = {}                 # id(Bedingung) -> {"hit", "value", "old"}: Vergleich "Wert aendert sich" mit dem gemerkten Bezugswert
+        live: set[str] = set()
+        for r in flows:
+            if not r.get("enabled", True):
+                continue
+            for n, c in enumerate(x for x in r["when"]["conds"] if x.get("type") == "change"):
+                key = f"{r['id']}:{n}:{c['sensor_id']}"
+                live.add(key)
+                val = (ctx.get("sensors") or {}).get(c["sensor_id"])
+                if val is None:
+                    continue
+                hit, new = rules.change_check(self.base.get(key), float(val), c["step"], c.get("dir", "any"))
+                changes[id(c)] = {"hit": hit, "value": float(val), "old": self.base.get(key)}
+                if self.base.get(key) != new:
+                    self.base[key] = new
+                    changed = True
+        for gone in [k for k in self.base if k not in live]:
+            self.base.pop(gone, None)
+            changed = True
+        ctx = {**ctx, "changes": changes}
         for r in flows:
             rid = r["id"]
             if not r.get("enabled", True):
@@ -94,7 +116,8 @@ class FlowEngine:
             if res is not None:
                 first = prev is None and bool(r.get("run_now"))                  # Option "gleich anwenden": beim Anlegen/Einschalten (noch kein bekannter Wert) sofort starten
                 pulse = prev is None and bool(res) and any(c.get("type") == "telegram" for c in r["when"]["conds"])       # ein Telegram-Wort darf nie verloren gehen, auch wenn es im allerersten Durchlauf eintrifft
-                if (prev is not None and res != prev) or first or pulse:
+                cpulse = bool(res) and bool(prev) and any((changes.get(id(c)) or {}).get("hit") for c in r["when"]["conds"] if c.get("type") == "change")       # zwei Aenderungen hintereinander: jede loest aus
+                if (prev is not None and res != prev) or first or pulse or cpulse:
                     branch = "then" if res else "else"
                     steps = r.get(branch) or []
                     cool = int(r.get("cooldown_s") or 0)
@@ -115,7 +138,8 @@ class FlowEngine:
                         reset = [c["id"] for c in r["when"]["conds"] if c["type"] == "virtual" and c.get("is") == "on" and c["id"] not in own
                                  and (ctx.get("virtual") or {}).get(c["id"], {}).get("kind") != "timer"] if (res and not r.get("keep_trigger")) else []        # ein Timer laeuft von selbst ab
                         self.runs.append({"id": uuid.uuid4().hex[:8], "rule_id": rid, "rule": r.get("name", ""), "branch": branch,
-                                          "steps": steps, "idx": 0, "due": None, "start": time.time(), "reset": reset})
+                                          "steps": steps, "idx": 0, "due": None, "start": time.time(), "reset": reset,
+                                          "vars": rules.vars_for_run(r, ctx, changes)})
                         events.append(("start", r, ("Regel eingeschaltet, Bedingung schon erfüllt: " if first and res else "Regel eingeschaltet, Bedingung nicht erfüllt: " if first
                                                     else "Auslöser: " if res else "Bedingung nicht mehr erfüllt: ") + txt + f" – {'DANN' if res else 'SONST'}-Ablauf startet" + (" (sofort angewendet)" if first else "")))
                 if prev != res:
@@ -167,7 +191,7 @@ class FlowEngine:
                         run["due"] = now_ts + st["seconds"]
                     continue
                 run["due"] = None
-                out.append({"rule_id": run["rule_id"], "rule": run.get("rule", ""), "branch": run["branch"], "step": st, "after_s": offset})
+                out.append({"rule_id": run["rule_id"], "rule": run.get("rule", ""), "branch": run["branch"], "step": st, "after_s": offset, "vars": run.get("vars") or {}})
             waiting = bool(run.get("due")) and run["due"] > now_ts and not skip_waits          # eine Wartezeit als letzter Schritt zaehlt mit
             if run["idx"] >= len(run["steps"]) and not waiting:
                 self.runs.remove(run)
@@ -202,6 +226,7 @@ class FlowEngine:
 
     def forget(self):
         """Hauptschalter aus: Bedingungen neu einlesen, ohne beim Wiedereinschalten sofort auszuloesen."""
-        if self.last:
+        if self.last or self.base:
             self.last.clear()
+            self.base.clear()
             self._save()

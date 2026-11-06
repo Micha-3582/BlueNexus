@@ -647,6 +647,7 @@ Mehrere Bedingungen lassen sich mit **alle (UND)** oder **eine davon (ODER)** ve
 | **Meine Aktoren** | Einer deiner Aktoren (Geräte aus der Liste „Meine Aktoren“) ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
 | **Eigener Schalter / Knopf** | Schalter ist an/aus, oder Knopf wurde gedrückt. |
 | **Telegram-Wort** | Jemand schreibt dem Telegram-Bot ein bestimmtes Wort (z. B. „Tor“). Nur bei Regeln der Art **Ablauf**, es ist ein Impuls wie „Knopf wird gedrückt“. Wahlweise nur von bestimmten Empfängern und wahlweise **mit Rückfrage** („ja“). Siehe Kapitel 13a. |
+| **Sensor: Wert ändert sich um …** | Löst jedes Mal einmal aus, wenn sich der Wert eines Messwert-Sensors seit der letzten Auslösung um mindestens die eingestellte Schrittweite verändert hat (z. B. Druckfortschritt um 1 %, Temperatur um 0,5 °C). Wahlweise in beiden Richtungen, nur **steigt** oder nur **fällt**. Der neue Wert gilt danach als Bezug und wird auch nach einem Neustart behalten; beim allerersten Durchlauf wird nur der Startwert gemerkt. Ein Impuls wie „Knopf wird gedrückt“, nur bei Regeln der Art **Ablauf**. Den Wert schickst du mit dem Platzhalter **[WERT]** im Nachrichtentext mit. |
 | **Regel (an/aus)** | Eine andere Regel ist ein- oder ausgeschaltet. Damit kann eine Regel auf den Zustand einer anderen reagieren, z. B. „Regel ‚Nachtruhe‘ ist aus → …“. Nur gespeicherte Regeln lassen sich wählen. |
 
 Fehlt ein Messwert (Sensor/Gerät nicht erreichbar), **passiert nichts** – die Regel schaltet nicht „ins Blaue“.
@@ -800,6 +801,22 @@ Die App meldet sich aufs Handy, wenn etwas nicht stimmt – und wenn es wieder i
 **Anlagenname:** Standardmäßig steht vor jeder Nachricht der Anlagenname in eckigen Klammern (z. B. „[Annas BlueNexus] …“). Mit dem Schalter **„Anlagenname vor jede Nachricht setzen“** lässt sich das abschalten, dann kommt die Nachricht ohne Vorspann.
 
 Telegram kann zusätzlich in **Abläufen** als Schritt „Telegram-Nachricht senden“ genutzt werden.
+
+**Platzhalter im Nachrichtentext.** In Telegram- und Pushover-Nachrichten sowie im Text zu Standbild und Video werden diese Platzhalter beim Senden ersetzt (die Übersicht steht auch im Regel-Editor unter „Platzhalter in Nachrichten“):
+
+| Platzhalter | wird ersetzt durch |
+|---|---|
+| **[WERT]** | aktueller Wert des Sensors mit Einheit, z. B. „43 %“ oder „219,5 °C“ |
+| **[ZAHL]** | aktueller Wert ohne Einheit, z. B. „43“ |
+| **[ALT]** | Wert bei der letzten Meldung (nur bei „Wert ändert sich um …“), sonst „–“ |
+| **[SENSOR]** | Name des Sensors |
+| **[UHR]** | Uhrzeit beim Senden, z. B. „14:35“ |
+| **[REGEL]** | Name der Regel |
+| **[WER]** | Konto, das den Auslöser zuletzt bedient hat (siehe unten) |
+
+[WERT], [ZAHL], [ALT] und [SENSOR] stammen vom **ersten Sensor in der Bedingung WENN** (bei „Wert ändert sich um …“ von dem, der ausgelöst hat) und werden beim Start des Ablaufs festgehalten. Ohne Sensor steht „–“.
+
+**Beispiel – Druckfortschritt bei jedem Prozent per Telegram:** WENN *Sensor: Druckfortschritt ändert sich um mindestens 1 %*, DANN *Telegram-Nachricht* „🖨️ [SENSOR]: [WERT] (vorher [ALT])“ → „🖨️ Druckfortschritt: 43 % (vorher 42 %)“.
 
 **Wer hat es bedient?** Geräte und eigene Schalter in der Bedingung WENN haben die Option **„bedient von“** (Häkchen je Konto; nichts angehakt = jeder). Die Bedingung gilt dann nur, wenn das Gerät bzw. der Schalter in den letzten 2 Minuten von einem der angehakten Konten von Hand bedient wurde. Im Text einer Telegram- oder Pushover-Nachricht wird **[WER]** durch den Namen ersetzt, der den Auslöser zuletzt bedient hat (bei einem Konto der Kontoname; sonst die Quelle, z. B. Regel oder Alexa, bzw. „unbekannt“). Beispiel: Regel „Toröffner“ mit WENN Toröffner ist an, DANN Telegram „Toröffner betätigt von [WER]“. Hat zwischendurch eine **Regel** geschaltet (z. B. Konto drückt Knopf → Regel schaltet den Taster → zweite Regel meldet „Taster ist an“), wird das Konto am **Anfang der Kette** genannt – „bedient von“ gilt entsprechend durch die Kette hindurch.
 

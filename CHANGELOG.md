@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.42.0 – 06.11.2026
+- Neu: **Bedingung „Sensor: Wert ändert sich um …“.** In Regeln der Art Ablauf löst ein Messwert-Sensor jedes Mal aus, wenn er sich seit der letzten Auslösung um mindestens eine einstellbare Schrittweite verändert hat (z. B. Druckfortschritt um 1 %, Temperatur um 0,5 °C), wahlweise in beiden Richtungen, nur steigend oder nur fallend. Der Bezugswert bleibt auch nach einem Neustart erhalten.
+- Neu: **Platzhalter in Nachrichten.** In Telegram- und Pushover-Texten sowie im Text zu Standbild und Video ersetzt BlueNexus **[WERT]** (Wert mit Einheit), **[ZAHL]**, **[ALT]** (vorheriger Wert), **[SENSOR]**, **[UHR]** und **[REGEL]** (zusätzlich zum bisherigen **[WER]**). Die Werte kommen vom ersten Sensor der Bedingung WENN. Alle Platzhalter stehen im Regel-Editor unter „Platzhalter in Nachrichten“ und als Hilfe-Fragezeichen an den Textfeldern.
+- Beispiel: Druckfortschritt bei jedem Prozent per Telegram: „🖨️ [SENSOR]: [WERT] (vorher [ALT])“.
+
 ## 1.41.4 – 06.11.2026
 - Behoben: **Druckerkamera: Live-Bild blieb nach wenigen Sekunden stehen.** Der Drucker erlaubt nur eine Kameraverbindung zugleich. Die Standbild-Abrufe der Kameraseite (alle paar Sekunden) öffneten eine zweite Verbindung und beendeten damit die Live-Ansicht. Solange eine Live-Ansicht der Druckerkamera läuft, gibt es jetzt keine neuen Abrufe mehr (das letzte Standbild bleibt stehen); ein gerade laufender Abruf darf vor dem Live-Start noch fertig werden.
 - Der Versuch aus 1.41.2 (Zeitstempel aus der Serveruhr) bleibt drin, schadet nicht.

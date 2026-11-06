@@ -50,7 +50,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(_DIR, "rules.json")
 STATE_PATH = os.path.join(_DIR, "rules_state.json")
 
-TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday", "rule", "telegram")
+TYPES = ("time", "price", "cheapest", "budget", "soc", "sun_tomorrow", "at", "sun", "sunwin", "sensor", "device", "virtual", "weekday", "rule", "telegram", "change")
 ONCE = ("at", "sun")               # Ausloeser, die einmal pro Tag feuern
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 VERSION = 2
@@ -216,6 +216,14 @@ def normalize_condition(c: dict) -> dict:
             raise RuleError("Telegram: Empfänger ungültig")
         return {"type": t, "word": word, "shown": str(c.get("shown") or c.get("word") or word).strip()[:40], "who": sorted({str(x) for x in who if str(x).strip()}),
                 "confirm": bool(c.get("confirm")), "reply": str(c.get("reply") or "").strip()[:200]}
+    if t == "change":                                # Wert eines Sensors hat sich um mindestens "step" veraendert (Impuls, nur Ablauf-Regeln)
+        sid = str(c.get("sensor_id") or "").strip()
+        if not sid:
+            raise RuleError("Sensor wählen")
+        d = str(c.get("dir") or "any").strip().lower()
+        if d not in ("any", "up", "down"):
+            raise RuleError("Änderung: beide Richtungen, steigt oder fällt wählen")
+        return {"type": t, "sensor_id": sid, "step": _num(c.get("step"), 0.001, 100000, "Schrittweite"), "dir": d}
     if t == "virtual":                               # eigener Schalter/Knopf (virtual.py)
         vid = str(c.get("id") or "").strip()
         if not vid:
@@ -534,7 +542,7 @@ def used_by(kind: str, rid: str) -> list[str]:
         hit = False
         for c in all_conditions(r):
             t = c.get("type")
-            hit = hit or (kind == "sensor" and t == "sensor" and c.get("sensor_id") == rid) or (kind == "virtual" and t == "virtual" and c.get("id") == rid) \
+            hit = hit or (kind == "sensor" and t in ("sensor", "change") and c.get("sensor_id") == rid) or (kind == "virtual" and t == "virtual" and c.get("id") == rid) \
                 or (kind == "device" and t == "device" and c.get("device_id") == rid)
         if "when" in r:
             for a in (r.get("then") or []) + (r.get("else") or []):
@@ -631,6 +639,8 @@ def normalize_rule(body: dict, rule_id: str | None = None) -> dict:
                 raise RuleError("„wird gedrückt“ geht nur bei Regeln der Art „Ablauf“")
             if any(c["type"] == "telegram" for c in conds):
                 raise RuleError("„Telegram-Wort“ geht nur bei Regeln der Art „Ablauf“")
+            if any(c["type"] == "change" for c in conds):
+                raise RuleError("„Wert ändert sich“ geht nur bei Regeln der Art „Ablauf“")
             for key, lst in (("DANN", then), ("SONST", other)):
                 ids = [a["device_id"] for a in lst]
                 if len(ids) != len(set(ids)):
@@ -913,6 +923,65 @@ def _by_check(c: dict, ref: str, ok, txt: str):
     return False, f"{txt} (nur wenn bedient von {', '.join(c['by'])} – war: {devicelog.who_name(w) if w else 'niemand/außen'})"
 
 
+def fmt_num(v) -> str:
+    """Zahl fuer Texte: hoechstens 2 Nachkommastellen, deutsches Komma (43 -> "43", 21.5 -> "21,5")."""
+    try:
+        return ("%.2f" % float(v)).rstrip("0").rstrip(".").replace(".", ",")
+    except (TypeError, ValueError):
+        return "–"
+
+
+def change_check(base, val, step: float, direction: str = "any"):
+    """Hat sich `val` gegenueber dem Bezugswert `base` um mindestens `step` veraendert? -> (ausgeloest, neuer Bezugswert).
+    Ohne Bezugswert wird nur der Startwert gemerkt. Bei 'steigt' bzw. 'faellt' setzt eine Bewegung in die Gegenrichtung den Bezug nach
+    (z. B. neuer Druck: Fortschritt springt von 100 auf 0), ohne auszuloesen."""
+    if base is None:
+        return False, val
+    d = val - base
+    if direction == "up" and d < 0 or direction == "down" and d > 0:
+        return False, val
+    if abs(d) >= step - 1e-9:
+        return True, val
+    return False, base
+
+
+PLACEHOLDERS = (("[WERT]", "aktueller Wert des Sensors mit Einheit, z. B. „43 %“"), ("[ZAHL]", "aktueller Wert ohne Einheit, z. B. „43“"),
+                ("[ALT]", "Wert bei der letzten Meldung mit Einheit (nur bei „Wert ändert sich“)"), ("[SENSOR]", "Name des Sensors"),
+                ("[UHR]", "Uhrzeit des Versands, z. B. „14:35“"), ("[REGEL]", "Name der Regel"), ("[WER]", "Konto, das den Auslöser bedient hat"))
+
+
+def vars_for_run(rule: dict, ctx: dict, changes: dict) -> dict:
+    """Werte fuer die Platzhalter [WERT] usw., festgehalten beim Start eines Ablaufs: vom ersten 'Wert ändert sich', das ausgeloest hat, bzw. vom ersten Sensor-Vergleich der Regel."""
+    info_of, vals = ctx.get("sensor_info") or {}, ctx.get("sensors") or {}
+    pick = None
+    for c in rule["when"]["conds"]:
+        if c.get("type") == "change" and (changes.get(id(c)) or {}).get("hit"):
+            pick = (c, changes[id(c)]["value"], changes[id(c)]["old"])
+            break
+    if pick is None:
+        for c in rule["when"]["conds"]:
+            if c.get("type") in ("change", "sensor") and "is" not in c and info_of.get(c.get("sensor_id")) and vals.get(c["sensor_id"]) is not None:
+                pick = (c, vals[c["sensor_id"]], None)
+                break
+    if pick is None:
+        return {}
+    c, val, old = pick
+    info = info_of.get(c["sensor_id"]) or {}
+    unit = (" " + info["unit"]) if info.get("unit") else ""
+    return {"wert": fmt_num(val) + unit, "zahl": fmt_num(val), "alt": (fmt_num(old) + unit) if old is not None else "–", "sensor": info.get("name") or c["sensor_id"]}
+
+
+def fill_vars(text: str, v: dict | None, rule_name: str = "", now: datetime | None = None) -> str:
+    """[WERT], [ZAHL], [ALT], [SENSOR], [UHR], [REGEL] im Nachrichtentext ersetzen (ohne Wert: "–")."""
+    if "[" not in text:
+        return text
+    v = v or {}
+    for key, val in (("[WERT]", v.get("wert", "–")), ("[ZAHL]", v.get("zahl", "–")), ("[ALT]", v.get("alt", "–")), ("[SENSOR]", v.get("sensor", "–")),
+                     ("[UHR]", (now or datetime.now()).strftime("%H:%M")), ("[REGEL]", rule_name or "–")):
+        text = text.replace(key, str(val))
+    return text
+
+
 def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool = False, side: str = "on") -> tuple[bool | None, str]:
     """(erfuellt?, Klartext). None = fehlende Daten (zaehlt als nicht erfuellt)."""
     now = ctx["now"]
@@ -940,6 +1009,17 @@ def eval_condition(c: dict, ctx: dict, ran_min: float = 0.0, fired_today: bool =
         if hit:
             return True, f"Telegram „{c.get('shown') or c['word']}“ von {hit.get('name') or '?'}"
         return False, f"Telegram „{c.get('shown') or c['word']}“ (wartet)"
+    if t == "change":                                                    # Impuls: der Ablauf-Motor hat den Vergleich mit dem letzten Bezugswert schon gemacht (flows.py)
+        info = (ctx.get("sensor_info") or {}).get(c.get("sensor_id"))
+        if not info:
+            return None, f"Sensor {c.get('sensor_id')} (nicht mehr vorhanden)"
+        unit = (" " + info["unit"]) if info.get("unit") else ""
+        word = {"any": "ändert sich", "up": "steigt", "down": "fällt"}.get(c.get("dir"), "ändert sich")
+        txt = f"{info.get('name') or info['id']} {word} um {c['step']:g}{unit}"
+        hit = (ctx.get("changes") or {}).get(id(c))
+        if hit is None:
+            return (None if (ctx.get("sensors") or {}).get(info["id"]) is None else False), txt
+        return bool(hit["hit"]), txt + (f" (jetzt {fmt_num(hit['value'])}{unit})" if hit["hit"] else "")
     if t == "virtual":
         info = (ctx.get("virtual") or {}).get(c.get("id"))
         if not info:

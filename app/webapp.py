@@ -2177,6 +2177,9 @@ class Controller:
         if t in ("notify", "pushover") and ("[WER]" in str(st.get("text") or "") or "[WER]" in str(st.get("title") or "")):
             rdef = next((x for x in rules.list_rules() if x.get("id") == act.get("rule_id")), None)
             st = {**st, **{k: _fill_who(st[k], rdef) for k in ("text", "title") if isinstance(st.get(k), str)}}      # [WER] = Konto, das den Ausloeser bedient hat (auch ueber Regel-Ketten)
+        if t in ("notify", "pushover", "photo", "video"):      # [WERT], [ZAHL], [ALT], [SENSOR], [UHR], [REGEL] (Werte hat der Ablauf beim Start festgehalten)
+            rname = rule if isinstance(rule, str) else str((rule or {}).get("name") or "")
+            st = {**st, **{k: rules.fill_vars(st[k], act.get("vars"), rname) for k in ("text", "title") if isinstance(st.get(k), str)}}
         jobs = []                                         # (aktion-fuers-logbuch, geraet, text, ok, fehler)
         names = {d["id"]: d["name"] for d in shelly.load_devices()}
         if t in ("switch", "toggle"):
