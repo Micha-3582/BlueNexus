@@ -29,6 +29,7 @@
   .tgl { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
     background: var(--card2); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: .75; }
   .tgl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tgl.sm svg { width: 17px; height: 17px; stroke-width: 2.2; }          /* Ein/Aus- und Druckknopf der Software-Schalter: so zierlich wie bei den Geraeten (PWR_ICON/PRESS_ICON) */
   .tgl.on { background: var(--on); border-color: var(--on); color: #fff; opacity: 1; }          /* an = Victron-Blau */
   .tgl.dirty { background: var(--green); border-color: var(--green); color: #101317; opacity: 1; }      /* dirty: Eingabe geaendert - mit dem Haekchen bestaetigen */
   .tgl.del { color: var(--red); }
@@ -3079,7 +3080,7 @@ async function loadVirtualAdmin() {
       ${window.IS_ADMIN ? pinBtn(`virtPin('${vid}', ${v.pin_set ? 'true' : 'false'})`, !!v.pin_set) : ''}
       <button class="ghost admin-only" onclick="editToggle('vedit-${vid}')" title="Bearbeiten: Name, Dashboard, Entfernen">✎</button>
       ${eyeBtn('virtual', vid)}${favBtn('virtual', vid)}
-      <button type="button" class="tgl${isSw && v.on ? ' on' : ''}${v.pin_set ? ' pinned' : ''}" style="opacity:1" title="${isSw ? (v.on ? 'Ausschalten' : 'Einschalten') : 'Drücken'}" aria-label="${isSw ? 'Schalten' : 'Drücken'}" onclick="virtAct('${vid}', ${isSw ? 'true' : 'false'}, ${v.on ? 'true' : 'false'}, ${v.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(v.name)}">${isSw ? I_SWITCH : I_PLAY}</button>
+      <button type="button" class="tgl sm${isSw && v.on ? ' on' : ''}${v.pin_set ? ' pinned' : ''}" style="opacity:1" title="${isSw ? (v.on ? 'Ausschalten' : 'Einschalten') : 'Drücken'}" aria-label="${isSw ? 'Schalten' : 'Drücken'}" onclick="virtAct('${vid}', ${isSw ? 'true' : 'false'}, ${v.on ? 'true' : 'false'}, ${v.pin_set ? 'true' : 'false'}, this.dataset.name)" data-name="${escH(v.name)}">${isSw ? PWR_ICON : PRESS_ICON}</button>
       </div></div>
       <div class="edit-panel" id="vedit-${vid}">
         ${v.nfc ? '<div class="muted">🏷️ NFC-Knopf: Name, Freigaben und Löschen gehören zum NFC-Tag – das alles erledigst du unter <b>NFC + QR</b>. Hier kannst du nur festlegen, ob der Knopf auf dem Dashboard erscheint und wer ihn sehen darf.</div>' : `<div class="edit-row"><input id="vname-${vid}" value="${escH(v.name)}" maxlength="60" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')virtRenameSave('${vid}')">
