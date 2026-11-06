@@ -190,7 +190,7 @@ function cardHtml(c) {
 }
 
 function enterFs(card) {                              // Bild auf Bildschirmgroesse (Overlay) - ohne das echte Browser-Vollbild, damit Android keinen Hinweis einblendet
-  const box = card.querySelector('.cam-box'); box.classList.add('fs'); document.body.style.overflow = 'hidden';
+  const box = card.querySelector('.cam-box'); box.classList.add('fs');                           // die Seite dahinter hält scrollguard.js fest (nicht selbst sperren: beide Sperren kamen sich in die Quere, die Seite blieb nach dem Schließen gesperrt)
   const r = box.querySelector('.cam-fsreal'); if (r) { r.style.display = ''; r.classList.toggle('avail', CAN_REAL_FS); }
 }
 function realFs(btn) {                                // optional: echtes Vollbild (Adressleiste weg, Querformat) - Android zeigt dabei einen eigenen Hinweis
@@ -200,7 +200,7 @@ function realFs(btn) {                                // optional: echtes Vollbi
 }
 const CAN_REAL_FS = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
 function exitFs() {
-  document.querySelectorAll('.cam-box.fs').forEach(b => b.classList.remove('fs')); document.body.style.overflow = '';
+  document.querySelectorAll('.cam-box.fs').forEach(b => b.classList.remove('fs'));
   try { if (document.fullscreenElement) document.exitFullscreen(); screen.orientation?.unlock?.(); } catch (e) { /* egal */ }
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) exitFs(); });
