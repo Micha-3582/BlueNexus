@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.10 – 06.11.2026
+- Verbessert: **Chime-Läuten aus einer Regel ist schneller.** Der Regelschritt „Chime läuten“ fragte bei jedem Mal erst die Liste der gekoppelten Chimes ab und läutete danach, also zwei Abrufe an die Türklingel hintereinander (der Knopf im Kamerafenster macht nur einen). Jetzt merkt sich BlueNexus die Chime-Nummern (10 Minuten), das Läuten ist ein einziger Abruf, und mehrere Chimes läuten gleichzeitig statt nacheinander. Hat sich ein Chime geändert, wird die Liste automatisch neu geholt.
+
 ## 1.34.9 – 06.11.2026
 - Fehlerbehebung: **WLAN-Geräte (Tuya, Tasmota, Shelly …) standen kurz auf „nicht erreichbar“**, obwohl sie liefen. Ein einziger verpasster Abruf genügte, und die Anzeige blieb gut 10 Sekunden grau. Jetzt wird ein eben noch erreichbares Gerät bei einem Aussetzer **sofort noch einmal gefragt**; klappt auch das nicht, bleibt der **letzte bekannte Zustand bis zu 45 Sekunden** stehen, erst danach heißt es „nicht erreichbar“. Bei Tuya wird zusätzlich ein zweiter Versuch gemacht und die Wartezeit nach einem Ausfall von 15 auf 6 Sekunden verkürzt.
 

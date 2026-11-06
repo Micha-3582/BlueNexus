@@ -222,16 +222,64 @@ def chime_ring(item: dict, chime_id, tone) -> None:
     _call(item, "DingDongOpt", {"DingDong": {"channel": int(item.get("channel") or 0), "option": 4, "id": _chime_id(item, chime_id), "musicId": tone}}, strict=False)
 
 
-def chime_ring_all(item: dict, tone) -> int:
-    """Laesst alle verbundenen Chimes der Tuerklingel laeuten (fuer Regeln). Gibt die Anzahl zurueck."""
+_chime_ids: dict = {}                       # Kamera-ID -> (Zeit, [Chime-Nummern]): die Nummern aendern sich kaum, die Abfrage kostete bei jedem Lauten einen eigenen Abruf
+CHIME_IDS_TTL_S = 600.0
+
+
+def _paired_chimes(item: dict, fresh: bool = False) -> list:
+    key = item.get("id", "")
+    hit = _chime_ids.get(key)
+    if hit and not fresh and time.time() - hit[0] < CHIME_IDS_TTL_S:
+        return list(hit[1])
     ch = int(item.get("channel") or 0)
     v = _call(item, "GetDingDongList", {"channel": ch}, strict=False)
     ids = [d.get("deviceId") for d in ((v.get("DingDongList") or {}).get("pairedlist") or []) if d.get("netState") == 2 and d.get("deviceId") is not None]
+    _chime_ids[key] = (time.time(), list(ids))
+    return ids
+
+
+def chime_ring_all(item: dict, tone) -> int:
+    """Laesst alle verbundenen Chimes der Tuerklingel laeuten (fuer Regeln). Gibt die Anzahl zurueck. Bekannte Chime-Nummern werden gemerkt, das Laeuten
+    ist dann ein einziger Abruf (wie der Knopf im Kamerafenster); schlaegt es fehl, wird die Liste einmal neu geholt."""
+    ids = _paired_chimes(item)
+    if not ids:
+        ids = _paired_chimes(item, fresh=True)
     if not ids:
         raise CameraError("Kein Chime verbunden")
-    for i in ids:
-        chime_ring(item, i, tone)
+    try:
+        errs = _ring_many(item, ids, tone)
+    except CameraError:
+        errs = ["x"]
+    if errs:                                             # Nummer evtl. veraltet (Chime neu gekoppelt): Liste frisch holen und noch einmal
+        ids = _paired_chimes(item, fresh=True)
+        if not ids:
+            raise CameraError("Kein Chime verbunden")
+        errs = _ring_many(item, ids, tone)
+        if errs:
+            raise CameraError(errs[0] if isinstance(errs[0], str) and errs[0] != "x" else "Der Chime hat nicht geläutet")
     return len(ids)
+
+
+def _ring_many(item: dict, ids: list, tone) -> list:
+    """Laeutet alle genannten Chimes gleichzeitig; Rueckgabe: Fehlertexte (leer = alles gut)."""
+    if len(ids) == 1:
+        try:
+            chime_ring(item, ids[0], tone)
+            return []
+        except CameraError as e:
+            return [str(e)]
+    errs = []
+    def one(i):
+        try:
+            chime_ring(item, i, tone)
+        except CameraError as e:
+            errs.append(str(e))
+    ts = [threading.Thread(target=one, args=(i,), daemon=True) for i in ids]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    return errs
 
 
 def chime_set_volume(item: dict, chime_id, volume) -> None:
