@@ -742,11 +742,10 @@
 
 <div class="card fam-card" id="fam-esphome" data-tab="suchen">
   <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>ESPHome <span class="qhelp" role="button" tabindex="0" data-help="Für Geräte mit ESPHome-Firmware und eingeschalteter Weboberfläche (<b>web_server</b>), zum Beispiel ein selbstgebauter Taster. Die IP-Adresse des Geräts eintragen und auf <b>Taster suchen</b> (Eingänge) oder <b>Messwerte suchen</b> (Temperatur, Luftfeuchte, Leistung, Druck, Helligkeit, Spannung, Funkstärke) klicken. Name und Symbol anpassen und Hinzufügen klicken. Der Taster steht danach unter Aktoren („wird gedrückt“ in Regeln), Messwerte unter Sensoren. Bekommt das Gerät eine neue IP-Adresse, die Suche mit der neuen Adresse wiederholen: Die Einträge ziehen um.">?</span></h2>
-  <div class="sub">Taster, Klimaanlagen und Messwerte eines ESPHome-Geräts per IP-Adresse hinzufügen.</div>
+  <div class="sub">Alles, was ein ESPHome-Gerät bietet (Taster, Klimaanlagen, Schalter, Messwerte), per IP-Adresse finden und hinzufügen.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
-    <button id="esphome-scan" class="ghost">Taster, Klima &amp; Schalter suchen</button>
-    <button id="esphome-sensor-scan" class="ghost">Messwerte suchen</button>
+    <button id="esphome-scan" class="ghost">Gerät suchen</button>
   </div>
 </div>
 
@@ -2452,8 +2451,8 @@ function foundPickIcon(btn, icon) { const d = btn.closest('[data-dev]'), ic = d.
 let FOUND_SPEC = null;
 function foundList(fresh, spec) {
   FOUND_SPEC = spec;
-  const icons = spec.icons === 'sensor' ? [...new Set([...SENSOR_EXTRA_ICONS, ...shellyIcons])] : spec.icons ? shellyIcons : [];
-  const row = f => { const k = spec.key(f); return `<div data-key="${escH(k)}" data-dev="${escH(k)}" style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+  const iconsFor = f => { const t = typeof spec.icons === 'function' ? spec.icons(f) : spec.icons; return t === 'sensor' ? [...new Set([...SENSOR_EXTRA_ICONS, ...shellyIcons])] : t ? shellyIcons : []; };
+  const row = f => { const k = spec.key(f), icons = iconsFor(f); return `<div data-key="${escH(k)}" data-dev="${escH(k)}" style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px"><div style="display:flex;align-items:center;gap:8px">
       ${icons.length ? `<button type="button" class="ghost fi-ico" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="foundIconGrid(this)">${escH(f.icon || shellyIcons[0] || '🔌')}</button>` : ''}
       <input class="fi-name" value="${escH(f.name)}" maxlength="60" style="flex:1;min-width:150px"></div>
@@ -2677,27 +2676,26 @@ document.addEventListener('click', e => {
 document.getElementById('tasmota-add').addEventListener('click', () => {
   const ip = document.getElementById('tasmota-ip').value.trim(); if (ip) { shellyMsg('Suche …'); foundShow(ip, '', true).then(() => shellyMsg('')); }
 });
-document.getElementById('esphome-scan').addEventListener('click', async e => {
+document.getElementById('esphome-scan').addEventListener('click', async e => {      // ein Knopf für alles: Taster, Klimaanlagen, Schalter und Messwerte
   const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
   b.disabled = true; shellyMsg('Frage ' + ip + ' ab … (einige Sekunden)');
   try {
     if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
-    const found = await shellyApi('/api/esphome/scan', 'POST', { ip }), fresh = found.filter(f => !f.known);
-    shellyMsg(found.length ? `${found.length} Taster/Klimaanlage(n) gefunden, ${fresh.length} noch nicht angelegt.` + (found.some(f => f.relinked) ? ' Ein vorhandener Eintrag wurde dem Gerät wieder zugeordnet.' : '') : 'Das Gerät meldet keine Taster und keine Klimaanlage. Ist im ESPHome-Setup ein binary_sensor oder eine Klima eingetragen?');
-    foundList(fresh, { key: f => f.id, icons: 'device', reload: () => loadShellyAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · ${f.domain === 'climate' ? 'Klimaanlage' : 'Taster'}`,
-      add: (ids, edits) => shellyApi('/api/esphome/add', 'POST', { ip, ids, edits }) });
-  } catch (err) { shellyMsg(err.message, true); }
-  b.disabled = false;
-});
-document.getElementById('esphome-sensor-scan').addEventListener('click', async e => {
-  const b = e.target, ip = document.getElementById('esphome-ip').value.trim(); if (!ip) return;
-  b.disabled = true; shellyMsg('Frage ' + ip + ' ab … (einige Sekunden)');
-  try {
-    if (!shellyIcons.length) { try { shellyIcons = await (await fetch('/api/shelly/icons')).json(); } catch (err) { /* egal */ } }
-    const found = await shellyApi('/api/esphome/sensors/scan', 'POST', { ip }), fresh = found.filter(f => !f.known), skipped = found.length ? found[0].skipped : 0;
-    shellyMsg(found.length ? `${found.length} Messwert(e) gefunden, ${fresh.length} noch nicht angelegt.` + (skipped ? ` ${skipped} weitere Messwerte (andere Einheiten) gibt es in BlueNexus noch nicht.` : '') : 'Das Gerät meldet keine passenden Messwerte (Temperatur °C, Luftfeuchte %, Leistung W, Druck hPa, Helligkeit lx, Spannung V, Funkstärke dBm).');
-    foundList(fresh, { key: f => f.id, icons: 'sensor', reload: () => loadSensorsAdmin(), sub: f => `${escH(f.model)} · ${escH(f.ip)} · ${f.value != null ? escH(f.value + ' ' + f.unit) : escH(f.unit)}`,
-      add: (ids, edits) => shellyApi('/api/esphome/sensors/add', 'POST', { ids, edits }) });
+    const devs = await shellyApi('/api/esphome/scan', 'POST', { ip });            // nacheinander: kleine Geräte (ESP8266) vertragen nicht viele Verbindungen auf einmal
+    let sens = [];
+    try { sens = await shellyApi('/api/esphome/sensors/scan', 'POST', { ip }); } catch (err) { /* ohne Messwerte weiter */ }
+    const kind = f => f.domain === 'climate' ? 'Klimaanlage' : f.domain === 'switch' ? 'Schalter' : 'Taster';
+    const items = [...devs.map(f => ({ ...f, _t: 'dev' })), ...sens.map(f => ({ ...f, _t: 'sen' }))], fresh = items.filter(f => !f.known), skipped = sens.length ? sens[0].skipped : 0;
+    shellyMsg(items.length ? `${items.length} Eintrag/Einträge gefunden (${devs.length} Taster/Klima/Schalter, ${sens.length} Messwerte), ${fresh.length} noch nicht angelegt.` + (devs.some(f => f.relinked) ? ' Ein vorhandener Eintrag wurde dem Gerät wieder zugeordnet.' : '') + (skipped ? ` ${skipped} weitere Messwerte (andere Einheiten) gibt es in BlueNexus noch nicht.` : '') : 'Das Gerät meldet nichts, was BlueNexus nutzen kann (Taster, Klima, Schalter oder Messwerte). Ist die Weboberfläche (web_server) eingeschaltet?');
+    const byKey = {}; items.forEach(f => { byKey[f.id] = f; });
+    foundList(fresh, { key: f => f.id, icons: f => f._t === 'sen' ? 'sensor' : 'device',
+      sub: f => f._t === 'sen' ? `${escH(f.model)} · ${escH(f.ip)} · Messwert · ${f.value != null ? escH(f.value + ' ' + f.unit) : escH(f.unit)}` : `${escH(f.model)} · ${escH(f.ip)} · ${kind(f)}`,
+      reload: () => { loadShellyAdmin(); loadSensorsAdmin(); },
+      add: async (ids, edits) => {
+        const pick = t => ids.filter(i => (byKey[i] || {})._t === t), pe = t => Object.fromEntries(pick(t).map(i => [i, edits[i]]));
+        if (pick('dev').length) await shellyApi('/api/esphome/add', 'POST', { ip, ids: pick('dev'), edits: pe('dev') });
+        if (pick('sen').length) await shellyApi('/api/esphome/sensors/add', 'POST', { ids: pick('sen'), edits: pe('sen') });
+      } });
   } catch (err) { shellyMsg(err.message, true); }
   b.disabled = false;
 });

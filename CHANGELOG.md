@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.38.0 – 06.11.2026
+- Neu: **Ein Suchknopf für ESPHome.** „Gerät suchen“ findet bei einem ESPHome-Gerät alles auf einmal: Taster, Klimaanlagen, Schalter und Messwerte stehen in einer gemeinsamen Liste, aus der man auswählt. Die beiden getrennten Knöpfe („Taster, Klima & Schalter suchen“ und „Messwerte suchen“) entfallen, damit man nicht mehr den falschen erwischt.
+
 ## 1.37.1 – 06.11.2026
 - Verbessert: Der **Test-Knopf der ESPHome-Taster** hat ein kleineres Dreieck in der Farbe und Strichstärke des Ein/Aus-Knopfs, so passt er optisch zu den Nachbarn.
 - Intern: Die ESPHome-Geräteverwaltung (Suchen, Anlegen, Neu-Zuordnen) liegt jetzt in einer eigenen Datei und nicht mehr gemischt mit den anderen Geräten im Geräteregister. Am Verhalten ändert sich nichts.

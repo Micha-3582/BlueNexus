@@ -282,7 +282,7 @@ assert "espS-taster-temperatur" in json.dumps(j.get_json()), "erscheint in der S
 assert "WLAN Signal" not in json.dumps(j.get_json()), "nicht angelegte Messwerte erscheinen nicht"
 
 pg = A.get("/smarthome").get_data(as_text=True)
-assert "esphome-sensor-scan" in pg and "/api/esphome/sensors/scan" in pg and "Messwerte suchen" in pg, "die Seite bietet die Messwert-Suche an"
+assert "esphome-sensor-scan" not in pg and "/api/esphome/scan" in pg and "/api/esphome/sensors/scan" in pg and "Gerät suchen" in pg, "ein Knopf sucht Taster, Klima, Schalter und Messwerte"
 
 # ein nicht angelegter Messwert wird nicht mitgefuehrt
 assert ("192.168.50.9", "sensor/WLAN Signal") not in esphome._values

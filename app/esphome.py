@@ -785,7 +785,7 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
     if not online or not c:
         raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
     if missing(ip, ent):
-        raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Taster, Klima & Schalter suchen“ noch einmal ausführen.")
+        raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Gerät suchen“ noch einmal ausführen.")
     given = {k: v for k, v in (("mode", mode), ("target", target), ("fan", fan), ("swing", swing), ("eco", eco)) if v is not None}
     cur_off = str(c.get("mode") or "OFF").upper() == "OFF"
     q = _climate_query(c, given)                                    # prueft die Werte (wirft EsphomeError)
@@ -890,7 +890,7 @@ def switch_set(d: dict, on: bool) -> dict:
     if not online:
         raise EsphomeError("Das Gerät antwortet nicht (WLAN/Strom prüfen)")
     if missing(ip, ent):
-        raise EsphomeError("Das Gerät meldet diesen Schalter nicht mehr (neue Firmware?) – bitte „Taster, Klima & Schalter suchen“ noch einmal ausführen.")
+        raise EsphomeError("Das Gerät meldet diesen Schalter nicht mehr (neue Firmware?) – bitte „Gerät suchen“ noch einmal ausführen.")
     obj = split_id(ent)[1]
     path = "/switch/" + requests.utils.quote(obj, safe="") + ("/turn_on" if on else "/turn_off")
 
