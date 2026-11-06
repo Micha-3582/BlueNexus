@@ -667,7 +667,18 @@ class _Stream:
         self._q: "queue.Queue[bytes | None]" = queue.Queue(maxsize=32)
         self._first = threading.Event()
         self.got = False                                           # wirklich Bilddaten empfangen (nicht nur Ende/Fehler)
+        self.err: list[str] = []                                   # letzte Meldungen von ffmpeg (fuer das Server-Log, wenn der Strom unerwartet endet)
+        self.nbytes = 0
         threading.Thread(target=self._read, daemon=True).start()
+        if proc.stderr is not None:
+            threading.Thread(target=self._read_err, daemon=True).start()
+
+    def _read_err(self):
+        try:
+            for line in iter(self.proc.stderr.readline, b""):
+                self.err = (self.err + [line.decode("utf-8", "replace").strip()[:200]])[-12:]
+        except (OSError, ValueError):
+            pass
 
     def _read(self):
         try:
@@ -676,6 +687,7 @@ class _Stream:
                 if not chunk:
                     break
                 self.got = True
+                self.nbytes += len(chunk)
                 self._first.set()
                 while not self._done:
                     try:
@@ -714,6 +726,8 @@ class _Stream:
             return
         self._done = True
         p = self.proc
+        if p.poll() is not None and time.time() - self.started < MAX_LIVE_S - 5:
+            print(f"[camera] ffmpeg-Strom nach {time.time() - self.started:.1f} s beendet (Code {p.returncode}, {self.nbytes // 1024} KB geliefert): {' | '.join(self.err) or 'keine Meldung'}", flush=True)
         try:
             if p.poll() is None:
                 try:
@@ -757,7 +771,7 @@ def stream(item: dict, quality: str = DEFAULT_QUALITY):
     last = "Die Kamera liefert kein Live-Bild"
     for attempt in range(START_TRIES):
         try:
-            proc = subprocess.Popen(ffmpeg_cmd(item, quality), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.PIPE)
+            proc = subprocess.Popen(ffmpeg_cmd(item, quality), stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
         except OSError as e:
             _slots.release()
             raise CameraError(f"ffmpeg konnte nicht gestartet werden: {e}")

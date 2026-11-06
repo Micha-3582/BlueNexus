@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.41.3 – 06.11.2026
+- Neu (Fehlersuche): Endet ein Kamera-Livestrom unerwartet früh, schreibt BlueNexus Dauer, Rückgabecode und die letzten ffmpeg-Meldungen ins Server-Log (`pm2 logs`, Zeile mit `[camera]`). Dient zur Suche nach dem Live-Bild der Druckerkamera, das nach wenigen Sekunden stehen bleibt.
+
 ## 1.41.2 – 06.11.2026
 - Behoben (Versuch): **Druckerkamera: Live-Bild blieb nach 2–3 Sekunden stehen.** Die Zeitstempel im Kamerastrom des Druckers springen; BlueNexus nimmt sie jetzt aus der Serveruhr und verwirft beschädigte Pakete. Gilt nur für die verschlüsselte Druckerkamera, andere Kameras bleiben unverändert.
 
