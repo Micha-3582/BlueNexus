@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.39.3 – 06.11.2026
+- Behoben: Das **Smart-Home-Menü** passte mit den Symbolen am Computer nicht mehr in die Leiste, der letzte Knopf („Sonstiges“) war abgeschnitten. Die Knöpfe sind etwas schmaler, und reicht die Breite trotzdem nicht, rutscht der Rest in eine zweite Zeile, sodass alles sichtbar ist und nichts gescrollt werden muss. Auf dem Handy bleibt es bei einer Zeile mit Symbolen.
+
 ## 1.39.2 – 06.11.2026
 - Verbessert: Im **Smart-Home-Menü** (Aktoren, Sensoren, Thermostate …) stehen die Symbole jetzt auch am Computer vor der Beschriftung, nicht mehr nur auf dem Handy. Auf schmalen Bildschirmen bleiben wie bisher nur die Symbole.
 
