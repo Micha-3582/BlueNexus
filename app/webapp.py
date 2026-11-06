@@ -2002,7 +2002,7 @@ class Controller:
         if not store.module_on("energy", cfg):           # Modul Energie aus: keine (veralteten) Energiewerte fuer Regeln - solche Bedingungen gelten als "keine Daten"
             ctx.update({"soc": None, "price_ct": None, "prices_today": None, "pv_tomorrow": None})
         used = {c.get("sensor_id") for r in rules.list_rules() if r.get("enabled", True)
-                for c in rules.all_conditions(r) if c.get("type") == "sensor"}
+                for c in rules.all_conditions(r) if c.get("type") in ("sensor", "change")}
         if used:                                         # nur die Sensoren abfragen, die eine aktive Regel auch braucht
             try:
                 sens = [s for s in homematic.load_sensors() if s["id"] in used]
@@ -2094,7 +2094,7 @@ class Controller:
                         need.update(c["device_id"] for c in rules.all_conditions(r) if c.get("type") == "device")
                     eph_seq = esphome.seqs()                                          # Taster-Druecke bis hierher werden in dieser Runde gesehen (danach consume)
                     devs = shelly.list_with_status(ids=need, deadline=RULES_STATUS_WAIT_S)       # nicht auf das langsamste WLAN-Geraet warten
-                    used_s = {c.get("sensor_id") for r in all_rules if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") == "sensor"}
+                    used_s = {c.get("sensor_id") for r in all_rules if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") in ("sensor", "change")}
                     homematic.set_watch([d["address"] for d in devs if d.get("kind") == "homematic" and d.get("address")]
                                         + [s_["address"] for s_ in homematic.load_sensors() if s_["id"] in used_s])      # nur deren Meldungen wecken die Regeln
                     if dry:      # Trockenlauf: mit gedachtem statt echtem Zustand rechnen
@@ -2149,7 +2149,7 @@ class Controller:
             except Exception as e:                       # noqa: BLE001
                 log.warning("Regel-Engine: %s", e)
             fast = any(c.get("type") in ("sensor", "device") for r in rules.list_rules() if r.get("enabled", True) for c in rules.all_conditions(r))
-            live_s = {c.get("sensor_id") for r in rules.list_rules() if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") == "sensor"}
+            live_s = {c.get("sensor_id") for r in rules.list_rules() if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") in ("sensor", "change")}
             polled = any(s_.get("source") in ("zigbee", "camera") for s_ in homematic.load_sensors() if s_["id"] in live_s)      # Zigbee/Kamera melden nichts von selbst: jede Sekunde abfragen
             iv = 1 if polled else (10 if homematic.push_active() else (2 if fast else 10))      # mit Push (Meldung der CCU) genuegt die Reserve-Runde; sonst alle 2 s abfragen
             nd = flow_engine.next_due()

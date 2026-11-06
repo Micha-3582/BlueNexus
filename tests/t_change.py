@@ -74,6 +74,13 @@ assert len(a) == 1 and a[0]["vars"]["alt"] == "15 %", a
 ev = eng2.step(datetime(2026, 11, 6, 14, 38), {"sensors": {}, "sensor_info": SENS}, [rule]); assert not eng2.advance()
 assert "keine Daten" in eng2.status["r1"]["text"] or eng2.status["r1"]["state"] == "off", eng2.status
 
-# Sensor einer Regel zugeordnet (Loeschschutz)
-assert rules.used_by("sensor", "s1") == [] or True
+# Regel-Kontext liefert den Wert auch dann, wenn der Sensor NUR in einer "Wert aendert sich"-Bedingung vorkommt (Fehler in 1.42.0: "nicht mehr vorhanden")
+import homematic
+from datetime import datetime as _dt
+homematic.load_sensors = lambda: [{"id": "s1", "name": "Druckfortschritt", "unit": "%", "kind": "progress"}]
+homematic.read_values = lambda sens, latch=False: {x["id"]: 42.0 for x in sens}
+rules.add_rule(flow_body)
+rc = webapp.ctrl._rules_ctx(cfg, None, _dt(2026, 11, 6, 15, 0))
+assert rc.get("sensors") == {"s1": 42.0} and "s1" in rc["sensor_info"], rc.get("sensors")
+assert rules.used_by("sensor", "s1") == ["Druckfortschritt"], rules.used_by("sensor", "s1")           # Loeschschutz zaehlt die Bedingung mit
 print("ok")
