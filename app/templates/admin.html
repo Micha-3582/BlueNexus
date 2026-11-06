@@ -745,7 +745,7 @@
   <div class="sub">Taster, Klimaanlagen und Messwerte eines ESPHome-Geräts per IP-Adresse hinzufügen.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input type="text" id="esphome-ip" placeholder="IP, z.B. 192.168.178.17" inputmode="decimal" autocomplete="off" style="flex:1;min-width:190px">
-    <button id="esphome-scan" class="ghost">Taster &amp; Klima suchen</button>
+    <button id="esphome-scan" class="ghost">Taster, Klima &amp; Schalter suchen</button>
     <button id="esphome-sensor-scan" class="ghost">Messwerte suchen</button>
   </div>
 </div>
@@ -1994,6 +1994,7 @@ function linkInfo(l) {          // Messung der Verbindung zu einem ESPHome-Gerä
 function shellyStatText(d) {
   if (d.online === undefined) return 'wird abgefragt …';                       // Liste steht schon, Live-Werte kommen gleich
   if (d.kind === 'esphome') return (!d.online ? 'nicht erreichbar' : d.missing ? 'Eingang fehlt am Gerät – neu suchen oder löschen' : 'Taster · ' + (d.shown ? 'gedrückt' : 'bereit')) + linkInfo(d.link);
+  if (d.kind === 'esphome_sw') return (!d.online ? 'nicht erreichbar' : d.missing ? 'Schalter fehlt am Gerät – neu suchen oder löschen' : (d.on ? 'an' : 'aus')) + linkInfo(d.link);
   return !d.online ? 'nicht erreichbar' + (d.error ? ' – ' + d.error : '') : (d.on ? 'an' : 'aus') + (d.power != null ? ` · ${Math.round(d.power)} W` : '') + (d.info ? ' · ' + d.info : '');
 }
 /* Nur Status/Watt/Knopffarbe aktualisieren - Eingabefelder und offene Symbolauswahl bleiben unangetastet */

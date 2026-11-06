@@ -42,7 +42,7 @@ SYNC_EVERY_S = 5.0
 MISSING_GRACE_S = 10.0           # so lange nach dem Verbinden darf ein Eintrag noch fehlen (Anfangszustand kommt bei einem ESP8266 langsam)
 SLOW_PRESS_S = 1.0               # dauert es von Druck bis fertiger Regelrunde laenger, steht das im Protokoll (sonst nur im Debug-Protokoll)
 MAX_QUEUE = 5                    # so viele Druecke warten hoechstens darauf, von den Regeln gesehen zu werden (Schutz vor einem prellenden Taster)
-DOMAINS = ("binary_sensor", "sensor", "climate")        # Eingaenge/Taster (Aktoren), Messwerte (Sensoren) und Klimaanlagen (Aktor, Art "esphome_ac")
+DOMAINS = ("binary_sensor", "sensor", "climate", "switch")        # Eingaenge/Taster (Aktoren), Messwerte (Sensoren) und Klimaanlagen (Aktor, Art "esphome_ac")
 VALUE_GRACE_S = 120.0            # ein Messwert gilt auch nach einem kurzen Verbindungsabbruch noch so lange (der ESP8266 verliert die Verbindung gelegentlich)
 
 
@@ -200,6 +200,7 @@ _seen: dict[str, dict] = {}                          # ip -> {Eintrag: Anzeigena
 _conn_at: dict[str, float] = {}                      # ip -> Zeit der letzten erfolgreichen Verbindung
 _values: dict[tuple, tuple] = {}                     # (ip, entity) -> (Zeit, Messwert|None) der angelegten Sensoren
 _climate: dict[tuple, tuple] = {}                    # (ip, entity) -> (Zeit, zuletzt gemeldete Felder der Klimaanlage)
+_switch: dict[tuple, tuple] = {}                     # (ip, entity) -> (Zeit, an?) der Schalter/Relais (Aktor, Art "esphome_sw")
 _sens_all: dict[tuple, float] = {}                   # (ip, entity) -> letzter Messwert, auch von nicht angelegten Sensoren (z. B. Aussentemperatur der Klimaanlage)
 _pre: dict[tuple, dict] = {}                         # (ip, entity) -> Vorwahl bei ausgeschalteter Anlage {mode,target,fan,swing,eco} (BlueNexus-Begriffe); geht erst beim Einschalten an die Anlage
 _last_mode: dict[tuple, str] = {}                    # (ip, entity) -> zuletzt benutzter Modus ausser OFF (fuer "einschalten" ohne Modus)
@@ -309,6 +310,11 @@ def _on_state(ip: str, j: dict) -> None:
             if m and m != "OFF":
                 _last_mode[(ip, ent)] = m
                 _pre.pop((ip, ent), None)                                  # Anlage laeuft (auch per Fernbedienung eingeschaltet): die Vorwahl ist erledigt
+        _notify()
+        return
+    if dom == "switch":                                                # Schalter/Relais: Zustand merken (kommt beim Verbinden und bei jeder Aenderung, auch am Geraet selbst)
+        with _lock:
+            _switch[(ip, ent)] = (time.time(), bool(j.get("value")))
         _notify()
         return
     if dom == "sensor":                                                # Messwert: nur merken, wenn ein Sensor ihn braucht
@@ -430,7 +436,7 @@ def release(ip: str) -> None:
         _conn_at.pop(ip, None)
         for k in [k for k in _values if k[0] == ip]:
             _values.pop(k, None)
-        for dct in (_climate, _sens_all, _last_mode, _pre):
+        for dct in (_climate, _switch, _sens_all, _last_mode, _pre):
             for k in [k for k in dct if k[0] == ip]:
                 dct.pop(k, None)
     if h:
@@ -444,7 +450,7 @@ def sync(devices: list[dict]) -> None:
         old = {ip: set(v) for ip, v in _wanted.items()}
         _wanted.clear()
         for d in devices:
-            if d.get("kind") in ("esphome", "esphome_ac") and d.get("ip") and d.get("entity"):               # Taster und Klimaanlagen (Geraeteregister)
+            if d.get("kind") in ("esphome", "esphome_ac", "esphome_sw") and d.get("ip") and d.get("entity"):               # Taster, Klimaanlagen und Schalter (Geraeteregister)
                 ip, ent = str(d["ip"]), str(d["entity"])
             elif d.get("source") == "esphome" and d.get("ip") and d.get("datapoint"):        # Messwert (Sensorregister)
                 ip, ent = str(d["ip"]), str(d["datapoint"])
@@ -779,7 +785,7 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
     if not online or not c:
         raise EsphomeError("Die Klimaanlage antwortet nicht (WLAN/Strom prüfen)")
     if missing(ip, ent):
-        raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Taster & Klima suchen“ noch einmal ausführen.")
+        raise EsphomeError("Das Gerät meldet diese Klimaanlage nicht mehr (neue Firmware?) – bitte „Taster, Klima & Schalter suchen“ noch einmal ausführen.")
     given = {k: v for k, v in (("mode", mode), ("target", target), ("fan", fan), ("swing", swing), ("eco", eco)) if v is not None}
     cur_off = str(c.get("mode") or "OFF").upper() == "OFF"
     q = _climate_query(c, given)                                    # prueft die Werte (wirft EsphomeError)
@@ -846,3 +852,76 @@ def climate_set(d: dict, power=None, mode=None, target=None, fan=None, swing=Non
     log.info("ESPHome-Klima %s: Befehl %s gesendet", ip, q)
     wait_applied(SET_WAIT_S)                                        # die neue Meldung des Geraets abwarten, damit die Anzeige gleich stimmt
     return climate_status(d)
+
+
+# ---------------------------------------------------------------- Schalter / Relais (Aktor, Art "esphome_sw"): ESPHome-Entitaet "switch"
+SWITCH_TRIES = 3
+SWITCH_WAIT_S = 3.0                                  # so lange auf die Rueckmeldung des Geraets nach einem Befehl warten
+
+
+def _switch_fields(ip: str, ent: str):
+    with _lock:
+        h = _hosts.get(ip)
+        online = bool(h and h["online"])
+        ts, on = _switch.get((ip, ent), (0.0, None))
+    return online, ts, on
+
+
+def switch_status(d: dict) -> dict:
+    """Zustand eines Schalters/Relais: {'online', 'on', 'power'}. Der Zustand kommt aus der gehaltenen Verbindung; nach einem kurzen Abbruch gilt der letzte noch VALUE_GRACE_S."""
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    _want(ip, ent)
+    ensure(ip)
+    online, ts, on = _switch_fields(ip, ent)
+    link = link_stats(ip)
+    if online and missing(ip, ent):
+        return {"online": True, "on": None, "power": None, "missing": True, "link": link}
+    if on is None or not (online or time.time() - ts < VALUE_GRACE_S):
+        return {"online": False, "on": None, "power": None, "link": link}
+    return {"online": True, "on": bool(on), "power": None, "link": link}
+
+
+def switch_set(d: dict, on: bool) -> dict:
+    """Schaltet das Relais per POST /switch/<name>/turn_on bzw. turn_off und wartet kurz auf die Rueckmeldung des Geraets. Rueckgabe: neuer Zustand."""
+    ip, ent = str(d.get("ip") or ""), str(d.get("entity") or "")
+    _want(ip, ent)
+    ensure(ip)
+    online, ts, cur = _switch_fields(ip, ent)
+    if not online:
+        raise EsphomeError("Das Gerät antwortet nicht (WLAN/Strom prüfen)")
+    if missing(ip, ent):
+        raise EsphomeError("Das Gerät meldet diesen Schalter nicht mehr (neue Firmware?) – bitte „Taster, Klima & Schalter suchen“ noch einmal ausführen.")
+    obj = split_id(ent)[1]
+    path = "/switch/" + requests.utils.quote(obj, safe="") + ("/turn_on" if on else "/turn_off")
+
+    def applied() -> bool:
+        return _switch_fields(ip, ent)[2] is bool(on)
+    t0, err, ok = time.time(), None, False
+    for attempt in range(1, SWITCH_TRIES + 1):
+        try:
+            r = requests.post(_url(ip, path), timeout=(PROBE_CONNECT_S, 8.0), headers={"Connection": "close", "Accept-Encoding": "identity"})
+            r.raise_for_status()
+            ok = True
+            break
+        except requests.RequestException as e:                      # das Geraet schliesst bei Last manchmal ohne Antwort - der Befehl kann trotzdem angekommen sein
+            err = e
+            log.info("ESPHome-Schalter %s: Versuch %d/%d ohne Antwort (%s)", ip, attempt, SWITCH_TRIES, e.__class__.__name__)
+            end = time.time() + 1.5
+            while time.time() < end and not applied():
+                time.sleep(0.15)
+            if applied():
+                ok = True
+                break
+            time.sleep(0.5)
+    if not ok:
+        log.warning("ESPHome-Schalter %s: Befehl %s fehlgeschlagen: %s", ip, path, err)
+        raise EsphomeError("Das Gerät hat den Befehl nicht angenommen oder ist nicht erreichbar.")
+    end = time.time() + SWITCH_WAIT_S
+    while time.time() < end and not applied():
+        time.sleep(0.1)
+    if not applied():                                               # keine Meldung abgewartet: den Befehl als neuen Zustand merken (die Verbindung korrigiert ihn, falls das Geraet anders entscheidet)
+        with _lock:
+            _switch[(ip, ent)] = (time.time(), bool(on))
+    _notify()
+    log.info("ESPHome-Schalter %s: %s -> %s", ip, ent, "an" if on else "aus")
+    return switch_status(d)
