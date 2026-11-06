@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.34.11 – 06.11.2026
+- Fehlerbehebung: **Regeln reagierten mal sofort, mal erst nach bis zu 5 Sekunden** (z. B. Software-Knopf löst Chime aus). Die Regelrunde wartete vor jedem Auslösen auf das **langsamste** der beteiligten Geräte; ein WLAN-Gerät mit kurzem Aussetzer hielt so alle Regeln auf. Jetzt wartet die Runde **höchstens 0,6 Sekunden** auf die Geräte. Wer bis dahin nicht geantwortet hat, zählt mit seinem letzten bekannten Zustand (die Abfrage läuft im Hintergrund weiter). Ein Gerät ohne bekannten Zustand wird weiterhin abgewartet.
+
 ## 1.34.10 – 06.11.2026
 - Verbessert: **Chime-Läuten aus einer Regel ist schneller.** Der Regelschritt „Chime läuten“ fragte bei jedem Mal erst die Liste der gekoppelten Chimes ab und läutete danach, also zwei Abrufe an die Türklingel hintereinander (der Knopf im Kamerafenster macht nur einen). Jetzt merkt sich BlueNexus die Chime-Nummern (10 Minuten), das Läuten ist ein einziger Abruf, und mehrere Chimes läuten gleichzeitig statt nacheinander. Hat sich ein Chime geändert, wird die Liste automatisch neu geholt.
 

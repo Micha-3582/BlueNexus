@@ -17,6 +17,7 @@ import socket
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutTimeout
 
 import requests
 
@@ -1413,17 +1414,36 @@ def tasmota_hook_set(dev_id: str, base: str | None) -> dict:
     return {"hook": base is not None}
 
 
-def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None) -> list[dict]:
+def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None, deadline: float | None = None) -> list[dict]:
     """Angelegte Geraete inkl. Live-Status (parallel abgefragt). Ohne Passwort.
     only_shown: nur die fuers Dashboard freigegebenen (Reihenfolge wie gespeichert).
     live=False: keine Abfrage der Geraete (nur Stammdaten - sofort da, z. B. fuer den Regel-Editor).
-    max_age: fuer die Oberflaeche - letzter bekannter Zustand (hoechstens so alt) statt auf jedes Geraet zu warten, siehe status_cached."""
+    max_age: fuer die Oberflaeche - letzter bekannter Zustand (hoechstens so alt) statt auf jedes Geraet zu warten, siehe status_cached.
+    deadline: fuer die Regelrunde - hoechstens so viele Sekunden auf die Geraete warten; wer bis dahin nicht geantwortet hat, zaehlt mit seinem letzten
+    bekannten Zustand (die Abfrage laeuft im Hintergrund weiter und aktualisiert ihn). Sonst bestimmt das langsamste WLAN-Geraet, wie schnell eine Regel reagiert."""
     items = [d for d in load_devices() if d.get("show")] if only_shown else load_devices()
     if ids is not None:                                    # nur bestimmte Geraete abfragen (schnelle Regelrunde)
         items = [d for d in items if d["id"] in ids]
     if not items:
         return []
-    if live:
+    if live and deadline is not None:
+        ex = ThreadPoolExecutor(max_workers=min(16, len(items)))
+        futs = [ex.submit(status, d) for d in items]
+        end = time.time() + deadline
+        states = []
+        for d, f in zip(items, futs):
+            try:
+                states.append(f.result(timeout=max(0.0, end - time.time())))
+            except FutTimeout:
+                hit = _st_cache.get(d.get("id"))
+                if hit and time.time() - hit[0] <= STALE_OK_S:
+                    st = dict(hit[1])
+                    st["stale"] = True
+                    states.append(st)
+                else:                                          # noch nie gefragt: dann bleibt nur das Warten
+                    states.append(f.result())
+        ex.shutdown(wait=False)
+    elif live:
         with ThreadPoolExecutor(max_workers=min(16, len(items))) as ex:
             states = list(ex.map(status if max_age is None else (lambda d: status_cached(d, max_age)), items))
     else:

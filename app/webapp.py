@@ -2091,7 +2091,7 @@ class Controller:
                         need.update(rules.devices_of(r))
                         need.update(c["device_id"] for c in rules.all_conditions(r) if c.get("type") == "device")
                     eph_seq = esphome.seqs()                                          # Taster-Druecke bis hierher werden in dieser Runde gesehen (danach consume)
-                    devs = shelly.list_with_status(ids=need)
+                    devs = shelly.list_with_status(ids=need, deadline=RULES_STATUS_WAIT_S)       # nicht auf das langsamste WLAN-Geraet warten
                     used_s = {c.get("sensor_id") for r in all_rules if r.get("enabled", True) for c in rules.all_conditions(r) if c.get("type") == "sensor"}
                     homematic.set_watch([d["address"] for d in devs if d.get("kind") == "homematic" and d.get("address")]
                                         + [s_["address"] for s_ in homematic.load_sensors() if s_["id"] in used_s])      # nur deren Meldungen wecken die Regeln
@@ -2516,6 +2516,7 @@ def api_welcome_done():
 _alexa_cache: dict = {}                                       # geraete-id -> (Zeit, an?)  - Echo fragt oft und von vielen Geraeten gleichzeitig
 _alexa_pool = None
 ALEXA_TTL_S = 4.0                                             # so lange gilt ein gelesener Zustand
+RULES_STATUS_WAIT_S = 0.6                                     # so lange wartet eine Regelrunde hoechstens auf die Geraete (danach: letzter bekannter Zustand)
 ALEXA_DEADLINE_S = 1.0                                        # laenger darf eine Antwort an Echo nie dauern - sonst verwirft Alexa das Geraet still
 
 

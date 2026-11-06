@@ -15,7 +15,7 @@ LAMPS = {f"shelly-l{i}": False for i in (1, 2)}
 LOG = []
 shelly._save([{"id": k, "kind": "shelly", "name": f"Lampe {k[-1]}", "icon": "💡", "ip": f"192.168.50.{9+i}", "channel": 0, "gen": 1, "model": "Shelly Plug", "show": False, "users": [], "power_w": 0, "switchable": True}
               for i, k in enumerate(LAMPS)])
-shelly.list_with_status = lambda only_shown=False, ids=None, live=True: [
+shelly.list_with_status = lambda only_shown=False, ids=None, live=True, max_age=None, deadline=None: [
     {"id": k, "name": f"Lampe {k[-1]}", "kind": "shelly", "online": True, "on": v, "power": 0, "switchable": True, "address": None}
     for k, v in LAMPS.items() if ids is None or k in ids]
 def fake_set(did, on, timer_s=None):
