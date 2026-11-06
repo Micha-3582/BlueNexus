@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.37.1 – 06.11.2026
+- Verbessert: Der **Test-Knopf der ESPHome-Taster** hat ein kleineres Dreieck in der Farbe und Strichstärke des Ein/Aus-Knopfs, so passt er optisch zu den Nachbarn.
+- Intern: Die ESPHome-Geräteverwaltung (Suchen, Anlegen, Neu-Zuordnen) liegt jetzt in einer eigenen Datei und nicht mehr gemischt mit den anderen Geräten im Geräteregister. Am Verhalten ändert sich nichts.
+
 ## 1.37.0 – 06.11.2026
 - Neu: **ESPHome-Schalter und Relais.** Ein ESPHome-Gerät mit einem Schalter (zum Beispiel ein selbstgebautes Relais) wird mit **Taster, Klima & Schalter suchen** gefunden und als Aktor angelegt. Er lässt sich wie jede Steckdose bedienen: Ein-/Aus-Knopf, Dashboard, Regeln und Automatik, lokal und ohne Cloud. Schaltet jemand am Gerät selbst, folgt BlueNexus sofort. Kommt ein Befehl nicht an, versucht BlueNexus es noch zweimal; bei Ausfall steht „nicht erreichbar“ samt Verbindungsmessung in der Zeile.
 

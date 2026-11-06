@@ -566,7 +566,7 @@ def match_stale(stale: list, cands: list, fallback: bool = False) -> list:
 def heal() -> int:
     """Hintergrund (alle paar Sekunden): Eintraege, die ein verbundenes Geraet nicht mehr meldet, werden einem eindeutig passenden neuen Eintrag desselben
     Geraets zugeordnet (starker/schwacher Namens-Treffer, nie geraten). Gibt die Zahl der neu zugeordneten Eintraege zurueck."""
-    import shelly
+    import esphome_devices
     with _lock:
         now = time.time()
         todo = {}
@@ -579,7 +579,7 @@ def heal() -> int:
     n = 0
     for ip, seen in todo.items():
         ents = [{"entity": e, "name": nm, "domain": split_id(e)[0]} for e, nm in seen.items()]
-        n += len(shelly.esphome_relink(ip, ents))
+        n += len(esphome_devices.esphome_relink(ip, ents))
     if n:
         resync()
     return n

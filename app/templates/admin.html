@@ -1943,6 +1943,7 @@ function uiForm({ title, message, fields, okText = 'OK' }) {
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let shellyIcons = [];
 const isAc = d => d.kind === 'midea' || d.rkind === 'midea';          // Klimaanlage, auch eine von einer fremden Instanz geteilte
+const PRESS_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polygon points="8 5 19 12 8 19 8 5"/></svg>';   // wie PWR_ICON: gleiche Groesse und Strichstaerke, Farbe der Schrift
 const PWR_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:middle"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></svg>';
 const POWER_ON_STYLE = 'background:var(--on);border-color:var(--on);color:#fff';          // eingeschaltet = Victron-Blau
 async function shellyApi(url, method, body) {
@@ -2130,7 +2131,7 @@ async function loadShellyAdmin(light) {              // light: nur Stammdaten, s
         ${d.switchable === false || !window.IS_ADMIN ? '' : pinBtn(`shellyPin('${id}', ${d.pin_set ? 'true' : 'false'})`, !!d.pin_set)}
         <button class="ghost admin-only" onclick="editToggle('dedit-${id}')" title="Bearbeiten: Name, Dashboard, Schaltbar, Entfernen">✎</button>
         ${eyeBtn('shelly', id)}${favBtn('shelly', id)}
-        ${d.kind === 'esphome' ? `<button class="ghost dev-press" onclick="shellyPress('${id}', this)" ${d.online ? '' : 'disabled'} title="Tastendruck auslösen – wie ein Druck am Taster (Regeln, die auf ihn reagieren, laufen los)">${I_PLAY}</button>` : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten')}">${PWR_ICON}</button>`}
+        ${d.kind === 'esphome' ? `<button class="ghost dev-press" onclick="shellyPress('${id}', this)" ${d.online ? '' : 'disabled'} title="Tastendruck auslösen – wie ein Druck am Taster (Regeln, die auf ihn reagieren, laufen los)">${PRESS_ICON}</button>` : `<button class="ghost dev-power${d.pin_set ? ' pinned' : ''}" data-on="${d.on ? '1' : '0'}" style="${d.on ? POWER_ON_STYLE : ''}" onclick="shellyTest('${id}', this)" ${d.online && d.switchable !== false ? '' : 'disabled'} title="${d.switchable === false ? 'Nur Überwachung – nicht schaltbar' : (d.on ? 'Ausschalten' : 'Einschalten')}">${PWR_ICON}</button>`}
         </div>
       </div>
       ${isAc(d) && d.switchable !== false ? `<div id="midea-${id}" class="midea-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px"></div>` : ''}

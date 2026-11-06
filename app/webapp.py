@@ -34,6 +34,7 @@ import os
 
 import share
 import esphome
+import esphome_devices
 import shelly
 import store
 import surplus
@@ -6392,7 +6393,7 @@ def api_esphome_scan():
     if not isinstance(ip, str) or not ip.strip():
         return jsonify(error="IP-Adresse fehlt"), 400
     try:
-        return jsonify(shelly.esphome_scan(ip.strip()))
+        return jsonify(esphome_devices.esphome_scan(ip.strip()))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
 
@@ -6404,7 +6405,7 @@ def api_esphome_sensor_scan():
     if not isinstance(ip, str) or not ip.strip():
         return jsonify(error="IP-Adresse fehlt"), 400
     try:
-        return jsonify(shelly.esphome_sensor_scan(ip.strip()))
+        return jsonify(esphome_devices.esphome_sensor_scan(ip.strip()))
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
 
@@ -6418,7 +6419,7 @@ def api_esphome_sensor_add():
     if bad:
         return bad
     try:
-        added = shelly.add_esphome_sensors(ids)
+        added = esphome_devices.add_esphome_sensors(ids)
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
     _apply_edits(added, _edits(), "sensor")
@@ -6435,7 +6436,7 @@ def api_esphome_add():
     if bad:
         return bad
     try:
-        res = shelly.add_esphome(ip.strip(), ids)
+        res = esphome_devices.add_esphome(ip.strip(), ids)
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
     _apply_edits(res, _edits(), "device")

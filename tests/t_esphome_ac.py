@@ -7,7 +7,7 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ps_common
 webapp, store, cfg, tmp = ps_common.setup(sys.argv[1])
-import esphome, shelly, rules
+import esphome, esphome_devices, shelly, rules
 
 CLIMATE = {"id": "climate-air_conditioner", "name": "Air Conditioner", "icon": "", "entity_category": 0,
            "modes": ["OFF", "HEAT_COOL", "COOL", "HEAT", "FAN_ONLY", "DRY"], "fan_modes": ["AUTO", "LOW", "MEDIUM", "HIGH"], "custom_fan_modes": ["silent", "turbo"],
@@ -100,18 +100,18 @@ ents = {e["entity"]: e for e in info["entities"]}
 assert set(ents) == {"climate-air_conditioner", "sensor-air_conditioner_outdoor_temperature", "sensor-air_conditioner_wi-fi_signal", "sensor-air_conditioner_indoor_humidity"}, set(ents)
 assert ents["climate-air_conditioner"]["domain"] == "climate" and ents["sensor-air_conditioner_wi-fi_signal"]["value"] == -58.0
 
-found = shelly.esphome_scan("192.168.50.9")
+found = esphome_devices.esphome_scan("192.168.50.9")
 assert [f["entity"] for f in found] == ["climate-air_conditioner"], found                  # Messwerte stehen bei "Messwerte suchen"
 assert found[0]["icon"] == "❄️" and found[0]["domain"] == "climate" and found[0]["known"] is False
 dev_id = found[0]["id"]
 assert dev_id == "esphome-air_conditioner_88d226-air_conditioner", dev_id
 
 # ---------------------------------------------------------------- Anlegen als Aktor
-added = shelly.add_esphome("192.168.50.9", [dev_id])
+added = esphome_devices.add_esphome("192.168.50.9", [dev_id])
 assert len(added) == 1 and added[0]["kind"] == "esphome_ac" and added[0]["rkind"] == "midea" and added[0]["switchable"] is True and added[0]["icon"] == "❄️", added
 d = shelly.load_devices()[0]
-assert shelly.add_esphome("192.168.50.9", [dev_id]) == [], "nicht doppelt anlegen"
-assert shelly.esphome_scan("192.168.50.9")[0]["known"] is True
+assert esphome_devices.add_esphome("192.168.50.9", [dev_id]) == [], "nicht doppelt anlegen"
+assert esphome_devices.esphome_scan("192.168.50.9")[0]["known"] is True
 
 # ---------------------------------------------------------------- Zustand (Midea-Format)
 wait(lambda: shelly.status(d).get("online"), 6.0, "Zustand da")

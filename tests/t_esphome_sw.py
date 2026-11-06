@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ps_common
 webapp, store, cfg, tmp = ps_common.setup(sys.argv[1])
-import esphome, shelly
+import esphome, esphome_devices, shelly
 
 STATE = {"on": False}
 STREAMS, POSTS = [], []
@@ -82,17 +82,17 @@ esphome._url = lambda ip, path: f"http://127.0.0.1:{PORT}{path}"
 esphome.PROBE_QUIET_S, esphome.BACKOFF_START_S, esphome.BACKOFF_MAX_S, esphome.SWITCH_WAIT_S = 0.5, 0.3, 0.6, 1.0
 
 # ---------------------------------------------------------------- Suchen
-found = shelly.esphome_scan("192.168.2.129")
+found = esphome_devices.esphome_scan("192.168.2.129")
 assert [f["entity"] for f in found] == ["switch/Relais"], found                       # Messwerte stehen bei "Messwerte suchen"
 assert found[0]["icon"] == "🔌" and found[0]["domain"] == "switch" and found[0]["known"] is False, found
 dev_id = found[0]["id"]
 
 # ---------------------------------------------------------------- Anlegen
-added = shelly.add_esphome("192.168.2.129", [dev_id])
+added = esphome_devices.add_esphome("192.168.2.129", [dev_id])
 assert len(added) == 1 and added[0]["kind"] == "esphome_sw" and added[0]["switchable"] is True and added[0]["icon"] == "🔌" and "rkind" not in added[0], added
 d = shelly.load_devices()[0]
-assert shelly.add_esphome("192.168.2.129", [dev_id]) == [], "nicht doppelt anlegen"
-assert shelly.esphome_scan("192.168.2.129")[0]["known"] is True
+assert esphome_devices.add_esphome("192.168.2.129", [dev_id]) == [], "nicht doppelt anlegen"
+assert esphome_devices.esphome_scan("192.168.2.129")[0]["known"] is True
 
 # ---------------------------------------------------------------- Zustand
 wait(lambda: shelly.status(d).get("online"), 6.0, "Zustand da")
