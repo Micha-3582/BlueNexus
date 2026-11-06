@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.39.2 – 06.11.2026
+- Verbessert: Im **Smart-Home-Menü** (Aktoren, Sensoren, Thermostate …) stehen die Symbole jetzt auch am Computer vor der Beschriftung, nicht mehr nur auf dem Handy. Auf schmalen Bildschirmen bleiben wie bisher nur die Symbole.
+
 ## 1.39.1 – 06.11.2026
 - Verbessert: Unter *Einstellungen → Geräte → Suchen* stehen die Such-Bereiche jetzt in derselben Reihenfolge wie die Auswahl der Systeme darüber: Shelly, Tasmota / WLED, Tuya, Homematic, Zigbee, Klimaanlage (Midea), ESPHome, Bambu Lab. „Suche in weiteren Netzen“ steht zuletzt.
 
