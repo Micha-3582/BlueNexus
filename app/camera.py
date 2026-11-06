@@ -648,7 +648,9 @@ def rtsp_url(item: dict, quality: str = DEFAULT_QUALITY, path: str | None = None
 def ffmpeg_cmd(item: dict, quality: str = DEFAULT_QUALITY) -> list[str]:
     """ffmpeg-Aufruf fuer den MJPEG-Strom. 'klar' = Hauptstrom (bis 1920 Pixel Breite, mehr Serverlast und Datenrate), 'fluessig' = Teilstrom. In Tests ersetzbar."""
     qd = QUALITIES[norm_quality(quality)]
-    return [ffmpeg_path() or "ffmpeg", "-loglevel", "error", "-rtsp_transport", "tcp", "-i", rtsp_url(item, quality), "-an",
+    # Druckerkamera (verschluesselt): ihre Zeitstempel springen, dann bleibt das Bild nach ein paar Sekunden stehen -> Zeitstempel aus der Uhr nehmen, kaputte Pakete verwerfen
+    tuning = ["-fflags", "+genpts+discardcorrupt+nobuffer", "-use_wallclock_as_timestamps", "1"] if item.get("tls") else []
+    return [ffmpeg_path() or "ffmpeg", "-loglevel", "error", "-rtsp_transport", "tcp", *tuning, "-i", rtsp_url(item, quality), "-an",
             "-vf", f"scale='min({qd['width']},iw)':-2", "-r", str(qd["fps"]), "-q:v", str(qd["q"]), "-f", "mpjpeg", "pipe:1"]
 
 

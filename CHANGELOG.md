@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.41.2 – 06.11.2026
+- Behoben (Versuch): **Druckerkamera: Live-Bild blieb nach 2–3 Sekunden stehen.** Die Zeitstempel im Kamerastrom des Druckers springen; BlueNexus nimmt sie jetzt aus der Serveruhr und verwirft beschädigte Pakete. Gilt nur für die verschlüsselte Druckerkamera, andere Kameras bleiben unverändert.
+
 ## 1.41.1 – 06.11.2026
 - Behoben: **Kameras: Seite ließ sich nach dem Vollbild nicht mehr scrollen.** Wer das Live-Bild im Vollbild geöffnet und mit dem runden ✕ wieder geschlossen hat, konnte die Seite nicht mehr scrollen, das Bild wirkte eingefroren, erst ein Reiterwechsel half. Ursache: Die Kameraseite und die allgemeine Scroll-Sperre für Vollbild-Fenster sperrten die Seite beide und kamen sich beim Aufheben in die Quere. Jetzt sperrt nur noch die allgemeine Sperre und gibt die Seite sicher wieder frei.
 
