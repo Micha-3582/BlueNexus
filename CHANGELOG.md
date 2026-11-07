@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.43.0 – 07.11.2026
+- Neu: **Kameratyp frei eintragbar.** Beim Stift einer Kamera gibt es unter dem Namen ein Feld „Kameratyp“ (z. B. RLC-820A). Der Eintrag erscheint oben rechts auf der Kamerakarte. Bleibt das Feld leer, steht dort der Standard („RTSP“ bzw. „Reolink“).
+
 ## 1.42.2 – 06.11.2026
 - Geändert: **Regel-Editor: Auswahl der Bedingungsarten sinnvoll sortiert.** Erst Zeit (Uhrzeit, Wochentag, Sonne), dann Sensoren, Aktoren und Auslöser (Sensor, Wert ändert sich, Aktoren, Eigener Schalter, Telegram-Wort, Regel), zuletzt Energie (Strompreis, Laufzeit, Akku, Sonne morgen). Der Eintrag „Sensor“ heißt jetzt „Sensor (Wert oder Ja/Nein)“.
 

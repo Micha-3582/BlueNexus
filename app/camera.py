@@ -889,6 +889,8 @@ def update(cid: str, **f) -> bool:
                 continue
             if isinstance(f.get("name"), str) and f["name"].strip():
                 it["name"] = f["name"].strip()[:60]
+            if isinstance(f.get("model"), str):                    # Kameratyp/Modell (Anzeige oben rechts); leer = Standard
+                it["model"] = f["model"].strip()[:40] or ("RTSP" if it.get("kind") == "rtsp" else "Reolink")
             for k in ("host", "user"):
                 if isinstance(f.get(k), str) and f[k].strip():
                     if k == "host":

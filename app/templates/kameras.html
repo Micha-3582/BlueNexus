@@ -163,7 +163,8 @@ function cardHtml(c) {
       <span class="when" data-when></span>
     </div>
     <div class="cam-edit admin-only" data-editpanel>
-      <div class="row"><input data-f="name" value="${escH(c.name)}" maxlength="60" style="flex:1;min-width:150px"><button type="button" class="cbtn" data-act="rename" title="Namen speichern" aria-label="Namen speichern">${I.check}</button></div>
+      <div class="row"><input data-f="name" value="${escH(c.name)}" maxlength="60" style="flex:1;min-width:150px" placeholder="Name"><button type="button" class="cbtn" data-act="rename" title="Namen und Kameratyp speichern" aria-label="Namen und Kameratyp speichern">${I.check}</button></div>
+      <div class="row"><input data-f="model" value="${escH(c.model || '')}" maxlength="40" style="flex:1;min-width:150px" placeholder="Kameratyp, z. B. RLC-820A (leer = ${c.kind === 'rtsp' ? 'RTSP' : 'Reolink'})"></div>
       <div class="row">
         <button type="button" class="cbtn vis${restricted ? ' on' : ''}" data-act="vis" data-users="${escH(restricted ? JSON.stringify(c.users) : '')}" aria-label="Sichtbarkeit pro Benutzer" title="${escH(restricted ? (c.users.length ? 'Sichtbar nur für: ' + c.users.join(', ') : 'Sichtbar nur für Administratoren – antippen, um Benutzer freizugeben') : 'Sichtbar für: alle Benutzer')}">${I.users}</button>
         <span class="muted" style="font-size:12px">${restricted ? (c.users.length ? 'nur ' + escH(c.users.join(', ')) : 'nur Administratoren') : 'alle Benutzer'}</span>
@@ -365,7 +366,7 @@ $('camgrid').addEventListener('click', async e => {
     else if (act === 'exitfs') { exitFs(); }
     else if (act === 'realfs') { realFs(b); }
     else if (act === 'edit') { card.querySelector('[data-editpanel]').classList.toggle('open'); }
-    else if (act === 'rename') { await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', { name: val('name') }); toast('Gespeichert ✓'); await load(); }
+    else if (act === 'rename') { await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', { name: val('name'), model: val('model') }); toast('Gespeichert ✓'); await load(); }
     else if (act === 'access') {
       const body = { host: val('host'), user: val('user'), port: val('port'), channel: val('channel') }; if (card.querySelector('[data-f=path_main]')) { body.path_main = val('path_main'); body.path_sub = card.querySelector('[data-f=path_sub]').value; } const pw = card.querySelector('[data-f=password]').value; if (pw) body.password = pw;
       await api('/api/cameras/' + encodeURIComponent(id), 'PATCH', body); toast('Zugang gespeichert ✓'); await load();

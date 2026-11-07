@@ -4939,7 +4939,7 @@ def api_camera_modify(cid):
     if err:
         return err
     try:
-        ok = camera.update(cid, name=b.get("name"), host=b.get("host"), user=b.get("user"), password=b.get("password"), port=b.get("port"),
+        ok = camera.update(cid, name=b.get("name"), model=b.get("model"), host=b.get("host"), user=b.get("user"), password=b.get("password"), port=b.get("port"),
                            channel=b.get("channel"), https=b.get("https") if isinstance(b.get("https"), bool) else None,
                            path_main=b.get("path_main"), path_sub=b.get("path_sub"),
                            show=b.get("show") if isinstance(b.get("show"), bool) else None)
