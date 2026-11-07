@@ -66,6 +66,9 @@ ICONS += ["🏠", "🏡", "🏘️", "🏗️", "🏭", "🏪", "🏫", "🏥", 
           "🎉", "🎈", "🎁", "🎄", "🎃", "🎆", "🎇", "🧨", "🎂", "🎵", "🎶", "🎼", "🎲", "🎯", "🎮", "🕹️", "🧩", "♟️", "🎨", "🖼️", "📚", "📖", "📝", "📅", "📆", "📋", "📁", "📂", "🗂️", "🗄️", "📦", "📮", "📫",
           "❤️", "💙", "💚", "💛", "🧡", "💜", "🖤", "🤍", "⚠️", "⛔", "🚫", "✅", "❌", "❗", "❓", "ℹ️", "🔔", "🔕", "⏰", "⏳", "⌛", "🔃", "🔄", "➕", "➖", "🔴", "🔵", "⚪", "⚫", "🔶", "🔷", "🔺", "🔻", "💠", "🔲", "🔳", "▪️", "◾", "🏁", "🚩", "🏳️", "🏴"]
 ICONS += ["🖨️"]
+# Neuere Emoji (13 bis 15), seit 1.44.0 wieder erlaubt: Fenster, Zimmerpflanze, Leiter, Aufzug, Spiegel, Blasen, Akku fast leer, WLAN usw.
+ICONS += [chr(c) for c in (0x1FA9F, 0x1FAB4, 0x1FA9E, 0x1FA9C, 0x1F6D7, 0x1FAE7, 0x1FAAB, 0x1F6DC, 0x1FAD6, 0x1FAA0, 0x1FAA3, 0x1FAA4, 0x1FAB5, 0x1FAA8,
+                           0x1FA9B, 0x1FA9A, 0x1FA9D, 0x1F6FB, 0x1F6FC, 0x1FAD9, 0x1FAAA, 0x1FAA9, 0x1FAAD, 0x1F6DD, 0x1F6DE, 0x1FA91, 0x1FA90, 0x1F9CB)]
 ICONS[:] = list(dict.fromkeys(ICONS))
 DEFAULT_ICON = ICONS[0]
 

@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.44.0 – 07.11.2026
+- Neu: **Neuere Symbole (Emoji 13 bis 15) stehen wieder zur Wahl**, bei Aktoren, Sensoren, Schaltern und überall, wo man ein Symbol auswählt, zum Beispiel 🪟 Fenster, 🪴 Zimmerpflanze, 🪞 Spiegel, 🪜 Leiter, 🛗 Aufzug, 🫧 Blasen, 🪫 Akku fast leer, 🛜 WLAN, 🫖 Teekanne, 🪣 Eimer, 🪛 Schraubendreher, 🪚 Säge und weitere. Nur Zeichen, die gar keine Emoji sind (z. B. das Ein-/Aus-Zeichen ⏻), bleiben ausgeschlossen. Bereits gewählte Symbole bleiben unverändert.
+
 ## 1.43.1 – 07.11.2026
 - Geändert: Bei ESPHome-Geräten steht „Verbindung stabil seit …“ nicht mehr in der Liste. Angezeigt werden nur noch Verbindungsabbrüche und Neustarts des Geräts.
 
