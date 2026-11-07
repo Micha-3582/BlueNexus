@@ -770,9 +770,12 @@ def seed_newdevices() -> None:
     import camera
     cams = camera.load()
     if not any(c.get("id") == "cam-demo-drucker" for c in cams):    # Kamera des Druckers (X1C, RTSPS Port 322); das Standbild liegt in demo_media
-        camera._save(cams + [{"id": "cam-demo-drucker", "kind": "rtsp", "name": "3D-Drucker Werkstatt – Kamera", "host": "192.168.50.70", "user": "bblp",
+        camera._save(cams + [{"id": "cam-demo-drucker", "kind": "rtsp", "name": "3D-Drucker", "host": "192.168.50.70", "user": "bblp",
                               "password": "", "port": 322, "channel": 0, "https": False, "show": True, "tls": True, "path_main": "/streaming/live/1",
                               "path_sub": "", "model": "Bambu Lab X1C"}])
+    for c in camera.load():                                 # fruehere Demo-Staende hiessen laenger (Name wurde in der Kartenzeile abgeschnitten)
+        if c.get("id") == "cam-demo-drucker" and c.get("name") != "3D-Drucker":
+            camera.update(c["id"], name="3D-Drucker")
     import store
     cfg = store.load_config()                               # Systemauswahl der Demo: ESPHome und Bambu Lab einschalten (sonst blendet die App ihre Geraete aus)
     fam = cfg.get("device_families")
