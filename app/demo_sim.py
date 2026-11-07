@@ -80,9 +80,31 @@ def _midea_pub(st: dict) -> dict:
     return {**st, "power": None, "info": midea.info_text(st)}
 
 
+def _printer_state() -> dict:
+    """Erfundener Druck: laeuft ca. 3 h, danach 20 min Pause, dann von vorn (stets plausibel, ohne Zustand zu speichern)."""
+    import bambu
+    cyc = 200 * 60
+    t = time.time() % cyc
+    if t >= 180 * 60:
+        out = {"online": True, "on": False, "power": None, "state": "FINISH", "progress": 100.0, "remaining_min": 0.0, "nozzle_c": 28.0, "bed_c": 31.0,
+               "chamber_c": 29.0, "layer": 412.0, "layers": 412.0, "job": "Gehäusedeckel", "error": False}
+    else:
+        pr = t / (180 * 60)
+        out = {"online": True, "on": True, "power": None, "state": "RUNNING", "progress": round(pr * 100, 1), "remaining_min": float(int((1 - pr) * 180)),
+               "nozzle_c": 220.0, "bed_c": 60.0, "chamber_c": 38.0, "layer": float(int(pr * 412)), "layers": 412.0, "job": "Gehäusedeckel", "error": False}
+    out["info"] = bambu.info_text(out)
+    return out
+
+
 def _device_status(d: dict) -> dict:
     if d.get("kind") == "midea":
         return _midea_pub(_midea_state(d))
+    if d.get("kind") == "bambu":
+        return _printer_state()
+    if d.get("kind") == "esphome":                          # Taster: Impuls, in der Demo nie gedrueckt
+        return {"online": True, "on": False, "power": None, "shown": False}
+    if d.get("kind") == "esphome_sw":
+        return {"online": True, "on": _is_on(d), "power": None}
     on = _is_on(d)
     if d.get("kind") == "wled":
         bri = int(_wled.get(d["id"], {}).get("bri", 70))
@@ -361,6 +383,11 @@ def activate() -> None:
         seed_thermo()                                       # erfundenes Funkthermometer, meldet sich laufend
     except Exception:                                       # noqa: BLE001
         pass
+    try:
+        seed_newdevices()                                   # Bambu-Drucker, ESPHome-Taster/-Schalter, Rauchmelder, Regel mit Wert-Aenderung
+    except Exception:                                       # noqa: BLE001
+        import logging
+        logging.getLogger("demo_sim").exception("neue Geraete konnten nicht angelegt werden")
     try:
         seed_notify()                                       # Telegram/Pushover/Regel mit Telegram-Wort (erfunden)
     except Exception:                                       # noqa: BLE001
@@ -712,6 +739,57 @@ def demo_apikeys() -> list:
         {"id": "k-demo0002", "name": "Auswertung (Node-RED)", "prefix": "bnx_Nr7q", "created": now - 5 * 86400, "last_used": now - 90, "last_ip": "192.168.1.31",
          "all": True, "items": [], "allow": []},
     ]
+
+
+def seed_newdevices() -> None:
+    """Erfundene Geraete der neueren App-Versionen: Bambu-Lab-Drucker, ESPHome-Taster und -Schalter, Homematic-Rauchmelder und eine Regel
+    'Wert aendert sich um ...' mit Platzhaltern. Idempotent (jeder Eintrag nur, wenn er fehlt)."""
+    import json
+    import homematic
+    import shelly
+    base = dict(gen=0, channel=0, auto=False, power_w=0, min_on_min=5, min_off_min=5, user="", password="")
+    wanted = [
+        dict(base, id="bambu-demo0001", kind="bambu", ip="192.168.50.70", serial="01S00A000000001", model="Bambu Lab · X1C", name="3D-Drucker Werkstatt",
+             icon="🖨️", show=True, switchable=False),
+        dict(base, id="esphome-demo-taster", kind="esphome", ip="192.168.50.71", entity="button_werkstatt", model="ESPHome", name="Werkstatt-Taster",
+             icon="🔘", show=False, switchable=False),
+        dict(base, id="esphome-demo-lueftung", kind="esphome_sw", ip="192.168.50.72", entity="switch_lueftung", model="ESPHome", name="Werkstatt-Lüftung",
+             icon="🔌", show=True, switchable=True),
+    ]
+    items = shelly.load_devices()
+    have = {d.get("id") for d in items}
+    add = [w for w in wanted if w["id"] not in have]
+    if add:
+        shelly._save(items + add)
+    sens = homematic.load_sensors()
+    if not any(x.get("id") == "hmS-DMO0000090-1-SMOKE_DETECTOR_ALARM_STATUS" for x in sens):
+        sens.append({"id": "hmS-DMO0000090-1-SMOKE_DETECTOR_ALARM_STATUS", "kind": "smoke", "address": "DMO0000090:1", "interface": "HmIP-RF",
+                     "datapoint": "SMOKE_DETECTOR_ALARM_STATUS", "unit": "", "binary": True, "model": "HmIP-SWSD", "room": "Flur", "name": "Rauchmelder Flur",
+                     "icon": "🚨", "show": True})
+        homematic._save_sensors(sens)
+    import store
+    cfg = store.load_config()                               # Systemauswahl der Demo: ESPHome und Bambu Lab einschalten (sonst blendet die App ihre Geraete aus)
+    fam = cfg.get("device_families")
+    if isinstance(fam, dict) and not (fam.get("esphome") and fam.get("bambu")):
+        cfg["device_families"] = {**fam, "esphome": True, "bambu": True}
+        store.save_config(cfg)
+    d = os.path.dirname(os.path.abspath(__file__))
+    try:                                                    # Regel: Wert aendert sich (Gartenthermometer um 1 Grad) -> Telegram mit Platzhaltern
+        p = os.path.join(d, "rules.json")
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        rules = data.get("rules") or []
+        if not any(r.get("id") == "demochg01" for r in rules):
+            grp = next((g["id"] for g in data.get("groups") or [] if "Benachrichtigung" in str(g.get("name"))), "")
+            rules.append({"id": "demochg01", "name": "Gartentemperatur melden", "device_id": "", "enabled": True,
+                          "when": {"mode": "all", "conds": [{"type": "change", "sensor_id": "thermo-t-demo0001-temp", "step": 1.0, "dir": "any"}]},
+                          "then": [{"type": "notify", "text": "🌡️ [SENSOR]: [WERT] (vorher [ALT]), [UHR]"}], "else": [], "group": grp,
+                          "mode": "flow", "abort_on_fall": False, "cooldown_s": 3, "keep_trigger": False})
+            data["rules"] = rules
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+    except (OSError, ValueError):
+        pass
 
 
 def seed_thermo() -> None:
