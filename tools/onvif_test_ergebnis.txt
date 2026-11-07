@@ -1,0 +1,48 @@
+== ONVIF-Test 192.168.51.162:8000  (07.11.2026 21:24:26) ==
+1) Kamerauhr gelesen, Abweichung zur PC-Uhr: -1 s
+2) GetCapabilities: HTTP 200
+   Ereignisdienst: http://192.168.51.162:8000/onvif/event_service
+3) GetEventProperties: HTTP 200
+   Ereignisarten, die die Kamera kennt:
+     - Media/ConfigurationChanged
+     - Media/ProfileChanged
+     - RuleEngine
+     - RuleEngine/CellMotionDetector
+     - RuleEngine/CellMotionDetector/Motion
+     - VideoSource/ImageTooDark/ImagingService
+     - VideoSource/MotionAlarm
+4) CreatePullPointSubscription: HTTP 200
+   Abo-Adresse: http://192.168.51.162:8000/onvif/PullSubManager?Idx=9733492
+
+5) Ereignisse (ca. 120 s). BITTE JETZT vor der Kamera bewegen / eine Person laufen lassen ...
+   [21:24:27] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/FaceDetect  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/VehicleDetect  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/DogCatDetect  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/Visitor  [('Source', '000'), ('State', 'false')]
+   [21:24:27] tns1:RuleEngine/MyRuleDetector/Package  [('Source', '000'), ('State', 'false')]
+   ... noch 89 s
+   [21:25:01] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'true')]
+   [21:25:01] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'true')]
+   [21:25:07] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'true')]
+   [21:25:14] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'false')]
+   [21:25:14] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'true')]
+   ... noch 57 s
+   [21:25:31] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'false')]
+   [21:25:31] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'false')]
+   [21:25:32] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'false')]
+   [21:25:33] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'true')]
+   [21:25:33] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'true')]
+   [21:25:33] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'true')]
+   [21:25:42] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'false')]
+   [21:25:42] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'false')]
+   [21:25:43] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'true')]
+   [21:25:43] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'true')]
+   [21:25:45] tns1:RuleEngine/MyRuleDetector/PeopleDetect  [('Source', '000'), ('State', 'false')]
+   ... noch 26 s
+   [21:26:13] tns1:RuleEngine/CellMotionDetector/Motion  [('VideoSourceConfigurationToken', '000'), ('VideoAnalyticsConfigurationToken', '000'), ('Rule', '000'), ('IsMotion', 'false')]
+   [21:26:13] tns1:VideoSource/MotionAlarm  [('Source', '000'), ('State', 'false')]
+
+   26 Ereignisse empfangen.

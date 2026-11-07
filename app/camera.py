@@ -404,6 +404,12 @@ def motion_states(item: dict, force: bool = False) -> dict:
     """{"md": bool, "people": bool, "vehicle": bool, "dog_cat": bool, "support": {...}} einer Reolink-Kamera.
     "md" = einfache Bewegungserkennung, "visitor" = Klingel einer Tuerklingel gedrueckt, die anderen (nur wenn die Kamera sie kann) = KI-Erkennung. 1 s zwischengespeichert, auch bei Fehlern."""
     cid = item["id"]
+    if item.get("kind") == "rtsp":                                   # keine Reolink-HTTP-Schnittstelle: Ereignisse ueber ONVIF (onvif.py)
+        import onvif
+        try:
+            return onvif.states(item, get, 8.0 if force else 0.0)
+        except onvif.OnvifError as e:
+            raise CameraError(str(e))
     with _motion_locks.setdefault(cid, threading.Lock()):            # mehrere Sensoren derselben Kamera: nur eine Abfrage
         hit = _motion_cache.get(cid)
         if hit and not force and time.time() - hit[0] < MOTION_TTL_S:
@@ -452,19 +458,20 @@ def motion_scan(known_ids: set) -> list[dict]:
     """Bewegungs-Sensoren aller Reolink-Kameras (Bewegung + unterstuetzte Person/Fahrzeug/Tier)."""
     out, errors = [], []
     for cam in load():
-        if cam.get("kind", "reolink") != "reolink":
+        if cam.get("kind", "reolink") not in ("reolink", "rtsp") or cam.get("tls"):       # RTSP-Kameras: nur wenn sie ONVIF-Ereignisse melden (Drucker-Kamera nie)
             continue
         try:
             st = motion_states(cam, force=True)
         except CameraError as e:
-            errors.append(f"{cam.get('name')}: {e}")
+            if cam.get("kind") != "rtsp":
+                errors.append(f"{cam.get('name')}: {e}")
             continue
         for key in ("md", "people", "vehicle", "dog_cat", "visitor"):
             if key not in st["support"]:
                 continue
             sid = motion_sensor_id(cam["id"], key)
             out.append({"id": sid, "kind": "motion", "address": cam["id"], "interface": "Kamera", "datapoint": key, "unit": "", "binary": True,
-                        "model": cam.get("model") or "Reolink", "room": "", "name": f"{cam.get('name')} – {MOTION_LABEL[key]}", "source": "camera",
+                        "model": cam.get("model") or ("RTSP" if cam.get("kind") == "rtsp" else "Reolink"), "room": "", "name": f"{cam.get('name')} – {MOTION_LABEL[key]}", "source": "camera",
                         "known": sid in known_ids})
     if errors and not out:
         raise CameraError("Keine Kamera erreichbar – " + "; ".join(errors))
@@ -923,6 +930,9 @@ def update(cid: str, **f) -> bool:
                 it["show"] = f["show"]
             _snap_cache.pop(cid, None)
             _tokens.pop(cid, None)
+            if it.get("kind") == "rtsp":                                 # neue Zugangsdaten: ONVIF-Abo neu aufbauen
+                import onvif
+                onvif.forget(cid)
             _save(items)
             return True
     return False
@@ -937,6 +947,8 @@ def remove(cid: str) -> bool:
         _save(keep)
         _snap_cache.pop(cid, None)
         _tokens.pop(cid, None)
+        import onvif
+        onvif.forget(cid)
         return True
 
 

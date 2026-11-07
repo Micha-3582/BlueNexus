@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.45.0 – 07.11.2026
+- Neu: **Bewegungs-Erkennung für RTSP-Kameras über ONVIF.** Kameras ohne Reolink-Schnittstelle (z. B. Reolink Lumus 2K, nur Port 9000, RTSP 554 und ONVIF 8000) liefern jetzt Bewegung, Person, Fahrzeug und Tier als Sensoren. „Kameras suchen“ bietet sie an, danach lassen sie sich in Regeln, auf dem Dashboard und im Logbuch nutzen wie die Erkennungen der anderen Kameras. BlueNexus hält dafür ein ONVIF-Abo je Kamera (Meldung sofort, mit automatischer Wiederverbindung). Klingel und Chime bleiben Reolink-Kameras mit Schnittstelle vorbehalten.
+
 ## 1.44.1 – 07.11.2026
 - Geändert: Das Symbol 🪟 (Fenster) steht in der Auswahl jetzt direkt hinter der Tür 🚪 statt ganz am Ende.
 
