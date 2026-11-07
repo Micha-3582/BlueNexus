@@ -1996,7 +1996,7 @@ function linkInfo(l) {          // Messung der Verbindung zu einem ESPHome-Gerä
   if (!l) return '';
   const dur = s => s >= 3600 ? Math.floor(s / 3600) + ' h ' + Math.round(s % 3600 / 60) + ' min' : s >= 90 ? Math.round(s / 60) + ' min' : Math.round(s) + ' s';
   const rs = l.restarts ? ' · ' + l.restarts + (l.restarts === 1 ? ' Neustart' : ' Neustarts') + ' des Geräts (zuletzt vor ' + dur(l.last_restart_ago_s) + ')' : '';
-  if (!l.drops) return ' · Verbindung stabil seit ' + dur(l.since_s) + rs;
+  if (!l.drops) return rs;                                                    // stabil: keine Anzeige (nur bei Abbruechen/Neustarts)
   return rs + ' · ' + l.drops + (l.drops === 1 ? ' Abbruch' : ' Abbrüche') + ' in ' + dur(l.since_s) + ' (zusammen ' + dur(l.down_s) + ' weg, längster ' + dur(l.longest_s) + ', zuletzt vor ' + dur(l.last_drop_ago_s) + (l.last_reason ? ': ' + l.last_reason : '') + ')';
 }
 function shellyStatText(d) {
