@@ -767,6 +767,13 @@ def seed_newdevices() -> None:
                      "datapoint": "SMOKE_DETECTOR_ALARM_STATUS", "unit": "", "binary": True, "model": "HmIP-SWSD", "room": "Flur", "name": "Rauchmelder Flur",
                      "icon": "🚨", "show": True})
         homematic._save_sensors(sens)
+    mic = {"md": "🏃", "people": "🧍", "vehicle": "🚗", "dog_cat": "🐕", "visitor": "🔔"}      # Kamera-Erkennungen: eigenes Symbol je Art (App 1.45.2)
+    sens = homematic.load_sensors()
+    if any(x.get("source") == "camera" and x.get("datapoint") in mic and x.get("icon") != mic[x["datapoint"]] for x in sens):
+        for x in sens:
+            if x.get("source") == "camera" and x.get("datapoint") in mic:
+                x["icon"] = mic[x["datapoint"]]
+        homematic._save_sensors(sens)
     import camera
     cams = camera.load()
     if not any(c.get("id") == "cam-demo-drucker" for c in cams):    # Kamera des Druckers (X1C, RTSPS Port 322); das Standbild liegt in demo_media
