@@ -14,7 +14,7 @@
   /* base.html setzt am Handy overflow-x:hidden auf <main> - das wuerde 'sticky' ausschalten; clip verhindert Seitenueberlauf ohne */
   /* Schmale Bildschirme: nur Symbole (Name im Tooltip), damit nichts gescrollt werden muss */
   @media (max-width: 900px) { .tabbar { gap: 4px; padding: 8px 6px; } .tabbar > * { width: 40px; height: 40px; padding: 0; justify-content: center; } .tabbar .lbl { display: none; } }
-  @media (max-width: 480px) { .tabbar { gap: 2px; padding: 8px 4px; justify-content: space-between; } .tabbar > * { width: 34px; height: 36px; } .tabbar svg { width: 19px; height: 19px; } }
+  @media (max-width: 480px) { .tabbar { gap: 2px; padding: 8px 4px; justify-content: space-between; } .tabbar > * { width: 34px; height: 34px; } .tabbar svg { width: 19px; height: 19px; } }
   @media (max-width: 640px) { main { overflow-x: clip; } }
   .tabbar button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; background: var(--card); color: var(--muted); border: 1px solid var(--border);
     border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }

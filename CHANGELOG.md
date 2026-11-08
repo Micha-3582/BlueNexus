@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.46.2 – 08.11.2026
+- Geändert: Die runden Symbol-Knöpfe der Reiterleisten (Smart Home, Einstellungen) sind auf schmalen Bildschirmen jetzt überall exakt rund (vorher leicht oval).
+
 ## 1.46.1 – 08.11.2026
 - Behoben: Gewählte neue Symbole (z. B. 🪟 Fenster) wurden bei jedem Start der App wieder durch das Standard-Symbol (🏠) ersetzt. Eine alte Aufräum-Funktion für Handys ohne neue Emoji ist jetzt auf das eine Zeichen beschränkt, das dort wirklich fehlt. Bereits zurückgesetzte Symbole müssen einmal neu gewählt werden.
 - Geändert: Auf schmalen Bildschirmen (Handy) zeigt die Reiterleiste der Einstellungen nur noch die Symbole (Name als Tooltip), wie im Smart-Home-Menü – ohne seitliches Scrollen.
