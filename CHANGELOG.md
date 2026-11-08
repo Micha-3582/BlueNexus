@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.46.0 – 08.11.2026
+- Neu: Die Reiterleiste der **Einstellungen** (Anlage, Tarif & Laden, Solar, VRM, Automatik, Wetter, Meldungen, Dashboard, System, Konto & Benutzer) hat jetzt eigene Symbole vor der Beschriftung – im gleichen Linien-Stil wie das Smart-Home-Menü, auch auf der Seite „Automatik“.
+
 ## 1.45.4 – 08.11.2026
 - Behoben: Der Bereich „Chime (Türgong)“ auf der Kameraseite und der Regelschritt „Chime läuten“ erscheinen nur noch bei Reolink-Video-Türklingeln, nicht mehr bei normalen Kameras (die haben keinen Chime). Erkannt wird die Türklingel am Modellnamen beim Hinzufügen; bei bestehenden Kameras am gespeicherten Modell.
 
