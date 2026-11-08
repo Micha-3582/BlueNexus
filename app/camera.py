@@ -81,10 +81,16 @@ def get(cid: str) -> dict | None:
     return next((x for x in load() if x["id"] == cid), None)
 
 
+def _is_doorbell(model: str) -> bool:
+    m = (model or "").lower()
+    return "doorbell" in m or "türklingel" in m or "tuerklingel" in m
+
+
 def public(item: dict, admin: bool = False) -> dict:
     """Ohne Passwort. IP/Benutzer/Port/Kanal nur fuer Administratoren."""
     out = {k: item.get(k) for k in ("id", "name", "model", "kind", "show", "users") if k in item}
     out["kind"] = item.get("kind", "reolink")
+    out["doorbell"] = item["doorbell"] if isinstance(item.get("doorbell"), bool) else _is_doorbell(item.get("model", ""))      # nur Video-Tuerklingeln haben einen Chime
     if admin:
         out.update({"host": item.get("host", ""), "user": item.get("user", ""), "port": item.get("port"), "channel": item.get("channel", 0),
                     "https": bool(item.get("https")), "password_set": bool(item.get("password"))})
@@ -881,6 +887,7 @@ def add(name: str, host: str, user: str, password: str, port=None, channel=0, ht
             except CameraError:
                 raise e1
         item["model"] = info["model"]
+        item["doorbell"] = _is_doorbell(info["model"])
         if not item["name"]:
             item["name"] = info["name"] or info["model"] or "Kamera"
     with _lock:

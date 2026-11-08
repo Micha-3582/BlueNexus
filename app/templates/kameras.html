@@ -170,7 +170,7 @@ function cardHtml(c) {
         <span class="muted" style="font-size:12px">${restricted ? (c.users.length ? 'nur ' + escH(c.users.join(', ')) : 'nur Administratoren') : 'alle Benutzer'}</span>
         <button type="button" class="cbtn del" data-act="del" style="margin-left:auto" title="Entfernen" aria-label="Entfernen">${I.trash}</button>
       </div>
-      ${c.kind === 'rtsp' ? '' : `<details style="margin-top:8px" data-chime><summary class="muted" style="cursor:pointer">🔔 Chime (Türgong)</summary>
+      ${c.kind === 'rtsp' || !c.doorbell ? '' : `<details style="margin-top:8px" data-chime><summary class="muted" style="cursor:pointer">🔔 Chime (Türgong)</summary>
         <div data-chimebox class="muted" style="margin-top:8px">Wird geladen …</div>
       </details>`}
       <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Zugang ändern (${escH(c.host || '')})</summary>
