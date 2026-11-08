@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.46.3 – 08.11.2026
+- Geändert: Auf dem Handy (unter 480 Pixel Breite) sind die Symbol-Knöpfe im Smart-Home-Menü und in den Einstellungen jetzt gleich groß (36 Pixel, rund).
+
 ## 1.46.2 – 08.11.2026
 - Geändert: Die runden Symbol-Knöpfe der Reiterleisten (Smart Home, Einstellungen) sind auf schmalen Bildschirmen jetzt überall exakt rund (vorher leicht oval).
 
