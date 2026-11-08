@@ -441,6 +441,15 @@ def _normalize_action(a: dict, flow: bool = False) -> dict:
     st = str(a.get("state", "on")).strip().lower()
     if not vid or st not in ("on", "off", "press", "toggle"):
         raise RuleError("Eigener Schalter: Schalter und Aktion wählen")
+    try:                                              # nur Aktionen, die zur Art passen: Knopf = drücken, Schalter/Timer = ein/aus/umschalten
+        import virtual
+        kind = next((x.get("kind") for x in virtual.load() if x["id"] == vid), None)
+    except Exception:                                 # noqa: BLE001
+        kind = None
+    if kind == "button" and st != "press":
+        raise RuleError("Eigener Schalter: Ein Knopf kann nur gedrückt werden")
+    if kind in ("switch", "timer") and st == "press":
+        raise RuleError("Eigener Schalter: Ein Schalter oder Timer kann nur ein-, aus- oder umgeschaltet werden, nicht gedrückt")
     return {"type": t, "id": vid, "state": st}
 
 

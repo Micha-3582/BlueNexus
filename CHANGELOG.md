@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.45.3 – 08.11.2026
+- Geändert: Regel-Editor, Schritt „Eigener Schalter“: Es werden nur noch Aktionen angeboten, die zur Art passen – ein Knopf kann nur **gedrückt** werden, ein Schalter oder Timer nur **ein-, aus- oder umgeschaltet** werden. Beim Wechsel des Ziels passt sich die Auswahl an. Beim Speichern prüft BlueNexus das zusätzlich; bestehende, nicht passende Regeln werden mit „(geht hier nicht)“ markiert und lassen sich erst nach Korrektur speichern.
+
 ## 1.45.2 – 08.11.2026
 - Geändert: Kamera-Sensoren bekommen je Erkennung ein eigenes Symbol: 🏃 Bewegung, 🧍 Person, 🚗 Fahrzeug, 🐕 Tier, 🔔 Klingel – schon in der Trefferliste und beim Anlegen.
 

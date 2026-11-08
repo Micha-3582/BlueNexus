@@ -263,6 +263,18 @@ function sunInfo(c) {                            // Uhrzeiten von heute inkl. Ve
   const night = c.phase === 'night', a = m(night ? sn.sunset : sn.sunrise) + (+c.start || 0), b = m(night ? sn.sunrise : sn.sunset) + (+c.end || 0);
   return night ? `→ an ab ${f(a)} Uhr, aus um ${f(b)} Uhr (am nächsten Morgen)` : `→ an ab ${f(a)} Uhr, aus um ${f(b)} Uhr`;
 }
+function virtActs(kind, cur) {          // nur Aktionen, die zur Art des Eigenen Schalters passen
+  const L = { on: ['on', kind === 'timer' ? 'einschalten (Timer: starten / verlängern)' : 'einschalten'], off: ['off', kind === 'timer' ? 'ausschalten (Timer: stoppen)' : 'ausschalten'],
+    toggle: ['toggle', 'umschalten'], press: ['press', 'drücken'] };
+  const keys = kind === 'button' ? ['press'] : kind ? ['on', 'off', 'toggle'] : ['on', 'off', 'toggle', 'press'];
+  const out = keys.map(k => L[k]);
+  if (cur && !keys.includes(cur) && L[cur]) out.push([cur, L[cur][1] + ' (geht hier nicht)']);      // alte Regel nicht stillschweigend ändern
+  return out;
+}
+function virtKind(el) {       // Ziel gewechselt: Aktionsliste anpassen
+  const k = ((S.virtual || []).find(x => x.id === el.value) || {}).kind, st = el.parentElement.querySelector('.a-vst');
+  if (st) st.innerHTML = optHtml(virtActs(k), virtActs(k)[0][0]);
+}
 function condRow(c, mode) {                       // mode: 'on' | 'off' = was DANN macht (nur fuer den Text von "Laufzeit pro Tag")
   const sel = (cls, val, list) => `<select class="${cls}" style="width:auto" onchange="ruleEdited(this)">${optHtml(list, val)}</select>`;
   const num = (cls, val, w) => `<input class="${cls}" type="number" step="any" value="${escH(val)}" style="width:${w}px" oninput="ruleEdited(this)">`;
@@ -488,7 +500,8 @@ function actRow(a, branch, flow) {
     body = `<b>🔒 Türschloss</b> ${sel('a-lid', a.id, opts)} ${sel('a-lst', a.state, [['open', 'Tür öffnen (Falle ziehen)'], ['unlock', 'entriegeln'], ['lock', 'verriegeln']])}${list.length ? '' : '<span class="muted">Noch kein Türschloss angelegt – Smart Home → Geräte suchen → Homematic-Türschlösser suchen.</span>'}${warn}`;
   } else if (t === 'virtual') {
     const list = S.virtual || [], opts = list.map(x => [escH(x.id), escH(x.icon + ' ' + x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Schalter fehlt)']);
-    body = `<b>🎚 Eigener Schalter</b> ${sel('a-vid', a.id, opts)} ${sel('a-vst', a.state, [['on', 'einschalten (Timer: starten / verlängern)'], ['off', 'ausschalten (Timer: stoppen)'], ['toggle', 'umschalten'], ['press', 'drücken (Knopf)']])}`;
+    const vk = (list.find(x => x.id === a.id) || {}).kind;
+    body = `<b>🎚 Eigener Schalter</b> <select class="a-vid" style="width:auto" onchange="virtKind(this);ruleEdited(this)">${optHtml(opts, a.id)}</select> ${sel('a-vst', a.state, virtActs(vk, a.state))}`;
   }
   const mv = flow ? `<button class="ghost" style="padding:2px 8px" title="nach oben" onclick="actMove(this,-1)">↑</button><button class="ghost" style="padding:2px 8px" title="nach unten" onclick="actMove(this,1)">↓</button>` : '';
   return `<div class="act" data-branch="${branch}" data-type="${t}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.04);border-radius:8px;padding:6px 8px;margin-top:6px">
