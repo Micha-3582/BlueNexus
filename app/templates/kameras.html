@@ -2,6 +2,7 @@
 {% block title %}Kameras · {{ app_display_name }}{% endblock %}
 {% block content %}
 <style>
+  img[data-img]:not([src]), img[data-live]:not([src]) { visibility: hidden; }      /* kein Bild geladen (Kamera offline): kein Symbol fuer "fehlendes Bild" */
   .cam-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cam-top h2 { margin: 0; }
   .cam-top .grow { flex: 1; }
