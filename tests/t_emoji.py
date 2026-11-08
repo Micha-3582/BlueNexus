@@ -12,5 +12,7 @@ for f in glob.glob(root + "/app/**/*.py", recursive=True) + glob.glob(root + "/a
 assert len(shelly.ICONS) == len(set(shelly.ICONS)) and "🔌" in shelly.ICONS
 homematic._save_sensors([{"id": "s1", "kind": "motion", "address": "A", "interface": "x", "datapoint": "M", "binary": True, "unit": "", "name": "F", "model": "m", "room": "", "icon": chr(0x23fb)}])
 webapp._migrate_icons(); assert homematic.load_sensors()[0]["icon"] == "🔌"
+homematic._save_sensors([{"id": "s2", "kind": "contact", "address": "B", "interface": "x", "datapoint": "M", "binary": True, "unit": "", "name": "F", "model": "m", "room": "", "icon": chr(0x1FA9F)}])
+webapp._migrate_icons(); assert homematic.load_sensors()[0]["icon"] == chr(0x1FA9F), "Fenster-Symbol darf nicht ersetzt werden"
 print("SYMBOLE-ALTER OK")
 assert all(c in shelly.ICONS for c in (chr(0x1FA9F), chr(0x1FAB4), chr(0x1F6DC)))   # Fenster, Zimmerpflanze, WLAN

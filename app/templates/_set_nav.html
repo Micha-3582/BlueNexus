@@ -8,11 +8,14 @@
   .setnav a svg { display: block; flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   .setnav a:hover { color: var(--fg); }
   .setnav a.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  /* Schmale Bildschirme: nur Symbole (Name im Tooltip), damit nichts gescrollt werden muss */
+  @media (max-width: 900px) { .setnav { gap: 4px; padding: 8px 6px; } .setnav > * { width: 40px; height: 40px; padding: 0; justify-content: center; } .setnav .lbl { display: none; } }
+  @media (max-width: 480px) { .setnav { gap: 2px; padding: 8px 4px; justify-content: space-between; } .setnav > * { width: 34px; height: 36px; } .setnav svg { width: 19px; height: 19px; } }
   @media (max-width: 640px) { main { overflow-x: clip; } }
 </style>
 <nav class="setnav" id="tabbar" aria-label="Einstellungen">
   {% for tid, label, area in [('anlage', 'Anlage', 'settings_anlage'), ('tarif', 'Tarif & Laden', 'settings_tarif'), ('vrm', 'VRM', 'settings_vrm'), ('automatik', 'Automatik', 'automation'), ('wetter', 'Wetter', 'settings_wetter'), ('meldungen', 'Meldungen', 'settings_meldungen'), ('anzeige', 'Dashboard', 'settings_anzeige'), ('system', 'System', 'settings_system'), ('konto', 'Konto & Benutzer', 'account')] %}
-    {% if (tid == 'konto' and (user_perms.account != 'none' or user_perms.user_management != 'none')) or (tid != 'konto' and user_perms[area] != 'none') %}<a href="{{ '/automation' if tid == 'automatik' else '/admin#' + tid }}"{% if tid == 'automatik' %} class="active"{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true">{{ si.ic[tid]|safe }}</svg>{{ label }}</a>{% endif %}
+    {% if (tid == 'konto' and (user_perms.account != 'none' or user_perms.user_management != 'none')) or (tid != 'konto' and user_perms[area] != 'none') %}<a href="{{ '/automation' if tid == 'automatik' else '/admin#' + tid }}"{% if tid == 'automatik' %} class="active"{% endif %} title="{{ label }}" aria-label="{{ label }}"><svg viewBox="0 0 24 24" aria-hidden="true">{{ si.ic[tid]|safe }}</svg><span class="lbl">{{ label }}</span></a>{% endif %}
   {% endfor %}
 </nav>
 <script>

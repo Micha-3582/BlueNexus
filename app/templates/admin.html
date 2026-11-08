@@ -12,6 +12,9 @@
     padding: 8px 10px; margin-bottom: 14px; border-radius: 18px; background: var(--navbg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); scrollbar-width: none; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* base.html setzt am Handy overflow-x:hidden auf <main> - das wuerde 'sticky' ausschalten; clip verhindert Seitenueberlauf ohne */
+  /* Schmale Bildschirme: nur Symbole (Name im Tooltip), damit nichts gescrollt werden muss */
+  @media (max-width: 900px) { .tabbar { gap: 4px; padding: 8px 6px; } .tabbar > * { width: 40px; height: 40px; padding: 0; justify-content: center; } .tabbar .lbl { display: none; } }
+  @media (max-width: 480px) { .tabbar { gap: 2px; padding: 8px 4px; justify-content: space-between; } .tabbar > * { width: 34px; height: 36px; } .tabbar svg { width: 19px; height: 19px; } }
   @media (max-width: 640px) { main { overflow-x: clip; } }
   .tabbar button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; background: var(--card); color: var(--muted); border: 1px solid var(--border);
     border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
@@ -4459,7 +4462,7 @@ const ADMIN_TABS = [
   setHdr(); window.addEventListener('resize', setHdr); window.addEventListener('load', setHdr);
   const bar = document.getElementById('tabbar');
   const TABS = IS_SH ? SH_TABS.filter(id => document.querySelector(`#tabbar a[data-tab="${id}"]`)).map(id => ({ id })) : ADMIN_TABS.filter(t => t.href ? ((window.USER_PERMS || {})[t.area] || 'none') !== 'none' : cards.some(c => c.dataset.tab === t.id));      // Reiter ohne Karten entfallen; 'href' = eigene Seite (Automatik)
-  if (!IS_SH) bar.innerHTML = TABS.map(t => t.href ? `<button type="button" data-href="${t.href}">${tabIco(t.id)}${t.label}</button>` : `<button type="button" data-tab="${t.id}">${tabIco(t.id)}${t.label}</button>`).join('');
+  if (!IS_SH) bar.innerHTML = TABS.map(t => t.href ? `<button type="button" data-href="${t.href}" title="${t.label}" aria-label="${t.label}">${tabIco(t.id)}<span class="lbl">${t.label}</span></button>` : `<button type="button" data-tab="${t.id}" title="${t.label}" aria-label="${t.label}">${tabIco(t.id)}<span class="lbl">${t.label}</span></button>`).join('');
   function show(id) {
     if (!TABS.some(t => t.id === id && !t.href)) id = TABS.find(t => !t.href).id;
     // Speichern-Leiste ueberall ausser bei 'VRM', 'Wetter', 'Meldungen' (dort hat jede Karte eigene Knoepfe) und im Smart Home (jede Aenderung speichert sofort)

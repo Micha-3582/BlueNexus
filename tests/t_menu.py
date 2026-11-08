@@ -38,8 +38,8 @@ assert re.findall(r'class="active" title="([^"]+)"', s2) == ["Regeln"]
 t = A.get("/automation").get_data(as_text=True)
 assert 'class="shnav"' not in t
 s3 = re.search(r'<nav class="setnav".*?</nav>', t, re.S).group(0)
-assert [__import__('html').unescape(x) for x in re.findall(r'<a href="[^"]+"[^>]*>(?:<svg.*?</svg>)?([^<]+)</a>', s3)] == ["Anlage", "Tarif & Laden", "VRM", "Automatik", "Wetter", "Meldungen", "Dashboard", "System", "Konto & Benutzer"], s3
-assert re.findall(r'class="active">(?:<svg.*?</svg>)?([^<]+)</a>', s3) == ["Automatik"]
+assert [__import__('html').unescape(x) for x in re.findall(r'<a href="[^"]+"[^>]*>(?:<svg.*?</svg>)?(?:<span[^>]*>)?([^<]+)(?:</span>)?</a>', s3)] == ["Anlage", "Tarif & Laden", "VRM", "Automatik", "Wetter", "Meldungen", "Dashboard", "System", "Konto & Benutzer"], s3
+assert re.findall(r'class="active"[^>]*>(?:<svg.*?</svg>)?(?:<span[^>]*>)?([^<]+)(?:</span>)?</a>', s3) == ["Automatik"]
 adm = A.get("/admin").get_data(as_text=True)
 assert "href: '/automation'" in adm
 print("Unter-Menue OK")
@@ -74,7 +74,7 @@ assert navlabels(AU, "/automation")[1] == ["Dashboard", "Einstellungen"]
 assert [x[0] for x in nav(AU.get("/automation").get_data(as_text=True)) if x[2] == "Einstellungen"] == ["/automation"]       # nur Automatik -> Link fuehrt dorthin
 assert [x[2] for x in nav(AU.get("/automation").get_data(as_text=True)) if x[1]] == ["Einstellungen"]
 s4 = re.search(r'<nav class="setnav".*?</nav>', AU.get("/automation").get_data(as_text=True), re.S).group(0)
-assert [__import__('html').unescape(x) for x in re.findall(r'<a href="[^"]+"[^>]*>(?:<svg.*?</svg>)?([^<]+)</a>', s4)] == ["Automatik"], s4
+assert [__import__('html').unescape(x) for x in re.findall(r'<a href="[^"]+"[^>]*>(?:<svg.*?</svg>)?(?:<span[^>]*>)?([^<]+)(?:</span>)?</a>', s4)] == ["Automatik"], s4
 G = login("geraete", "geraetepass1")
 st, nv = navlabels(G, "/smarthome"); assert st == 200
 href = [x[0] for x in nav(G.get("/smarthome").get_data(as_text=True)) if x[2] == "Smart Home"][0]; assert href == "/smarthome"

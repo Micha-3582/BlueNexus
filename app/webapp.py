@@ -3666,7 +3666,7 @@ def _vis_users_changed(old, new):
             save(items)
 
 
-_ICON_SWAP = {"\U0001fa9f": "🏠", "\U0001faab": "🔋", "\U000023fb": "🔌", "\U0001fae7": "💧", "\U0001fab4": "🌱", "\U0001fad6": "☕", "\U0001f6dc": "📡", "\U0001fa9e": "🔆", "\U0001faa0": "🚿", "\U0001fa9c": "🏠", "\U0001f6d7": "🏢"}      # Symbole, die aeltere Android-/iPhone-Versionen nicht kennen (Kaestchen mit Kreuz)
+_ICON_SWAP = {"\U000023fb": "🔌"}      # nur noch das Ein/Aus-Zeichen (auf vielen Handys ein Kaestchen); alle anderen neuen Symbole bleiben, wie gewaehlt (seit 1.44.0)
 
 
 def _migrate_icons() -> None:
