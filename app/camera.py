@@ -38,6 +38,7 @@ MAX_STREAMS = 6                            # gleichzeitige Live-Stroeme insgesam
 MAX_LIVE_S = 15 * 60                       # ein Live-Strom endet nach dieser Zeit (Tab vergessen = kein Dauerverkehr); "Play" startet neu
 STREAM_FPS = 8
 MOTION_TTL_S = 0.5                        # Bewegungszustand je Kamera so lange gueltig (mehrere Sensoren derselben Kamera teilen eine Abfrage)
+MOTION_ICON = {"md": "🏃", "people": "🧍", "vehicle": "🚗", "dog_cat": "🐕", "visitor": "🔔"}
 MOTION_LABEL = {"md": "Bewegung", "people": "Person", "vehicle": "Fahrzeug", "dog_cat": "Tier", "visitor": "Klingel gedrückt"}
 
 _lock = threading.RLock()
@@ -472,7 +473,7 @@ def motion_scan(known_ids: set) -> list[dict]:
             sid = motion_sensor_id(cam["id"], key)
             out.append({"id": sid, "kind": "motion", "address": cam["id"], "interface": "Kamera", "datapoint": key, "unit": "", "binary": True,
                         "model": cam.get("model") or ("RTSP" if cam.get("kind") == "rtsp" else "Reolink"), "room": "", "name": f"{cam.get('name')} – {MOTION_LABEL[key]}", "source": "camera",
-                        "known": sid in known_ids})
+                        "icon": MOTION_ICON[key], "known": sid in known_ids})
     if errors and not out:
         raise CameraError("Keine Kamera erreichbar – " + "; ".join(errors))
     return out
@@ -503,6 +504,7 @@ def add_motion_sensors(ids: list[str]) -> list[dict]:
         if i in have:
             continue
         item = {k: f[k] for k in ("id", "kind", "address", "interface", "datapoint", "unit", "binary", "model", "room", "name", "source")}
+        item["icon"] = f.get("icon") or MOTION_ICON["md"]
         item["users"] = []                                           # neu: zunaechst nur fuer Administratoren sichtbar
         items.append(item)
         added.append(item)
