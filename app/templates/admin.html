@@ -2472,12 +2472,13 @@ function foundBox(sec) {                      // Abschnitt der Trefferliste ('' 
   if (!el) { el = document.createElement('div'); el.dataset.sec = sec; box.appendChild(el); }
   return el;
 }
+function foundIsSensor(spec, f) { return (typeof spec.icons === 'function' ? spec.icons(f) : spec.icons) === 'sensor'; }      // Sensor-Treffer: Symbol nach Art des Messwerts (wie nach dem Anlegen)
 function foundList(fresh, spec) {
   const sec = spec.section || ''; FOUND_SPECS[sec] = spec;
   const iconsFor = f => { const t = typeof spec.icons === 'function' ? spec.icons(f) : spec.icons; return t === 'sensor' ? [...new Set([...SENSOR_EXTRA_ICONS, ...shellyIcons])] : t ? shellyIcons : []; };
   const row = f => { const k = spec.key(f), icons = iconsFor(f); return `<div data-key="${escH(k)}" data-dev="${escH(k)}" style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px"><div style="display:flex;align-items:center;gap:8px">
-      ${icons.length ? `<button type="button" class="ghost fi-ico" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="foundIconGrid(this)">${escH(f.icon || shellyIcons[0] || '🔌')}</button>` : ''}
+      ${icons.length ? `<button type="button" class="ghost fi-ico" style="font-size:22px;padding:4px 10px" title="Symbol wählen" onclick="foundIconGrid(this)">${escH(f.icon || (foundIsSensor(spec, f) && SENSOR_ICON[f.kind]) || shellyIcons[0] || '🔌')}</button>` : ''}
       <input class="fi-name" value="${escH(f.name)}" maxlength="60" style="flex:1;min-width:150px"></div>
       <div class="muted" style="margin-top:3px">${spec.sub(f)}</div>
       ${icons.length ? `<div class="fi-grid" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:6px">${icons.map(i => `<button type="button" class="ghost" style="font-size:22px;padding:4px 8px" onclick="foundPickIcon(this, '${i}')">${i}</button>`).join('')}</div>` : ''}</div>
