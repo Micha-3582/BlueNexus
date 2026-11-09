@@ -310,7 +310,7 @@ def pairing_code(server: str, tid: str, token: str, lan: bool = False) -> str:
     """Kopplungscode fuer die Standalone-Firmware: bnxthermo1_ + Base64(JSON {server, id, token}) - ohne WLAN-Daten."""
     import base64
     srv = (server or "").strip().rstrip("/")
-    if lan:                                              # Heimnetz: lokale Adresse mit http (kein Tunnel, spart Batterie)
+    if lan:                                              # Heimnetz: lokale Adresse mit http (kein Tunnel)
         if not re.match(r"^http://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):
             raise ThermoError("Adresse im Heimnetz: bitte als http://192.168.x.x:5005 eintragen (ohne Pfad)")
     elif not re.match(r"^https://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):

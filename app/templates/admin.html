@@ -156,7 +156,7 @@
   <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten <span class="qhelp" role="button" tabindex="0" data-help="Das Thermometer bekommt einmalig die Standalone-Firmware (1.2.0-sa, per USB). Danach richtest du es per Handy im Einrichtungsfenster des Thermometers ein: WLAN eingeben und den Kopplungscode einfügen. Den Code erzeugst du hier.">?</span></div>
   <div style="font-size:13px;margin-bottom:6px" class="muted">Wie soll das Thermometer melden?</div>
   <div id="th-mode" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px">
-    <label class="th-modecard"><input type="radio" name="th-mode" value="lan" checked><b>🏠 Im Heimnetz (HTTP)</b><span class="muted">Läuft auch ohne Internet und spart Batterie. Das Thermometer steht im gleichen Netz wie BlueNexus.</span></label>
+    <label class="th-modecard"><input type="radio" name="th-mode" value="lan" checked><b>🏠 Im Heimnetz (HTTP)</b><span class="muted">Läuft auch ohne Internet. Das Thermometer steht im gleichen Netz wie BlueNexus.</span></label>
     <label class="th-modecard"><input type="radio" name="th-mode" value="net"><b>🌐 Über Internet (https)</b><span class="muted">Funktioniert überall, auch an fremden Standorten. Braucht den Fernzugriff (Cloudflare Tunnel).</span></label>
   </div>
   <style>.th-modecard{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;background:var(--card)}.th-modecard:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.th-modecard input{position:absolute;opacity:0;pointer-events:none}</style>
