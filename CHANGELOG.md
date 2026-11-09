@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.48.0 – 09.11.2026
+- Neu: **Funkthermometer ohne USB anlegen** (für Standorte ohne eigene BlueNexus). Einstellungen → System → Funkthermometer → „Gerät ohne USB anlegen“ erzeugt Geräte-ID und Schlüssel und zeigt einen **Kopplungscode** (`bnxthermo1_…`, Adresse + ID + Schlüssel, ohne WLAN) zum Kopieren. Solche Geräte melden ihre Werte über die Internet-Adresse (Tunnel) an `/api/sensor/<ID>` – höchstens eine Meldung alle 20 Sekunden, andere Thermometer bleiben auf das lokale Netz beschränkt. Optional ein **Standort** je Gerät (in der Liste mit 📍).
+
 ## 1.47.0 – 09.11.2026
 - Neu: **Live-Werte der Anlage lassen sich teilen** (nur ansehen): Solar gesamt, PV-Wechselrichter gesamt sowie L1/L2/L3 und PV-Ladegerät (MPPT). Im Reiter *Teilen* beim Aufklappen einer Person anhaken; die Gegenseite holt sie wie Sensoren (Watt) ab und kann sie auf dem Dashboard und in Regeln nutzen.
 

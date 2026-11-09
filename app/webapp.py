@@ -4285,6 +4285,17 @@ def api_thermo_list():
                        secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
     b = request.get_json(silent=True) or {}
     interval = b.get("interval", thermo.DEFAULT_INTERVAL_MIN)
+    if b.get("standalone"):                                # Geraet ohne USB (Standort ohne eigene BlueNexus): nur Kopplungscode, kein WLAN
+        server = str(b.get("server") or "").strip()
+        try:
+            dev, token = thermo.create(str(b.get("name") or ""), interval, standalone=True, location=str(b.get("location") or ""))
+            code = thermo.pairing_code(server, dev["id"], token)
+        except thermo.ThermoError as e:
+            if "dev" in locals():
+                thermo.remove(dev["id"])                    # Adresse ungueltig: das eben angelegte Geraet nicht zuruecklassen
+            return jsonify(error=str(e)), 400
+        opslog.log("thermo", f"Funkthermometer „{dev['name']}“ ohne USB angelegt ({dev['id']})", dry=False)
+        return jsonify(device=dev, code=code), 201
     w = b.get("wifi")
     if not isinstance(w, dict):
         return jsonify(error="WLAN-Angaben fehlen"), 400
@@ -4327,7 +4338,7 @@ def api_thermo_item(tid):
     if request.method == "DELETE":
         return (jsonify(ok=True), 200) if thermo.remove(tid) else (jsonify(error="Thermometer nicht gefunden"), 404)
     b = request.get_json(silent=True) or {}
-    ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"))
+    ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"), location=b.get("location") if isinstance(b.get("location"), str) else None)
     return (jsonify(ok=True), 200) if ok else (jsonify(error="Thermometer nicht gefunden"), 404)
 
 
@@ -4355,14 +4366,15 @@ def api_thermo_status(tid):
 @app.route("/api/sensor/<tid>", methods=["POST"])
 def api_thermo_ingest(tid):
     """Messwerte des Funkthermometers. Nur aus dem lokalen Netz, nur mit dem Schluessel des Geraets (Kopfzeile Authorization: Bearer ...)."""
-    if not extapi.lan_request_ok(request.headers, request.remote_addr):
+    remote = not extapi.lan_request_ok(request.headers, request.remote_addr)
+    if remote and not thermo.is_standalone(tid):           # von aussen (Tunnel) nur Geraete, die ausdruecklich als "ohne USB / Standort ohne BlueNexus" angelegt wurden
         thermo.note_attempt(tid, request.remote_addr or "?", "von außerhalb des lokalen Netzes (abgewiesen)")
         return "", 404
     ip = client_ip()
     if too_many_attempts("thermo:" + ip):
         return jsonify(error="too many attempts"), 429
     h = request.headers.get("Authorization", "")
-    code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True), ip)
+    code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True), ip, remote=remote)
     if code == 401:
         log.warning("Funkthermometer %s: Anfrage von %s abgelehnt (Schlüssel falsch oder Gerät unbekannt)", tid, ip)
     if code == 401:

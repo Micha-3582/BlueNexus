@@ -153,7 +153,7 @@ def _make_sensors(dev: dict) -> list[dict]:
     return made
 
 
-def create(name: str, interval=DEFAULT_INTERVAL_MIN) -> tuple[dict, str]:
+def create(name: str, interval=DEFAULT_INTERVAL_MIN, standalone: bool = False, location: str = "") -> tuple[dict, str]:
     """Neues Thermometer: -> (Geraet ohne Schluessel, Klartext-Schluessel). Der Schluessel wird nur HIER im Klartext geliefert."""
     nm = (name or "").strip()[:40] or "Thermometer"
     token = new_token()
@@ -165,6 +165,10 @@ def create(name: str, interval=DEFAULT_INTERVAL_MIN) -> tuple[dict, str]:
             tid = new_id()
         dev = {"id": tid, "name": nm, "token_hash": _hash(token), "interval": _interval(interval), "created": time.time(),
                "last_seen": None, "fw": None, "last": {}}
+        if standalone:                                   # Geraet an einem Standort ohne eigene BlueNexus: meldet ueber die Internet-Adresse (Tunnel)
+            dev["standalone"] = True
+        if (location or "").strip():
+            dev["location"] = location.strip()[:40]
         items.append(dev)
         _save(items)
     _make_sensors(dev)
@@ -211,7 +215,7 @@ def public(dev: dict) -> dict:
         cor["hum"] = round(min(100.0, max(0.0, cor["hum"] + float(cal.get("hum") or 0))), 2)
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
-    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
+    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
             "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
@@ -220,7 +224,7 @@ def listing() -> list[dict]:
     return [public(x) for x in load()]
 
 
-def rename(tid: str, name: str | None = None, interval=None) -> bool:
+def rename(tid: str, name: str | None = None, interval=None, location: str | None = None) -> bool:
     with _lock:
         items = _load()
         d = next((x for x in items if x.get("id") == tid), None)
@@ -230,6 +234,11 @@ def rename(tid: str, name: str | None = None, interval=None) -> bool:
             d["name"] = name.strip()[:40]
         if interval is not None:
             d["interval"] = _interval(interval)
+        if location is not None:
+            if location.strip():
+                d["location"] = location.strip()[:40]
+            else:
+                d.pop("location", None)
         _save(items)
     import homematic                                        # Sensornamen mitfuehren (nur solche, die noch den automatischen Namen tragen)
     if name is not None and name.strip():
@@ -287,7 +296,25 @@ def note_attempt(tid: str, ip: str, why: str) -> None:
         _save(items)
 
 
-def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
+REMOTE_MIN_GAP_S = 20               # Geraete von aussen (Tunnel): hoechstens eine Meldung je 20 s (Bremse gegen Dauerfeuer mit gueltigem Schluessel)
+
+
+def is_standalone(tid: str) -> bool:
+    d = get(tid) if ID_RE.match(tid or "") else None
+    return bool(d and d.get("standalone"))
+
+
+def pairing_code(server: str, tid: str, token: str) -> str:
+    """Kopplungscode fuer die Standalone-Firmware: bnxthermo1_ + Base64(JSON {server, id, token}) - ohne WLAN-Daten."""
+    import base64
+    srv = (server or "").strip().rstrip("/")
+    if not re.match(r"^https://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):
+        raise ThermoError("Internet-Adresse: bitte als https://… eintragen (die Tunnel-Adresse von BlueNexus, ohne Pfad)")
+    raw = json.dumps({"server": srv, "id": tid, "token": token}, separators=(",", ":")).encode("utf-8")
+    return "bnxthermo1_" + base64.b64encode(raw).decode("ascii")
+
+
+def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False) -> tuple[int, dict]:
     """Messung annehmen. -> (HTTP-Status, Antwort). 401 = Schluessel falsch/Geraet unbekannt (gleiche Antwort, damit man IDs nicht abklopfen kann)."""
     if not ID_RE.match(tid or ""):
         return 401, {"error": "unauthorized"}
@@ -304,6 +331,8 @@ def ingest(tid: str, token: str, body: dict, ip: str = "") -> tuple[int, dict]:
                 d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "falscher Schlüssel"}
                 _save(items)
             return 401, {"error": "unauthorized"}
+        if remote and d.get("last_seen") and time.time() - float(d["last_seen"]) < REMOTE_MIN_GAP_S:
+            return 429, {"error": "too many requests"}
         if not isinstance(body, dict):
             d["attempt"] = {"ts": time.time(), "ip": str(ip)[:45], "why": "keine gültigen Daten"}
             _save(items)

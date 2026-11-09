@@ -46,10 +46,10 @@
       var batTxt = bstate === '' ? '' : ' · Batterie ' + dec(bat, 2) + ' V' + (bstate === 'low' ? ' – bald wechseln' : '');
       return '<div data-row="' + esc(d.id) + '" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
-        + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
+        + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.location ? ' · 📍 ' + esc(d.location) : '') + (d.standalone ? ' · ohne USB' : '') + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
         + '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot-Drucker, nur am Android-Handy)">Etikett</button>'
-        + '<button type="button" class="ghost" data-act="reflash" data-id="' + esc(d.id) + '" title="Dieses Thermometer neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten">Neu flashen</button>'
+        + (d.standalone ? '' : '<button type="button" class="ghost" data-act="reflash" data-id="' + esc(d.id) + '" title="Dieses Thermometer neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten">Neu flashen</button>')
         + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
@@ -371,4 +371,27 @@
   $('th-reset').addEventListener('click', resetChip);
   load();
   setInterval(function () { if (!document.hidden && !state.busy) load(); }, 20000);        // Liste (zuletzt gesehen, Werte) auffrischen
+
+  /* Geraet ohne USB anlegen (Standort ohne eigene BlueNexus): ID + Schluessel erzeugen, Kopplungscode zum Kopieren zeigen */
+  (function () {
+    var go = $('th-sa-go'); if (!go) return;
+    var srv = $('th-sa-server');
+    try { var sv = localStorage.getItem('thSaServer'); if (sv) srv.value = sv; else if (location.protocol === 'https:') srv.value = location.origin; } catch (e) { /* nur Komfort */ }
+    go.addEventListener('click', function () {
+      var name = $('th-sa-name').value.trim() || 'Thermometer', addr = srv.value.trim().replace(/\/+$/, '');
+      if (!/^https:\/\/[A-Za-z0-9.\-]+(:\d{1,5})?$/.test(addr)) { $('th-sa-msg').textContent = 'Bitte die Internet-Adresse als https://… eintragen (Tunnel-Adresse von BlueNexus).'; $('th-sa-msg').style.color = '#e5544a'; return; }
+      go.disabled = true;
+      api('/api/thermo', 'POST', { standalone: true, name: name, location: $('th-sa-loc').value.trim(), interval: +$('th-sa-int').value || 15, server: addr }).then(function (j) {
+        try { localStorage.setItem('thSaServer', addr); } catch (e) { /* egal */ }
+        $('th-sa-code').value = j.code; $('th-sa-out').style.display = 'block';
+        $('th-sa-msg').style.color = ''; $('th-sa-msg').textContent = '„' + j.device.name + '“ (' + j.device.id + ') angelegt. Der Code wird nur jetzt angezeigt – jetzt kopieren und an den Standort schicken.';
+        try { navigator.clipboard.writeText(j.code); } catch (e) { /* Kopieren-Knopf bleibt */ }
+        load();
+      }).catch(function (e) { $('th-sa-msg').style.color = '#e5544a'; $('th-sa-msg').textContent = e.message; }).then(function () { go.disabled = false; });
+    });
+    $('th-sa-copy').addEventListener('click', function () {
+      var t = $('th-sa-code'); t.select();
+      try { navigator.clipboard.writeText(t.value).then(function () { toast('Kopiert ✓'); }); } catch (e) { document.execCommand('copy'); }
+    });
+  })();
 })();
