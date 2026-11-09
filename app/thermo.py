@@ -153,7 +153,7 @@ def _make_sensors(dev: dict) -> list[dict]:
     return made
 
 
-def create(name: str, interval=DEFAULT_INTERVAL_MIN, standalone: bool = False, location: str = "") -> tuple[dict, str]:
+def create(name: str, interval=DEFAULT_INTERVAL_MIN, standalone: bool = False, location: str = "", paired: bool = False) -> tuple[dict, str]:
     """Neues Thermometer: -> (Geraet ohne Schluessel, Klartext-Schluessel). Der Schluessel wird nur HIER im Klartext geliefert."""
     nm = (name or "").strip()[:40] or "Thermometer"
     token = new_token()
@@ -167,6 +167,8 @@ def create(name: str, interval=DEFAULT_INTERVAL_MIN, standalone: bool = False, l
                "last_seen": None, "fw": None, "last": {}}
         if standalone:                                   # Geraet an einem Standort ohne eigene BlueNexus: meldet ueber die Internet-Adresse (Tunnel)
             dev["standalone"] = True
+        if paired:                                       # per Kopplungscode im Heimnetz eingerichtet (kein Zugriff von aussen)
+            dev["paired"] = True
         if (location or "").strip():
             dev["location"] = location.strip()[:40]
         items.append(dev)
@@ -215,7 +217,7 @@ def public(dev: dict) -> dict:
         cor["hum"] = round(min(100.0, max(0.0, cor["hum"] + float(cal.get("hum") or 0))), 2)
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
-    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
+    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
             "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
@@ -304,11 +306,14 @@ def is_standalone(tid: str) -> bool:
     return bool(d and d.get("standalone"))
 
 
-def pairing_code(server: str, tid: str, token: str) -> str:
+def pairing_code(server: str, tid: str, token: str, lan: bool = False) -> str:
     """Kopplungscode fuer die Standalone-Firmware: bnxthermo1_ + Base64(JSON {server, id, token}) - ohne WLAN-Daten."""
     import base64
     srv = (server or "").strip().rstrip("/")
-    if not re.match(r"^https://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):
+    if lan:                                              # Heimnetz: lokale Adresse mit http (kein Tunnel, spart Batterie)
+        if not re.match(r"^http://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):
+            raise ThermoError("Adresse im Heimnetz: bitte als http://192.168.x.x:5005 eintragen (ohne Pfad)")
+    elif not re.match(r"^https://[A-Za-z0-9.\-]+(:\d{1,5})?$", srv):
         raise ThermoError("Internet-Adresse: bitte als https://… eintragen (die Tunnel-Adresse von BlueNexus, ohne Pfad)")
     raw = json.dumps({"server": srv, "id": tid, "token": token}, separators=(",", ":")).encode("utf-8")
     return "bnxthermo1_" + base64.b64encode(raw).decode("ascii")

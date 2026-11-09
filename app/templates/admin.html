@@ -153,7 +153,24 @@
   <div id="th-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
   <div id="th-etk-hint" class="muted" style="margin-bottom:14px;font-size:13px"></div>
   <div id="th-warn" class="muted" style="display:none;border:1px solid #f0a030;border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
-  <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten</div>
+  <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten <span class="qhelp" role="button" tabindex="0" data-help="Das Thermometer bekommt einmalig die Standalone-Firmware (1.2.0-sa, per USB). Danach richtest du es per Handy im Einrichtungsfenster des Thermometers ein: WLAN eingeben und den Kopplungscode einfügen. Den Code erzeugst du hier.">?</span></div>
+  <div style="font-size:13px;margin-bottom:6px" class="muted">Wie soll das Thermometer melden?</div>
+  <div id="th-mode" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px">
+    <label class="th-modecard"><input type="radio" name="th-mode" value="lan" checked><b>🏠 Im Heimnetz (HTTP)</b><span class="muted">Läuft auch ohne Internet und spart Batterie. Das Thermometer steht im gleichen Netz wie BlueNexus.</span></label>
+    <label class="th-modecard"><input type="radio" name="th-mode" value="net"><b>🌐 Über Internet (https)</b><span class="muted">Funktioniert überall, auch an fremden Standorten. Braucht den Fernzugriff (Cloudflare Tunnel).</span></label>
+  </div>
+  <style>.th-modecard{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;background:var(--card)}.th-modecard:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.th-modecard input{position:absolute;opacity:0;pointer-events:none}</style>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px">
+    <div><label for="th-sa-name">Name</label><input id="th-sa-name" maxlength="40" placeholder="z. B. Außen"></div>
+    <div><label for="th-sa-loc">Standort (optional)</label><input id="th-sa-loc" maxlength="40" placeholder="z. B. Bauhof Nord"></div>
+    <div><label for="th-sa-int">Messung alle</label><select id="th-sa-int"><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="15" selected>15 Minuten</option><option value="30">30 Minuten</option><option value="60">60 Minuten</option></select></div>
+    <div style="grid-column:1/-1"><label for="th-sa-server" id="th-sa-srvlbl">Adresse von BlueNexus <span class="qhelp" role="button" tabindex="0" data-help="Heimnetz: die lokale Adresse (http://192.168…), wird vorgeschlagen. Internet: die von außen erreichbare Adresse (Tunnel), z. B. https://bluenexus.example.de. Sie steckt im Kopplungscode.">?</span></label><input id="th-sa-server" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
+  </div>
+  <div style="margin-top:12px"><button type="button" id="th-sa-go">Kopplungscode erzeugen</button></div>
+  <div id="th-sa-out" style="display:none;margin-top:12px"><label for="th-sa-code">Kopplungscode</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="th-sa-code" readonly style="flex:1;min-width:220px;font-family:monospace" onclick="this.select()"><button type="button" class="ghost" id="th-sa-copy">Kopieren</button></div></div>
+  <div id="th-sa-msg" class="muted" style="margin-top:8px"></div>
+  <details style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px"><summary style="cursor:pointer;font-weight:600">Per USB flashen (erstes Flashen, Neu flashen, integrierte Firmware) <span class="qhelp" role="button" tabindex="0" data-help="Hier gibst du das WLAN ein, BlueNexus spielt die Firmware 1.1.1 per USB auf die Platine und verbindet sie – ohne Kopplungscode, nur im Heimnetz.">?</span></summary>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
     <div style="grid-column:1/-1"><label for="th-for">Einrichten für <span class="qhelp" role="button" tabindex="0" data-help="„Neues Thermometer“ legt ein weiteres Gerät an. Wählst du ein vorhandenes, wird DIESES neu geflasht (zum Beispiel nach einem Firmware-Update): ID, Sensoren, Aufzeichnung (Verläufe), Regeln und Abgleich bleiben erhalten, nur der Schlüssel wird erneuert.">?</span></label><select id="th-for"><option value="">Neues Thermometer</option></select></div>
     <div><label for="th-name">Name</label><input id="th-name" maxlength="40" value="Außen" placeholder="z. B. Außen"></div>
@@ -178,17 +195,6 @@
   </div>
   <div id="th-steps" style="margin-top:12px"></div>
   <div id="th-msg" class="muted" style="margin-top:8px"></div>
-  <details style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px"><summary style="cursor:pointer;font-weight:600">Gerät ohne USB anlegen (Standort ohne eigene BlueNexus) <span class="qhelp" role="button" tabindex="0" data-help="Für Thermometer, die an einem anderen Ort stehen und ihre Werte über das Internet (Tunnel) an diese BlueNexus schicken. BlueNexus legt das Gerät an und erzeugt einen Kopplungscode. Den gibt man am Standort per Handy im Einrichtungsfenster des Thermometers ein, zusammen mit dem dortigen WLAN. Dafür braucht das Thermometer die Standalone-Firmware (1.2.0-sa). Voraussetzung: Fernzugriff (Cloudflare Tunnel) ist eingerichtet.">?</span></summary>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px">
-      <div><label for="th-sa-name">Name</label><input id="th-sa-name" maxlength="40" placeholder="z. B. Außen"></div>
-      <div><label for="th-sa-loc">Standort (optional)</label><input id="th-sa-loc" maxlength="40" placeholder="z. B. Bauhof Nord"></div>
-      <div><label for="th-sa-int">Messung alle</label><select id="th-sa-int"><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="15" selected>15 Minuten</option><option value="30">30 Minuten</option><option value="60">60 Minuten</option></select></div>
-      <div style="grid-column:1/-1"><label for="th-sa-server">Internet-Adresse von BlueNexus <span class="qhelp" role="button" tabindex="0" data-help="Die von außen erreichbare Adresse (Tunnel), z. B. https://bluenexus.example.de – nicht die lokale. Sie steckt im Kopplungscode.">?</span></label><input id="th-sa-server" placeholder="https://…" autocomplete="off" spellcheck="false"></div>
-    </div>
-    <div style="margin-top:12px"><button type="button" id="th-sa-go">Kopplungscode erzeugen</button></div>
-    <div id="th-sa-out" style="display:none;margin-top:12px"><label for="th-sa-code">Kopplungscode</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="th-sa-code" readonly style="flex:1;min-width:220px;font-family:monospace" onclick="this.select()"><button type="button" class="ghost" id="th-sa-copy">Kopieren</button></div></div>
-    <div id="th-sa-msg" class="muted" style="margin-top:8px"></div>
   </details>
 </div>
 {% endif %}

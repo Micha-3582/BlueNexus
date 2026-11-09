@@ -4286,10 +4286,11 @@ def api_thermo_list():
     b = request.get_json(silent=True) or {}
     interval = b.get("interval", thermo.DEFAULT_INTERVAL_MIN)
     if b.get("standalone"):                                # Geraet ohne USB (Standort ohne eigene BlueNexus): nur Kopplungscode, kein WLAN
-        server = str(b.get("server") or "").strip()
+        lan = b.get("mode") == "lan"                         # Heimnetz: http-Adresse, kein Zugriff von aussen; sonst Internet (https, Tunnel)
+        server = str(b.get("server") or "").strip() or (_thermo_server_hint() if lan else "")
         try:
-            dev, token = thermo.create(str(b.get("name") or ""), interval, standalone=True, location=str(b.get("location") or ""))
-            code = thermo.pairing_code(server, dev["id"], token)
+            dev, token = thermo.create(str(b.get("name") or ""), interval, standalone=not lan, paired=lan, location=str(b.get("location") or ""))
+            code = thermo.pairing_code(server, dev["id"], token, lan=lan)
         except thermo.ThermoError as e:
             if "dev" in locals():
                 thermo.remove(dev["id"])                    # Adresse ungueltig: das eben angelegte Geraet nicht zuruecklassen

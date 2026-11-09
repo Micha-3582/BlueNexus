@@ -35,4 +35,12 @@ assert N.post("/api/sensor/" + c["device"]["id"], json=B, headers={"Authorizatio
 assert N.post("/api/sensor/" + c["device"]["id"], json=B, headers={"Authorization": "Bearer " + c["token"]}).status_code == 200          # im lokalen Netz wie bisher
 # Standort aendern
 assert A.patch("/api/thermo/" + tid, json={"location": "Garten"}).status_code == 200 and thermo.get(tid)["location"] == "Garten"
+# Heimnetz-Weg: Code mit http-Adresse, Geraet bleibt von aussen gesperrt
+r = A.post("/api/thermo", json={"standalone": True, "mode": "lan", "name": "Flur", "server": "https://b.example.de"}); assert r.status_code == 400
+r = A.post("/api/thermo", json={"standalone": True, "mode": "lan", "name": "Flur", "server": "http://192.168.50.40:5005"}); assert r.status_code == 201, r.get_data(as_text=True)
+j = r.get_json(); d2 = json.loads(base64.b64decode(j["code"][len("bnxthermo1_"):]))
+assert d2["server"] == "http://192.168.50.40:5005" and j["device"]["paired"] is True and j["device"]["standalone"] is False
+H2 = {"Authorization": "Bearer " + d2["token"]}
+x = N.post("/api/sensor/" + d2["id"], json=B, headers={**H2, **EXT}); assert x.status_code == 404, (x.status_code, x.get_data(as_text=True))
+x = N.post("/api/sensor/" + d2["id"], json=B, headers=H2); assert x.status_code == 200, (x.status_code, x.get_data(as_text=True))
 print("THERMO-STANDALONE OK")
