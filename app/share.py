@@ -272,7 +272,7 @@ def provider_items(share: dict) -> list[dict]:
         sens = [s for s in homematic.load_sensors() if s["id"] in sens_ids and s.get("source") != "remote"]
         vals = homematic.read_values(sens)
         for s in sens:
-            out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "📟", "kind": s.get("kind") or "",
+            out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "", "kind": s.get("kind") or "",
                         "binary": bool(s.get("binary")), "unit": s.get("unit") or "", "room": s.get("room") or "", "control": False, "state": {"value": vals.get(s["id"])}})
     sp_ids = {r.split(":", 1)[1] for r in mode if r.startswith("setpoint:")}
     if sp_ids:
@@ -655,7 +655,7 @@ def import_items(source_id: str, refs: list[str]) -> dict:
         elif x.get("type") == "sensor":
             new_s.append({"id": lid, "kind": x.get("kind") or "", "source": "remote", "src": source_id, "rref": ref, "address": ref, "interface": "remote", "datapoint": "",
                           "unit": x.get("unit") or "", "binary": bool(x.get("binary")), "model": model, "room": x.get("room") or "", "name": x.get("name") or ref,
-                          "icon": x.get("icon") or "📟", "show": True, "vis2": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
+                          "icon": x.get("icon") or "", "show": True, "vis2": True})                    # ohne "users": alle Benutzer dieser Anlage sehen es (Admin kann es einschraenken)
         else:
             rkind = ("virtual-" + str(x.get("kind"))) if x.get("type") == "virtual" else (x.get("kind") or "shelly")
             new_d.append({"id": lid, "kind": "remote", "source": source_id, "rref": ref, "rkind": rkind, "gen": 0, "channel": 0, "model": model,

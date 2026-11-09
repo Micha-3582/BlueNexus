@@ -3678,6 +3678,9 @@ def _migrate_icons() -> None:
             hit = False
             for x in items:
                 ic = x.get("icon")
+                if x.get("source") == "remote" and x.get("kind") is not None and ic == "📟":      # geholte Sensoren mit dem alten Ersatz-Symbol: Symbol wieder nach Art des Messwerts waehlen lassen
+                    x["icon"] = ""
+                    hit = True
                 if isinstance(ic, str) and ic in _ICON_SWAP:
                     x["icon"] = _ICON_SWAP[ic]
                     hit = True

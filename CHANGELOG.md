@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.46.5 – 09.11.2026
+- Behoben: Geteilte Sensoren (z. B. Temperatur, Luftfeuchte) kamen bei der Gegenseite immer mit dem Standard-Symbol 📟 an. Jetzt wird das Symbol des Teilenden durchgereicht; hat der Sensor keins gewählt, nimmt die Gegenseite das passende Symbol zur Art des Messwerts (🌡️, 💧 …). Bereits geholte Sensoren mit dem alten Standard-Symbol werden beim Start entsprechend zurückgesetzt.
+
 ## 1.46.4 – 08.11.2026
 - Behoben: Bei einer Kamera, die offline ist, erscheint hinter „offline“ nicht mehr das Symbol für ein fehlendes Bild.
 
