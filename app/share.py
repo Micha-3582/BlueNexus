@@ -36,7 +36,19 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 SHARES_PATH = os.path.join(_DIR, "shares.json")            # Geber: Freigaben
 SOURCES_PATH = os.path.join(_DIR, "sources.json")          # Empfaenger: Fremde Quellen (mit Schluessel!)
 API_VERSION = 1
-REF_TYPES = ("device", "sensor", "virtual", "setpoint", "lock", "blind", "sound", "wol")
+REF_TYPES = ("device", "sensor", "virtual", "setpoint", "lock", "blind", "sound", "wol", "live")
+
+# Live-Werte der Anlage (Victron), nur lesend teilbar: Schluessel -> (Name, Auslese aus read_system()). Die Gegenseite bekommt sie wie Sensoren (Watt).
+LIVE_VALUES = {
+    "solar": ("Solar gesamt", lambda s: s.get("solar_total")),
+    "pv_inverter": ("PV-Wechselrichter", lambda s: (s.get("pv_inverter") or {}).get("total")),
+    "pv_inverter_l1": ("PV-Wechselrichter L1", lambda s: (s.get("pv_inverter") or {}).get("l1")),
+    "pv_inverter_l2": ("PV-Wechselrichter L2", lambda s: (s.get("pv_inverter") or {}).get("l2")),
+    "pv_inverter_l3": ("PV-Wechselrichter L3", lambda s: (s.get("pv_inverter") or {}).get("l3")),
+    "pv_charger": ("PV-Ladegerät (MPPT)", lambda s: s.get("pv_charger")),
+}
+LIVE_ICON = "☀️"
+live_system = lambda: None          # von webapp gesetzt: liefert die letzte Cerbo-Messung (dict) oder None
 MORE_TYPES = ("setpoint", "lock", "blind", "sound", "wol")        # Eintraege, die in eigenen Registern landen (nicht bei Geraeten/Sensoren)
 MODES = ("view", "control")
 MAX_ITEMS = 300
@@ -147,6 +159,8 @@ def shareable() -> list[dict]:
         if s.get("source") == "remote":
             continue
         out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "📟", "detail": "Sensor"})
+    for k, (nm, _f) in LIVE_VALUES.items():
+        out.append({"ref": "live:" + k, "type": "sensor", "name": nm, "icon": LIVE_ICON, "detail": "Live-Wert (nur ansehen)"})
     for kind, load, label, icon in _more_registries():
         for x in load():
             if x.get("source") == "remote":
@@ -188,6 +202,8 @@ def update(share_id: str, name: str | None = None, items=None, icon: str | None 
                     raise ShareError("Ein Eintrag lässt sich nicht freigeben (gibt es nicht mehr?)")
                 if mode not in MODES:
                     raise ShareError("Art der Freigabe: nur sehen oder bedienen")
+                if ref.startswith("live:"):
+                    mode = "view"                                         # Live-Werte lassen sich nur ansehen
                 seen.add(ref)
                 clean.append({"ref": ref, "mode": mode})
             s["items"] = clean
@@ -274,6 +290,16 @@ def provider_items(share: dict) -> list[dict]:
         for s in sens:
             out.append({"ref": "sensor:" + s["id"], "type": "sensor", "name": s.get("name") or s["id"], "icon": s.get("icon") or "", "kind": s.get("kind") or "",
                         "binary": bool(s.get("binary")), "unit": s.get("unit") or "", "room": s.get("room") or "", "control": False, "state": {"value": vals.get(s["id"])}})
+    live_keys = [r.split(":", 1)[1] for r in mode if r.startswith("live:") and r.split(":", 1)[1] in LIVE_VALUES]
+    if live_keys:
+        sysd = live_system() or {}
+        for k in live_keys:
+            try:
+                v = LIVE_VALUES[k][1](sysd)
+            except Exception:                                             # noqa: BLE001
+                v = None
+            out.append({"ref": "live:" + k, "type": "sensor", "name": LIVE_VALUES[k][0], "icon": LIVE_ICON, "kind": "power", "binary": False, "unit": "W", "room": "",
+                        "control": False, "state": {"value": (round(float(v)) if isinstance(v, (int, float)) else None)}})
     sp_ids = {r.split(":", 1)[1] for r in mode if r.startswith("setpoint:")}
     if sp_ids:
         sps = [s for s in homematic.load_setpoints() if s["id"] in sp_ids and s.get("source") != "remote"]

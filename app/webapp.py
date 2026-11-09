@@ -2495,6 +2495,7 @@ demo_sim.activate()                                            # Demo-Modus (BLU
 demo_sim.seed_favorites(users)                                  # Demo: feste erfundene Favoriten (Kachel 'Favoriten')
 
 ctrl = Controller()
+share.live_system = lambda: ctrl.last_system if time.time() - ctrl.last_system_ts < 45 else None        # Live-Werte fuer die Freigabe (Solar)
 shelly.migrate_device_sensors()                                  # einmalig: Sensoren zu Geraeten der ersten Fassung richtigstellen
 shelly.migrate_device_sensors_v2()
 perf.install()                                                  # Geschwindigkeits-Messung (Fehlersuche), nur im Speicher

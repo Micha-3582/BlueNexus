@@ -2928,7 +2928,9 @@ async function loadShares() {
           <button type="button" class="tgl del" title="Person und alle Freigaben löschen" aria-label="Person löschen" onclick="shareDelete('${id}')">${I_TRASH}</button>
         </div></div>
       <div id="shicons-${id}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
-      <div id="shbody-${id}" style="display:${open ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:10px">${its.length ? its.map(i => { const c = nameOf[i.ref], ref = escH(i.ref);
+      <div id="shbody-${id}" style="display:${open ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:10px">
+        <div style="border:1px dashed var(--border);border-radius:10px;padding:10px"><div class="muted" style="margin-bottom:6px">☀️ Live-Werte der Anlage teilen (nur ansehen)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${SHARE_CAT.filter(c => c.ref.startsWith('live:')).map(c => `<label class="chk"><input type="checkbox" ${(sh.items || []).some(i => i.ref === c.ref) ? 'checked' : ''} onchange="shareLive('${id}','${escH(c.ref)}',this.checked)"> ${escH(c.name)}</label>`).join('')}</div></div>${its.length ? its.map(i => { const c = nameOf[i.ref], ref = escH(i.ref);
         return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:22px;padding:4px 10px">${escH(c.icon)}</span>
           <div style="flex:1;min-width:150px"><b>${escH(c.name)}</b><div class="muted">${escH(c.detail)} · ${i.mode === 'control' ? 'sehen & bedienen' : 'nur sehen'}</div></div>
@@ -2952,6 +2954,10 @@ async function shareSetIcon(id, icon) {
 function shareToggle(id) { if (SHARE_OPEN.has(id)) SHARE_OPEN.delete(id); else SHARE_OPEN.add(id); loadShares(); }
 async function shareSetMode(sid, ref, mode) {
   try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: mode } }); savedToast(); } catch (e) { uiAlert(e.message); }
+  loadShares();
+}
+async function shareLive(sid, ref, on) {
+  try { await shellyApi('/api/share-item', 'POST', { ref, shares: { [sid]: on ? 'view' : null } }); savedToast(); } catch (e) { uiAlert(e.message); }
   loadShares();
 }
 async function shareStop(sid, ref) {
