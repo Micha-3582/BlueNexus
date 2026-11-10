@@ -37,6 +37,20 @@
   $('th-ssid').addEventListener('input', function () { $('th-ssid').dataset.auto = '0'; });
 
   /* ---------------- Liste ---------------- */
+  /* Symbolknoepfe der Geraeteliste: quadratisch (.tgl, wie im Smart-Home-Bereich), Beschreibung als Hover-/Lesetext */
+  function ti(p) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>'; }
+  var TI = {
+    tag: ti('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'),
+    bolt: ti('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+    key: ti('<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2"/><path d="M16 7l3 3"/><path d="M18.5 4.5l2 2"/>'),
+    clock: ti('<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>'),
+    sliders: ti('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'),
+    pen: ti('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+    trash: ti('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>')
+  };
+  function tbtn(act, id, title, icon, del) {
+    return '<button type="button" class="tgl' + (del ? ' del' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" title="' + esc(title) + '" aria-label="' + esc(title) + '">' + icon + '</button>';
+  }
   function renderList() {
     var el = $('th-list');
     if (!state.devices.length) { el.innerHTML = '<div class="muted">Noch kein Thermometer eingerichtet.</div>'; return; }
@@ -48,13 +62,14 @@
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
         + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.location ? ' · 📍 ' + esc(d.location) : '') + (d.standalone ? ' · ohne USB' : d.paired ? ' · per Code' : '') + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
-        + '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot-Drucker, nur am Android-Handy)">Etikett</button>'
-        + (d.standalone ? '' : '<button type="button" class="ghost" data-act="reflash" data-id="' + esc(d.id) + '" title="Dieses Thermometer neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten">Neu flashen</button>')
-        + (d.has_code ? '<button type="button" class="ghost" data-act="code" data-id="' + esc(d.id) + '" title="Kopplungscode wieder ansehen (nach Passwortabfrage)">🔑</button>' : '')
-        + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
-        + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
-        + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
-        + '<button type="button" class="ghost" data-act="del" data-id="' + esc(d.id) + '" title="Entfernen">✕</button></div>';
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">'
+        + tbtn('label', d.id, 'Etikett drucken: Name, ID und QR-Code für das Gehäuse (Niimbot-Drucker, nur am Android-Handy)', TI.tag)
+        + (d.standalone ? '' : tbtn('reflash', d.id, 'Neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten', TI.bolt))
+        + (d.has_code ? tbtn('code', d.id, 'Kopplungscode wieder ansehen (nach Passwortabfrage)', TI.key) : '')
+        + tbtn('interval', d.id, 'Messintervall ändern (zum Testen oder Abgleichen kurz stellen)', TI.clock)
+        + tbtn('calib', d.id, 'Auf Referenzwerte abgleichen (kalibrieren)', TI.sliders)
+        + tbtn('rename', d.id, 'Umbenennen', TI.pen)
+        + tbtn('del', d.id, 'Entfernen', TI.trash, true) + '</div></div>';
     }).join('');
   }
   var RR = { 1: 'Einschalten', 2: 'RESET-Taste', 3: 'Software-Neustart', 4: 'Absturz', 5: 'Watchdog', 6: 'Watchdog', 7: 'Watchdog', 8: 'Zeitgeber', 9: 'Batterie schwach (Brownout)', 11: 'USB', 12: 'JTAG' };
