@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.51.1 – 10.11.2026
+- Behoben: Unter „ESP vorbereiten“ standen noch die alten Knöpfe („Einrichten und flashen“, „ESP32 löschen“) doppelt außerhalb des Aufklapp-Bereichs. Jetzt erscheinen sie nur noch nach dem Aufklappen.
+
 ## 1.51.0 – 10.11.2026
 - Geändert: **Nur noch eine Thermometer-Firmware (2.0.0).** „Einrichten und flashen“ mit WLAN-Eingabe entfällt. Das USB-Fenster heißt **„ESP vorbereiten“** und spielt die mitgelieferte Firmware ohne Eingaben auf (Chips lassen sich auf Vorrat vorbereiten); eingerichtet wird das Thermometer am Einsatzort per Handy mit dem Kopplungscode, den BlueNexus erzeugt. Eine Kurzanleitung steht darunter. Die alte Firmware 1.1.1 liegt nicht mehr im Paket.
 - Neu: **Firmware-Update per Funk** (ab Firmware 2.0.0). In der Liste erscheint „Update … verfügbar“ mit einem Knopf; das Thermometer lädt die Datei bei seiner nächsten Meldung (Heimnetz oder Tunnel, nur mit dem Schlüssel des Geräts).
