@@ -4291,6 +4291,7 @@ def api_thermo_list():
         try:
             dev, token = thermo.create(str(b.get("name") or ""), interval, standalone=not lan, paired=lan, location=str(b.get("location") or ""))
             code = thermo.pairing_code(server, dev["id"], token, lan=lan)
+            thermo.set_code(dev["id"], code)
         except thermo.ThermoError as e:
             if "dev" in locals():
                 thermo.remove(dev["id"])                    # Adresse ungueltig: das eben angelegte Geraet nicht zuruecklassen
@@ -4341,6 +4342,18 @@ def api_thermo_item(tid):
     b = request.get_json(silent=True) or {}
     ok = thermo.rename(tid, name=b.get("name") if isinstance(b.get("name"), str) else None, interval=b.get("interval"), location=b.get("location") if isinstance(b.get("location"), str) else None)
     return (jsonify(ok=True), 200) if ok else (jsonify(error="Thermometer nicht gefunden"), 404)
+
+
+@app.route("/api/thermo/<tid>/code", methods=["POST"])
+def api_thermo_code(tid):
+    """Kopplungscode eines per Code angelegten Geraets erneut anzeigen - nur nach Eingabe des eigenen Passworts."""
+    pw = (request.get_json(silent=True) or {}).get("password") or ""
+    if not users.verify(g.user, pw):
+        return jsonify(error="Passwort falsch"), 403
+    code = thermo.get_code(tid)
+    if not code:
+        return jsonify(error="Für dieses Gerät ist kein Kopplungscode gespeichert (nur bei Geräten, die mit Code angelegt wurden)."), 404
+    return jsonify(code=code)
 
 
 @app.route("/api/thermo/<tid>/calibrate", methods=["POST"])

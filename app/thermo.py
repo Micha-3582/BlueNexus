@@ -217,7 +217,7 @@ def public(dev: dict) -> dict:
         cor["hum"] = round(min(100.0, max(0.0, cor["hum"] + float(cal.get("hum") or 0))), 2)
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
-    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
+    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "has_code": bool(dev.get("code")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
             "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
@@ -304,6 +304,22 @@ REMOTE_MIN_GAP_S = 20               # Geraete von aussen (Tunnel): hoechstens ei
 def is_standalone(tid: str) -> bool:
     d = get(tid) if ID_RE.match(tid or "") else None
     return bool(d and d.get("standalone"))
+
+
+def set_code(tid: str, code: str) -> None:
+    """Fertigen Kopplungscode beim Geraet merken, damit ein Administrator ihn spaeter (nach Passwortabfrage) wieder ansehen kann.
+    Der Schluessel erlaubt nur, Messwerte fuer genau dieses Geraet zu melden."""
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if d:
+            d["code"] = code
+            _save(items)
+
+
+def get_code(tid: str) -> str:
+    d = get(tid) if ID_RE.match(tid or "") else None
+    return str((d or {}).get("code") or "")
 
 
 def pairing_code(server: str, tid: str, token: str, lan: bool = False) -> str:

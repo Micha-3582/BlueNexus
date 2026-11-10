@@ -43,4 +43,11 @@ assert d2["server"] == "http://192.168.50.40:5005" and j["device"]["paired"] is 
 H2 = {"Authorization": "Bearer " + d2["token"]}
 x = N.post("/api/sensor/" + d2["id"], json=B, headers={**H2, **EXT}); assert x.status_code == 404, (x.status_code, x.get_data(as_text=True))
 x = N.post("/api/sensor/" + d2["id"], json=B, headers=H2); assert x.status_code == 200, (x.status_code, x.get_data(as_text=True))
+# Kopplungscode spaeter wieder ansehen: nur mit Passwort, nur bei Geraeten mit Code
+assert A.post("/api/thermo/" + tid + "/code", json={"password": "falsch"}).status_code == 403
+assert L.post("/api/thermo/" + tid + "/code", json={"password": "lesepass123"}).status_code == 403            # ohne Verwaltungsrecht gesperrt
+r = A.post("/api/thermo/" + tid + "/code", json={"password": "adminpass1"}); assert r.status_code == 200 and r.get_json()["code"] == code
+assert A.post("/api/thermo/" + c["device"]["id"] + "/code", json={"password": "adminpass1"}).status_code == 404         # USB-Geraet: kein Code gespeichert
+assert next(x for x in thermo.listing() if x["id"] == tid)["has_code"] is True
+assert "bnxthermo1_" not in A.get("/api/thermo").get_data(as_text=True)                            # die Liste verraet den Code nicht
 print("THERMO-STANDALONE OK")

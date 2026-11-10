@@ -50,6 +50,7 @@
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
         + '<button type="button" class="ghost" data-act="label" data-id="' + esc(d.id) + '" title="Etikett mit Namen, ID und QR-Code für das Gehäuse drucken (Niimbot-Drucker, nur am Android-Handy)">Etikett</button>'
         + (d.standalone ? '' : '<button type="button" class="ghost" data-act="reflash" data-id="' + esc(d.id) + '" title="Dieses Thermometer neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten">Neu flashen</button>')
+        + (d.has_code ? '<button type="button" class="ghost" data-act="code" data-id="' + esc(d.id) + '" title="Kopplungscode wieder ansehen (nach Passwortabfrage)">🔑</button>' : '')
         + '<button type="button" class="ghost" data-act="interval" data-id="' + esc(d.id) + '" title="Messintervall ändern (zum Testen oder Abgleichen kurz stellen)">Intervall</button>'
         + '<button type="button" class="ghost" data-act="calib" data-id="' + esc(d.id) + '" title="Auf Referenzwerte abgleichen (kalibrieren)">Abgleichen</button>'
         + '<button type="button" class="ghost" data-act="rename" data-id="' + esc(d.id) + '" title="Umbenennen">✎</button>'
@@ -345,6 +346,14 @@
     } else if (b.dataset.act === 'reflash') {
       $('th-for').value = id; forChanged(); $('th-ssid').scrollIntoView({ block: 'center' }); $('th-flash').focus();
       msg('„' + (d.name || id) + '“ ausgewählt: WLAN prüfen und „Einrichten und flashen“ klicken. ID, Sensoren und Aufzeichnung bleiben erhalten.');
+    } else if (b.dataset.act === 'code') {
+      uiDialog({ title: 'Kopplungscode ansehen', message: 'Zur Bestätigung dein aktuelles Passwort.', label: 'Passwort', type: 'password', okText: 'Anzeigen' }).then(function (pw) {
+        if (!pw) return;
+        api('/api/thermo/' + encodeURIComponent(id) + '/code', 'POST', { password: pw }).then(function (j) {
+          try { navigator.clipboard.writeText(j.code); } catch (e) { /* Feld bleibt zum Kopieren */ }
+          return uiForm({ title: 'Kopplungscode: ' + (d.name || id), message: 'Gilt nur für dieses Gerät. Er liegt auch schon in der Zwischenablage.', fields: [{ id: 'code', label: 'Kopplungscode', type: 'text', value: j.code }], okText: 'Schließen' });
+        }).catch(function (e) { msg(e.message, true); });
+      });
     } else if (b.dataset.act === 'interval') {
       setInterval_(d);
     } else if (b.dataset.act === 'calib') {
