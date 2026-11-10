@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.49.1 – 10.11.2026
+- Behoben: Auf dem Handy ließ sich die Einstellungsseite (System) seitlich verschieben. Ursache waren die versteckten Auswahlknöpfe der neuen Thermometer-Karten.
+
 ## 1.49.0 – 10.11.2026
 - Geändert: **Funkthermometer einrichten mit Auswahl.** Oben wählst du den Weg: **Im Heimnetz (HTTP)** (läuft auch ohne Internet) oder **Über Internet (https)** (überall, braucht den Fernzugriff). Beide erzeugen einen **Kopplungscode**; beim Heimnetz enthält er die lokale `http://`-Adresse, und das Gerät bleibt von außen gesperrt. Das Flashen per USB steht jetzt eingeklappt darunter („Per USB flashen“). In der Liste steht „· per Code“ bzw. „· ohne USB“.
 

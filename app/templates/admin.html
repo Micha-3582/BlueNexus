@@ -159,7 +159,7 @@
     <label class="th-modecard"><input type="radio" name="th-mode" value="lan" checked><b>🏠 Im Heimnetz (HTTP)</b><span class="muted">Läuft auch ohne Internet. Das Thermometer steht im gleichen Netz wie BlueNexus.</span></label>
     <label class="th-modecard"><input type="radio" name="th-mode" value="net"><b>🌐 Über Internet (https)</b><span class="muted">Funktioniert überall, auch an fremden Standorten. Braucht den Fernzugriff (Cloudflare Tunnel).</span></label>
   </div>
-  <style>.th-modecard{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;background:var(--card)}.th-modecard:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.th-modecard input{position:absolute;opacity:0;pointer-events:none}</style>
+  <style>.th-modecard{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;background:var(--card)}.th-modecard:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.th-modecard{position:relative}.th-modecard input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;margin:0;left:0;top:0}</style>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px">
     <div><label for="th-sa-name">Name</label><input id="th-sa-name" maxlength="40" placeholder="z. B. Außen"></div>
     <div><label for="th-sa-loc">Standort (optional)</label><input id="th-sa-loc" maxlength="40" placeholder="z. B. Bauhof Nord"></div>
