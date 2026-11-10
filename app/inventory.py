@@ -93,11 +93,14 @@ def collect() -> list[dict]:
     except Exception as e:                                      # noqa: BLE001
         log.warning("Geraeteuebersicht: Thermometer nicht lesbar: %s", e)
 
-    count: dict[str, int] = {}
+    # Eine Kamera darf dieselbe Adresse haben wie ein anderes Geraet (Drucker mit Kamera, Tuerklingel ...): das ist dasselbe Geraet, kein Adressenkonflikt.
+    # Doppelt sind nur gleiche Adressen unter den Nicht-Kameras bzw. unter den Kameras (selbst).
+    count: dict[tuple, int] = {}
     for r in rows:
         if r["ip"]:
-            count[r["ip"]] = count.get(r["ip"], 0) + 1
+            k = (r["ip"], r["typ"] == "Kamera")
+            count[k] = count.get(k, 0) + 1
     for r in rows:
-        r["doppelt"] = bool(r["ip"]) and count.get(r["ip"], 0) > 1
+        r["doppelt"] = bool(r["ip"]) and count.get((r["ip"], r["typ"] == "Kamera"), 0) > 1
     rows.sort(key=lambda r: (_sort_key(r["ip"]), r["typ"], r["name"].lower()))
     return rows

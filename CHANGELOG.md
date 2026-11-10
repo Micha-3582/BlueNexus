@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.51.2 – 10.11.2026
+- Behoben: In der Geräteübersicht (IP-Adressen) wurde ein Drucker mit seiner Kamera (gleiche Adresse) fälschlich als „doppelte IP-Adresse“ markiert. Eine Kamera darf dieselbe Adresse haben wie ein anderes Gerät; doppelt sind nur gleiche Adressen unter den Geräten bzw. unter den Kameras.
+
 ## 1.51.1 – 10.11.2026
 - Behoben: Unter „ESP vorbereiten“ standen noch die alten Knöpfe („Einrichten und flashen“, „ESP32 löschen“) doppelt außerhalb des Aufklapp-Bereichs. Jetzt erscheinen sie nur noch nach dem Aufklappen.
 
