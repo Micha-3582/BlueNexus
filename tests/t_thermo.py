@@ -80,7 +80,7 @@ assert A.delete("/api/thermo/" + tid).status_code == 200 and A.delete("/api/ther
 assert not [s for s in homematic.load_sensors() if s.get("source") == "thermo"] and thermo.load() == []
 # 9) Karte nur mit Modul Smart Home
 cfg["modules"] = {"energy": True, "smarthome": True, "verlauf": True, "cameras": True, "alexa": False}
-h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' in h and "thermo-flash.js?v=" in h and "thermo-cfg.js" not in h and 'id="th-pass"' not in h and h.count('id="th-flash"') == 1 and h.count('id="th-steps"') == 1 and "Einrichten und flashen" not in h
+h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' in h and "thermo-flash.js?v=" in h and "thermo-cfg.js" not in h and 'id="th-pass"' not in h and h.count('id="th-flash"') == 1 and h.count('id="th-guide-label"') == 1 and h.count('id="th-steps"') == 1 and "Einrichten und flashen" not in h
 cfg["modules"] = {"energy": True, "smarthome": False, "verlauf": True, "cameras": True, "alexa": False}
 h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' not in h
 # 10) Konfig bytegleich zur Referenz des Thermometer-Chats (make_cfg.py)

@@ -245,6 +245,16 @@
         name: d.name, sub: d.id, url: base + '/admin?thermo=' + encodeURIComponent(d.id) + '#system' });
     }).catch(function (e) { uiAlert('Das Druckfenster konnte nicht geladen werden (' + e.message + '). Bitte die Seite neu laden.', 'Drucken nicht möglich'); });
   }
+  var GUIDE_URL = 'https://bluenexus-home.de/thermometer/anleitung/';                 // fest, steht auf den Platinen
+  function guideLabel() {
+    var es = typeof etikettState === 'function' ? etikettState() : { ok: false, kind: 'other', text: '' };
+    if (!es.ok) { uiAlert(es.kind === 'other' ? 'Etiketten drucken geht am Android-Handy (Chrome, über https): Öffne BlueNexus dort und drücke „Anleitungs-Etikett für die Platine“.' : es.text, 'Drucken hier nicht möglich'); return; }
+    etikettLoad().then(function () {
+      EtikettDruck.open({ title: '🏷 Anleitungs-Etikett drucken', intro: 'QR-Code zur Anleitung des Thermometers (Sicherheit, Einrichten, Zurücksetzen) – zum Aufkleben auf die Platine. Die Adresse ist fest und gilt für alle Thermometer. Für draußen ein wasser- und UV-festes Etikettenmaterial verwenden.',
+        name: 'Anleitung', sub: 'USB nur ohne Batterien!', url: GUIDE_URL });
+    }).catch(function (e) { uiAlert('Das Druckfenster konnte nicht geladen werden (' + e.message + '). Bitte die Seite neu laden.', 'Drucken nicht möglich'); });
+  }
+  $('th-guide-label').addEventListener('click', guideLabel);
   function labelHint() {
     var el = $('th-etk-hint'); if (!el) return;
     var es = typeof etikettState === 'function' ? etikettState() : null;
