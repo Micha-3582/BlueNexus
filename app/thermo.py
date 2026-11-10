@@ -367,7 +367,7 @@ def ota_start(tid: str, latest: str) -> str:
             return "Thermometer nicht gefunden"
         if not ota_capable(d.get("fw")):
             return "Dieses Thermometer hat keine Firmware ab 2.0.0 – es muss einmal per USB umgeflasht werden."
-        if _ver(d.get("fw")) == _ver(latest):
+        if _ver(d.get("fw")) >= _ver(latest):                      # nur nach oben: die Firmware spielt jede ABWEICHENDE Version ein, also nie eine aeltere anbieten
             return "Das Thermometer hat schon die neueste Firmware."
         d["ota_pending"], d["ota_tries"] = True, 0
         d.pop("ota_failed", None)
@@ -380,9 +380,9 @@ def ota_offer(tid: str, reported_fw: str, latest: str) -> bool:
     with _lock:
         items = _load()
         d = next((x for x in items if x.get("id") == tid), None)
-        if not d or not d.get("ota_pending"):
+        if not d or not d.get("ota_pending") or not ota_capable(reported_fw):
             return False
-        if _ver(reported_fw) == _ver(latest):                      # Update angekommen
+        if _ver(reported_fw) >= _ver(latest):                      # Update angekommen (oder das Geraet hat schon eine neuere Version): nichts anbieten, nie zurueck
             d.pop("ota_pending", None); d.pop("ota_tries", None)
             _save(items)
             return False

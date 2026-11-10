@@ -4285,7 +4285,7 @@ def api_thermo_list():
         fw = _thermo_firmware()
         devs = thermo.listing()
         for dv in devs:                                    # "Update verfuegbar": nur Geraete ab Firmware 2.0.0 koennen per Funk aktualisiert werden
-            dv["update"] = bool(fw and fw.get("ota_md5") and thermo.ota_capable(dv.get("fw")) and thermo._ver(dv.get("fw")) != thermo._ver(fw["version"]))
+            dv["update"] = bool(fw and fw.get("ota_md5") and thermo.ota_capable(dv.get("fw")) and thermo._ver(dv.get("fw")) < thermo._ver(fw["version"]))
         pub = {k: v for k, v in (fw or {}).items() if k not in ("ota_file", "ota_md5", "ota_size")} or None
         return jsonify(devices=devs, firmware=pub, server=_thermo_server_hint(), wifi=thermo.wifi_public(),
                        secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")

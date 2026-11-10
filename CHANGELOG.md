@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.52.2 – 10.11.2026
+- Neu: **Thermometer-Firmware 2.0.2** ersetzt 2.0.1. Das Einrichtungs-WLAN ist batterieschonender; mit Batterien kam es vorher zu Neustarts, und das WLAN verschwand immer wieder.
+- Behoben: **Update-Anzeige.** Ein Thermometer mit einer neueren Firmware als im Paket bekam fälschlich „Update verfügbar“. Jetzt wird ein Update nur noch angeboten, wenn die Paketversion **höher** ist als die gemeldete (Zahl für Zahl verglichen); nie eine ältere. Das gilt auch für schon vorgemerkte Updates.
+
 ## 1.52.1 – 10.11.2026
 - Geändert: Der animierte Hintergrund (Knotennetz) wird jetzt in einem eigenen Worker gezeichnet (OffscreenCanvas) und läuft damit unabhängig vom Rest der Seite weiter, auch wenn die Seite gerade etwas Schweres tut (Klick, Neuzeichnen, Daten laden). Auf Browsern ohne diese Technik zeichnet wie bisher die Seite selbst. Gilt für alle Seiten.
 

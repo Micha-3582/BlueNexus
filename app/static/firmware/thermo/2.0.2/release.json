@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "chip": "ESP32-C3",
   "flash_size_mb": 4,
   "parts": [
@@ -24,22 +24,22 @@
     {
       "file": "firmware.bin",
       "offset": 65536,
-      "size": 1033744,
-      "sha256": "9af1b533787e231e90c00e7f1b1cb574b2c1ecb9aba144d3caaf105e0555e6c0"
+      "size": 1034048,
+      "sha256": "25eca39c7cc31f79c4daa94cd2c498efb15a2f983ea969123a3d577cf4d0a452"
     }
   ],
   "merged": {
-    "file": "thermo-2.0.1.bin",
+    "file": "thermo-2.0.2.bin",
     "offset": 0,
-    "size": 1099280,
-    "sha256": "87b4f2446d61844279b400dc7196c4a6c2e77e6e114c0ad5cb4805ee71544382"
+    "size": 1099584,
+    "sha256": "35872b2d914c7f34f45d390f8c0864fffed04ce4a82e615b978133776ebded0c"
   },
   "ota": {
     "file": "firmware.bin",
     "offset": 65536,
-    "size": 1033744,
-    "sha256": "9af1b533787e231e90c00e7f1b1cb574b2c1ecb9aba144d3caaf105e0555e6c0",
-    "md5": "71365dcc04dd8e1b39afbfb8d017af71"
+    "size": 1034048,
+    "sha256": "25eca39c7cc31f79c4daa94cd2c498efb15a2f983ea969123a3d577cf4d0a452",
+    "md5": "27a072a48c814e60c5bb075e6eef7fd9"
   },
   "cfg_offset": 4063232,
   "cfg_size": 4096
