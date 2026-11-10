@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.52.1 – 10.11.2026
+- Geändert: Der animierte Hintergrund (Knotennetz) wird jetzt in einem eigenen Worker gezeichnet (OffscreenCanvas) und läuft damit unabhängig vom Rest der Seite weiter, auch wenn die Seite gerade etwas Schweres tut (Klick, Neuzeichnen, Daten laden). Auf Browsern ohne diese Technik zeichnet wie bisher die Seite selbst. Gilt für alle Seiten.
+
 ## 1.52.0 – 10.11.2026
 - Neu: **Thermometer-Firmware 2.0.1** ersetzt 2.0.0. Das Thermometer ist beim Aufwachen deutlich kürzer wach (WLAN-Verbindung in etwa 0,6 s statt 2,9 s im Heimnetz), die Batterie hält dadurch rund viermal so lange. Thermometer mit 2.0.0 bekommen in der Liste „Update 2.0.1 verfügbar“ und lassen sich per Funk aktualisieren. In der Heimnetz-Auswahl steht jetzt, dass die Batterie dort deutlich länger hält als über Internet.
 
