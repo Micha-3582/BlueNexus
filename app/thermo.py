@@ -217,7 +217,7 @@ def public(dev: dict) -> dict:
         cor["hum"] = round(min(100.0, max(0.0, cor["hum"] + float(cal.get("hum") or 0))), 2)
     at = dev.get("attempt") or {}
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
-    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "has_code": bool(dev.get("code")), "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
+    return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "has_code": bool(dev.get("code")), "ota_pending": bool(dev.get("ota_pending")), "ota_failed": dev.get("ota_failed") or "", "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
             "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
 
@@ -333,6 +333,66 @@ def pairing_code(server: str, tid: str, token: str, lan: bool = False) -> str:
         raise ThermoError("Internet-Adresse: bitte als https://… eintragen (die Tunnel-Adresse von BlueNexus, ohne Pfad)")
     raw = json.dumps({"server": srv, "id": tid, "token": token}, separators=(",", ":")).encode("utf-8")
     return "bnxthermo1_" + base64.b64encode(raw).decode("ascii")
+
+
+OTA_MAX_OFFERS = 5                  # so oft wird ein Funk-Update hoechstens angeboten (danach Abbruch: das Geraet hat es nicht geschafft)
+
+
+def verify_token(tid: str, token: str) -> bool:
+    """Gehoert der Schluessel zu diesem Geraet (aktueller oder neu ausgegebener)? Fuer den Firmware-Download."""
+    if not ID_RE.match(tid or "") or not token:
+        return False
+    d = get(tid)
+    if not d:
+        return False
+    h = _hash(token)
+    return hmac.compare_digest(str(d.get("token_hash") or ""), h) or (bool(d.get("pending_hash")) and hmac.compare_digest(str(d["pending_hash"]), h))
+
+
+def _ver(v) -> tuple:
+    return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.\-]", str(v or "")) if x != "")
+
+
+def ota_capable(fw) -> bool:
+    """Funk-Update gibt es ab Firmware 2.0.0 (aeltere Geraete muessen einmal per USB umgeflasht werden)."""
+    return _ver(fw)[:1] >= (2,)
+
+
+def ota_start(tid: str, latest: str) -> str:
+    """Funk-Update fuer dieses Geraet vormerken (wird bei der naechsten Meldung angeboten). -> "" oder Fehlertext."""
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if not d:
+            return "Thermometer nicht gefunden"
+        if not ota_capable(d.get("fw")):
+            return "Dieses Thermometer hat keine Firmware ab 2.0.0 – es muss einmal per USB umgeflasht werden."
+        if _ver(d.get("fw")) == _ver(latest):
+            return "Das Thermometer hat schon die neueste Firmware."
+        d["ota_pending"], d["ota_tries"] = True, 0
+        d.pop("ota_failed", None)
+        _save(items)
+    return ""
+
+
+def ota_offer(tid: str, reported_fw: str, latest: str) -> bool:
+    """Soll dem Geraet jetzt ein Update angeboten werden? Raeumt die Vormerkung auf, wenn die neue Version gemeldet wurde."""
+    with _lock:
+        items = _load()
+        d = next((x for x in items if x.get("id") == tid), None)
+        if not d or not d.get("ota_pending"):
+            return False
+        if _ver(reported_fw) == _ver(latest):                      # Update angekommen
+            d.pop("ota_pending", None); d.pop("ota_tries", None)
+            _save(items)
+            return False
+        if int(d.get("ota_tries") or 0) >= OTA_MAX_OFFERS:        # Geraet schafft es nicht: aufhoeren statt endlos zu wiederholen
+            d.pop("ota_pending", None); d["ota_failed"] = latest
+            _save(items)
+            return False
+        d["ota_tries"] = int(d.get("ota_tries") or 0) + 1
+        _save(items)
+    return True
 
 
 def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False) -> tuple[int, dict]:

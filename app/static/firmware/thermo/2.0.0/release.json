@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "chip": "ESP32-C3",
+  "flash_size_mb": 4,
+  "parts": [
+    {
+      "file": "bootloader.bin",
+      "offset": 0,
+      "size": 13248,
+      "sha256": "30d47ab1f344cfa69f6b2f718ffa72fc7baea6db047eaabefea162db29e6821c"
+    },
+    {
+      "file": "partitions.bin",
+      "offset": 32768,
+      "size": 3072,
+      "sha256": "b8527b603fcb7f2588d81812db020f70d29ea1883f9f82e0b388aa68661fd179"
+    },
+    {
+      "file": "boot_app0.bin",
+      "offset": 57344,
+      "size": 8192,
+      "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+    },
+    {
+      "file": "firmware.bin",
+      "offset": 65536,
+      "size": 1032912,
+      "sha256": "eb84355fb41a081cbc7e6e7745c631045a1c22cdc0424409bd1bc140b7acbad0"
+    }
+  ],
+  "merged": {
+    "file": "thermo-2.0.0.bin",
+    "offset": 0,
+    "size": 1098448,
+    "sha256": "243f33a4dfab9f1a4b7132d1da51bfb3f6d6f61acb97c547a31e286ba7d83901"
+  },
+  "ota": {
+    "file": "firmware.bin",
+    "offset": 65536,
+    "size": 1032912,
+    "sha256": "eb84355fb41a081cbc7e6e7745c631045a1c22cdc0424409bd1bc140b7acbad0",
+    "md5": "2cde3b7079d63ea9446db5fec091b345"
+  },
+  "cfg_offset": 4063232,
+  "cfg_size": 4096
+}

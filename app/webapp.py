@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 
 from flask.sessions import SecureCookieSessionInterface
 from flask import (Flask, g, jsonify, make_response, redirect, render_template, request,
-                   session, url_for, Response, stream_with_context)
+                   session, url_for, Response, stream_with_context, send_file)
 
 import json
 import os
@@ -173,7 +173,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"api_thermo_ingest", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"api_thermo_ingest", "api_thermo_fw", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -4264,8 +4264,9 @@ def _thermo_firmware():
             rel = json.load(f)
         base = f"/static/firmware/thermo/{ver}/"
         m = rel.get("merged") or {}
+        o = rel.get("ota") or {}
         return {"version": rel.get("version", ver), "chip": rel.get("chip"), "url": base + str(m.get("file")), "offset": int(m.get("offset", 0)), "size": m.get("size"),
-                "sha256": m.get("sha256"), "cfg_offset": int(rel.get("cfg_offset", 0x1F0000)), "cfg_size": int(rel.get("cfg_size", 4096))}
+                "sha256": m.get("sha256"), "ota_file": os.path.join(THERMO_FW_DIR, ver, str(o.get("file") or "firmware.bin")), "ota_md5": str(o.get("md5") or ""), "ota_size": o.get("size")}
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -4281,7 +4282,12 @@ def _thermo_server_hint() -> str:
 def api_thermo_list():
     """GET: Thermometer + Firmware + Adressvorschlag. POST {name, interval}: neues Thermometer anlegen (Schluessel kommt EINMAL im Klartext zurueck)."""
     if request.method == "GET":
-        return jsonify(devices=thermo.listing(), firmware=_thermo_firmware(), server=_thermo_server_hint(), wifi=thermo.wifi_public(),
+        fw = _thermo_firmware()
+        devs = thermo.listing()
+        for dv in devs:                                    # "Update verfuegbar": nur Geraete ab Firmware 2.0.0 koennen per Funk aktualisiert werden
+            dv["update"] = bool(fw and fw.get("ota_md5") and thermo.ota_capable(dv.get("fw")) and thermo._ver(dv.get("fw")) != thermo._ver(fw["version"]))
+        pub = {k: v for k, v in (fw or {}).items() if k not in ("ota_file", "ota_md5", "ota_size")} or None
+        return jsonify(devices=devs, firmware=pub, server=_thermo_server_hint(), wifi=thermo.wifi_public(),
                        secure=request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
     b = request.get_json(silent=True) or {}
     interval = b.get("interval", thermo.DEFAULT_INTERVAL_MIN)
@@ -4347,6 +4353,22 @@ def api_thermo_item(tid):
 @app.route("/api/thermo/<tid>/code", methods=["POST"])
 def api_thermo_code(tid):
     """Kopplungscode eines per Code angelegten Geraets erneut anzeigen (nur Administratoren, wie alle Thermometer-Einstellungen)."""
+    b = request.get_json(silent=True) or {}
+    if b.get("new"):                                       # Neuen Kopplungscode erzeugen (Geraet ohne gespeicherten Code, z. B. mit alter Firmware): behaelt ID, Sensoren, Verlaeufe, Regeln
+        dev = thermo.get(tid)
+        if not dev:
+            return jsonify(error="Thermometer nicht gefunden"), 404
+        lan = not dev.get("standalone")                    # Internet-Geraete (ohne USB) brauchen eine https-Adresse, alle anderen die lokale http-Adresse
+        server = str(b.get("server") or "").strip() or (_thermo_server_hint() if lan else "")
+        try:
+            thermo.pairing_code(server, tid, "x" * 8, lan=lan)           # Adresse vorab pruefen, bevor ein Schluessel ausgegeben wird
+        except thermo.ThermoError as e:
+            return jsonify(error=str(e)), 400
+        _dev, token = thermo.rekey(tid)
+        code = thermo.pairing_code(server, tid, token, lan=lan)
+        thermo.set_code(tid, code)
+        opslog.log("thermo", f"Neuer Kopplungscode für Thermometer {tid} erzeugt", dry=False)
+        return jsonify(code=code, new=True)
     code = thermo.get_code(tid)
     if not code:
         return jsonify(error="Für dieses Gerät ist kein Kopplungscode gespeichert (nur bei Geräten, die mit Code angelegt wurden)."), 404
@@ -4386,6 +4408,10 @@ def api_thermo_ingest(tid):
         return jsonify(error="too many attempts"), 429
     h = request.headers.get("Authorization", "")
     code, body = thermo.ingest(tid, h[7:].strip() if h[:7].lower() == "bearer " else "", request.get_json(silent=True), ip, remote=remote)
+    if code == 200:                                          # Funk-Update (OTA): nur wenn der Administrator es fuer dieses Geraet angestossen hat
+        fw = _thermo_firmware()
+        if fw and fw.get("ota_md5") and thermo.ota_offer(tid, str((request.get_json(silent=True) or {}).get("fw") or ""), fw["version"]):
+            body["ota"] = {"version": fw["version"], "md5": fw["ota_md5"], "url": f"/api/sensor/{tid}/fw.bin"}
     if code == 401:
         log.warning("Funkthermometer %s: Anfrage von %s abgelehnt (Schlüssel falsch oder Gerät unbekannt)", tid, ip)
     if code == 401:
@@ -4393,6 +4419,42 @@ def api_thermo_ingest(tid):
     else:
         ctrl._rules_wake.set()                                          # Regeln mit diesem Sensor gleich pruefen
     return jsonify(body), code
+
+
+@app.route("/api/sensor/<tid>/fw.bin", methods=["GET"])
+def api_thermo_fw(tid):
+    """Firmware-Datei fuer das Funk-Update (OTA): nur mit dem Schluessel des Geraets, nur wenn fuer dieses Geraet ein Update vorgemerkt ist.
+    Gleiche Regeln wie die Messung: von aussen (Tunnel) nur Geraete ohne USB."""
+    remote = not extapi.lan_request_ok(request.headers, request.remote_addr)
+    if remote and not thermo.is_standalone(tid):
+        return "", 404
+    ip = client_ip()
+    if too_many_attempts("thermo:" + ip):
+        return jsonify(error="too many attempts"), 429
+    h = request.headers.get("Authorization", "")
+    if not thermo.verify_token(tid, h[7:].strip() if h[:7].lower() == "bearer " else ""):
+        note_failed_attempt("thermo:" + ip)
+        return jsonify(error="unauthorized"), 401
+    dev = thermo.get(tid) or {}
+    fw = _thermo_firmware()
+    if not fw or not dev.get("ota_pending") or not os.path.isfile(fw.get("ota_file") or ""):
+        return "", 404
+    r = send_file(fw["ota_file"], mimetype="application/octet-stream", conditional=False, max_age=0)
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
+@app.route("/api/thermo/<tid>/update", methods=["POST"])
+def api_thermo_update(tid):
+    """Funk-Update (OTA) fuer ein Thermometer anstossen: es laedt die Firmware bei seiner naechsten Meldung."""
+    fw = _thermo_firmware()
+    if not fw or not fw.get("ota_md5"):
+        return jsonify(error="Keine Firmware für Funk-Updates in dieser Installation"), 404
+    err = thermo.ota_start(tid, fw["version"])
+    if err:
+        return jsonify(error=err), 400
+    opslog.log("thermo", f"Funk-Update auf Firmware {fw['version']} für Thermometer {tid} vorgemerkt", dry=False)
+    return jsonify(ok=True, version=fw["version"])
 
 
 @app.route("/api/inventory", methods=["GET"])

@@ -1,14 +1,13 @@
-/* Funkthermometer (ESP32-C3): einrichten, flashen und zuruecksetzen - direkt im Browser per Web Serial (esptool-js, lokal ausgeliefert).
-   Ablauf: Thermometer in BlueNexus anlegen (ID + Schluessel) -> Konfiguration (cfg.bin) im Browser bauen (WLAN-Passwort bleibt im Browser) ->
-   Chip loeschen, Firmware (ein Image) bei 0x0 und cfg.bin bei 0x1F0000 schreiben -> Neustart -> auf die erste Messung warten. */
+/* Funkthermometer (ESP32-C3): Chip vorbereiten (Firmware per Web Serial aufspielen, esptool-js lokal ausgeliefert), Liste, Kopplungscode, Funk-Update.
+   Ablauf "ESP vorbereiten": Chip loeschen, ein Image bei 0x0 schreiben, fertig - ohne WLAN, ohne Schluessel. Eingerichtet wird das Thermometer am Einsatzort
+   per Handy (Einrichtungs-WLAN BlueNexus-Thermo-XXXX) mit dem Kopplungscode, den BlueNexus unter "Neues Thermometer einrichten" erzeugt. */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var card = $('thermo-card'); if (!card) return;
   var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-  var state = { fw: null, server: '', secure: false, devices: [], busy: false, wifi: { saved: false, ssid: '', has_pass: false } };
+  var state = { fw: null, server: '', secure: false, devices: [], busy: false };
   var USB_FILTER = [{ usbVendorId: 0x303A, usbProductId: 0x1001 }];       // ESP32-C3: "USB JTAG/serial debug unit"
-  var IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
   function msg(t, err) { var m = $('th-msg'); m.textContent = t || ''; m.style.color = err ? '#e5544a' : ''; }
   function api(url, method, body) {
@@ -24,18 +23,6 @@
   }
   var dec = function (v, d) { return v == null ? '–' : Number(v).toFixed(d == null ? 1 : d).replace('.', ','); };
 
-  /* ---------------- Gemerktes WLAN ---------------- */
-  function applyWifi() {
-    var w = state.wifi, ss = $('th-ssid'), pw = $('th-pass');
-    if (w.saved) {
-      if (!ss.value || ss.dataset.auto === '1') { ss.value = w.ssid; ss.dataset.auto = '1'; }
-      pw.placeholder = w.has_pass ? 'gemerkt – leer lassen' : 'Passwort';
-      $('th-saved').textContent = 'WLAN „' + w.ssid + '“ ist gemerkt' + (w.has_pass ? ' (mit Passwort)' : '') + '.';
-    } else { pw.placeholder = 'Passwort'; $('th-saved').textContent = ''; }
-    $('th-forget').style.display = w.saved ? '' : 'none';
-  }
-  $('th-ssid').addEventListener('input', function () { $('th-ssid').dataset.auto = '0'; });
-
   /* ---------------- Liste ---------------- */
   /* Symbolknoepfe der Geraeteliste: quadratisch (.tgl, wie im Smart-Home-Bereich), Beschreibung als Hover-/Lesetext */
   function ti(p) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>'; }
@@ -46,10 +33,24 @@
     clock: ti('<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>'),
     sliders: ti('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'),
     pen: ti('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+    down: ti('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
     trash: ti('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>')
   };
   function tbtn(act, id, title, icon, del) {
     return '<button type="button" class="tgl' + (del ? ' del' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" title="' + esc(title) + '" aria-label="' + esc(title) + '">' + icon + '</button>';
+  }
+  /* Neuen Kopplungscode erzeugen (Geraet ohne gespeicherten Code): ID, Sensoren, Verlaeufe, Regeln bleiben; der alte Schluessel gilt, bis sich das Geraet mit dem neuen meldet */
+  function newCode(d) {
+    var net = !!d.standalone, def = net ? ((function () { try { return localStorage.getItem('thSaServer') || ''; } catch (e) { return ''; } })() || (location.protocol === 'https:' ? location.origin : '')) : state.server;
+    uiForm({ title: 'Neuen Kopplungscode erzeugen: ' + (d.name || d.id), okText: 'Erzeugen',
+      message: 'Das Thermometer behält ID, Sensoren, Verläufe und Regeln. Es muss danach neu eingerichtet werden (Kopplungscode am Einsatzort im Einrichtungsfenster eingeben, bei einem Gerät mit alter Firmware erst „ESP vorbereiten“). Bis es sich mit dem neuen Schlüssel meldet, gilt der alte weiter.',
+      fields: [{ id: 'server', label: net ? 'Internet-Adresse von BlueNexus (https://…)' : 'Adresse von BlueNexus im Heimnetz (http://…)', type: 'text', value: def }] }).then(function (r) {
+      if (!r) return;
+      api('/api/thermo/' + encodeURIComponent(d.id) + '/code', 'POST', { new: true, server: r.server }).then(function (j) {
+        try { navigator.clipboard.writeText(j.code); } catch (e) { /* Feld bleibt zum Kopieren */ }
+        showCode(d, j.code); return load();
+      }).catch(function (e) { msg(e.message, true); });
+    });
   }
   /* Kopplungscode anzeigen: Feld zum Markieren + Kopieren-Knopf (ein Klick legt den langen Code in die Zwischenablage) */
   function showCode(d, code) {
@@ -81,17 +82,24 @@
       var batTxt = bstate === '' ? '' : ' · Batterie ' + dec(bat, 2) + ' V' + (bstate === 'low' ? ' – bald wechseln' : '');
       return '<div data-row="' + esc(d.id) + '" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:12px;padding:10px 12px">'
         + '<span title="' + (d.online ? 'meldet sich' : 'meldet sich nicht') + '" style="width:10px;height:10px;border-radius:50%;background:' + (d.online ? '#35c07a' : (d.last_seen == null ? '#9aa4b5' : '#e5544a')) + '"></span>'
-        + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.location ? ' · 📍 ' + esc(d.location) : '') + (d.standalone ? ' · ohne USB' : d.paired ? ' · per Code' : '') + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + '</span>'
+        + '<div style="flex:1;min-width:180px"><b>' + esc(d.name) + '</b> <span class="muted">· ' + esc(d.id) + (d.location ? ' · 📍 ' + esc(d.location) : '') + (d.standalone ? ' · ohne USB' : d.paired ? ' · per Code' : '') + (d.fw ? ' · Firmware ' + esc(d.fw) : '') + fwTxt(d) + '</span>'
         + '<div class="muted" style="font-size:13px">' + (d.last_seen == null ? (d.attempt ? '<span style="color:#e5544a">Anfrage angekommen, aber abgelehnt: ' + esc(d.attempt.why) + ' (vor ' + d.attempt.age_s + ' s, von ' + esc(d.attempt.ip) + ')</span>' : 'wartet auf die erste Meldung') : dec(l.temp) + ' °C · ' + dec(l.hum, 0) + ' % · ' + ago(d.age_s) + batTxt + (l.rssi != null ? ' · Empfang ' + dec(l.rssi, 0) + ' dBm' : '')) + ' · alle ' + d.interval + ' min' + metaTxt(d) + calTxt(d) + '</div></div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">'
         + tbtn('label', d.id, 'Etikett drucken: Name, ID und QR-Code für das Gehäuse (Niimbot-Drucker, nur am Android-Handy)', TI.tag)
-        + (d.standalone ? '' : tbtn('reflash', d.id, 'Neu flashen (z. B. Firmware-Update): ID, Sensoren, Aufzeichnung und Regeln bleiben erhalten', TI.bolt))
-        + (d.has_code ? tbtn('code', d.id, 'Kopplungscode wieder ansehen (nach Passwortabfrage)', TI.key) : '')
+        + (d.update ? tbtn('update', d.id, d.ota_pending ? 'Firmware-Update ist vorgemerkt – das Thermometer lädt es bei seiner nächsten Meldung (erneut anstoßen: klicken)' : 'Firmware auf ' + (state.fw ? state.fw.version : 'die neueste Version') + ' aktualisieren (per Funk, bei der nächsten Meldung)', TI.down) : '')
+        + (d.has_code ? tbtn('code', d.id, 'Kopplungscode wieder ansehen', TI.key) : tbtn('newcode', d.id, 'Neuen Kopplungscode erzeugen (z. B. für ein Thermometer mit älterer Firmware, das neu eingerichtet werden soll – ID, Sensoren und Verläufe bleiben erhalten)', TI.key))
         + tbtn('interval', d.id, 'Messintervall ändern (zum Testen oder Abgleichen kurz stellen)', TI.clock)
         + tbtn('calib', d.id, 'Auf Referenzwerte abgleichen (kalibrieren)', TI.sliders)
         + tbtn('rename', d.id, 'Umbenennen', TI.pen)
         + tbtn('del', d.id, 'Entfernen', TI.trash, true) + '</div></div>';
     }).join('');
+  }
+  function fwTxt(d) {                                     // Hinweis zur Firmware: Update verfuegbar / vorgemerkt / gescheitert / zu alt fuer Funk-Update
+    if (d.ota_failed) return ' · <span style="color:#e5544a">Funk-Update auf ' + esc(d.ota_failed) + ' fehlgeschlagen</span>';
+    if (d.ota_pending) return ' · <span style="color:#f0a63c">Update vorgemerkt</span>';
+    if (d.update) return ' · <span style="color:#f0a63c">Update ' + esc(state.fw ? state.fw.version : '') + ' verfügbar</span>';
+    if (d.fw && parseInt(d.fw, 10) < 2) return ' · <span class="muted">alte Firmware – einmal per USB auf ' + esc(state.fw ? state.fw.version : '2.0.0') + ' umflashen</span>';
+    return '';
   }
   var RR = { 1: 'Einschalten', 2: 'RESET-Taste', 3: 'Software-Neustart', 4: 'Absturz', 5: 'Watchdog', 6: 'Watchdog', 7: 'Watchdog', 8: 'Zeitgeber', 9: 'Batterie schwach (Brownout)', 11: 'USB', 12: 'JTAG' };
   function metaTxt(d) {                                   // ab Firmware 1.1: Aufwachen Nr. und Grund des letzten Starts
@@ -103,15 +111,6 @@
     if (c.temp != null) p.push((c.temp > 0 ? '+' : '') + dec(c.temp, 2) + ' °C');
     if (c.hum != null) p.push((c.hum > 0 ? '+' : '') + dec(c.hum, 1) + ' %');
     return p.length ? ' · Abgleich ' + p.join(' / ') : '';
-  }
-  function fillFor() {                                      // Auswahl "Einrichten fuer": neues Thermometer oder ein vorhandenes neu flashen
-    var sel = $('th-for'), cur = sel.value;
-    sel.innerHTML = '<option value="">Neues Thermometer</option>' + state.devices.map(function (d) { return '<option value="' + esc(d.id) + '">' + esc(d.name) + ' · ' + esc(d.id) + ' – neu flashen (Messwerte bleiben)</option>'; }).join('');
-    sel.value = state.devices.some(function (d) { return d.id === cur; }) ? cur : '';
-  }
-  function forChanged() {                                   // vorhandenes gewaehlt: Name und Intervall des Geraets uebernehmen
-    var d = state.devices.find(function (x) { return x.id === $('th-for').value; });
-    if (d) { $('th-name').value = d.name; if ([5, 10, 15, 30, 60].indexOf(d.interval) >= 0) $('th-int').value = String(d.interval); }
   }
   var focused = false;
   function focusFromLink() {                                  // QR-Code vom Etikett: /admin?thermo=<ID>#system -> Zeile hervorheben
@@ -125,16 +124,16 @@
   }
   function load() {
     return api('/api/thermo').then(function (j) {
-      state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure; state.wifi = j.wifi || state.wifi; applyWifi();
-      if (!$('th-server').value) $('th-server').value = state.server;
-      renderList(); fillFor(); checkEnv(); labelHint(); focusFromLink();
+      state.devices = j.devices || []; state.fw = j.firmware || null; state.server = j.server || ''; state.secure = !!j.secure;
+      if ($('th-fwver')) $('th-fwver').textContent = state.fw ? state.fw.version : '';
+      renderList(); checkEnv(); labelHint(); focusFromLink();
     }).catch(function (e) { msg(e.message, true); });
   }
 
   /* ---------------- Voraussetzungen ---------------- */
   function envProblem() {
     if (!navigator.serial) return 'Zum Flashen braucht der Browser „Web Serial“: bitte Chrome oder Edge am PC benutzen (nicht Firefox, Safari oder Handy).';
-    if (!window.isSecureContext) return 'Flashen im Browser geht nur über eine gesicherte Adresse (https oder localhost). Öffne BlueNexus über die https-Adresse – oder nimm „Ohne PC einrichten“.';
+    if (!window.isSecureContext) return 'Flashen im Browser geht nur über eine gesicherte Adresse (https oder localhost). Öffne BlueNexus über die https-Adresse  Ein Thermometer ohne USB einzurichten geht auch ohne Flashen (Kopplungscode).';
     if (!state.fw) return 'Die Firmware-Datei fehlt in dieser Installation (static/firmware/thermo).';
     return '';
   }
@@ -144,25 +143,8 @@
     $('th-flash').disabled = !!p || state.busy; $('th-reset').disabled = !(navigator.serial && window.isSecureContext) || state.busy;
   }
 
-  /* ---------------- Eingaben ---------------- */
-  function readForm() {
-    var name = $('th-name').value.trim() || 'Thermometer', ssid = $('th-ssid').value, pass = $('th-pass').value, server = $('th-server').value.trim().replace(/\/+$/, '');
-    if (!ssid) throw new Error('Bitte den WLAN-Namen eintragen.');
-    if (new TextEncoder().encode(ssid).length > 32) throw new Error('Der WLAN-Name ist zu lang (höchstens 32 Zeichen).');
-    if (pass && (pass.length < 8 || pass.length > 63)) throw new Error('Das WLAN-Passwort muss 8 bis 63 Zeichen haben (oder leer bei einem offenen WLAN).');
-    var useSaved = !pass && state.wifi.saved && state.wifi.ssid === ssid && state.wifi.has_pass;
-    if (!/^http:\/\/[^\/\s]+$/.test(server)) throw new Error('Die Adresse von BlueNexus muss so aussehen: http://192.168.x.x:5005 (nur http, ohne Pfad).');
-    var ip = null;
-    if ($('th-fixed').checked) {
-      var a = $('th-ip').value.trim(), g = $('th-gw').value.trim(), m = $('th-mask').value.trim() || '255.255.255.0', d = $('th-dns').value.trim() || g;
-      [a, g, m, d].forEach(function (x) { if (!IPV4.test(x)) throw new Error('Feste IP: bitte gültige Adressen eintragen (z. B. 192.168.2.60).'); });
-      ip = { addr: a, gw: g, mask: m, dns: d };
-    }
-    return { name: name, ssid: ssid, pass: pass, useSaved: useSaved, server: server, interval: parseInt($('th-int').value, 10) || 15, ip: ip };
-  }
-
   /* ---------------- Fortschritt ---------------- */
-  var STEPS = ['Thermometer anlegen bzw. vorbereiten', 'Mit dem Chip verbinden', 'Chip löschen', 'Firmware schreiben', 'Konfiguration schreiben', 'Neustart', 'Auf die erste Messung warten'];
+  var STEPS = ['Mit dem Chip verbinden', 'Chip löschen', 'Firmware schreiben', 'Fertig'];
   var stepState = [];
   function steps(i, st, extra) {
     stepState[i] = { st: st, extra: extra || '' };
@@ -197,81 +179,39 @@
   function setBusy(b) { state.busy = b; $('th-flash').disabled = b; $('th-reset').disabled = b; checkEnv(); }
 
   function flash() {
-    var f;
-    try { f = readForm(); } catch (e) { msg(e.message, true); return; }
-    if (!f.pass && !f.useSaved) {                              // kein Passwort eingetragen und keins gemerkt: nachfragen (haeufiger Tippfehler: Chip kaeme sonst nicht ins WLAN)
-      uiDialog({ title: 'Kein WLAN-Passwort?', okText: 'Ja, das WLAN ist offen', message: 'Es ist kein Passwort eingetragen. Nur bei einem offenen WLAN ohne Passwort ist das richtig – sonst kann sich das Thermometer nicht verbinden.' }).then(function (ok) { if (ok) doFlash(f); });
-      return;
-    }
-    doFlash(f);
+    if (!state.fw) { msg('Die Firmware-Datei fehlt in dieser Installation.', true); return; }
+    uiDialog({ title: 'ESP vorbereiten', okText: 'Weiter',
+      html: '<div style="text-align:left;line-height:1.5">Der angesteckte Chip wird <b>gelöscht</b> und bekommt die Firmware <b>' + esc(state.fw.version) + '</b>. Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li>USB-C-Kabel an den PC anstecken.</li><li>Neuer Chip: er meldet sich von selbst. Ein schon eingerichteter: <b>BOOT-Taste halten</b>, USB-C anstecken (oder RESET drücken), BOOT loslassen.</li><li>Auf „Weiter“ klicken und „USB JTAG/serial debug unit“ wählen.</li></ol></div>' }).then(function (ok) { if (ok) doFlash(); });
   }
-  function doFlash(f) {
-    var fwUrl = state.fw && state.fw.url, created = null, lib = null, session = null, logLines = [], ov = null;
+  function doFlash() {
+    var lib = null, session = null, logLines = [];
     msg(''); resetSteps(); setBusy(true);
     var log = function (s) { logLines.push(String(s)); if (logLines.length > 40) logLines.shift(); };
     steps(0, 'run');
-    api('/api/thermo', 'POST', { name: f.name, interval: f.interval, replace: $('th-for').value || undefined, remember: $('th-remember').checked, wifi: { ssid: f.ssid, pass: f.pass, server: f.server, ip: f.ip } }).then(function (j) {
-      created = j; steps(0, 'ok', j.device.id); if (j.wifi) { state.wifi = j.wifi; applyWifi(); }
-      var cfgBytes = Uint8Array.from(atob(j.cfg), function (c) { return c.charCodeAt(0); });       // vom Server gebaut (ID, Schluessel, WLAN) - 4096 Byte
-      steps(1, 'run');
-      return Promise.all([loadLib(), fetch(fwUrl).then(function (r) { if (!r.ok) throw new Error('Firmware nicht ladbar'); return r.arrayBuffer(); })]).then(function (r) {
-        return sha256hex(r[1]).then(function (h) {
-          if (state.fw.sha256 && h !== state.fw.sha256) throw new Error('Die Firmware-Datei ist beschädigt (Prüfsumme stimmt nicht).');
-          lib = r[0]; return openChip(lib, log).then(function (s) { session = s; return { fw: new Uint8Array(r[1]), cfg: cfgBytes }; });
-        });
+    Promise.all([loadLib(), fetch(state.fw.url).then(function (r) { if (!r.ok) throw new Error('Firmware nicht ladbar'); return r.arrayBuffer(); })]).then(function (r) {
+      return sha256hex(r[1]).then(function (h) {
+        if (state.fw.sha256 && h !== state.fw.sha256) throw new Error('Die Firmware-Datei ist beschädigt (Prüfsumme stimmt nicht).');
+        lib = r[0]; return openChip(lib, log).then(function (s) { session = s; return new Uint8Array(r[1]); });
       });
-    }).then(function (d) {
-      steps(1, 'ok', session.chip); steps(2, 'run');
+    }).then(function (fw) {
+      steps(0, 'ok', session.chip); steps(1, 'run');
       return session.loader.eraseFlash().then(function () {
-        steps(2, 'ok'); steps(3, 'run');
-        var wrote = 0;
+        steps(1, 'ok'); steps(2, 'run');
         return session.loader.writeFlash({
-          fileArray: [{ data: d.fw, address: state.fw.offset || 0 }, { data: d.cfg, address: state.fw.cfg_offset }],
+          fileArray: [{ data: fw, address: state.fw.offset || 0 }],
           flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep', eraseAll: false, compress: true,
-          reportProgress: function (i, w, t) { if (i === 0) steps(3, 'run', Math.round(w / t * 100) + ' %'); else { if (!wrote) { steps(3, 'ok'); wrote = 1; } steps(4, 'run'); } }
+          reportProgress: function (i, w, t) { steps(2, 'run', Math.round(w / t * 100) + ' %'); }
         });
       });
     }).then(function () {
-      steps(3, 'ok'); steps(4, 'ok'); steps(5, 'ok', 'fertig geschrieben');
-      return session.transport.disconnect().catch(function () {});               /* ein automatischer Neustart wirkt bei diesem Board nicht (getestet: RTS-, Soft- und Hard-Reset) - die RESET-Taste startet es */
+      steps(2, 'ok'); steps(3, 'ok', 'Firmware ' + state.fw.version + ' ist drauf');
+      return session.transport.disconnect().catch(function () {});               /* ein automatischer Neustart wirkt bei diesem Board nicht - die RESET-Taste startet es */
     }).then(function () {
-      steps(6, 'run', 'jetzt die RESET-Taste am Board drücken – das Thermometer meldet sich dann nach 1 bis 20 Sekunden');
-      ov = resetOverlay();                                                         // grosser Hinweis ueber der Seite: nicht zu uebersehen
-      return waitFirst(created.device.id, 90, ov, created.replaced ? created.device.last_seen : null);
-    }).then(function (dev) {
-      steps(6, 'ok'); if (ov) ov.close(true);
-      msg('Thermometer verbunden: ' + dec(dev.last.temp) + ' °C, ' + dec(dev.last.hum, 0) + ' % Luftfeuchte. Die Sensoren findest du unter Smart Home → Sensoren (zunächst nur für Administratoren sichtbar).');
-      setBusy(false); return load();
+      msg('Fertig. Der Chip ist vorbereitet. Beim ersten Start (RESET drücken oder Strom anschließen) öffnet er das WLAN „BlueNexus-Thermo-XXXX“ – dort wird er am Einsatzort per Handy mit dem Kopplungscode eingerichtet (Anleitung unten). Den nächsten Chip einfach anstecken und noch einmal „ESP vorbereiten“ drücken.');
+      setBusy(false);
     }).catch(function (e) {
-      if (ov) ov.close(false);
       var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
-      var ours = created && !created.replaced && k >= 0 && k <= 5;          // nur selbst Angelegtes wieder entfernen, nie ein vorhandenes Thermometer
-      var cleanup = (ours ? api('/api/thermo/' + created.device.id, 'DELETE').catch(function () {}) : Promise.resolve());
-      var closer = session ? session.transport.disconnect().catch(function () {}) : Promise.resolve();
-      var diag = (k === 6 && created) ? api('/api/thermo/' + encodeURIComponent(created.device.id) + '/status').then(function (j) { return j.device; }).catch(function () { return null; }) : Promise.resolve(null);
-      Promise.all([cleanup, closer, diag]).then(function (r) {
-        var dev = r[2], why = '';
-        if (k === 6) why = dev && dev.attempt
-          ? 'Eine Anfrage ist bei BlueNexus angekommen, wurde aber abgelehnt: ' + dev.attempt.why + ' (von ' + dev.attempt.ip + ').'
-          : 'Bei BlueNexus ist keine Anfrage angekommen. Häufige Ursachen: Der Chip ist nach dem Flashen nicht neu gestartet (RESET-Taste drücken oder USB-C kurz abziehen und wieder anstecken – er meldet sich dann innerhalb von etwa 20 Sekunden), WLAN-Name oder -Passwort stimmen nicht (nur 2,4 GHz), oder die Adresse unter „Erweitert“ ist von dort aus nicht erreichbar.';
-        msg((k === 6 ? (e && e.message === 'Abgebrochen' ? 'Abgebrochen. Der Chip ist geflasht – nach dem Druck auf die RESET-Taste meldet er sich und erscheint in der Liste.' : 'Der Chip ist geflasht, hat sich aber in 90 Sekunden nicht gemeldet. ' + why + ' Meldet er sich später doch noch, siehst du es in der Liste.') : friendly(e)) + (ours ? ' (Das angelegte Thermometer wurde wieder entfernt.)' : ''), true);
-        setBusy(false); load();
-      });
-    });
-  }
-  function waitFirst(id, secs, ov, base) {            // base = last_seen vor dem Flashen (neu eingerichtetes vorhandenes Thermometer): erst eine NEUERE Meldung zaehlt
-    var t0 = Date.now(), hinted = false;
-    return new Promise(function (resolve, reject) {
-      (function poll() {
-        api('/api/thermo/' + encodeURIComponent(id) + '/status').then(function (j) {
-          if (j.device && j.device.last_seen != null && (base == null || j.device.last_seen > base)) return resolve(j.device);
-          if (ov && ov.cancelled) return reject(new Error('Abgebrochen'));
-          if (ov) ov.tick(Math.round((Date.now() - t0) / 1000));
-          if (Date.now() - t0 > secs * 1000) return reject(new Error('timeout'));
-          if (Date.now() - t0 > 30000 && !hinted) { hinted = true; steps(6, 'run', 'noch nichts angekommen – die RESET-Taste am Board noch einmal drücken (manchmal braucht es zwei Anläufe)'); }
-          setTimeout(poll, 2000);
-        }).catch(reject);
-      })();
+      (session ? session.transport.disconnect().catch(function () {}) : Promise.resolve()).then(function () { msg(friendly(e), true); setBusy(false); });
     });
   }
 
@@ -287,42 +227,12 @@
       loadLib().then(function (lib) { return openChip(lib, log); }).then(function (s) { session = s; steps(1, 'ok', s.chip); steps(2, 'run'); return s.loader.eraseFlash(); }).then(function () {
         steps(2, 'ok'); return session.transport.disconnect().catch(function () {});
       }).then(function () {
-        msg('ESP32 gelöscht. Er ist jetzt im Auslieferungszustand und lässt sich über „Einrichten und flashen“ neu einrichten. Ein dazugehöriges Thermometer in der Liste kannst du mit ✕ entfernen.'); setBusy(false);
+        msg('ESP32 gelöscht (Auslieferungszustand). Mit „ESP vorbereiten“ bekommt er wieder die Firmware. Ein dazugehöriges Thermometer in der Liste kannst du mit dem Mülleimer entfernen.'); setBusy(false);
       }).catch(function (e) {
         var k = stepState.map(function (x) { return x && x.st; }).lastIndexOf('run'); if (k >= 0) steps(k, 'err');
         (session ? session.transport.disconnect().catch(function () {}) : Promise.resolve()).then(function () { msg(friendly(e), true); setBusy(false); });
       });
     });
-  }
-
-  /* ---------------- Grosser Hinweis: jetzt RESET druecken ---------------- */
-  function resetOverlay() {
-    if (!document.getElementById('th-css')) {
-      var st = document.createElement('style'); st.id = 'th-css';
-      st.textContent = '@keyframes thPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,166,60,.65)}50%{box-shadow:0 0 0 22px rgba(240,166,60,0)}}@keyframes thSpin{to{transform:rotate(360deg)}}';
-      document.head.appendChild(st);
-    }
-    var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:1300;padding:16px';
-    ov.innerHTML = '<div class="th-ovcard" style="background:var(--card);border:2px solid #f0a63c;border-radius:18px;padding:26px 24px;width:100%;max-width:520px;text-align:center;box-shadow:0 12px 50px rgba(0,0,0,.6)">'
-      + '<div style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;background:#f0a63c;color:#1b1f24;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;letter-spacing:1px;animation:thPulse 1.4s infinite">RESET</div>'
-      + '<div style="font-size:23px;font-weight:800;line-height:1.25;margin-bottom:10px">Jetzt die RESET-Taste am Thermometer drücken</div>'
-      + '<div style="font-size:16px;line-height:1.55">Das Flashen ist <b>fertig</b>. Damit das Thermometer startet, auf der Platine die kleine Taste <b>RESET</b> (RST) <b>einmal</b> drücken – <b>nicht</b> die Taste BOOT. Die blaue LED blitzt dann <b>3× kurz</b> auf, wenn die Meldung gesendet wurde.</div>'
-      + '<div class="th-ovstat muted" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:18px;height:18px;border:3px solid var(--border);border-top-color:#f0a63c;border-radius:50%;animation:thSpin .9s linear infinite"></span><span class="th-ovtxt">Warte auf das Thermometer …</span></div>'
-      + '<div class="th-ovhint" style="display:none;margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(240,166,60,.16);color:#f0a63c;font-weight:700">Noch nichts angekommen? Die RESET-Taste <b>noch einmal</b> drücken – manchmal braucht es zwei Anläufe.</div>'
-      + '<div style="margin-top:20px"><button type="button" class="ghost th-ovcancel">Abbrechen</button></div></div>';
-    document.body.appendChild(ov);
-    var o = { cancelled: false, tick: function (sec) {
-      ov.querySelector('.th-ovtxt').textContent = 'Warte auf das Thermometer … ' + sec + ' s';
-      if (sec >= 30) ov.querySelector('.th-ovhint').style.display = '';
-    }, close: function (ok) {
-      if (!ov.parentNode) return;
-      if (!ok) { ov.remove(); return; }
-      ov.querySelector('.th-ovcard').innerHTML = '<div style="font-size:64px;color:#35c07a;line-height:1">✓</div><div style="font-size:22px;font-weight:800;margin-top:8px">Thermometer verbunden</div>';
-      setTimeout(function () { ov.remove(); }, 1400);
-    } };
-    ov.querySelector('.th-ovcancel').addEventListener('click', function () { o.cancelled = true; });
-    return o;
   }
 
   /* ---------------- Etikett fuers Gehaeuse (Niimbot, Code in /static/etikett/) ---------------- */
@@ -379,9 +289,13 @@
         if (!r || !String(r.name || '').trim()) return;
         api('/api/thermo/' + encodeURIComponent(id), 'PATCH', { name: r.name }).then(load).catch(function (e) { msg(e.message, true); });
       });
-    } else if (b.dataset.act === 'reflash') {
-      $('th-for').value = id; forChanged(); $('th-ssid').scrollIntoView({ block: 'center' }); $('th-flash').focus();
-      msg('„' + (d.name || id) + '“ ausgewählt: WLAN prüfen und „Einrichten und flashen“ klicken. ID, Sensoren und Aufzeichnung bleiben erhalten.');
+    } else if (b.dataset.act === 'update') {
+      uiDialog({ title: 'Firmware-Update', okText: 'Update vormerken', message: '„' + (d.name || id) + '“ lädt die Firmware ' + (state.fw ? state.fw.version : '') + ' bei seiner nächsten Meldung (gleich nach der Messung, nur bei ausreichender Batterie) und startet neu. Es gibt keinen automatischen Rückfall bei einer fehlerhaften Firmware – neue Versionen erst an einem Thermometer testen.' }).then(function (ok) {
+        if (!ok) return;
+        api('/api/thermo/' + encodeURIComponent(id) + '/update', 'POST', {}).then(function (j) { savedToast('Update vorgemerkt ✓'); msg('Das Thermometer lädt die Firmware ' + j.version + ' bei seiner nächsten Meldung (spätestens nach ' + d.interval + ' Minuten; nach RESET sofort).'); return load(); }).catch(function (e) { msg(e.message, true); });
+      });
+    } else if (b.dataset.act === 'newcode') {
+      newCode(d);
     } else if (b.dataset.act === 'code') {
       api('/api/thermo/' + encodeURIComponent(id) + '/code', 'POST', {}).then(function (j) { showCode(d, j.code); }).catch(function (e) { msg(e.message, true); });
     } else if (b.dataset.act === 'interval') {
@@ -396,15 +310,6 @@
         api('/api/thermo/' + encodeURIComponent(id), 'DELETE').then(function () { savedToast('Entfernt ✓'); return load(); }).catch(function (e) { msg(e.message, true); });
       });
     }
-  });
-  $('th-for').addEventListener('change', forChanged);
-  $('th-fixed').addEventListener('change', function () { card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = $('th-fixed').checked ? '' : 'none'; }); });
-  card.querySelectorAll('.th-ip').forEach(function (x) { x.style.display = 'none'; });
-  $('th-forget').addEventListener('click', function () {
-    uiDialog({ title: 'Gemerktes WLAN vergessen?', okText: 'Vergessen', message: 'Name und Passwort werden vom Server gelöscht. Bereits eingerichtete Thermometer behalten ihre Einstellungen.' }).then(function (ok) {
-      if (!ok) return;
-      api('/api/thermo_wifi', 'DELETE').then(function (j) { state.wifi = j.wifi; $('th-pass').value = ''; applyWifi(); savedToast('Vergessen ✓'); }).catch(function (e) { msg(e.message, true); });
-    });
   });
   $('th-flash').addEventListener('click', flash);
   $('th-reset').addEventListener('click', resetChip);

@@ -4,6 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.51.0 – 10.11.2026
+- Geändert: **Nur noch eine Thermometer-Firmware (2.0.0).** „Einrichten und flashen“ mit WLAN-Eingabe entfällt. Das USB-Fenster heißt **„ESP vorbereiten“** und spielt die mitgelieferte Firmware ohne Eingaben auf (Chips lassen sich auf Vorrat vorbereiten); eingerichtet wird das Thermometer am Einsatzort per Handy mit dem Kopplungscode, den BlueNexus erzeugt. Eine Kurzanleitung steht darunter. Die alte Firmware 1.1.1 liegt nicht mehr im Paket.
+- Neu: **Firmware-Update per Funk** (ab Firmware 2.0.0). In der Liste erscheint „Update … verfügbar“ mit einem Knopf; das Thermometer lädt die Datei bei seiner nächsten Meldung (Heimnetz oder Tunnel, nur mit dem Schlüssel des Geräts).
+- Neu: **Neuen Kopplungscode erzeugen** (🔑) für Thermometer ohne gespeicherten Code, z. B. mit alter Firmware: ID, Sensoren, Verläufe und Regeln bleiben erhalten.
+
 ## 1.50.2 – 10.11.2026
 - Geändert: Der 🔑-Knopf zeigt den Kopplungscode jetzt **ohne Passwortabfrage** (nur für angemeldete Administratoren) und hat einen **Kopieren-Knopf**, der den langen Code mit einem Klick in die Zwischenablage legt.
 

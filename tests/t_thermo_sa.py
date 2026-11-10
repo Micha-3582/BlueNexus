@@ -50,3 +50,63 @@ assert A.post("/api/thermo/" + c["device"]["id"] + "/code", json={}).status_code
 assert next(x for x in thermo.listing() if x["id"] == tid)["has_code"] is True
 assert "bnxthermo1_" not in A.get("/api/thermo").get_data(as_text=True)                            # die Liste verraet den Code nicht
 print("THERMO-STANDALONE OK")
+
+# ---- Funk-Update (OTA) ab Firmware 2.0.0 ----
+import json as _j
+rel = _j.load(open(os.path.join(os.path.dirname(webapp.__file__), "static", "firmware", "thermo", "2.0.0", "release.json"), encoding="utf-8"))
+R = rel["ota"]
+# Geraet ohne USB (Internet): meldet Firmware 1.9.0 (kein OTA), dann 2.0.0 = neueste (kein Update noetig)
+time.sleep(0.01)
+def rep(tid_, tok, fw, hdr=None):
+    d_ = thermo._load(); [x for x in d_ if x["id"] == tid_][0]["last_seen"] = 0; thermo._save(d_)           # 20-s-Bremse fuer den Test umgehen
+    return N.post("/api/sensor/" + tid_, json={**B, "fw": fw}, headers={"Authorization": "Bearer " + tok, **(hdr or {})})
+r = rep(d2["id"], d2["token"], "1.1.1"); assert r.status_code == 200 and "ota" not in r.get_json()
+lst = A.get("/api/thermo").get_json()["devices"]; x = [y for y in lst if y["id"] == d2["id"]][0]; assert x["update"] is False         # 1.1.1: kein Funk-Update moeglich
+assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400
+# Geraet meldet 2.0.0 -> neueste Version -> "schon aktuell"
+r = rep(d2["id"], d2["token"], "2.0.0"); assert r.status_code == 200 and "ota" not in r.get_json()
+assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400                       # schon die neueste
+# Test mit einer "neueren" Version: im Test die Firmware-Info umbiegen
+fake = {"version": "2.0.1", "ota_file": os.path.join(os.path.dirname(webapp.__file__), "static", "firmware", "thermo", "2.0.0", "firmware.bin"), "ota_md5": R["md5"], "ota_size": R["size"], "url": "x", "offset": 0, "chip": "ESP32-C3", "sha256": ""}
+orig_fw = webapp._thermo_firmware; webapp._thermo_firmware = lambda: fake
+try:
+    lst = A.get("/api/thermo").get_json()["devices"]; assert [y for y in lst if y["id"] == d2["id"]][0]["update"] is True
+    assert L.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 403                     # nur Administratoren
+    assert N.get("/api/sensor/" + d2["id"] + "/fw.bin", headers=H2).status_code == 404                    # ohne Vormerkung keine Datei
+    r = rep(d2["id"], d2["token"], "2.0.0"); assert "ota" not in r.get_json()                              # und kein Angebot
+    assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 200
+    r = rep(d2["id"], d2["token"], "2.0.0"); o = r.get_json()["ota"]
+    assert o == {"version": "2.0.1", "md5": R["md5"], "url": "/api/sensor/" + d2["id"] + "/fw.bin"}, o
+    assert N.get(o["url"], headers={"Authorization": "Bearer falsch"}).status_code == 401              # ohne den Schluessel des Geraets keine Datei
+    g = N.get(o["url"], headers=H2); assert g.status_code == 200 and int(g.headers["Content-Length"]) == R["size"] and len(g.data) == R["size"]
+    import hashlib as _h; assert _h.md5(g.data).hexdigest() == R["md5"]
+    assert N.get(o["url"], headers={**H2, **EXT}).status_code == 404                                       # Heimnetz-Geraet: nicht ueber den Tunnel
+    r = rep(d2["id"], d2["token"], "2.0.1"); assert r.status_code == 200 and "ota" not in r.get_json()   # neue Version gemeldet: Vormerkung weg, keine Schleife
+    assert thermo.get(d2["id"]).get("ota_pending") is None
+    # Geraet schafft es nicht: nach OTA_MAX_OFFERS Angeboten Schluss
+    assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400                       # 2.0.1 = neueste
+    fake["version"] = "2.0.2"
+    assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 200
+    n = 0
+    for _ in range(8):
+        if "ota" in rep(d2["id"], d2["token"], "2.0.1").get_json(): n += 1
+    assert n == thermo.OTA_MAX_OFFERS and thermo.get(d2["id"]).get("ota_failed") == "2.0.2", (n, thermo.get(d2["id"]))
+    # Internet-Geraet (ohne USB): Datei auch ueber den Tunnel, wenn vorgemerkt
+    d_ = thermo._load(); [x for x in d_ if x["id"] == tid][0]["fw"] = "2.0.0"; thermo._save(d_)
+    assert A.post("/api/thermo/" + tid + "/update", json={}).status_code == 200
+    r = rep(tid, d["token"], "2.0.0", EXT); assert r.status_code == 200 and "ota" in r.get_json(), r.get_data(as_text=True)
+    assert N.get("/api/sensor/" + tid + "/fw.bin", headers={**H, **EXT}).status_code == 200
+finally:
+    webapp._thermo_firmware = orig_fw
+# Neuen Kopplungscode fuer ein Geraet ohne gespeicherten Code (z. B. alte Firmware): ID bleibt, alter Schluessel gilt bis zur ersten Meldung mit dem neuen
+c_old = c["device"]["id"]
+r = A.post("/api/thermo/" + c_old + "/code", json={"new": True, "server": "https://x.example.de"}); assert r.status_code == 400            # Heimnetz-Geraet: http noetig
+r = A.post("/api/thermo/" + c_old + "/code", json={"new": True, "server": "http://192.168.50.40:5005"}); assert r.status_code == 200, r.get_data(as_text=True)
+d3 = _j.loads(base64.b64decode(r.get_json()["code"][len("bnxthermo1_"):])); assert d3["id"] == c_old and d3["token"] != c["token"]
+assert N.post("/api/sensor/" + c_old, json=B, headers={"Authorization": "Bearer " + c["token"]}).status_code == 200          # alter Schluessel gilt noch
+thermo._save([{**x, "last_seen": 0} if x["id"] == c_old else x for x in thermo._load()])
+assert N.post("/api/sensor/" + c_old, json=B, headers={"Authorization": "Bearer " + d3["token"]}).status_code == 200          # neuer Schluessel wird angenommen
+thermo._save([{**x, "last_seen": 0} if x["id"] == c_old else x for x in thermo._load()])
+assert N.post("/api/sensor/" + c_old, json=B, headers={"Authorization": "Bearer " + c["token"]}).status_code == 401             # und ersetzt den alten
+assert A.post("/api/thermo/" + c_old + "/code", json={}).get_json()["code"].startswith("bnxthermo1_")                          # jetzt auch wieder ansehbar
+print("THERMO-OTA OK")

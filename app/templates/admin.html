@@ -148,12 +148,11 @@
 
 {% if modules.smarthome %}
 <div class="card" id="thermo-card" data-tab="system" data-area="settings_system">
-  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Funkthermometer (ESP32) <span class="qhelp" role="button" tabindex="0" data-help="Selbstgebautes Batterie-Thermometer mit ESP32-C3. Hier gibst du das WLAN ein, BlueNexus spielt die Firmware per USB auf die Platine und verbindet sie – danach erscheinen Temperatur, Luftfeuchte, Batterie und Funkstärke bei den Sensoren.">?</span></h2>
-  <div class="sub">Thermometer einrichten (USB anstecken, einmalig anlernen) und den ESP32 bei Bedarf löschen.</div>
+  <h2><svg class="h2i" style="color:var(--green)" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Funkthermometer (ESP32) <span class="qhelp" role="button" tabindex="0" data-help="Selbstgebautes Batterie-Thermometer mit ESP32-C3. Du legst es hier an und bekommst einen Kopplungscode; den gibst du am Einsatzort per Handy im Einrichtungsfenster des Thermometers ein. Danach erscheinen Temperatur, Luftfeuchte, Batterie und Funkstärke bei den Sensoren.">?</span></h2>
+  <div class="sub">Thermometer mit einem Kopplungscode einrichten – ohne Kabel, per Handy am Einsatzort. Die Firmware wird einmal per USB aufgespielt („ESP vorbereiten“) und lässt sich danach per Funk aktualisieren.</div>
   <div id="th-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
   <div id="th-etk-hint" class="muted" style="margin-bottom:14px;font-size:13px"></div>
-  <div id="th-warn" class="muted" style="display:none;border:1px solid #f0a030;border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
-  <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten <span class="qhelp" role="button" tabindex="0" data-help="Das Thermometer bekommt einmalig die Standalone-Firmware (1.2.0-sa, per USB). Danach richtest du es per Handy im Einrichtungsfenster des Thermometers ein: WLAN eingeben und den Kopplungscode einfügen. Den Code erzeugst du hier.">?</span></div>
+  <div style="font-weight:600;margin:4px 0 8px">Neues Thermometer einrichten <span class="qhelp" role="button" tabindex="0" data-help="Das Thermometer bekommt einmalig die Firmware (unten „ESP vorbereiten“, per USB). Danach richtest du es per Handy im Einrichtungsfenster des Thermometers ein: WLAN eingeben und den Kopplungscode einfügen. Den Code erzeugst du hier.">?</span></div>
   <div style="font-size:13px;margin-bottom:6px" class="muted">Wie soll das Thermometer melden?</div>
   <div id="th-mode" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px">
     <label class="th-modecard"><input type="radio" name="th-mode" value="lan" checked><b>🏠 Im Heimnetz (HTTP)</b><span class="muted">Läuft auch ohne Internet. Das Thermometer steht im gleichen Netz wie BlueNexus.</span></label>
@@ -170,24 +169,22 @@
   <div id="th-sa-out" style="display:none;margin-top:12px"><label for="th-sa-code">Kopplungscode</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="th-sa-code" readonly style="flex:1;min-width:220px;font-family:monospace" onclick="this.select()"><button type="button" class="ghost" id="th-sa-copy">Kopieren</button></div></div>
   <div id="th-sa-msg" class="muted" style="margin-top:8px"></div>
-  <details style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px"><summary style="cursor:pointer;font-weight:600">Per USB flashen (erstes Flashen, Neu flashen, integrierte Firmware) <span class="qhelp" role="button" tabindex="0" data-help="Hier gibst du das WLAN ein, BlueNexus spielt die Firmware 1.1.1 per USB auf die Platine und verbindet sie – ohne Kopplungscode, nur im Heimnetz.">?</span></summary>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-    <div style="grid-column:1/-1"><label for="th-for">Einrichten für <span class="qhelp" role="button" tabindex="0" data-help="„Neues Thermometer“ legt ein weiteres Gerät an. Wählst du ein vorhandenes, wird DIESES neu geflasht (zum Beispiel nach einem Firmware-Update): ID, Sensoren, Aufzeichnung (Verläufe), Regeln und Abgleich bleiben erhalten, nur der Schlüssel wird erneuert.">?</span></label><select id="th-for"><option value="">Neues Thermometer</option></select></div>
-    <div><label for="th-name">Name</label><input id="th-name" maxlength="40" value="Außen" placeholder="z. B. Außen"></div>
-    <div><label for="th-ssid">WLAN-Name <span class="qhelp" role="button" tabindex="0" data-help="Nur 2,4-GHz-WLAN: Der Chip kann kein 5 GHz. Das Passwort wird nur gespeichert, wenn „WLAN merken“ angekreuzt ist (nur auf diesem Server, nur für Administratoren) – so gibst du es bei weiteren Thermometern nicht noch einmal ein.">?</span></label><input id="th-ssid" maxlength="32" autocomplete="off" placeholder="Name deines WLANs"></div>
-    <div><label for="th-pass">WLAN-Passwort</label><div class="pw-wrap"><input id="th-pass" type="password" maxlength="63" autocomplete="new-password" placeholder="Passwort"><button type="button" class="pw-toggle" data-for="th-pass" aria-label="Anzeigen" title="Anzeigen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-    <div style="grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label class="chk" style="margin:0"><input type="checkbox" id="th-remember" checked> WLAN für weitere Thermometer merken</label><span id="th-saved" class="muted"></span><button type="button" id="th-forget" class="ghost" style="display:none">Gemerktes WLAN vergessen</button></div>
-    <div><label for="th-int">Messung alle <span class="qhelp" role="button" tabindex="0" data-help="Wie oft das Thermometer misst und sendet. Seltener = Batterie hält länger. Standard: 15 Minuten.">?</span></label><select id="th-int"><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="15" selected>15 Minuten</option><option value="30">30 Minuten</option><option value="60">60 Minuten</option></select></div>
-  </div>
-  <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Erweitert (Server-Adresse, feste IP)</summary>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:8px">
-      <div style="grid-column:1/-1"><label for="th-server">Adresse von BlueNexus im WLAN <span class="qhelp" role="button" tabindex="0" data-help="Unter dieser Adresse erreicht das Thermometer BlueNexus: nur http, mit der lokalen Adresse und dem Port, ohne Domain und ohne Tunnel (spart Batterie). Wird vorgeschlagen und lässt sich ändern.">?</span></label><input id="th-server" placeholder="http://192.168.x.x:5005"></div>
-      <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="th-fixed"> Feste IP-Adresse statt automatisch (DHCP) <span class="qhelp" role="button" tabindex="0" data-help="Spart dem Thermometer etwa eine Sekunde Wachzeit je Messung. Nimm eine freie Adresse im Netz des WLANs.">?</span></label>
-      <div class="th-ip"><label for="th-ip">IP-Adresse</label><input id="th-ip" placeholder="192.168.x.60"></div>
-      <div class="th-ip"><label for="th-gw">Gateway</label><input id="th-gw" placeholder="192.168.x.1"></div>
-      <div class="th-ip"><label for="th-mask">Netzmaske</label><input id="th-mask" value="255.255.255.0"></div>
-      <div class="th-ip"><label for="th-dns">DNS</label><input id="th-dns" placeholder="wie Gateway"></div>
+  <details style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px"><summary style="cursor:pointer;font-weight:600">ESP vorbereiten (Firmware per USB aufspielen) <span class="qhelp" role="button" tabindex="0" data-help="Spielt die Thermometer-Firmware auf einen leeren oder alten ESP32-C3 – ohne WLAN, ohne Schlüssel. Eingerichtet wird das Thermometer später am Einsatzort per Handy mit dem Kopplungscode. So lassen sich Chips auf Vorrat vorbereiten.">?</span></summary>
+    <div class="muted" style="margin:8px 0 10px">Ein Klick spielt die Firmware <b id="th-fwver"></b> auf den angesteckten ESP32 – ohne Eingaben. Der Chip wird dabei gelöscht.</div>
+    <div id="th-warn" class="muted" style="display:none;border:1px solid #f0a030;border-radius:10px;padding:10px 12px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button type="button" id="th-flash">⚡ ESP vorbereiten</button>
+      <button type="button" id="th-reset" class="ghost" title="Löscht den ESP32 komplett (Auslieferungszustand) – ohne neue Firmware">ESP32 löschen</button>
     </div>
+    <div id="th-steps" style="margin-top:12px"></div>
+    <div id="th-msg" class="muted" style="margin-top:8px"></div>
+    <div style="margin-top:14px;font-weight:600">So geht es danach weiter</div>
+    <ol class="muted" style="margin:6px 0 0 18px;padding:0;line-height:1.55">
+      <li>Chip am Einsatzort mit Strom versorgen (oder RESET drücken). Beim ersten Start öffnet er das WLAN <b>BlueNexus-Thermo-XXXX</b>.</li>
+      <li>Mit dem Handy mit diesem WLAN verbinden – die Einrichtungsseite öffnet sich (sonst <b>http://192.168.4.1</b> im Browser; ersetzt Chrome das durch https, einen anderen Browser nehmen).</li>
+      <li>Dort das WLAN wählen, den <b>Kopplungscode</b> einfügen (den erzeugst du oben mit „Kopplungscode erzeugen“) und speichern.</li>
+      <li>Zurücksetzen ohne PC: <b>5× RESET</b> zügig hintereinander (innerhalb von 10 Sekunden).</li>
+    </ol>
   </details>
   <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button type="button" id="th-flash">⚡ Einrichten und flashen</button>

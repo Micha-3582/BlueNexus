@@ -14,7 +14,7 @@ N = webapp.app.test_client()                                                   #
 # 1) Rechte: nur Administratoren richten ein
 assert L.get("/api/thermo").status_code == 403 and L.post("/api/thermo", json={"name": "x", "wifi": {}}).status_code == 403 and N.get("/api/thermo").status_code == 401
 j = A.get("/api/thermo").get_json()
-fw = j["firmware"]; assert fw["version"] == "1.1.1" and fw["offset"] == 0 and fw["cfg_offset"] == 0x1F0000 and fw["cfg_size"] == 4096 and fw["url"].endswith("thermo-1.1.1.bin"), fw
+fw = j["firmware"]; assert fw["version"] == "2.0.0" and fw["offset"] == 0 and "cfg_offset" not in fw and fw["url"].endswith("thermo-2.0.0.bin") and "ota_file" not in fw and "ota_md5" not in fw, fw
 fp = os.path.join(os.path.dirname(webapp.__file__), fw["url"].lstrip("/").replace("/", os.sep))
 assert hashlib.sha256(open(fp, "rb").read()).hexdigest() == fw["sha256"]       # mitgelieferte Firmware passt zur Pruefsumme
 assert A.get(fw["url"]).status_code == 200                                      # und ist auslieferbar
@@ -80,7 +80,7 @@ assert A.delete("/api/thermo/" + tid).status_code == 200 and A.delete("/api/ther
 assert not [s for s in homematic.load_sensors() if s.get("source") == "thermo"] and thermo.load() == []
 # 9) Karte nur mit Modul Smart Home
 cfg["modules"] = {"energy": True, "smarthome": True, "verlauf": True, "cameras": True, "alexa": False}
-h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' in h and "thermo-flash.js?v=" in h and "thermo-cfg.js" not in h and 'id="th-pass" type="password"' in h and 'data-for="th-pass"' in h
+h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' in h and "thermo-flash.js?v=" in h and "thermo-cfg.js" not in h and 'id="th-pass"' not in h and 'id="th-flash"' in h
 cfg["modules"] = {"energy": True, "smarthome": False, "verlauf": True, "cameras": True, "alexa": False}
 h = A.get("/admin").get_data(as_text=True); assert 'id="thermo-card"' not in h
 # 10) Konfig bytegleich zur Referenz des Thermometer-Chats (make_cfg.py)
