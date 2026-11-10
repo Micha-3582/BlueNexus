@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.52.3 – 10.11.2026
+- Neu: **Thermometer-Firmware 2.0.5** ersetzt 2.0.2. Enthalten sind die Verbesserungen der Zwischenversionen: geringere Sendeleistung bei naher Funkstation, ein Brownout-Schutz, der auch nach Spannungseinbrüchen zählt (keine Neustart-Schleife mehr), und ein Diagnoseprotokoll im Gerät. Geräte mit 2.0.2 bis 2.0.4 sehen „Update 2.0.5 verfügbar“.
+
 ## 1.52.2 – 10.11.2026
 - Neu: **Thermometer-Firmware 2.0.2** ersetzt 2.0.1. Das Einrichtungs-WLAN ist batterieschonender; mit Batterien kam es vorher zu Neustarts, und das WLAN verschwand immer wieder.
 - Behoben: **Update-Anzeige.** Ein Thermometer mit einer neueren Firmware als im Paket bekam fälschlich „Update verfügbar“. Jetzt wird ein Update nur noch angeboten, wenn die Paketversion **höher** ist als die gemeldete (Zahl für Zahl verglichen); nie eine ältere. Das gilt auch für schon vorgemerkte Updates.
