@@ -51,9 +51,9 @@ assert next(x for x in thermo.listing() if x["id"] == tid)["has_code"] is True
 assert "bnxthermo1_" not in A.get("/api/thermo").get_data(as_text=True)                            # die Liste verraet den Code nicht
 print("THERMO-STANDALONE OK")
 
-# ---- Funk-Update (OTA) ab Firmware 2.0.0: die mitgelieferte (neueste) Firmware ist 2.0.5 ----
+# ---- Funk-Update (OTA) ab Firmware 2.0.0: die mitgelieferte (neueste) Firmware ist 2.0.6 ----
 import json as _j, hashlib as _h
-FWD = os.path.join(os.path.dirname(webapp.__file__), "static", "firmware", "thermo", "2.0.5")
+FWD = os.path.join(os.path.dirname(webapp.__file__), "static", "firmware", "thermo", "2.0.6")
 R = _j.load(open(os.path.join(FWD, "release.json"), encoding="utf-8"))["ota"]
 def rep(tid_, tok, fw, hdr=None):
     d_ = thermo._load(); [x for x in d_ if x["id"] == tid_][0]["last_seen"] = 0; thermo._save(d_)           # 20-s-Bremse fuer den Test umgehen
@@ -62,8 +62,8 @@ def upd(tid_): return [y for y in A.get("/api/thermo").get_json()["devices"] if 
 # Firmware 1.1.1: kein Funk-Update moeglich
 r = rep(d2["id"], d2["token"], "1.1.1"); assert r.status_code == 200 and "ota" not in r.get_json()
 assert upd(d2["id"]) is False and A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400
-# schon die neueste (2.0.5): nichts zu tun
-r = rep(d2["id"], d2["token"], "2.0.5"); assert "ota" not in r.get_json() and upd(d2["id"]) is False
+# schon die neueste (2.0.6): nichts zu tun
+r = rep(d2["id"], d2["token"], "2.0.6"); assert "ota" not in r.get_json() and upd(d2["id"]) is False
 assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400
 # Geraet mit 2.0.0: Update verfuegbar
 rep(d2["id"], d2["token"], "2.0.0"); assert upd(d2["id"]) is True
@@ -72,23 +72,23 @@ assert N.get("/api/sensor/" + d2["id"] + "/fw.bin", headers=H2).status_code == 4
 assert "ota" not in rep(d2["id"], d2["token"], "2.0.0").get_json()                                       # und kein Angebot
 assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 200
 o = rep(d2["id"], d2["token"], "2.0.0").get_json()["ota"]
-assert o == {"version": "2.0.5", "md5": R["md5"], "url": "/api/sensor/" + d2["id"] + "/fw.bin"}, o
+assert o == {"version": "2.0.6", "md5": R["md5"], "url": "/api/sensor/" + d2["id"] + "/fw.bin"}, o
 assert N.get(o["url"], headers={"Authorization": "Bearer falsch"}).status_code == 401                    # ohne den Schluessel des Geraets keine Datei
 g = N.get(o["url"], headers=H2); assert g.status_code == 200 and int(g.headers["Content-Length"]) == R["size"] and len(g.data) == R["size"]
 assert _h.md5(g.data).hexdigest() == R["md5"]
 assert N.get(o["url"], headers={**H2, **EXT}).status_code == 404                                         # Heimnetz-Geraet: nicht ueber den Tunnel
-r = rep(d2["id"], d2["token"], "2.0.5"); assert r.status_code == 200 and "ota" not in r.get_json()      # neue Version gemeldet: Vormerkung weg, keine Schleife
+r = rep(d2["id"], d2["token"], "2.0.6"); assert r.status_code == 200 and "ota" not in r.get_json()      # neue Version gemeldet: Vormerkung weg, keine Schleife
 assert thermo.get(d2["id"]).get("ota_pending") is None
 # Geraet schafft es nicht (bleibt auf 2.0.0): nach OTA_MAX_OFFERS Angeboten Schluss
-assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400                         # meldet 2.0.5 = aktuell
+assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400                         # meldet 2.0.6 = aktuell
 rep(d2["id"], d2["token"], "2.0.0"); assert A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 200
 n = sum(1 for _ in range(8) if "ota" in rep(d2["id"], d2["token"], "2.0.0").get_json())
-assert n == thermo.OTA_MAX_OFFERS and thermo.get(d2["id"]).get("ota_failed") == "2.0.5", (n, thermo.get(d2["id"]))
+assert n == thermo.OTA_MAX_OFFERS and thermo.get(d2["id"]).get("ota_failed") == "2.0.6", (n, thermo.get(d2["id"]))
 # Nie zurueck: ein Geraet mit NEUERER Version als im Paket bekommt weder "Update verfuegbar" noch ein Angebot (die Firmware spielt jede abweichende Version ein)
-rep(d2["id"], d2["token"], "2.0.6"); assert upd(d2["id"]) is False and A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400
+rep(d2["id"], d2["token"], "2.0.7"); assert upd(d2["id"]) is False and A.post("/api/thermo/" + d2["id"] + "/update", json={}).status_code == 400
 rep(d2["id"], d2["token"], "2.0.1"); assert upd(d2["id"]) is True                                         # aeltere Version: Update verfuegbar
 d_ = thermo._load(); [x for x in d_ if x["id"] == d2["id"]][0]["ota_pending"] = True; thermo._save(d_)   # selbst bei vorgemerktem Update:
-assert "ota" not in rep(d2["id"], d2["token"], "2.0.6").get_json() and thermo.get(d2["id"]).get("ota_pending") is None
+assert "ota" not in rep(d2["id"], d2["token"], "2.0.7").get_json() and thermo.get(d2["id"]).get("ota_pending") is None
 # Internet-Geraet (ohne USB): Offer und Datei auch ueber den Tunnel
 rep(tid, d["token"], "2.0.0", EXT); assert A.post("/api/thermo/" + tid + "/update", json={}).status_code == 200
 r = rep(tid, d["token"], "2.0.0", EXT); assert r.status_code == 200 and "ota" in r.get_json(), r.get_data(as_text=True)

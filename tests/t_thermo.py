@@ -14,7 +14,7 @@ N = webapp.app.test_client()                                                   #
 # 1) Rechte: nur Administratoren richten ein
 assert L.get("/api/thermo").status_code == 403 and L.post("/api/thermo", json={"name": "x", "wifi": {}}).status_code == 403 and N.get("/api/thermo").status_code == 401
 j = A.get("/api/thermo").get_json()
-fw = j["firmware"]; assert fw["version"] == "2.0.5" and fw["offset"] == 0 and "cfg_offset" not in fw and fw["url"].endswith("thermo-2.0.5.bin") and "ota_file" not in fw and "ota_md5" not in fw, fw
+fw = j["firmware"]; assert fw["version"] == "2.0.6" and fw["offset"] == 0 and "cfg_offset" not in fw and fw["url"].endswith("thermo-2.0.6.bin") and "ota_file" not in fw and "ota_md5" not in fw, fw
 fp = os.path.join(os.path.dirname(webapp.__file__), fw["url"].lstrip("/").replace("/", os.sep))
 assert hashlib.sha256(open(fp, "rb").read()).hexdigest() == fw["sha256"]       # mitgelieferte Firmware passt zur Pruefsumme
 assert A.get(fw["url"]).status_code == 200                                      # und ist auslieferbar

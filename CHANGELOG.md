@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.53.1 – 10.11.2026
+- Neu: **Thermometer-Firmware 2.0.6** ersetzt 2.0.5 (Geräte mit 2.0.5 sehen „Update 2.0.6 verfügbar“).
+- Geändert: Das Anleitungs-Etikett trägt nicht mehr „USB nur ohne Batterien!“ (beim neuen Aufbau ohne Regler überholt, die Sicherheitshinweise stehen auf der Anleitungsseite), sondern „QR-Code scannen“. Handbuch: Etikett-Absatz und der veraltete Abschnitt „Neu flashen“ (Knöpfe gibt es nicht mehr) überarbeitet.
+
 ## 1.53.0 – 10.11.2026
 - Neu: **Anleitungs-Etikett für die Platine** (Einstellungen → System → Funkthermometer, Knopf „🏷 Anleitungs-Etikett für die Platine“). Druckt einen QR-Code zur Anleitungsseite des Thermometers (Sicherheit, Einrichten, Zurücksetzen) mit „Anleitung“ und „USB nur ohne Batterien!“ auf ein Niimbot-Etikett (nur am Android-Handy, Chrome, https). Die Adresse ist fest und gilt für alle Thermometer; der Knopf ist auch ohne eingerichtetes Thermometer da.
 

@@ -251,7 +251,7 @@
     if (!es.ok) { uiAlert(es.kind === 'other' ? 'Etiketten drucken geht am Android-Handy (Chrome, über https): Öffne BlueNexus dort und drücke „Anleitungs-Etikett für die Platine“.' : es.text, 'Drucken hier nicht möglich'); return; }
     etikettLoad().then(function () {
       EtikettDruck.open({ title: '🏷 Anleitungs-Etikett drucken', intro: 'QR-Code zur Anleitung des Thermometers (Sicherheit, Einrichten, Zurücksetzen) – zum Aufkleben auf die Platine. Die Adresse ist fest und gilt für alle Thermometer. Für draußen ein wasser- und UV-festes Etikettenmaterial verwenden.',
-        name: 'Anleitung', sub: 'USB nur ohne Batterien!', url: GUIDE_URL });
+        name: 'Anleitung', sub: 'QR-Code scannen', url: GUIDE_URL });
     }).catch(function (e) { uiAlert('Das Druckfenster konnte nicht geladen werden (' + e.message + '). Bitte die Seite neu laden.', 'Drucken nicht möglich'); });
   }
   $('th-guide-label').addEventListener('click', guideLabel);
