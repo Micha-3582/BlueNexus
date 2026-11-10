@@ -51,6 +51,27 @@
   function tbtn(act, id, title, icon, del) {
     return '<button type="button" class="tgl' + (del ? ' del' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" title="' + esc(title) + '" aria-label="' + esc(title) + '">' + icon + '</button>';
   }
+  /* Kopplungscode anzeigen: Feld zum Markieren + Kopieren-Knopf (ein Klick legt den langen Code in die Zwischenablage) */
+  function showCode(d, code) {
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px';
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.5)">'
+      + '<h3 style="margin:0 0 10px;font-size:17px">Kopplungscode: ' + esc(d.name || d.id) + '</h3>'
+      + '<div class="muted" style="margin-bottom:12px">Gilt nur für dieses Gerät. Im Einrichtungsfenster des Thermometers einfügen.</div>'
+      + '<textarea readonly rows="4" style="width:100%;font-family:monospace;font-size:13px;resize:none" onclick="this.select()">' + esc(code) + '</textarea>'
+      + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button type="button" class="ghost dlg-no">Schließen</button><button type="button" class="dlg-copy">Kopieren</button></div></div>';
+    var close = function () { document.removeEventListener('keydown', onKey); ov.remove(); };
+    var onKey = function (e) { if (e.key === 'Escape') close(); };
+    ov.querySelector('.dlg-no').onclick = close;
+    ov.querySelector('.dlg-copy').onclick = function () {
+      var ta = ov.querySelector('textarea'); ta.select();
+      var done = function () { savedToast('Kopiert ✓'); };
+      try { navigator.clipboard.writeText(code).then(done, function () { document.execCommand('copy'); done(); }); } catch (e) { document.execCommand('copy'); done(); }
+    };
+    ov.addEventListener('mousedown', function (e) { if (e.target === ov) close(); });
+    document.addEventListener('keydown', onKey); document.body.appendChild(ov);
+    ov.querySelector('.dlg-copy').focus();
+  }
   function renderList() {
     var el = $('th-list');
     if (!state.devices.length) { el.innerHTML = '<div class="muted">Noch kein Thermometer eingerichtet.</div>'; return; }
@@ -362,13 +383,7 @@
       $('th-for').value = id; forChanged(); $('th-ssid').scrollIntoView({ block: 'center' }); $('th-flash').focus();
       msg('„' + (d.name || id) + '“ ausgewählt: WLAN prüfen und „Einrichten und flashen“ klicken. ID, Sensoren und Aufzeichnung bleiben erhalten.');
     } else if (b.dataset.act === 'code') {
-      uiDialog({ title: 'Kopplungscode ansehen', message: 'Zur Bestätigung dein aktuelles Passwort.', label: 'Passwort', type: 'password', okText: 'Anzeigen' }).then(function (pw) {
-        if (!pw) return;
-        api('/api/thermo/' + encodeURIComponent(id) + '/code', 'POST', { password: pw }).then(function (j) {
-          try { navigator.clipboard.writeText(j.code); } catch (e) { /* Feld bleibt zum Kopieren */ }
-          return uiForm({ title: 'Kopplungscode: ' + (d.name || id), message: 'Gilt nur für dieses Gerät. Er liegt auch schon in der Zwischenablage.', fields: [{ id: 'code', label: 'Kopplungscode', type: 'text', value: j.code }], okText: 'Schließen' });
-        }).catch(function (e) { msg(e.message, true); });
-      });
+      api('/api/thermo/' + encodeURIComponent(id) + '/code', 'POST', {}).then(function (j) { showCode(d, j.code); }).catch(function (e) { msg(e.message, true); });
     } else if (b.dataset.act === 'interval') {
       setInterval_(d);
     } else if (b.dataset.act === 'calib') {

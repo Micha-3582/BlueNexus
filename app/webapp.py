@@ -4346,10 +4346,7 @@ def api_thermo_item(tid):
 
 @app.route("/api/thermo/<tid>/code", methods=["POST"])
 def api_thermo_code(tid):
-    """Kopplungscode eines per Code angelegten Geraets erneut anzeigen - nur nach Eingabe des eigenen Passworts."""
-    pw = (request.get_json(silent=True) or {}).get("password") or ""
-    if not users.verify(g.user, pw):
-        return jsonify(error="Passwort falsch"), 403
+    """Kopplungscode eines per Code angelegten Geraets erneut anzeigen (nur Administratoren, wie alle Thermometer-Einstellungen)."""
     code = thermo.get_code(tid)
     if not code:
         return jsonify(error="Für dieses Gerät ist kein Kopplungscode gespeichert (nur bei Geräten, die mit Code angelegt wurden)."), 404

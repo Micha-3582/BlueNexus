@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.50.2 – 10.11.2026
+- Geändert: Der 🔑-Knopf zeigt den Kopplungscode jetzt **ohne Passwortabfrage** (nur für angemeldete Administratoren) und hat einen **Kopieren-Knopf**, der den langen Code mit einem Klick in die Zwischenablage legt.
+
 ## 1.50.1 – 10.11.2026
 - Geändert: In der Thermometer-Liste sind die Knöpfe jetzt **quadratische Symbolknöpfe** wie im Smart-Home-Bereich (Etikett, Neu flashen, Kopplungscode, Intervall, Abgleichen, Umbenennen, Entfernen); die Beschreibung steht als Hover-Text.
 
