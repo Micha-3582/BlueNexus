@@ -70,6 +70,11 @@ N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": 3000, "pr": "H-1
 r = N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": -5, "pr": "boese<"}, headers=H(token)); assert r.status_code == 200
 m = A.get("/api/thermo/" + tid + "/status").get_json()["device"]["meta"]
 assert m["pa"] == 3000 and m["st"] == {"n": 3, "retry": 1, "fail": 1} and 1800 < m["pa_avg"] < 2000, m
+import homematic as _hm
+act = [x for x in _hm.load_sensors() if x["id"] == "thermo-" + tid + "-act"]
+assert len(act) == 1 and act[0]["unit"] == "s" and act[0]["name"].endswith("Aktivzeit"), act
+assert _hm.read_sensor(act[0]) == 3.0, _hm.read_sensor(act[0])                  # letzter Wert 3000 ms
+assert len([x for x in _hm.load_sensors() if x["id"].startswith("thermo-" + tid + "-")]) == 5
 # 4) Offline nach 3 verpassten Intervallen
 d = thermo._load(); d[0]["last_seen"] = time.time() - (30 * 60 * 3 + 200); thermo._save(d); homematic._value_cache.clear()
 assert homematic.read_sensor(next(s for s in homematic.load_sensors() if s.get("datapoint") == "temp")) is None

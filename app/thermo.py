@@ -44,6 +44,7 @@ METRICS = {
     "hum": ("hum", "humidity", "Luftfeuchte", "%"),
     "bat": ("bat", "voltage", "Batterie", "V"),
     "rssi": ("rssi", "signal", "Funkstärke", "dBm"),
+    "act": ("act", "duration", "Aktivzeit", "s"),          # ab Firmware 2.0.9 (Aktivzeit des vorherigen Aufwachens); wird erst bei der ersten Meldung angelegt
 }
 
 
@@ -135,12 +136,14 @@ def _interval(v) -> int:
     return max(1, min(1440, n))
 
 
-def _make_sensors(dev: dict) -> list[dict]:
+def _make_sensors(dev: dict, only: tuple = ()) -> list[dict]:
     import homematic
     sens = homematic.load_sensors()
     have = {s["id"] for s in sens}
     made = []
     for metric, (_k, kind, label, unit) in METRICS.items():
+        if (only and metric not in only) or (not only and metric == "act"):               # "act" nur gezielt (bei der ersten Aktivzeit-Meldung)
+            continue
         sid = sensor_id(dev["id"], metric)
         if sid in have:
             continue
@@ -219,7 +222,7 @@ def public(dev: dict) -> dict:
     attempt = {"age_s": int(now - at["ts"]), "ip": at.get("ip", ""), "why": at.get("why", "")} if at.get("ts") and now - at["ts"] < 3600 else None
     return {"id": dev["id"], "name": dev.get("name") or dev["id"], "standalone": bool(dev.get("standalone")), "paired": bool(dev.get("paired")), "has_code": bool(dev.get("code")), "ota_pending": bool(dev.get("ota_pending")), "ota_failed": dev.get("ota_failed") or "", "location": dev.get("location") or "", "interval": iv, "created": dev.get("created"), "last_seen": ls, "fw": dev.get("fw"), "attempt": attempt,
             "age_s": None if ls is None else int(now - ls), "online": ls is not None and now - ls <= run_iv * 60 * MISSED_INTERVALS + 120,
-            "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS]}
+            "last": cor, "raw": raw, "meta": dict(dev.get("meta") or {}), "calib": {"temp": cal.get("temp"), "hum": cal.get("hum")}, "sensors": [sensor_id(dev["id"], m) for m in METRICS if m != "act"]}
 
 
 def listing() -> list[dict]:
@@ -455,6 +458,7 @@ def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False)
         pr = str(body.get("pr") or "").strip()
         if pa is not None:
             meta["pa"] = int(pa)
+            last["act"] = round(int(pa) / 1000.0, 2)
             meta["pa_avg"] = round(int(pa) if meta.get("pa_avg") is None else 0.9 * float(meta["pa_avg"]) + 0.1 * int(pa))      # gleitender Mittelwert
         if re.match(r"^(S|R|T|W-?\d{1,3}|H-?\d{1,4})$", pr):
             meta["pr"] = pr
@@ -475,7 +479,13 @@ def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False)
             d["fw"] = fw
         interval = int(d.get("interval") or DEFAULT_INTERVAL_MIN)
         d["interval_ack"] = interval                                    # so schlaeft das Geraet ab jetzt (Grundlage fuer "meldet sich nicht mehr")
+        new_act = pa is not None and not d.get("act_made")              # nur einmal anlegen: ein geloeschter Sensor kommt nicht zurueck
+        if new_act:
+            d["act_made"] = True
         _save(items)
+        dev_copy = dict(d)
+    if new_act:
+        _make_sensors(dev_copy, only=("act",))                          # Aktivzeit-Sensor beim ersten Wert anlegen (auch bei schon vorhandenen Geraeten)
     return 200, {"ok": True, "interval": interval}
 
 
