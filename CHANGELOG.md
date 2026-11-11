@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.53.2 – 11.11.2026
+- Neu: **Thermometer-Firmware 2.0.7** ersetzt 2.0.6 (sendet bei Verbindungsfehlern einmal erneut). Geräte mit 2.0.6 sehen „Update 2.0.7 verfügbar“; aktualisiert wird weiterhin nur auf Knopfdruck je Gerät.
+- Korrigiert: Anleitung im Fenster „ESP vorbereiten“ und im Handbuch. Bei vorbereiteten Modulen (Regler und rote LED entfernt) versorgt USB den Chip nicht: Batterien müssen eingelegt sein **und** das USB-Kabel stecken. Download-Modus: RESET halten, BOOT halten, RESET loslassen, BOOT loslassen; danach RESET drücken.
+
 ## 1.53.1 – 10.11.2026
 - Neu: **Thermometer-Firmware 2.0.6** ersetzt 2.0.5 (Geräte mit 2.0.5 sehen „Update 2.0.6 verfügbar“).
 - Geändert: Das Anleitungs-Etikett trägt nicht mehr „USB nur ohne Batterien!“ (beim neuen Aufbau ohne Regler überholt, die Sicherheitshinweise stehen auf der Anleitungsseite), sondern „QR-Code scannen“. Handbuch: Etikett-Absatz und der veraltete Abschnitt „Neu flashen“ (Knöpfe gibt es nicht mehr) überarbeitet.

@@ -171,8 +171,8 @@
   }
   function friendly(e) {
     var t = (e && e.message) || String(e);
-    if (e && e.name === 'NotFoundError') return 'Kein Chip ausgewählt. Beim Anstecken muss ein Eintrag „USB JTAG/serial debug unit“ erscheinen – bei einem schon eingerichteten Thermometer erst den Download-Modus aktivieren (BOOT-Taste halten, USB-C anstecken oder RESET drücken, BOOT loslassen).';
-    if (/Failed to connect|No serial data|timeout/i.test(t)) return 'Keine Verbindung zum Chip. Download-Modus aktivieren: BOOT-Taste halten, USB-C anstecken (oder RESET drücken), BOOT loslassen – dann erneut versuchen. Das Kabel muss Daten übertragen (nicht nur laden).';
+    if (e && e.name === 'NotFoundError') return 'Kein Chip ausgewählt. Beim Anstecken muss ein Eintrag „USB JTAG/serial debug unit“ erscheinen – bei einem schon eingerichteten Thermometer erst den Download-Modus aktivieren (RESET halten, BOOT halten, RESET loslassen, BOOT loslassen). Ohne Regler am Modul müssen dafür Batterien eingelegt sein UND das USB-Kabel stecken.';
+    if (/Failed to connect|No serial data|timeout/i.test(t)) return 'Keine Verbindung zum Chip. Download-Modus aktivieren: RESET halten, BOOT halten, RESET loslassen, BOOT loslassen – dann erneut versuchen. Bei einem vorbereiteten Modul (ohne Regler) müssen Batterien eingelegt sein UND das USB-Kabel stecken. Das Kabel muss Daten übertragen (nicht nur laden).';
     if (/busy|already open|InvalidStateError/i.test(t)) return 'Der Anschluss ist belegt (anderes Programm oder Browser-Fenster nutzt ihn). Bitte schließen und erneut versuchen.';
     return t;
   }
@@ -181,7 +181,7 @@
   function flash() {
     if (!state.fw) { msg('Die Firmware-Datei fehlt in dieser Installation.', true); return; }
     uiDialog({ title: 'ESP vorbereiten', okText: 'Weiter',
-      html: '<div style="text-align:left;line-height:1.5">Der angesteckte Chip wird <b>gelöscht</b> und bekommt die Firmware <b>' + esc(state.fw.version) + '</b>. Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li>USB-C-Kabel an den PC anstecken.</li><li>Neuer Chip: er meldet sich von selbst. Ein schon eingerichteter: <b>BOOT-Taste halten</b>, USB-C anstecken (oder RESET drücken), BOOT loslassen.</li><li>Auf „Weiter“ klicken und „USB JTAG/serial debug unit“ wählen.</li></ol></div>' }).then(function (ok) { if (ok) doFlash(); });
+      html: '<div style="text-align:left;line-height:1.5">Der angesteckte Chip wird <b>gelöscht</b> und bekommt die Firmware <b>' + esc(state.fw.version) + '</b>. Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li><b>Batterien einlegen UND USB-C-Kabel anstecken</b> – bei einem vorbereiteten Modul (Regler und rote LED entfernt) versorgt USB den Chip nicht, ohne Batterien erscheint der Port nicht. (Nur bei einem Modul <i>mit</i> Regler nie beides gleichzeitig.)</li><li>Neuer Chip: er meldet sich von selbst. Ein schon eingerichteter (schläft): Download-Modus: <b>RESET halten, BOOT halten, RESET loslassen, BOOT loslassen</b>.</li><li>Auf „Weiter“ klicken und „USB JTAG/serial debug unit“ wählen.</li><li>Nach dem Aufspielen die <b>RESET-Taste drücken</b>.</li></ol></div>' }).then(function (ok) { if (ok) doFlash(); });
   }
   function doFlash() {
     var lib = null, session = null, logLines = [];
@@ -220,7 +220,7 @@
     var err = !navigator.serial ? 'Zum Löschen braucht der Browser „Web Serial“ (Chrome oder Edge am PC).' : (!window.isSecureContext ? 'Das geht nur über https oder localhost.' : '');
     if (err) { msg(err, true); return; }
     uiDialog({ title: 'ESP32 löschen', okText: 'Weiter',
-      html: '<div style="text-align:left;line-height:1.5">Der Chip wird <b>komplett gelöscht</b> (Auslieferungszustand). Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li>USB-C-Kabel an den PC anstecken.</li><li><b>BOOT-Taste halten</b>, dann USB-C anstecken (oder RESET drücken), danach BOOT loslassen.</li><li>Auf „Weiter“ klicken und den Eintrag „USB JTAG/serial debug unit“ wählen.</li></ol></div>' }).then(function (ok) {
+      html: '<div style="text-align:left;line-height:1.5">Der Chip wird <b>komplett gelöscht</b> (Auslieferungszustand). Ein schlafender Chip ist am PC nicht zu sehen – bitte so vorbereiten:<ol style="margin:8px 0 0 18px;padding:0"><li><b>Batterien einlegen UND USB-C-Kabel anstecken</b> – bei einem vorbereiteten Modul (Regler und rote LED entfernt) versorgt USB den Chip nicht, ohne Batterien erscheint der Port nicht. (Nur bei einem Modul <i>mit</i> Regler nie beides gleichzeitig.)</li><li>Download-Modus: <b>RESET halten, BOOT halten, RESET loslassen, BOOT loslassen</b>.</li><li>Auf „Weiter“ klicken und den Eintrag „USB JTAG/serial debug unit“ wählen.</li></ol></div>' }).then(function (ok) {
       if (!ok) return;
       resetSteps(); msg(''); setBusy(true);
       var session = null, log = function () {};
