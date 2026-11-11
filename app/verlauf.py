@@ -30,7 +30,7 @@ CHARTS_PATH = os.path.join(_DIR, "verlauf_charts.json")
 RAW_DAYS = 7
 PRICE_BACKFILL_DAYS = 14                      # beim Anlegen der Preis-Reihe die schon bekannten Tibber-Preise der letzten Tage nachtragen
 ROLLUP_DAYS = 400
-INTERVALS = (5, 10, 30, 60, 300)             # erlaubte Abtastzeiten in Sekunden
+INTERVALS = (5, 10, 30, 60, 300, 900, 1800, 3600)             # erlaubte Abtastzeiten in Sekunden
 DEFAULT_INTERVAL = {"energy": 10, "device_power": 10, "device_state": 30, "sensor": 60}
 MAX_CHARTS, MAX_SERIES_PER_CHART, MAX_SERIES = 40, 12, 80
 CHART_KINDS = ("line", "area", "bar", "step", "points", "stackarea", "stackbar")      # Darstellung: Linie, Flaeche, Balken, Stufen, Punkte, gestapelte Flaeche, gestapelte Balken
@@ -311,7 +311,8 @@ def catalog() -> list[dict]:
                 for k, lab in (("indoor", "Innentemperatur"), ("outdoor", "Außentemperatur"), ("target", "Solltemperatur")):
                     out.append({"id": f"device_{k}:{d['id']}", "type": "device_temp", "label": f"{name} – {lab}", "unit": "°C", "group": "Geräte", "interval": 60})
         for s in homematic.load_sensors():
-            out.append({"id": f"sensor:{s['id']}", "type": "sensor", "label": s.get("name") or s["id"], "unit": s.get("unit") or "", "group": "Sensoren", "binary": bool(s.get("binary"))})
+            out.append({"id": f"sensor:{s['id']}", "type": "sensor", "label": s.get("name") or s["id"], "unit": s.get("unit") or "", "group": "Sensoren", "binary": bool(s.get("binary")),
+                        **({"interval": 900} if s.get("source") == "thermo" else {})})                  # Funkthermometer melden selten (Standard 15 Minuten)
     return out
 
 

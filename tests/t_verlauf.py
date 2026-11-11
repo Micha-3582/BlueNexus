@@ -145,7 +145,7 @@ assert M.get("/verlauf").status_code in (302, 403) and M.get("/api/verlauf/serie
 assert V.get("/verlauf").status_code == 200 and V.get("/api/verlauf/series").status_code == 200
 assert V.get("/api/verlauf/catalog").status_code in (302, 403) and V.post("/api/verlauf/series", json={"source": "energy:soc"}).status_code in (302, 403)
 assert V.post("/api/verlauf/charts", json={"charts": []}).status_code in (302, 403)
-cat = A.get("/api/verlauf/catalog").get_json(); assert cat["intervals"] == [5, 10, 30, 60, 300] and any(x["id"] == "energy:grid_w" and x["known"] for x in cat["sources"])
+cat = A.get("/api/verlauf/catalog").get_json(); assert cat["intervals"] == [5, 10, 30, 60, 300, 900, 1800, 3600] and any(x["id"] == "energy:grid_w" and x["known"] for x in cat["sources"])
 r = A.get("/api/verlauf/series").get_json(); assert {s["id"] for s in r["series"]} >= {"energy:grid_w", "device_power:d1"} and r["stats"]["rollup"] > 0
 tms = int(time.time() * 1000)
 d = A.get(f"/api/verlauf/data?series=energy:grid_w,nix&from={tms - 3600000}&to={tms}&points=500").get_json()

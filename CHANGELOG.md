@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.55.1 – 11.11.2026
+- Neu: Verläufe bieten als Abtastzeit jetzt auch **15 min, 30 min und 1 h** an. Funkthermometer-Sensoren schlagen 15 Minuten vor, damit derselbe Wert nicht mehrfach aufgezeichnet wird. Schon eingerichtete Aufzeichnungen bleiben unverändert und lassen sich in der Liste umstellen.
+
 ## 1.55.0 – 11.11.2026
 - Neu: **Aktivzeit als Sensor mit Verlauf.** Meldet ein Thermometer (Firmware ab 2.0.9) die Aktivzeit, legt BlueNexus einmalig den Sensor „<Name> Aktivzeit“ (in Sekunden) an – auch bei schon vorhandenen Thermometern. Er steht wie die anderen Sensoren zur Verfügung (Smart Home → Sensoren, Verläufe/Aufzeichnen, Regeln) und ist zunächst nur für Administratoren sichtbar. Wird der Sensor gelöscht, kommt er nicht wieder.
 
