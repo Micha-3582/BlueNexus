@@ -31,6 +31,7 @@ RAW_DAYS = 7
 PRICE_BACKFILL_DAYS = 14                      # beim Anlegen der Preis-Reihe die schon bekannten Tibber-Preise der letzten Tage nachtragen
 ROLLUP_DAYS = 400
 INTERVALS = (5, 10, 30, 60, 300, 600, 900, 1800, 3600)             # erlaubte Abtastzeiten in Sekunden
+EVENT_GAP_S = 7200                           # Reihen "bei jeder Meldung" (Funkthermometer): laenger als 2 Stunden ohne Wert = Luecke im Diagramm
 DEFAULT_INTERVAL = {"energy": 10, "device_power": 10, "device_state": 30, "sensor": 60}
 MAX_CHARTS, MAX_SERIES_PER_CHART, MAX_SERIES = 40, 12, 80
 CHART_KINDS = ("line", "area", "bar", "step", "points", "stackarea", "stackbar")      # Darstellung: Linie, Flaeche, Balken, Stufen, Punkte, gestapelte Flaeche, gestapelte Balken
@@ -64,6 +65,11 @@ def close():
         if _conn is not None:
             _conn.close()
             _conn = None
+
+
+def is_event_source(source: str) -> bool:
+    """Reihen, die nicht abgefragt, sondern bei jeder Meldung des Geraets aufgezeichnet werden koennen (Funkthermometer)."""
+    return str(source).startswith("sensor:thermo-")
 
 
 def add_samples(rows: list[tuple]) -> int:
@@ -128,7 +134,9 @@ def query(series: dict, t0: float, t1: float, max_points: int = 1500) -> dict:
     with _lock:
         c = _db()
         for sid, meta in series.items():
-            base = max(1, int(meta.get("interval_s") or 10)) if use_raw else 60
+            ev = not int(meta.get("interval_s") or 0)                        # 0 = bei jeder Meldung
+            ivq = int(meta.get("interval_s") or 10)
+            base = max(1, ivq) if use_raw else 60
             bucket = max(base, math.ceil(span / max_points))
             if not use_raw:
                 bucket = max(60, bucket // 60 * 60)
@@ -138,7 +146,7 @@ def query(series: dict, t0: float, t1: float, max_points: int = 1500) -> dict:
             else:
                 cur = c.execute("SELECT (ts / ?) * ?, SUM(vsum) / SUM(n), MIN(vmin), MAX(vmax) FROM rollup WHERE series = ? AND ts BETWEEN ? AND ? GROUP BY 1 ORDER BY 1",
                                 (bucket, bucket, sid, t0 - bucket, t1))
-            gap = max(bucket * 3, int(meta.get("interval_s") or 10) * 3, 180)
+            gap = max(bucket * 3, EVENT_GAP_S if ev else ivq * 3, 180)
             pts, prev = [], None
             for b, avg, mn, mx in cur.fetchall():
                 if prev is not None and b - prev > gap:
@@ -146,7 +154,7 @@ def query(series: dict, t0: float, t1: float, max_points: int = 1500) -> dict:
                 pts.append([b * 1000, round(avg, 2), round(mn, 2), round(mx, 2)])
                 prev = b
             out[sid] = {"label": meta.get("label", sid), "unit": meta.get("unit", ""), "points": pts, "bucket_s": bucket,
-                        "interval_s": int(meta.get("interval_s") or 10), "source": "raw" if use_raw else "rollup"}
+                        "interval_s": ivq, "source": "raw" if use_raw else "rollup"}
     return out
 
 
@@ -203,9 +211,9 @@ def add_series(source: str, interval_s=None, label: str = "") -> dict:
     if len(items) >= MAX_SERIES:
         raise VerlaufError(f"Höchstens {MAX_SERIES} Reihen")
     c = cat[source]
-    iv = check_interval(interval_s, c.get("interval") or DEFAULT_INTERVAL.get(c["type"], 60))
+    iv = check_interval(interval_s, c["interval"] if "interval" in c else DEFAULT_INTERVAL.get(c["type"], 60), event_ok=is_event_source(source))
     item = {"id": source, "source": source, "label": (str(label).strip()[:60] or c["label"]), "unit": c["unit"], "interval_s": iv, "binary": bool(c.get("binary")),
-            "step": bool(c.get("step"))}
+            "step": bool(c.get("step")), "event": is_event_source(source)}
     items.append(item)
     _save_series(items)
     if source == "energy:price_ct":
@@ -236,13 +244,15 @@ def backfill_prices(days: int = PRICE_BACKFILL_DAYS) -> int:
     return add_samples(rows)
 
 
-def check_interval(v, default: int) -> int:
+def check_interval(v, default: int, event_ok: bool = False) -> int:
     if v in (None, ""):
         return default
     try:
         iv = int(v)
     except (TypeError, ValueError):
         raise VerlaufError("Abtastzeit ungültig")
+    if iv == 0 and event_ok:
+        return 0                                                  # bei jeder Meldung des Geraets (nur Funkthermometer)
     if iv not in INTERVALS:
         raise VerlaufError("Abtastzeit: " + ", ".join(f"{i} s" for i in INTERVALS))
     return iv
@@ -255,7 +265,7 @@ def update_series(sid: str, label=None, interval_s=None) -> bool:
             if label is not None and str(label).strip():
                 x["label"] = str(label).strip()[:60]
             if interval_s not in (None, ""):
-                x["interval_s"] = check_interval(interval_s, x.get("interval_s", 60))
+                x["interval_s"] = check_interval(interval_s, x.get("interval_s", 60), event_ok=is_event_source(x["source"]))
             _save_series(items)
             return True
     return False
@@ -312,7 +322,7 @@ def catalog() -> list[dict]:
                     out.append({"id": f"device_{k}:{d['id']}", "type": "device_temp", "label": f"{name} – {lab}", "unit": "°C", "group": "Geräte", "interval": 60})
         for s in homematic.load_sensors():
             out.append({"id": f"sensor:{s['id']}", "type": "sensor", "label": s.get("name") or s["id"], "unit": s.get("unit") or "", "group": "Sensoren", "binary": bool(s.get("binary")),
-                        **({"interval": 900} if s.get("source") == "thermo" else {})})                  # Funkthermometer melden selten (Standard 15 Minuten)
+                        **({"interval": 0, "event": True} if s.get("source") == "thermo" else {})})                  # Funkthermometer: Standard = bei jeder Meldung (kein Abfragen)
     return out
 
 
@@ -370,6 +380,34 @@ def read_sources(ids: list[str], system: dict | None, extras: dict | None = None
     return out
 
 
+def record_event(sensor_ids: list, ts: float | None = None) -> int:
+    """Funkthermometer hat gemeldet: die Werte der Reihen "bei jeder Meldung" (interval_s == 0) genau jetzt aufzeichnen - der echte Wert, kein Abtasten."""
+    import homematic
+    st = _store()
+    cfg = st.load_config()
+    if not st.module_on("verlauf", cfg) or not st.module_on("smarthome", cfg):
+        return 0
+    want = {f"sensor:{i}" for i in sensor_ids}
+    mine = [x["id"] for x in load_series() if x["id"] in want and x.get("interval_s") == 0]
+    if not mine:
+        return 0
+    vals = read_sources(mine, None)
+    t = ts or time.time()
+    return add_samples([(sid, t, v) for sid, v in vals.items() if v is not None])
+
+
+def migrate_event_series() -> int:
+    """Bestehende Thermometer-Reihen (bisher abgefragt, dadurch alte Werte mehrfach) einmalig auf "bei jeder Meldung" umstellen."""
+    items = load_series(); n = 0
+    for x in items:
+        if is_event_source(x["source"]) and not x.get("event"):
+            x["event"] = True
+            x["interval_s"] = 0; n += 1
+    if n:
+        _save_series(items)
+    return n
+
+
 # ---------------------------------------------------------------- Aufzeichnung
 class Sampler:
     """Liest alle faelligen Reihen und schreibt sie in die Datenbank (jede Reihe in ihrer eigenen Abtastzeit)."""
@@ -395,6 +433,8 @@ class Sampler:
                 continue
             if kind != "energy" and not st.module_on("smarthome", cfg):
                 continue
+            if s.get("interval_s") == 0:
+                continue                                       # "bei jeder Meldung": wird von record_event() beim Eintreffen der Meldung geschrieben
             if now - self._last.get(s["id"], 0) >= int(s.get("interval_s") or 60) - 0.5:
                 due.append(s["id"])
         n = 0

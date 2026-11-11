@@ -12,6 +12,7 @@ Reine Logik + eine JSON-Datei (thermo.json).
 from __future__ import annotations
 
 import hashlib
+import logging
 import hmac
 import json
 import os
@@ -37,6 +38,7 @@ LIMITS = {"temp": (-60.0, 80.0), "hum": (0.0, 100.0)}
 CAL_MAX_AGE_S = 300                 # Abgleich nur mit frischer Messung (das Geraet misst nach RESET sofort neu)
 CAL_MAX_OFF = {"temp": 10.0, "hum": 30.0}   # groessere Abweichungen sind kein Messfehler des Sensors, sondern ein Hinweis auf eine falsche Referenz
 
+log = logging.getLogger("thermo")
 ID_RE = re.compile(r"^t-[a-z0-9]{6,12}$")
 # metric -> (Schluessel im Zustand, Sensorart, Bezeichnung, Einheit)
 METRICS = {
@@ -485,7 +487,12 @@ def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False)
         _save(items)
         dev_copy = dict(d)
     if new_act:
-        _make_sensors(dev_copy, only=("act",))                          # Aktivzeit-Sensor beim ersten Wert anlegen (auch bei schon vorhandenen Geraeten)
+        _make_sensors(dev_copy, only=("act",))
+    try:                                                                # Verlaeufe "bei jeder Meldung": echten Wert jetzt aufzeichnen
+        import verlauf
+        verlauf.record_event([sensor_id(tid, m) for m in METRICS])
+    except Exception as e:                                              # noqa: BLE001 - eine Aufzeichnung darf die Meldung nie scheitern lassen
+        log.warning("Thermometer %s: Verlauf nicht aufgezeichnet: %s", tid, e)                          # Aktivzeit-Sensor beim ersten Wert anlegen (auch bei schon vorhandenen Geraeten)
     return 200, {"ok": True, "interval": interval}
 
 

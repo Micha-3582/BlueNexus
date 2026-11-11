@@ -420,25 +420,24 @@ async function loadSeries() {
   $('vl-stats').textContent = `Datenbank: ${st.raw.toLocaleString('de-DE')} Rohwerte (${st.raw_days} Tage) · ${st.rollup.toLocaleString('de-DE')} Minutenwerte (${st.rollup_days} Tage) · ${mb} MB` + (st.since ? ' · seit ' + new Date(st.since * 1000).toLocaleDateString('de-DE') : '');
   renderSeriesTable();
 }
-function ivLabel(s) { return s < 60 ? s + ' s' : s < 3600 ? s / 60 + ' min' : s / 3600 + ' h'; }
+function ivLabel(s) { return s === 0 ? 'bei jeder Meldung' : s < 60 ? s + ' s' : s < 3600 ? s / 60 + ' min' : s / 3600 + ' h'; }
 function renderSeriesTable() {
   const t = $('vl-series-table'), list = Object.values(SERIES);
   $('vl-list-count').textContent = '(' + list.length + ')';
   const ivs = (CATALOG && CATALOG.intervals) || [5, 10, 30, 60, 300, 600, 900, 1800, 3600];
   t.innerHTML = list.length ? list.map(s => `<tr data-id="${esc(s.id)}"><td><input value="${esc(s.label)}" maxlength="60" onchange="seriesPatch('${esc(s.id)}', { label: this.value })"></td>
-      <td style="white-space:nowrap"><select style="width:auto" onchange="seriesPatch('${esc(s.id)}', { interval_s: +this.value })">${ivs.map(i => `<option value="${i}" ${i === s.interval_s ? 'selected' : ''}>alle ${ivLabel(i)}</option>`).join('')}</select></td>
+      <td style="white-space:nowrap"><select style="width:auto" onchange="seriesPatch('${esc(s.id)}', { interval_s: +this.value })">${(s.event ? [0, ...ivs] : ivs).map(i => `<option value="${i}" ${i === s.interval_s ? 'selected' : ''}>${i ? 'alle ' : ''}${ivLabel(i)}</option>`).join('')}</select></td>
       <td class="muted">${esc(s.unit || (s.binary ? 'an/aus' : ''))}</td><td style="text-align:right"><button class="ghost" onclick="seriesRemove('${esc(s.id)}')" title="Aufzeichnung beenden">✕</button></td></tr>`).join('')
     : '<tr><td class="muted">Noch nichts ausgewählt.</td></tr>';
 }
 async function loadCatalog() {
   CATALOG = await api('/api/verlauf/catalog');
   const groups = {}; CATALOG.sources.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
-  $('vl-src').innerHTML = Object.entries(groups).map(([g, l]) => `<optgroup label="${esc(g)}">${l.map(c => `<option value="${esc(c.id)}" data-type="${esc(c.type)}" data-interval="${c.interval || ''}" data-label="${esc(c.label)}" ${c.known ? 'disabled' : ''}>${esc(c.label)}${c.unit ? ' (' + esc(c.unit) + ')' : ''}${c.known ? ' – wird aufgezeichnet' : ''}</option>`).join('')}</optgroup>`).join('') || '<option value="">Nichts verfügbar</option>';
+  $('vl-src').innerHTML = Object.entries(groups).map(([g, l]) => `<optgroup label="${esc(g)}">${l.map(c => `<option value="${esc(c.id)}" data-type="${esc(c.type)}" data-interval="${c.interval == null ? '' : c.interval}" data-event="${c.event ? 1 : ''}" data-label="${esc(c.label)}" ${c.known ? 'disabled' : ''}>${esc(c.label)}${c.unit ? ' (' + esc(c.unit) + ')' : ''}${c.known ? ' – wird aufgezeichnet' : ''}</option>`).join('')}</optgroup>`).join('') || '<option value="">Nichts verfügbar</option>';
   const first = [...$('vl-src').options].find(o => !o.disabled); if (first) $('vl-src').value = first.value;
-  $('vl-iv').innerHTML = CATALOG.intervals.map(i => `<option value="${i}">alle ${ivLabel(i)}</option>`).join('');
   srcChanged(); renderSeriesTable();
 }
-function srcChanged() { const o = $('vl-src').selectedOptions[0]; if (!o) return; const d = o.dataset.interval || (CATALOG.defaults || {})[o.dataset.type]; if (d) $('vl-iv').value = d; $('vl-label').placeholder = o.dataset.label || 'Name (optional)'; }
+function srcChanged() { const o = $('vl-src').selectedOptions[0]; if (!o) return; const ev = !!o.dataset.event; $('vl-iv').innerHTML = (ev ? [0, ...CATALOG.intervals] : CATALOG.intervals).map(i => `<option value="${i}">${i ? 'alle ' : ''}${ivLabel(i)}</option>`).join(''); const d = o.dataset.interval !== '' ? o.dataset.interval : (CATALOG.defaults || {})[o.dataset.type]; if (d != null && d !== '') $('vl-iv').value = d; $('vl-label').placeholder = o.dataset.label || 'Name (optional)'; }
 $('vl-src').addEventListener('change', srcChanged);
 $('vl-manage').addEventListener('click', async () => {
   const b = $('vl-manage-box'); b.style.display = b.style.display === 'none' ? 'block' : 'none';

@@ -75,6 +75,33 @@ act = [x for x in _hm.load_sensors() if x["id"] == "thermo-" + tid + "-act"]
 assert len(act) == 1 and act[0]["unit"] == "s" and act[0]["name"].endswith("Aktivzeit"), act
 assert _hm.read_sensor(act[0]) == 3.0, _hm.read_sensor(act[0])                  # letzter Wert 3000 ms
 assert len([x for x in _hm.load_sensors() if x["id"].startswith("thermo-" + tid + "-")]) == 5
+# Verlauf "bei jeder Meldung": der echte Wert wird beim Eintreffen der Meldung aufgezeichnet (kein Abfragen, keine alten Werte)
+import verlauf, store as _st
+verlauf.close(); verlauf.DB_PATH = os.path.join(tmp, "v_thermo.db"); verlauf.SERIES_PATH = os.path.join(tmp, "v_thermo_s.json"); verlauf.CHARTS_PATH = os.path.join(tmp, "v_thermo_c.json")
+for _p in (verlauf.DB_PATH, verlauf.DB_PATH + "-wal", verlauf.DB_PATH + "-shm", verlauf.SERIES_PATH):
+    if os.path.exists(_p): os.remove(_p)
+sid_t = "sensor:thermo-" + tid + "-temp"
+cat = {c["id"]: c for c in verlauf.catalog()}
+assert cat[sid_t]["interval"] == 0 and cat[sid_t]["event"] is True, cat.get(sid_t)
+ser = verlauf.add_series(sid_t, None, "")                                                     # Standard bei Thermometern: bei jeder Meldung
+assert ser["interval_s"] == 0 and ser["event"] is True, ser
+try:
+    verlauf.add_series("energy:grid_w", 0, ""); raise SystemExit("0 darf nur bei Thermometern gehen")
+except verlauf.VerlaufError:
+    pass
+n0 = verlauf.query({sid_t: {"label": "T", "unit": "°C", "interval_s": 0}}, time.time() - 600, time.time() + 5)[sid_t]["points"]
+assert not n0, n0
+for t_ in (21.5, 22.0):
+    assert N.post("/api/sensor/" + tid, json={"temp": t_, "hum": 50}, headers=H(token)).status_code == 200
+    time.sleep(1.1)                                                                           # eigene Sekunde je Meldung
+rows = [r_[0] for r_ in verlauf._db().execute("SELECT v FROM samples WHERE series = ? ORDER BY ts", (sid_t,)).fetchall()]
+assert rows == [21.5, 22.0], rows                                                             # genau die gemeldeten Werte
+verlauf.Sampler().tick()                                                                      # Abfragen schreibt nichts dazu
+assert [r_[0] for r_ in verlauf._db().execute("SELECT v FROM samples WHERE series = ? ORDER BY ts", (sid_t,)).fetchall()] == rows
+verlauf.update_series(sid_t, interval_s=300); assert verlauf.load_series()[0]["interval_s"] == 300       # auch feste Abtastzeit moeglich
+# bestehende (abgefragte) Thermometer-Reihe wird einmal auf "bei jeder Meldung" umgestellt
+it = verlauf.load_series(); it[0].pop("event", None); verlauf._save_series(it)
+assert verlauf.migrate_event_series() == 1 and verlauf.load_series()[0]["interval_s"] == 0 and verlauf.migrate_event_series() == 0
 # 4) Offline nach 3 verpassten Intervallen
 d = thermo._load(); d[0]["last_seen"] = time.time() - (30 * 60 * 3 + 200); thermo._save(d); homematic._value_cache.clear()
 assert homematic.read_sensor(next(s for s in homematic.load_sensors() if s.get("datapoint") == "temp")) is None

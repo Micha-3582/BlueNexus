@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.59.0 – 12.11.2026
+- Neu: **Aufzeichnung „bei jeder Meldung“ für Funkthermometer.** Die Sensoren eines Thermometers werden nicht mehr in einem festen Takt abgefragt (dabei kamen alte Werte mehrfach und zu falschen Zeiten ins Diagramm), sondern genau dann aufgezeichnet, wenn das Thermometer gemeldet hat – mit dem echten Wert und der echten Uhrzeit. Das ist jetzt die Voreinstellung für Thermometer-Sensoren; eine feste Abtastzeit bleibt wählbar. Schon vorhandene Thermometer-Reihen werden beim Update einmal umgestellt. Fehlt eine Meldung länger als 2 Stunden, zeigt das Diagramm eine Lücke.
+
 ## 1.58.1 – 11.11.2026
 - Behoben: Bei aktiver Lupe oder aktivem Messen löst gedrückte Maustaste (Halten und Ziehen) nicht mehr das Umsortieren des Diagramms aus; solange ein Werkzeug an ist, wird nicht umsortiert.
 

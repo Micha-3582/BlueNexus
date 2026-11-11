@@ -2457,6 +2457,10 @@ class Controller:
         threading.Thread(target=self.run_surplus, daemon=True).start()
         threading.Thread(target=self.run_rules, daemon=True).start()
         self.verlauf = verlauf.Sampler(lambda: self.last_system if time.time() - self.last_system_ts < 45 else None, self._verlauf_extra)
+        try:
+            verlauf.migrate_event_series()                      # Thermometer-Reihen: bei jeder Meldung statt Abfragen
+        except Exception as e:                              # noqa: BLE001
+            log.warning("Verlauf: Umstellung auf Meldungs-Aufzeichnung fehlgeschlagen: %s", e)
         threading.Thread(target=self.verlauf.run, daemon=True).start()
         def _fixed_price_housekeeping():                                                    # Festpreis: erst Perioden auf den Preis ergaenzen, dann Kosten nachgeholter Tage nachrechnen
             if not store.module_on("energy"):
