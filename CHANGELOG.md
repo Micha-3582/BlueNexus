@@ -4,6 +4,10 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.56.0 – 11.11.2026
+- Neu: **Min/Ø/Max in der Legende der Verläufe.** Der Knopf „∑ Min/Ø/Max“ zeigt hinter jedem Messwert den kleinsten, durchschnittlichen und größten Wert des angezeigten Zeitraums – ohne mit der Maus nach den Spitzen suchen zu müssen. Aus der Voreinstellung heraus aus; die Wahl wird gemerkt und gilt auch für das PNG-Bild.
+- Neu: Abtastzeit **10 min** ergänzt (jetzt 5 s bis 1 h).
+
 ## 1.55.1 – 11.11.2026
 - Neu: Verläufe bieten als Abtastzeit jetzt auch **15 min, 30 min und 1 h** an. Funkthermometer-Sensoren schlagen 15 Minuten vor, damit derselbe Wert nicht mehrfach aufgezeichnet wird. Schon eingerichtete Aufzeichnungen bleiben unverändert und lassen sich in der Liste umstellen.
 

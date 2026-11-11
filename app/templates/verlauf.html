@@ -10,7 +10,7 @@
   .vl-range button + button { border-left: 1px solid var(--border); }
   .vl-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-  #vl-zoom.on, #vl-day.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
+  #vl-zoom.on, #vl-day.on, #vl-stats.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
   .vl-chart { margin-top: 14px; }
   .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
   .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -37,6 +37,7 @@
       <button type="button" class="ghost" id="vl-zoom" aria-pressed="false" title="Lupe: Bereich im Diagramm aufziehen und vergrößern. Danach ist wieder Wischen aktiv.">🔍 Zoom</button>
       <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
     </span>
+    <button type="button" class="ghost" id="vl-stats" aria-pressed="false" title="In der Legende zu jedem Messwert den kleinsten, durchschnittlichen und größten Wert des angezeigten Zeitraums zeigen">∑ Min/Ø/Max</button>
     <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
     <button type="button" class="ghost" id="vl-zoomback" style="display:none" title="Zum vorherigen Zeitraum zurück (oder Doppelklick ins Diagramm)">↩ Zoom zurück</button>
     <button type="button" class="ghost" id="vl-manage" style="display:none" title="Festlegen, welche Messwerte aufgezeichnet werden (Sensoren, Leistung, Preise …)">⚙ Messwerte</button>
@@ -208,6 +209,13 @@ function setZoomMode(on) {
   document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
 }
 $('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
+function setStats(on, redraw) {                       // Min/Mittel/Max in der Legende (pro Gerät gemerkt)
+  VLChart.stats = on; $('vl-stats').classList.toggle('on', on); $('vl-stats').setAttribute('aria-pressed', on);
+  try { localStorage.setItem('vlStats', on ? '1' : '0'); } catch (e) { /* egal */ }
+  if (redraw) renderCharts();
+}
+$('vl-stats').addEventListener('click', () => setStats(!VLChart.stats, true));
+try { setStats(localStorage.getItem('vlStats') === '1', false); } catch (e) { /* egal */ }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ZOOM_MODE) setZoomMode(false); });
 
 /* ---------------- Diagramme ---------------- */
@@ -397,7 +405,7 @@ function ivLabel(s) { return s < 60 ? s + ' s' : s < 3600 ? s / 60 + ' min' : s 
 function renderSeriesTable() {
   const t = $('vl-series-table'), list = Object.values(SERIES);
   $('vl-list-count').textContent = '(' + list.length + ')';
-  const ivs = (CATALOG && CATALOG.intervals) || [5, 10, 30, 60, 300, 900, 1800, 3600];
+  const ivs = (CATALOG && CATALOG.intervals) || [5, 10, 30, 60, 300, 600, 900, 1800, 3600];
   t.innerHTML = list.length ? list.map(s => `<tr data-id="${esc(s.id)}"><td><input value="${esc(s.label)}" maxlength="60" onchange="seriesPatch('${esc(s.id)}', { label: this.value })"></td>
       <td style="white-space:nowrap"><select style="width:auto" onchange="seriesPatch('${esc(s.id)}', { interval_s: +this.value })">${ivs.map(i => `<option value="${i}" ${i === s.interval_s ? 'selected' : ''}>alle ${ivLabel(i)}</option>`).join('')}</select></td>
       <td class="muted">${esc(s.unit || (s.binary ? 'an/aus' : ''))}</td><td style="text-align:right"><button class="ghost" onclick="seriesRemove('${esc(s.id)}')" title="Aufzeichnung beenden">✕</button></td></tr>`).join('')

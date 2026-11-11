@@ -92,7 +92,17 @@ window.VLChart = (function () {
         datasets.push({ label: '_min', _band: true, _key: id, hidden: !!hid[id], data: pts.map(function (p) { return { x: p[0], y: p[2] }; }), borderWidth: 0, pointRadius: 0, fill: false, yAxisID: ax, spanGaps: false });
         datasets.push({ label: '_max', _band: true, _key: id, hidden: !!hid[id], data: pts.map(function (p) { return { x: p[0], y: p[3] }; }), borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: col + '30', yAxisID: ax, spanGaps: false });
       }
-      datasets.push({ _key: id, hidden: !!hid[id], label: series[id].label + (series[id].unit && !bin ? ' (' + series[id].unit + ')' : ''), _unit: series[id].unit || '', _bin: bin, _minmax: banded,
+      var st = null;                                      // Kennzahlen des sichtbaren Zeitraums: Min, Mittel, Max (nicht bei An/Aus-Reihen)
+      if (!bin) {
+        var sn = 0, ss = 0, smin = null, smax = null;
+        pts.forEach(function (p) {
+          if (p[1] == null) return;
+          var lo = p[2] != null ? p[2] : p[1], hi = p[3] != null ? p[3] : p[1];
+          sn++; ss += p[1]; if (smin === null || lo < smin) smin = lo; if (smax === null || hi > smax) smax = hi;
+        });
+        if (sn) st = { min: smin, avg: ss / sn, max: smax };
+      }
+      datasets.push({ _key: id, hidden: !!hid[id], _stats: st, label: series[id].label + (series[id].unit && !bin ? ' (' + series[id].unit + ')' : ''), _unit: series[id].unit || '', _bin: bin, _minmax: banded,
         data: pts.map(function (p) { return { x: p[0], y: p[1], mn: p[2], mx: p[3] }; }),
         borderColor: col, backgroundColor: isBar ? col + 'cc' : (kind === 'area' ? col + '33' : (kind === 'stackarea' ? col + '88' : col)), borderWidth: isBar ? 0 : 1.3,
         pointRadius: kind === 'points' ? 2 : 0, pointHoverRadius: 4, showLine: kind !== 'points', fill: (kind === 'stackarea' && !bin) ? 'stack' : (kind === 'area' ? 'origin' : false), tension: 0,
@@ -124,7 +134,16 @@ window.VLChart = (function () {
             ch._hid = ch._hid || {}; ch._hid[key] = vis;                  // vis = war sichtbar -> jetzt ausgeblendet
             ds.forEach(function (d, i) { if (d._key === key) ch.setDatasetVisibility(i, !vis); });
             ch.update();
-          }, labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; } } },
+          }, labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; },
+            generateLabels: function (chart) {                           // optional: Min / Mittel / Max des Zeitraums hinter dem Namen
+              var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              if (opts.stats === false || (opts.stats == null && !VLChart.stats)) return items;
+              items.forEach(function (it) {
+                var ds = chart.data.datasets[it.datasetIndex], st = ds && ds._stats;
+                if (st) it.text += '   Min ' + fmtNum(st.min) + ' · Ø ' + fmtNum(st.avg) + ' · Max ' + fmtNum(st.max);
+              });
+              return items;
+            } } },
           tooltip: {
             position: (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners.mouseX && !stacked && !isBar) ? 'mouseX' : 'average',
             filter: function (it) { return !it.dataset._band; },
@@ -168,5 +187,6 @@ window.VLChart = (function () {
     return { any: any, created: true };
   }
 
-  return { COLORS: COLORS, pointsFor: pointsFor, draw: draw, fmtTick: fmtTick, niceTicks: niceTicks, fmtNum: fmtNum };
+  var api = { COLORS: COLORS, pointsFor: pointsFor, draw: draw, fmtTick: fmtTick, niceTicks: niceTicks, fmtNum: fmtNum, stats: false };
+  return api;
 })();
