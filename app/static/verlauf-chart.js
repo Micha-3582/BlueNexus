@@ -172,8 +172,27 @@ window.VLChart = (function () {
           ctx.save(); ctx.strokeStyle = ZEROC; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.left, py); ctx.lineTo(a.right, py); ctx.stroke(); ctx.restore();
         }
       }, {
+        id: 'measureBox', afterDraw: function (chart) {           // Messen: Zeitabstand zwischen zwei Punkten (Auswahl waehrend des Ziehens oder gemerkter Bereich)
+          var a = chart.chartArea, sx = chart.scales.x, t0, t1;
+          if (chart._sel && chart._vlMeasure && chart._vlMeasure()) { t0 = sx.getValueForPixel(Math.min(chart._sel.x0, chart._sel.x1)); t1 = sx.getValueForPixel(Math.max(chart._sel.x0, chart._sel.x1)); }
+          else if (chart._meas) { t0 = chart._meas.t0; t1 = chart._meas.t1; }
+          else return;
+          var x0 = Math.max(a.left, sx.getPixelForValue(t0)), x1 = Math.min(a.right, sx.getPixelForValue(t1)); if (!(x1 > x0)) return;
+          var ctx = chart.ctx, pad = function (n) { return String(n).padStart(2, '0'); }, day = (sx.max - sx.min) > 86400000 * 0.9;
+          var tf = function (t) { var d = new Date(t); return (day ? pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '. ' : '') + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ((sx.max - sx.min) < 7200000 ? ':' + pad(d.getSeconds()) : ''); };
+          var sec = Math.round((t1 - t0) / 1000), dd = Math.floor(sec / 86400), hh = Math.floor(sec % 86400 / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60;
+          var dur = sec < 60 ? ss + ' s' : (dd ? dd + ' T ' : '') + (hh ? hh + ' h ' : '') + (mm || !(dd || hh) ? mm + ' min' : '') + (sec < 600 ? ' ' + ss + ' s' : '');
+          var txt = tf(t0) + ' – ' + tf(t1) + '  =  ' + dur.trim();
+          ctx.save(); ctx.fillStyle = 'rgba(244,140,36,.16)'; ctx.strokeStyle = 'rgba(244,140,36,.95)'; ctx.lineWidth = 1;
+          ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top);
+          ctx.beginPath(); ctx.moveTo(x0 + .5, a.top); ctx.lineTo(x0 + .5, a.bottom); ctx.moveTo(x1 - .5, a.top); ctx.lineTo(x1 - .5, a.bottom); ctx.stroke();
+          ctx.font = '600 13px system-ui, sans-serif'; var w = ctx.measureText(txt).width + 16, lx = Math.max(a.left, Math.min(a.right - w, (x0 + x1) / 2 - w / 2)), ly = a.top + 6;
+          ctx.fillStyle = 'rgba(20,24,32,.92)'; ctx.fillRect(lx, ly, w, 24); ctx.strokeRect(lx + .5, ly + .5, w - 1, 23);
+          ctx.fillStyle = '#f7b660'; ctx.textBaseline = 'middle'; ctx.fillText(txt, lx + 8, ly + 12); ctx.restore();
+        }
+      }, {
         id: 'zoomBox', afterDraw: function (chart) {            // Auswahlrechteck beim Aufziehen (Zoom)
-          var s = chart._sel; if (!s) return;
+          var s = chart._sel; if (!s || (chart._vlMeasure && chart._vlMeasure())) return;          // beim Messen zeichnet measureBox
           var a = chart.chartArea, x = Math.min(s.x0, s.x1), w = Math.abs(s.x1 - s.x0), ctx = chart.ctx;
           ctx.save(); ctx.fillStyle = 'rgba(60,162,203,.18)'; ctx.strokeStyle = 'rgba(60,162,203,.9)';
           ctx.fillRect(x, a.top, w, a.bottom - a.top); ctx.strokeRect(x, a.top, w, a.bottom - a.top); ctx.restore();
@@ -181,7 +200,7 @@ window.VLChart = (function () {
       }]
     };
     var ch = new Chart(cv.getContext('2d'), cfg);
-    ch._vlKind = kind; ch._vlStats = !!c.stats;
+    ch._vlKind = kind; ch._vlStats = !!c.stats; ch._vlMeasure = opts.measure || null;
     inst[c.id] = ch;
     if (opts.onCreate) opts.onCreate(ch);
     return { any: any, created: true };

@@ -10,7 +10,7 @@
   .vl-range button + button { border-left: 1px solid var(--border); }
   .vl-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-  #vl-zoom.on, #vl-day.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
+  #vl-zoom.on, #vl-day.on, #vl-measure.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
   .vl-chart { margin-top: 14px; }
   .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
   .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -34,6 +34,7 @@
       <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button><button data-h="168">7 T</button><button data-h="720">30 T</button><button data-h="8760">1 J</button>
     </div>
     <span class="vl-nav">
+      <button type="button" class="ghost" id="vl-measure" aria-pressed="false" title="Zeit messen: im Diagramm von einem Punkt zum anderen ziehen – BlueNexus zeigt, wie viel Zeit dazwischen liegt. Esc oder erneut klicken beendet.">📏 Messen</button>
       <button type="button" class="ghost" id="vl-zoom" aria-pressed="false" title="Lupe: Bereich im Diagramm aufziehen und vergrößern. Danach ist wieder Wischen aktiv.">🔍 Zoom</button>
       <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
     </span>
@@ -201,14 +202,22 @@ function panTo(from, to) {
 }
 $('vl-live').addEventListener('click', () => { if (RANGE.liveHours) setRange({ hours: RANGE.liveHours }); });
 /* Lupe: nur fuer EINEN Zoom aktiv - danach springt sie zurueck und Wischen gilt wieder. */
-let ZOOM_MODE = false;
-function setZoomMode(on) {
-  ZOOM_MODE = on;
-  $('vl-zoom').classList.toggle('on', on); $('vl-zoom').setAttribute('aria-pressed', on);
+let ZOOM_MODE = false, MEAS_MODE = false;
+function applyModes() {
+  const on = ZOOM_MODE || MEAS_MODE;
+  $('vl-zoom').classList.toggle('on', ZOOM_MODE); $('vl-zoom').setAttribute('aria-pressed', ZOOM_MODE);
+  $('vl-measure').classList.toggle('on', MEAS_MODE); $('vl-measure').setAttribute('aria-pressed', MEAS_MODE);
   document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
 }
+function setZoomMode(on) { ZOOM_MODE = on; if (on) setMeasMode(false, true); applyModes(); }
+function setMeasMode(on, quiet) {                              // Messen: Zeitabstand zwischen zwei Punkten (Auswahl bleibt stehen, bis neu gezogen oder beendet wird)
+  MEAS_MODE = on; if (on) ZOOM_MODE = false;
+  if (!on) Object.values(INST).forEach(c => { if (c._meas) { c._meas = null; c.draw(); } });
+  if (!quiet) applyModes();
+}
 $('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && ZOOM_MODE) setZoomMode(false); });
+$('vl-measure').addEventListener('click', () => { setMeasMode(!MEAS_MODE, true); applyModes(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && (ZOOM_MODE || MEAS_MODE)) { setZoomMode(false); setMeasMode(false); } });
 
 /* ---------------- Diagramme ---------------- */
 const { fmtTick, niceTicks, fmtNum } = VLChart;
@@ -235,12 +244,12 @@ async function loadChartData(c) {
   let d; try { d = await api(`/api/verlauf/data?series=${encodeURIComponent(ids.join(','))}&from=${Math.round(t0)}&to=${Math.round(t1)}&points=${VLChart.pointsFor(c.kind, cv.clientWidth, 1.4)}`); }
   catch (e) { em.style.display = 'flex'; em.textContent = e.message; return; }
   LAST[c.id] = { d, t0, t1 };
-  const r = VLChart.draw(INST, c, SERIES, d, t0, t1, cv, { onCreate: () => attachZoom(c.id, cv) });
+  const r = VLChart.draw(INST, c, SERIES, d, t0, t1, cv, { measure: () => MEAS_MODE, onCreate: () => attachZoom(c.id, cv) });
   em.style.display = r.any ? 'none' : 'flex'; em.textContent = r.any ? '' : 'Noch keine Werte in diesem Zeitraum';
 }
 function attachZoom(cid, cv) {
   let pending = null, pan = null;
-  cv.style.touchAction = ZOOM_MODE ? 'none' : 'pan-y'; cv.style.cursor = 'default';     // senkrecht scrollt die Seite, seitlich wischt das Diagramm
+  cv.style.touchAction = (ZOOM_MODE || MEAS_MODE) ? 'none' : 'pan-y'; cv.style.cursor = 'default';     // senkrecht scrollt die Seite, seitlich wischt das Diagramm
   const ch = () => INST[cid];
   const px = e => Math.max(ch().chartArea.left, Math.min(ch().chartArea.right, e.clientX - cv.getBoundingClientRect().left));
   const capture = e => { try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } };
@@ -268,7 +277,13 @@ function attachZoom(cid, cv) {
     pending = null;
     if (pan) { endPan(); return; }
     const c = ch(); if (!c || !c._sel) return;
-    const s = c._sel; c._sel = null; c.draw();
+    const s = c._sel; c._sel = null;
+    if (MEAS_MODE) {                                                   // Messen: Bereich merken, nicht zoomen
+      const sx = c.scales.x;
+      c._meas = Math.abs(s.x1 - s.x0) > 3 ? { t0: sx.getValueForPixel(Math.min(s.x0, s.x1)), t1: sx.getValueForPixel(Math.max(s.x0, s.x1)) } : null;
+      c.draw(); return;
+    }
+    c.draw();
     if (Math.abs(s.x1 - s.x0) > 8) {
       const a = c.scales.x.getValueForPixel(Math.min(s.x0, s.x1)), b = c.scales.x.getValueForPixel(Math.max(s.x0, s.x1));
       setZoomMode(false);                                              // Lupe springt nach dem Zoom wieder heraus
@@ -278,7 +293,7 @@ function attachZoom(cid, cv) {
   cv.addEventListener('pointerdown', e => {
     if (e.button > 0 || !ch()) return;
     const x = e.clientX - cv.getBoundingClientRect().left, a = ch().chartArea; if (x < a.left || x > a.right) return;
-    if (ZOOM_MODE) begin(e);
+    if (ZOOM_MODE || MEAS_MODE) begin(e);
     else if (e.pointerType === 'touch') pending = { x: e.clientX, y: e.clientY, e };          // erst erkennen, ob seitlich gewischt oder senkrecht gescrollt wird
     else startPan(e, e.clientX);
   });

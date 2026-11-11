@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.57.0 – 11.11.2026
+- Neu: **Zeit messen in den Verläufen.** Der Knopf „📏 Messen“ (neben „Zoom“) schaltet das Messen ein: im Diagramm von einem Punkt zum anderen ziehen, und BlueNexus zeigt Start, Ende und die **Dauer dazwischen** (z. B. „06:12 – 18:40 = 12 h 28 min“). Die Markierung bleibt stehen, bis neu gezogen, Esc gedrückt oder der Knopf erneut gedrückt wird.
+
 ## 1.56.1 – 11.11.2026
 - Geändert: **Min/Ø/Max in der Legende gibt es jetzt je Diagramm** statt als Knopf oben: Im Bearbeiten-Dialog (✎) den Haken „Min, Durchschnitt und Max in der Legende zeigen“ setzen. Der Knopf oben ist entfernt (er hatte fälschlich die Anzeige „Datenbank: … Rohwerte“ überschrieben, die jetzt wieder als ruhiger Text unter der Leiste steht).
 
