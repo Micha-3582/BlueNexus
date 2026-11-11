@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.54.1 – 11.11.2026
+- Neu: **Thermometer-Firmware 2.0.9** ersetzt 2.0.8. Sie meldet Aktivzeit und Sendeergebnis des vorherigen Aufwachens, die BlueNexus seit 1.54.0 in der Geräteliste anzeigt. Geräte mit älterer Firmware sehen „Update 2.0.9 verfügbar“ (nur auf Knopfdruck je Gerät).
+
 ## 1.54.0 – 11.11.2026
 - Neu: **Aktivzeit und Sendefehler der Thermometer.** Meldet ein Thermometer (Firmware ab 2.0.9) zusätzlich die Aktivzeit und das Ergebnis des vorherigen Aufwachens, zeigt die Liste „Aktivzeit 1,8 s (Ø 1,9 s)“ und „Sendefehler 2 von 120“ (mit Zahl der Meldungen, die erst im 2. Versuch durchkamen). Daraus lässt sich der Stromverbrauch abschätzen. Ältere Firmware meldet die Felder nicht; die Meldungen werden wie bisher angenommen.
 - Neu: **Thermometer-Firmware 2.0.8** ersetzt 2.0.7 (Diagnoseprotokoll mit Aktivzeit je Aufwachen). Aktualisiert wird weiterhin nur auf Knopfdruck je Gerät.
