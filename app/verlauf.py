@@ -187,7 +187,7 @@ def save_charts(items) -> list[dict]:
         ids = [str(i) for i in (it.get("series") or []) if str(i) in known][:MAX_SERIES_PER_CHART]
         raw = it.get("colors") if isinstance(it.get("colors"), dict) else {}
         colors = {k: str(v).lower() for k, v in raw.items() if k in ids and re.fullmatch(r"#[0-9a-fA-F]{6}", str(v))}      # frei gewaehlte Farben je Reihe (#rrggbb)
-        out.append({"id": cid, "title": title, "series": ids, "colors": colors, "dashboard": bool(it.get("dashboard")),
+        out.append({"id": cid, "title": title, "series": ids, "colors": colors, "dashboard": bool(it.get("dashboard")), "stats": bool(it.get("stats")),
                     "kind": it.get("kind") if it.get("kind") in CHART_KINDS else "line"})
     _store()._dump_json(CHARTS_PATH, out, indent=2)
     return out

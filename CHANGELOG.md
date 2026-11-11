@@ -4,8 +4,11 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.56.1 – 11.11.2026
+- Geändert: **Min/Ø/Max in der Legende gibt es jetzt je Diagramm** statt als Knopf oben: Im Bearbeiten-Dialog (✎) den Haken „Min, Durchschnitt und Max in der Legende zeigen“ setzen. Der Knopf oben ist entfernt (er hatte fälschlich die Anzeige „Datenbank: … Rohwerte“ überschrieben, die jetzt wieder als ruhiger Text unter der Leiste steht).
+
 ## 1.56.0 – 11.11.2026
-- Neu: **Min/Ø/Max in der Legende der Verläufe.** Der Knopf „∑ Min/Ø/Max“ zeigt hinter jedem Messwert den kleinsten, durchschnittlichen und größten Wert des angezeigten Zeitraums – ohne mit der Maus nach den Spitzen suchen zu müssen. Aus der Voreinstellung heraus aus; die Wahl wird gemerkt und gilt auch für das PNG-Bild.
+- Neu: **Min/Ø/Max in der Legende der Verläufe** (in 1.56.1 vom Knopf oben zum Haken je Diagramm umgestellt): hinter jedem Messwert der kleinste, durchschnittliche und größte Wert des angezeigten Zeitraums.
 - Neu: Abtastzeit **10 min** ergänzt (jetzt 5 s bis 1 h).
 
 ## 1.55.1 – 11.11.2026

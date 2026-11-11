@@ -65,7 +65,7 @@ for bad, kw in (("device_power:d1", {}), ("gibts:nicht", {}), ("energy:soc", {"i
     except verlauf.VerlaufError:
         pass
 charts = verlauf.save_charts([{"id": "c1", "title": " Verbrauch ", "series": ["device_power:d1", "nix", "sensor:hmS-1"]}, {"id": "c1", "title": "doppelt", "series": []}])
-assert charts == [{"id": "c1", "title": "Verbrauch", "series": ["device_power:d1", "sensor:hmS-1"], "colors": {}, "dashboard": False, "kind": "line"}], charts
+assert charts == [{"id": "c1", "title": "Verbrauch", "series": ["device_power:d1", "sensor:hmS-1"], "colors": {}, "dashboard": False, "stats": False, "kind": "line"}], charts
 ch2 = verlauf.save_charts([{"id": "c9", "title": "F", "series": ["device_power:d1", "sensor:hmS-1"], "colors": {"device_power:d1": "#FF8800", "sensor:hmS-1": "rot", "nix": "#123456"}}])
 assert ch2[0]["colors"] == {"device_power:d1": "#ff8800"}, ch2
 assert verlauf.save_charts([{"id": "c9", "title": "F", "series": ["device_power:d1"]}])[0]["colors"] == {}
@@ -74,6 +74,7 @@ assert [verlauf.save_charts([{"id": "k", "title": "K", "series": [], "kind": k}]
 verlauf.save_charts(charts)
 assert verlauf.save_charts([{"id": "c8", "title": "D", "series": ["device_power:d1"], "dashboard": True}])[0]["dashboard"] is True
 assert verlauf.save_charts([{"id": "c8", "title": "D", "series": ["device_power:d1"]}])[0]["dashboard"] is False
+assert verlauf.save_charts([{"id": "c8", "title": "D", "series": ["device_power:d1"], "stats": True}])[0]["stats"] is True        # Min/Mittel/Max in der Legende (je Diagramm)
 verlauf.save_charts(charts)
 assert verlauf.remove_series("sensor:hmS-1") and verlauf.load_charts()[0]["series"] == ["device_power:d1"]
 verlauf.add_samples([("sensor:hmS-1", now - 60, 21.5)])

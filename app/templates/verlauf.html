@@ -10,7 +10,7 @@
   .vl-range button + button { border-left: 1px solid var(--border); }
   .vl-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-  #vl-zoom.on, #vl-day.on, #vl-stats.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
+  #vl-zoom.on, #vl-day.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
   .vl-chart { margin-top: 14px; }
   .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
   .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -37,7 +37,6 @@
       <button type="button" class="ghost" id="vl-zoom" aria-pressed="false" title="Lupe: Bereich im Diagramm aufziehen und vergrößern. Danach ist wieder Wischen aktiv.">🔍 Zoom</button>
       <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
     </span>
-    <button type="button" class="ghost" id="vl-stats" aria-pressed="false" title="In der Legende zu jedem Messwert den kleinsten, durchschnittlichen und größten Wert des angezeigten Zeitraums zeigen">∑ Min/Ø/Max</button>
     <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
     <button type="button" class="ghost" id="vl-zoomback" style="display:none" title="Zum vorherigen Zeitraum zurück (oder Doppelklick ins Diagramm)">↩ Zoom zurück</button>
     <button type="button" class="ghost" id="vl-manage" style="display:none" title="Festlegen, welche Messwerte aufgezeichnet werden (Sensoren, Leistung, Preise …)">⚙ Messwerte</button>
@@ -209,13 +208,6 @@ function setZoomMode(on) {
   document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = on ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
 }
 $('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
-function setStats(on, redraw) {                       // Min/Mittel/Max in der Legende (pro Gerät gemerkt)
-  VLChart.stats = on; $('vl-stats').classList.toggle('on', on); $('vl-stats').setAttribute('aria-pressed', on);
-  try { localStorage.setItem('vlStats', on ? '1' : '0'); } catch (e) { /* egal */ }
-  if (redraw) renderCharts();
-}
-$('vl-stats').addEventListener('click', () => setStats(!VLChart.stats, true));
-try { setStats(localStorage.getItem('vlStats') === '1', false); } catch (e) { /* egal */ }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ZOOM_MODE) setZoomMode(false); });
 
 /* ---------------- Diagramme ---------------- */
@@ -373,15 +365,16 @@ async function chartDialog(c) {
      <label style="margin-top:12px">Darstellung <span class="qhelp" role="button" tabindex="0" data-help="Linie, Fläche, Balken, Stufen und weitere Arten. Balken zeigen den Mittelwert je Zeitabschnitt, Stufen halten den Wert bis zur nächsten Änderung.">?</span></label>
      <select id="vd-kind">${[['line', 'Linie'], ['area', 'Fläche'], ['bar', 'Balken (Mittel je Zeitabschnitt)'], ['step', 'Stufen'], ['points', 'Punkte'], ['stackarea', 'Fläche gestapelt (Summe aus den Reihen)'], ['stackbar', 'Balken gestapelt (Summe aus den Reihen)']].map(([k, n]) => `<option value="${k}" ${(c && c.kind || 'line') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
      <label style="margin-top:10px;display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" id="vd-dash" style="width:auto" ${c && c.dashboard ? 'checked' : ''}> Auf dem Dashboard zeigen <span class="qhelp" role="button" tabindex="0" data-help="Alle so markierten Diagramme erscheinen auf dem Dashboard in der Kachel „Verlauf“.">?</span></label>
+     <label style="margin-top:10px;display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" id="vd-stats" style="width:auto" ${c && c.stats ? 'checked' : ''}> Min, Durchschnitt und Max in der Legende zeigen <span class="qhelp" role="button" tabindex="0" data-help="Zeigt hinter jedem Messwert den kleinsten, durchschnittlichen und größten Wert des angezeigten Zeitraums (ändert sich mit Zoom und Zeitraum). An/Aus-Werte haben keine Kennzahlen.">?</span></label>
      <label style="margin-top:12px">Reihen <span class="qhelp" role="button" tabindex="0" data-help="Bis zu 12 Reihen je Diagramm. Reihen mit unterschiedlichen Einheiten bekommen eine zweite Achse. Das Farbfeld links neben dem Namen legt die Farbe der Reihe in diesem Diagramm fest.">?</span></label>
      <div class="vl-checks">${(() => { let extra = c ? c.series.length : 0; return list.map(s => { const own = c && c.colors && c.colors[s.id], def = c && c.series.includes(s.id) ? COLORS[c.series.indexOf(s.id) % COLORS.length] : COLORS[extra++ % COLORS.length]; return `<label><input type="checkbox" value="${esc(s.id)}" ${c && c.series.includes(s.id) ? 'checked' : ''}> <button type="button" class="vd-col" data-id="${esc(s.id)}" data-own="${own ? '1' : ''}" data-def="${def}" data-value="${own || def}" data-name="${esc(s.label)}" title="Farbe in diesem Diagramm wählen (nur bei gewählter Reihe wirksam)" style="width:38px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:${own || def};flex:none;cursor:pointer"></button> <span style="flex:1">${esc(s.label)}${s.unit ? ' <span class="muted">(' + esc(s.unit) + ')</span>' : ''}</span></label>`; }).join(''); })()}</div>
 `, 'Speichern');
   if (!box) return;
   const title = box.querySelector('#vd-title').value.trim() || 'Diagramm', ids = [...box.querySelectorAll('.vl-checks input[type=checkbox]:checked')].map(x => x.value);
-  const dashboard = box.querySelector('#vd-dash').checked, kind = box.querySelector('#vd-kind').value;
+  const dashboard = box.querySelector('#vd-dash').checked, stats = box.querySelector('#vd-stats').checked, kind = box.querySelector('#vd-kind').value;
   const colors = {}; box.querySelectorAll('.vd-col').forEach(x => { if (ids.includes(x.dataset.id)) colors[x.dataset.id] = x.dataset.value; });
   close();
-  if (c) { c.title = title; c.series = ids; c.colors = colors; c.dashboard = dashboard; c.kind = kind; } else CHARTS.push({ id: 'c' + Date.now(), title, series: ids, colors, dashboard, kind });
+  if (c) { c.title = title; c.series = ids; c.colors = colors; c.dashboard = dashboard; c.stats = stats; c.kind = kind; } else CHARTS.push({ id: 'c' + Date.now(), title, series: ids, colors, dashboard, stats, kind });
   await saveCharts(); renderCharts();
 }
 window.editChart = id => chartDialog(CHARTS.find(c => c.id === id));

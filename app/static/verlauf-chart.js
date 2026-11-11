@@ -121,7 +121,7 @@ window.VLChart = (function () {
     if (kind === 'stackbar') scales.x.stacked = true;
     var existing = inst[c.id];
     if (existing) {
-      existing.data.datasets = datasets; existing.options.scales = scales; existing.update('none');
+      existing._vlStats = !!c.stats; existing.data.datasets = datasets; existing.options.scales = scales; existing.update('none');
       return { any: any, created: false };
     }
     var cfg = {
@@ -137,7 +137,7 @@ window.VLChart = (function () {
           }, labels: { color: LEG, boxWidth: 12, boxHeight: 12, filter: function (it, data) { return !data.datasets[it.datasetIndex]._band; },
             generateLabels: function (chart) {                           // optional: Min / Mittel / Max des Zeitraums hinter dem Namen
               var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-              if (opts.stats === false || (opts.stats == null && !VLChart.stats)) return items;
+              if (!chart._vlStats) return items;
               items.forEach(function (it) {
                 var ds = chart.data.datasets[it.datasetIndex], st = ds && ds._stats;
                 if (st) it.text += '   Min ' + fmtNum(st.min) + ' · Ø ' + fmtNum(st.avg) + ' · Max ' + fmtNum(st.max);
@@ -181,12 +181,12 @@ window.VLChart = (function () {
       }]
     };
     var ch = new Chart(cv.getContext('2d'), cfg);
-    ch._vlKind = kind;
+    ch._vlKind = kind; ch._vlStats = !!c.stats;
     inst[c.id] = ch;
     if (opts.onCreate) opts.onCreate(ch);
     return { any: any, created: true };
   }
 
-  var api = { COLORS: COLORS, pointsFor: pointsFor, draw: draw, fmtTick: fmtTick, niceTicks: niceTicks, fmtNum: fmtNum, stats: false };
+  var api = { COLORS: COLORS, pointsFor: pointsFor, draw: draw, fmtTick: fmtTick, niceTicks: niceTicks, fmtNum: fmtNum };
   return api;
 })();
