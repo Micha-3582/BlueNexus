@@ -14,7 +14,7 @@ N = webapp.app.test_client()                                                   #
 # 1) Rechte: nur Administratoren richten ein
 assert L.get("/api/thermo").status_code == 403 and L.post("/api/thermo", json={"name": "x", "wifi": {}}).status_code == 403 and N.get("/api/thermo").status_code == 401
 j = A.get("/api/thermo").get_json()
-fw = j["firmware"]; assert fw["version"] == "2.0.7" and fw["offset"] == 0 and "cfg_offset" not in fw and fw["url"].endswith("thermo-2.0.7.bin") and "ota_file" not in fw and "ota_md5" not in fw, fw
+fw = j["firmware"]; assert fw["version"] == "2.0.8" and fw["offset"] == 0 and "cfg_offset" not in fw and fw["url"].endswith("thermo-2.0.8.bin") and "ota_file" not in fw and "ota_md5" not in fw, fw
 fp = os.path.join(os.path.dirname(webapp.__file__), fw["url"].lstrip("/").replace("/", os.sep))
 assert hashlib.sha256(open(fp, "rb").read()).hexdigest() == fw["sha256"]       # mitgelieferte Firmware passt zur Pruefsumme
 assert A.get(fw["url"]).status_code == 200                                      # und ist auslieferbar
@@ -63,6 +63,13 @@ N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "ap": "kein-mac"}, hea
 assert A.get("/api/thermo/" + tid + "/status").get_json()["device"]["meta"]["ap"] == "aa:bb:cc:00:11:22"      # ungueltige Adresse wird ignoriert
 N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "n": "x", "rr": 99999}, headers=H(token))
 assert A.get("/api/thermo/" + tid + "/status").get_json()["device"]["meta"] == {"n": 8, "rr": 1, "ap": "aa:bb:cc:00:11:22"}                    # Unsinn wird ignoriert
+# ab Firmware 2.0.9: Aktivzeit und Ergebnis des vorherigen Aufwachens (optionale Felder, ungueltige Werte werden ignoriert)
+r = N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": 1840, "pr": "S"}, headers=H(token)); assert r.status_code == 200
+N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": 2000, "pr": "R"}, headers=H(token))
+N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": 3000, "pr": "H-11"}, headers=H(token))
+r = N.post("/api/sensor/" + tid, json={"temp": 20, "hum": 50, "pa": -5, "pr": "boese<"}, headers=H(token)); assert r.status_code == 200
+m = A.get("/api/thermo/" + tid + "/status").get_json()["device"]["meta"]
+assert m["pa"] == 3000 and m["st"] == {"n": 3, "retry": 1, "fail": 1} and 1800 < m["pa_avg"] < 2000, m
 # 4) Offline nach 3 verpassten Intervallen
 d = thermo._load(); d[0]["last_seen"] = time.time() - (30 * 60 * 3 + 200); thermo._save(d); homematic._value_cache.clear()
 assert homematic.read_sensor(next(s for s in homematic.load_sensors() if s.get("datapoint") == "temp")) is None

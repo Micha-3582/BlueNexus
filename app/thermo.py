@@ -451,6 +451,20 @@ def ingest(tid: str, token: str, body: dict, ip: str = "", remote: bool = False)
             meta["n"] = int(n)
         if rr is not None:
             meta["rr"] = int(rr)
+        pa = _num(body.get("pa"), 0, 600000)                                  # ab Firmware 2.0.9: Aktivzeit (ms) und Ergebnis des VORHERIGEN Aufwachens
+        pr = str(body.get("pr") or "").strip()
+        if pa is not None:
+            meta["pa"] = int(pa)
+            meta["pa_avg"] = round(int(pa) if meta.get("pa_avg") is None else 0.9 * float(meta["pa_avg"]) + 0.1 * int(pa))      # gleitender Mittelwert
+        if re.match(r"^(S|R|T|W-?\d{1,3}|H-?\d{1,4})$", pr):
+            meta["pr"] = pr
+            st = dict(meta.get("st") or {})
+            st["n"] = int(st.get("n") or 0) + 1
+            if pr == "R":
+                st["retry"] = int(st.get("retry") or 0) + 1                       # erst im 2. Versuch gesendet
+            elif pr != "S":
+                st["fail"] = int(st.get("fail") or 0) + 1                         # Sendefehler / Sensorfehler
+            meta["st"] = st
         ap = str(body.get("ap") or "").strip().lower()                        # Access Point (BSSID) ab Firmware 1.1.1
         if re.match(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$", ap):
             meta["ap"] = ap
