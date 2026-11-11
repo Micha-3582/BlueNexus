@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.58.1 – 12.11.2026
+- Behoben: Bei aktiver Lupe oder aktivem Messen löst gedrückte Maustaste (Halten und Ziehen) nicht mehr das Umsortieren des Diagramms aus; solange ein Werkzeug an ist, wird nicht umsortiert.
+
 ## 1.58.0 – 12.11.2026
 - Geändert: **Jedes Diagramm wird einzeln gezoomt und verschoben.** Ein Zoom oder Wischen in einem Diagramm ändert die anderen nicht mehr. An einem Diagramm mit eigenem Ausschnitt erscheint ein „−“ (ein Schritt zurück bis zum gemeinsamen Zeitraum); die Zeitraum-Knöpfe oben (1 h … 1 J, Tag wählen) gelten für alle Diagramme und setzen die eigenen Ausschnitte zurück. „Zoom zurück“ und „Jetzt“ oben entfallen.
 - Geändert: Die Werkzeuge in der Kopfzeile jedes Diagramms (Zoom, Messen, PNG, Bearbeiten, Löschen) sind jetzt **gleich große, quadratische Knöpfe mit Symbolen** wie in Smart Home und Einstellungen.

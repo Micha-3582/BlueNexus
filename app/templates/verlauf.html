@@ -460,7 +460,7 @@ window.seriesRemove = async id => {
 
 /* ---------------- Start ---------------- */
 if (IS_ADMIN) { $('vl-add-chart').style.display = ''; $('vl-manage').style.display = ''; }
-if (IS_ADMIN && window.sortableList) sortableList('vl-charts', { onDone: ids => { CHARTS.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); saveCharts().then(() => toast('Reihenfolge gespeichert ✓')); } });
+if (IS_ADMIN && window.sortableList) sortableList('vl-charts', { canStart: () => !ZOOM_CID && !MEAS_CID, onDone: ids => { CHARTS.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)); saveCharts().then(() => toast('Reihenfolge gespeichert ✓')); } });
 (async () => {
   try { await loadSeries(); } catch (e) { $('vl-note').textContent = e.message; return; }
   document.querySelectorAll('#vl-range button').forEach(b => b.classList.toggle('on', +b.dataset.h === RANGE.hours));
