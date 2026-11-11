@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.57.1 – 11.11.2026
+- Geändert: Der Knopf **📏** zum Zeitmessen sitzt jetzt in der Kopfzeile **jedes Diagramms** (neben PNG und Stift) statt oben in der Leiste. Gemessen wird nur in dem Diagramm, dessen 📏 an ist; so muss man nicht mehr nach oben scrollen.
+
 ## 1.57.0 – 11.11.2026
 - Neu: **Zeit messen in den Verläufen.** Der Knopf „📏 Messen“ (neben „Zoom“) schaltet das Messen ein: im Diagramm von einem Punkt zum anderen ziehen, und BlueNexus zeigt Start, Ende und die **Dauer dazwischen** (z. B. „06:12 – 18:40 = 12 h 28 min“). Die Markierung bleibt stehen, bis neu gezogen, Esc gedrückt oder der Knopf erneut gedrückt wird.
 
