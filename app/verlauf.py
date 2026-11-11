@@ -31,6 +31,10 @@ RAW_DAYS = 7
 PRICE_BACKFILL_DAYS = 14                      # beim Anlegen der Preis-Reihe die schon bekannten Tibber-Preise der letzten Tage nachtragen
 ROLLUP_DAYS = 400
 INTERVALS = (5, 10, 30, 60, 300, 600, 900, 1800, 3600)             # erlaubte Abtastzeiten in Sekunden
+CHANGE_HEARTBEAT_S = 3600                    # Reihen "bei Aenderung": ohne Aenderung mindestens einmal pro Stunde den aktuellen Wert nachtragen (Linie reisst nicht ab, Ausfall bleibt sichtbar)
+CHANGE_POLL_S = 10                           # so oft wird eine Reihe "bei Aenderung" hoechstens gelesen (Mindestabstand, schont Geraete und Datenbank)
+POWER_UNITS = {"W", "kW", "A", "mA", "VA", "kVA", "var", "Wh", "kWh"}      # Strom-/Leistungswerte schwanken staendig: dort gibt es kein "bei Aenderung"
+CHANGE_BAND = {"°C": 0.1, "%": 0.5, "hPa": 0.5}                             # Schwelle je Einheit; sonst 1 % des letzten Werts
 EVENT_GAP_S = 7200                           # Reihen "bei jeder Meldung" (Funkthermometer): laenger als 2 Stunden ohne Wert = Luecke im Diagramm
 DEFAULT_INTERVAL = {"energy": 10, "device_power": 10, "device_state": 30, "sensor": 60}
 MAX_CHARTS, MAX_SERIES_PER_CHART, MAX_SERIES = 40, 12, 80
@@ -70,6 +74,25 @@ def close():
 def is_event_source(source: str) -> bool:
     """Reihen, die nicht abgefragt, sondern bei jeder Meldung des Geraets aufgezeichnet werden koennen (Funkthermometer)."""
     return str(source).startswith("sensor:thermo-")
+
+
+def change_ok(source: str, unit: str = "", binary: bool = False) -> bool:
+    """Darf diese Quelle "bei Aenderung" aufgezeichnet werden? Nicht: Energie (Cerbo/Tarif), Geraete-Leistung und alles in W/kW/A/kWh (zu viele Aenderungen)."""
+    kind = str(source).partition(":")[0]
+    if kind in ("energy", "device_power") or is_event_source(source):
+        return False
+    return str(unit or "") not in POWER_UNITS
+
+
+def changed_enough(last, new, unit: str = "", binary: bool = False) -> bool:
+    if last is None:
+        return True
+    if binary:
+        return (last > 0.5) != (new > 0.5)
+    band = CHANGE_BAND.get(unit)
+    if band is None:
+        band = max(0.01, abs(last) * 0.01)
+    return abs(new - last) >= band - 1e-9
 
 
 def add_samples(rows: list[tuple]) -> int:
@@ -134,8 +157,9 @@ def query(series: dict, t0: float, t1: float, max_points: int = 1500) -> dict:
     with _lock:
         c = _db()
         for sid, meta in series.items():
-            ev = not int(meta.get("interval_s") or 0)                        # 0 = bei jeder Meldung
-            ivq = int(meta.get("interval_s") or 10)
+            iv0 = int(meta.get("interval_s") or 0)
+            ev = iv0 <= 0                                                    # 0 = bei jeder Meldung, -1 = bei Aenderung
+            ivq = iv0 if iv0 > 0 else 10
             base = max(1, ivq) if use_raw else 60
             bucket = max(base, math.ceil(span / max_points))
             if not use_raw:
@@ -166,7 +190,10 @@ def _store():
 
 def load_series() -> list[dict]:
     d = _store()._load_json_recovering(SERIES_PATH, lambda: [])
-    return [x for x in d if isinstance(x, dict) and x.get("id") and x.get("source")] if isinstance(d, list) else []
+    items = [x for x in d if isinstance(x, dict) and x.get("id") and x.get("source")] if isinstance(d, list) else []
+    for x in items:
+        x["change"] = change_ok(x["source"], x.get("unit"), bool(x.get("binary")))             # darf "bei Aenderung" gewaehlt werden
+    return items
 
 
 def _save_series(items: list[dict]):
@@ -211,7 +238,7 @@ def add_series(source: str, interval_s=None, label: str = "") -> dict:
     if len(items) >= MAX_SERIES:
         raise VerlaufError(f"Höchstens {MAX_SERIES} Reihen")
     c = cat[source]
-    iv = check_interval(interval_s, c["interval"] if "interval" in c else DEFAULT_INTERVAL.get(c["type"], 60), event_ok=is_event_source(source))
+    iv = check_interval(interval_s, c["interval"] if "interval" in c else DEFAULT_INTERVAL.get(c["type"], 60), event_ok=is_event_source(source), change_ok_=change_ok(source, c["unit"], bool(c.get("binary"))))
     item = {"id": source, "source": source, "label": (str(label).strip()[:60] or c["label"]), "unit": c["unit"], "interval_s": iv, "binary": bool(c.get("binary")),
             "step": bool(c.get("step")), "event": is_event_source(source)}
     items.append(item)
@@ -244,7 +271,7 @@ def backfill_prices(days: int = PRICE_BACKFILL_DAYS) -> int:
     return add_samples(rows)
 
 
-def check_interval(v, default: int, event_ok: bool = False) -> int:
+def check_interval(v, default: int, event_ok: bool = False, change_ok_: bool = False) -> int:
     if v in (None, ""):
         return default
     try:
@@ -253,6 +280,8 @@ def check_interval(v, default: int, event_ok: bool = False) -> int:
         raise VerlaufError("Abtastzeit ungültig")
     if iv == 0 and event_ok:
         return 0                                                  # bei jeder Meldung des Geraets (nur Funkthermometer)
+    if iv == -1 and change_ok_:
+        return -1                                                 # nur bei Aenderung (nicht bei Strom-/Leistungswerten)
     if iv not in INTERVALS:
         raise VerlaufError("Abtastzeit: " + ", ".join(f"{i} s" for i in INTERVALS))
     return iv
@@ -265,7 +294,7 @@ def update_series(sid: str, label=None, interval_s=None) -> bool:
             if label is not None and str(label).strip():
                 x["label"] = str(label).strip()[:60]
             if interval_s not in (None, ""):
-                x["interval_s"] = check_interval(interval_s, x.get("interval_s", 60), event_ok=is_event_source(x["source"]))
+                x["interval_s"] = check_interval(interval_s, x.get("interval_s", 60), event_ok=is_event_source(x["source"]), change_ok_=change_ok(x["source"], x.get("unit"), bool(x.get("binary"))))
             _save_series(items)
             return True
     return False
@@ -323,6 +352,8 @@ def catalog() -> list[dict]:
         for s in homematic.load_sensors():
             out.append({"id": f"sensor:{s['id']}", "type": "sensor", "label": s.get("name") or s["id"], "unit": s.get("unit") or "", "group": "Sensoren", "binary": bool(s.get("binary")),
                         **({"interval": 0, "event": True} if s.get("source") == "thermo" else {})})                  # Funkthermometer: Standard = bei jeder Meldung (kein Abfragen)
+    for c in out:
+        c["change"] = change_ok(c["id"], c.get("unit"), bool(c.get("binary")))
     return out
 
 
@@ -416,6 +447,7 @@ class Sampler:
         self.get_system = get_system
         self.get_extra = get_extra                  # weitere Messwerte ausserhalb des Cerbo, z. B. {"price_ct": ...}
         self._last: dict[str, float] = {}
+        self._lastv: dict[str, tuple] = {}                   # "bei Aenderung": id -> (zuletzt gespeicherter Wert, Zeit)
         self._pruned = 0.0
         self._stop = threading.Event()
         self.errors = 0
@@ -435,7 +467,9 @@ class Sampler:
                 continue
             if s.get("interval_s") == 0:
                 continue                                       # "bei jeder Meldung": wird von record_event() beim Eintreffen der Meldung geschrieben
-            if now - self._last.get(s["id"], 0) >= int(s.get("interval_s") or 60) - 0.5:
+            iv = s.get("interval_s")
+            poll = CHANGE_POLL_S if iv == -1 else int(iv or 60)
+            if now - self._last.get(s["id"], 0) >= poll - 0.5:
                 due.append(s["id"])
         n = 0
         if due:
@@ -448,7 +482,19 @@ class Sampler:
             vals = read_sources(due, self.get_system(), extras)
             for sid in due:
                 self._last[sid] = now
-            n = add_samples([(sid, now, v) for sid, v in vals.items() if v is not None])
+            meta = {x["id"]: x for x in load_series()}
+            rows = []
+            for sid, v in vals.items():
+                if v is None:
+                    continue
+                m = meta.get(sid) or {}
+                if m.get("interval_s") == -1:                 # nur bei Aenderung (oder stuendlicher Nachtrag)
+                    lv = self._lastv.get(sid)
+                    if lv is not None and not changed_enough(lv[0], v, m.get("unit") or "", bool(m.get("binary"))) and now - lv[1] < CHANGE_HEARTBEAT_S:
+                        continue
+                    self._lastv[sid] = (v, now)
+                rows.append((sid, now, v))
+            n = add_samples(rows)
         if now - self._pruned > 3600:
             self._pruned = now
             try:

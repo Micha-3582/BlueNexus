@@ -168,3 +168,33 @@ cfg3 = store.load_config(); cfg3["tariff_mode"] = "fixed"; cfg3["fixed_price_ct"
 assert webapp.ctrl._verlauf_extra()["price_ct"] == 31.5
 cfg3["tariff_mode"] = "dynamic"; store.save_config(cfg3)
 print("VERLAUF OK")
+
+# ---- "bei Aenderung": nicht fuer Strom/Leistung, Schwelle, stuendlicher Nachtrag, kein Abfragen im Takt
+assert verlauf.change_ok("sensor:hmS-1", "°C") and verlauf.change_ok("device_state:d1", "", True)
+assert not verlauf.change_ok("energy:grid_w", "W") and not verlauf.change_ok("device_power:d1", "W") and not verlauf.change_ok("sensor:x", "kWh") and not verlauf.change_ok("sensor:thermo-t-abcdefgh-temp", "°C")
+assert verlauf.changed_enough(None, 20.0, "°C") and not verlauf.changed_enough(20.0, 20.05, "°C") and verlauf.changed_enough(20.0, 20.1, "°C")
+assert verlauf.changed_enough(0, 1, "", True) and not verlauf.changed_enough(1.0, 1.0, "", True)
+assert verlauf.check_interval(-1, 60, change_ok_=True) == -1
+try:
+    verlauf.check_interval(-1, 60); raise SystemExit("-1 nur bei erlaubten Quellen")
+except verlauf.VerlaufError:
+    pass
+try:
+    verlauf.add_series("energy:soc", -1); raise SystemExit("Energie darf nicht bei Aenderung")
+except verlauf.VerlaufError:
+    pass
+verlauf.update_series("sensor:hmS-1", interval_s=-1); assert [x for x in verlauf.load_series() if x["id"] == "sensor:hmS-1"][0]["interval_s"] == -1
+vals = {"v": 20.0}
+orig = verlauf.read_sources; verlauf.read_sources = lambda ids, system, extras=None: {i: vals["v"] for i in ids if i == "sensor:hmS-1"}
+try:
+    smp = verlauf.Sampler()
+    cnt = lambda: verlauf._db().execute("SELECT COUNT(*) FROM samples WHERE series = 'sensor:hmS-1' AND ts > ?", (now_t - 10,)).fetchone()[0]
+    now_t = time.time()
+    smp.tick(now_t); c1 = cnt()                                  # erster Wert wird gespeichert
+    smp.tick(now_t + 11); assert cnt() == c1                     # unveraendert: nichts
+    vals["v"] = 20.05; smp.tick(now_t + 22); assert cnt() == c1  # unter der Schwelle: nichts
+    vals["v"] = 20.3; smp.tick(now_t + 33); assert cnt() == c1 + 1   # Aenderung: gespeichert
+    smp.tick(now_t + 44); assert cnt() == c1 + 1
+    smp.tick(now_t + 33 + 3601); assert cnt() == c1 + 2          # stuendlicher Nachtrag
+finally:
+    verlauf.read_sources = orig

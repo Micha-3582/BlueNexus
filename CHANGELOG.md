@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.60.0 – 12.11.2026
+- Neu: **Aufzeichnung „bei Änderung“** für Messwerte, die sich selten ändern (Temperatur, Luftfeuchte, Türen/Fenster, an/aus). Es wird nur gespeichert, wenn sich der Wert spürbar geändert hat (z. B. 0,1 °C); bei Stillstand trägt BlueNexus mindestens einmal pro Stunde den aktuellen Wert nach. Für Strom- und Leistungswerte (W, kW, A, kWh, Energie, Geräte-Leistung) wird die Wahl **nicht angeboten**, dort bleibt der feste Takt.
+
 ## 1.59.0 – 12.11.2026
 - Neu: **Aufzeichnung „bei jeder Meldung“ für Funkthermometer.** Die Sensoren eines Thermometers werden nicht mehr in einem festen Takt abgefragt (dabei kamen alte Werte mehrfach und zu falschen Zeiten ins Diagramm), sondern genau dann aufgezeichnet, wenn das Thermometer gemeldet hat – mit dem echten Wert und der echten Uhrzeit. Das ist jetzt die Voreinstellung für Thermometer-Sensoren; eine feste Abtastzeit bleibt wählbar. Schon vorhandene Thermometer-Reihen werden beim Update einmal umgestellt. Fehlt eine Meldung länger als 2 Stunden, zeigt das Diagramm eine Lücke.
 
