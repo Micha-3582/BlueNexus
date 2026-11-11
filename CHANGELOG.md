@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.57.2 – 11.11.2026
+- Geändert: Die **Lupe (Zoom)** sitzt jetzt wie das Messen in der Kopfzeile **jedes Diagramms** (🔍 neben 📏 und PNG) statt oben in der Leiste. Der aufgezogene Bereich gilt weiter für alle Diagramme; Zoom zurück, Zeitraum und Tag wählen bleiben oben.
+
 ## 1.57.1 – 11.11.2026
 - Geändert: Der Knopf **📏** zum Zeitmessen sitzt jetzt in der Kopfzeile **jedes Diagramms** (neben PNG und Stift) statt oben in der Leiste. Gemessen wird nur in dem Diagramm, dessen 📏 an ist; so muss man nicht mehr nach oben scrollen.
 

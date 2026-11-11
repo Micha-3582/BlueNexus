@@ -10,7 +10,7 @@
   .vl-range button + button { border-left: 1px solid var(--border); }
   .vl-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-  #vl-zoom.on, #vl-day.on, .vl-meas.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
+  #vl-day.on, .vl-meas.on, .vl-zoomb.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
   .vl-chart { margin-top: 14px; }
   .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
   .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -34,7 +34,6 @@
       <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button><button data-h="168">7 T</button><button data-h="720">30 T</button><button data-h="8760">1 J</button>
     </div>
     <span class="vl-nav">
-      <button type="button" class="ghost" id="vl-zoom" aria-pressed="false" title="Lupe: Bereich im Diagramm aufziehen und vergrößern. Danach ist wieder Wischen aktiv.">🔍 Zoom</button>
       <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
     </span>
     <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
@@ -201,19 +200,19 @@ function panTo(from, to) {
 }
 $('vl-live').addEventListener('click', () => { if (RANGE.liveHours) setRange({ hours: RANGE.liveHours }); });
 /* Lupe: nur fuer EINEN Zoom aktiv - danach springt sie zurueck und Wischen gilt wieder. */
-let ZOOM_MODE = false, MEAS_CID = null;                        // Messen gilt nur fuer das Diagramm, dessen 📏 gedrueckt wurde
+let ZOOM_CID = null, MEAS_CID = null;                          // Lupe und Messen gelten nur fuer das Diagramm, dessen Knopf gedrueckt wurde (der Zoom-Bereich gilt dann fuer alle Diagramme)
 function applyModes() {
-  $('vl-zoom').classList.toggle('on', ZOOM_MODE); $('vl-zoom').setAttribute('aria-pressed', ZOOM_MODE);
   document.querySelectorAll('.vl-meas').forEach(b => { const on = b.dataset.cid === MEAS_CID; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = (ZOOM_MODE || cv.id === 'cv-' + MEAS_CID) ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
+  document.querySelectorAll('.vl-zoomb').forEach(b => { const on = b.dataset.cid === ZOOM_CID; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  document.querySelectorAll('.vl-canvas canvas').forEach(cv => { cv.style.touchAction = (cv.id === 'cv-' + ZOOM_CID || cv.id === 'cv-' + MEAS_CID) ? 'none' : 'pan-y'; cv.style.cursor = 'default'; });
 }
 function clearMeas() { Object.values(INST).forEach(c => { if (c._meas) { c._meas = null; c.draw(); } }); }
-function setZoomMode(on) { ZOOM_MODE = on; if (on) { MEAS_CID = null; clearMeas(); } applyModes(); }
+function setZoomMode(on, cid) { ZOOM_CID = on ? cid : null; if (on) { MEAS_CID = null; clearMeas(); } applyModes(); }
+window.toggleZoom = cid => setZoomMode(ZOOM_CID !== cid, cid);        // 🔍 am Diagramm: Bereich aufziehen und vergroessern
 window.toggleMeasure = cid => {                                  // 📏 am Diagramm: Zeitabstand zwischen zwei Punkten messen (Auswahl bleibt, bis neu gezogen oder beendet wird)
-  const on = MEAS_CID !== cid; MEAS_CID = on ? cid : null; if (on) ZOOM_MODE = false; clearMeas(); applyModes();
+  const on = MEAS_CID !== cid; MEAS_CID = on ? cid : null; if (on) ZOOM_CID = null; clearMeas(); applyModes();
 };
-$('vl-zoom').addEventListener('click', () => setZoomMode(!ZOOM_MODE));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && (ZOOM_MODE || MEAS_CID)) { ZOOM_MODE = false; MEAS_CID = null; clearMeas(); applyModes(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && (ZOOM_CID || MEAS_CID)) { ZOOM_CID = null; MEAS_CID = null; clearMeas(); applyModes(); } });
 
 /* ---------------- Diagramme ---------------- */
 const { fmtTick, niceTicks, fmtNum } = VLChart;
@@ -221,6 +220,7 @@ const { fmtTick, niceTicks, fmtNum } = VLChart;
 function chartCard(c) {
   return `<div class="card vl-chart" data-sort-id="${esc(c.id)}"><div class="vl-chart-head"><h3>${esc(c.title)}${c.dashboard ? ' <span class="muted" style="font-size:12px;font-weight:normal" title="Wird auch auf dem Dashboard gezeigt">· 🏠 Dashboard</span>' : ''}</h3>
     <button class="ghost vl-zout" onclick="zoomOut()" style="${ZOOM_STACK.length ? '' : 'display:none'}" title="Zoom zurück: einen Schritt zum vorherigen Ausschnitt (gilt für alle Diagramme)" aria-label="Zoom zurück">−</button>
+    <button class="ghost vl-zoomb${ZOOM_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleZoom('${esc(c.id)}')" title="Lupe: im Diagramm einen Bereich aufziehen und vergrößern (gilt für alle Diagramme). Danach ist wieder Wischen aktiv." aria-label="Zoom">🔍</button>
     <button class="ghost vl-meas${MEAS_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleMeasure('${esc(c.id)}')" title="Zeit messen: im Diagramm von einem Punkt zum anderen ziehen – BlueNexus zeigt die Dauer dazwischen. Esc oder erneut klicken beendet." aria-label="Zeit messen">📏</button>
     <button class="ghost" onclick="exportDialog('${esc(c.id)}')" title="Als PNG-Bild speichern">⬇ PNG</button>
     ${IS_ADMIN ? `<button class="ghost" onclick="editChart('${esc(c.id)}')" title="Diagramm bearbeiten">✎</button><button class="ghost" onclick="deleteChart('${esc(c.id)}')" title="Diagramm löschen">✕</button>` : ''}</div>
@@ -246,7 +246,7 @@ async function loadChartData(c) {
 }
 function attachZoom(cid, cv) {
   let pending = null, pan = null;
-  cv.style.touchAction = (ZOOM_MODE || MEAS_CID === cid) ? 'none' : 'pan-y'; cv.style.cursor = 'default';     // senkrecht scrollt die Seite, seitlich wischt das Diagramm
+  cv.style.touchAction = (ZOOM_CID === cid || MEAS_CID === cid) ? 'none' : 'pan-y'; cv.style.cursor = 'default';     // senkrecht scrollt die Seite, seitlich wischt das Diagramm
   const ch = () => INST[cid];
   const px = e => Math.max(ch().chartArea.left, Math.min(ch().chartArea.right, e.clientX - cv.getBoundingClientRect().left));
   const capture = e => { try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } };
@@ -283,14 +283,14 @@ function attachZoom(cid, cv) {
     c.draw();
     if (Math.abs(s.x1 - s.x0) > 8) {
       const a = c.scales.x.getValueForPixel(Math.min(s.x0, s.x1)), b = c.scales.x.getValueForPixel(Math.max(s.x0, s.x1));
-      setZoomMode(false);                                              // Lupe springt nach dem Zoom wieder heraus
+      setZoomMode(false, cid);                                         // Lupe springt nach dem Zoom wieder heraus
       zoomTo(a, b);
     }
   };
   cv.addEventListener('pointerdown', e => {
     if (e.button > 0 || !ch()) return;
     const x = e.clientX - cv.getBoundingClientRect().left, a = ch().chartArea; if (x < a.left || x > a.right) return;
-    if (ZOOM_MODE || MEAS_CID === cid) begin(e);
+    if (ZOOM_CID === cid || MEAS_CID === cid) begin(e);
     else if (e.pointerType === 'touch') pending = { x: e.clientX, y: e.clientY, e };          // erst erkennen, ob seitlich gewischt oder senkrecht gescrollt wird
     else startPan(e, e.clientX);
   });
@@ -315,7 +315,7 @@ async function loadAll(first) {
   $('vl-note').textContent = RANGE.pan ? `Zeitraum: ${tf(t0)} – ${tf(t1)}  („Jetzt“ = aktuelle Zeit)`
     : RANGE.from ? `Ausschnitt: ${tf(t0)} – ${tf(t1)}  (Doppelklick ins Diagramm oder „Zoom zurück“)`
     : RANGE.day ? new Date(t0).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
-    : 'Tipp: Im Diagramm seitlich wischen verschiebt die Zeit. Mit „🔍 Zoom“ einen Bereich aufziehen und vergrößern.';
+    : 'Tipp: Im Diagramm seitlich wischen verschiebt die Zeit. Mit 🔍 am Diagramm einen Bereich aufziehen und vergrößern.';
   await Promise.all(CHARTS.map(loadChartData));
 }
 setInterval(() => { if (!RANGE.day && !RANGE.from && !document.hidden && !document.querySelector('.vl-modal')) loadAll(); }, 15000);
