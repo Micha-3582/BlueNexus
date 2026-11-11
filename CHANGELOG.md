@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.53.4 – 11.11.2026
+- Neu: Im Bereich „ESP vorbereiten“ führt ein Link zur ausführlichen Anleitung auf der Homepage (Vorbereiten, Einrichten, Zurücksetzen).
+
 ## 1.53.3 – 11.11.2026
 - Geändert: Die Anleitung zu „ESP vorbereiten“ nennt jetzt die empfohlene Reihenfolge: **erst flashen, dann löten.** Ein neues Modul wird per USB vorbereitet, bevor Regler und rote LED entfernt werden; dann braucht es beim Flashen keine Batterien. Der Hinweis „Batterien einlegen und USB stecken“ bleibt nur für schon umgebaute Module.
 
