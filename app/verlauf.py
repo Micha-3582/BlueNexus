@@ -318,7 +318,13 @@ def remove_series(sid: str) -> bool:
 # ---------------------------------------------------------------- Quellen
 ENERGY_KEYS = {
     "grid_w": ("Netz (Bezug +, Einspeisung −)", "W", lambda s: s["grid"]["total"]),
-    "load_w": ("Verbrauch Haus", "W", lambda s: s["loads"]["total"]),
+    "load_w": ("Gesamtverbrauch Haus", "W", lambda s: s["loads"]["total"]),
+    "grid_l1": ("Netz L1", "W", lambda s: s["grid"]["l1"]),
+    "grid_l2": ("Netz L2", "W", lambda s: s["grid"]["l2"]),
+    "grid_l3": ("Netz L3", "W", lambda s: s["grid"]["l3"]),
+    "load_l1": ("Gesamtverbrauch L1", "W", lambda s: s["loads"]["l1"]),
+    "load_l2": ("Gesamtverbrauch L2", "W", lambda s: s["loads"]["l2"]),
+    "load_l3": ("Gesamtverbrauch L3", "W", lambda s: s["loads"]["l3"]),
     "solar_w": ("Solar gesamt", "W", lambda s: s["solar_total"]),
     "batt_w": ("Batterie (Laden +, Entladen −)", "W", lambda s: s["battery"]["power"]),
     "soc": ("Akkustand", "%", lambda s: s["battery"]["soc"]),

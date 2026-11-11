@@ -198,3 +198,11 @@ try:
     smp.tick(now_t + 33 + 3601); assert cnt() == c1 + 2          # stuendlicher Nachtrag
 finally:
     verlauf.read_sources = orig
+
+# ---- Phasenwerte (L1-L3) von Netz und Gesamtverbrauch sind aufzeichenbar
+PH = {"grid": {"l1": 3980, "l2": 272, "l3": 384, "total": 4636}, "loads": {"l1": 161, "l2": 272, "l3": 384, "total": 817}, "solar_total": 0, "battery": {"power": 0, "soc": 50}}
+ids_ph = ["energy:grid_l1", "energy:grid_l2", "energy:grid_l3", "energy:load_l1", "energy:load_l2", "energy:load_l3", "energy:load_w"]
+assert {c["id"] for c in verlauf.catalog()} >= set(ids_ph)
+got = verlauf.read_sources(ids_ph, PH)
+assert got == {"energy:grid_l1": 3980.0, "energy:grid_l2": 272.0, "energy:grid_l3": 384.0, "energy:load_l1": 161.0, "energy:load_l2": 272.0, "energy:load_l3": 384.0, "energy:load_w": 817.0}, got
+assert next(c for c in verlauf.catalog() if c["id"] == "energy:load_w")["label"] == "Gesamtverbrauch Haus"

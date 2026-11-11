@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.61.0 – 12.11.2026
+- Neu: **Phasenwerte in den Verläufen.** Zum Aufzeichnen stehen jetzt auch **Netz L1, L2, L3** und **Gesamtverbrauch L1, L2, L3** bereit (wie auf den Live-Kacheln des Dashboards). „Verbrauch Haus“ heißt jetzt **„Gesamtverbrauch Haus“**, damit man es unter dem Namen der Kachel findet; schon angelegte Reihen behalten ihren Namen und ihre Werte.
+
 ## 1.60.0 – 12.11.2026
 - Neu: **Aufzeichnung „bei Änderung“** für Messwerte, die sich selten ändern (Temperatur, Luftfeuchte, Türen/Fenster, an/aus). Es wird nur gespeichert, wenn sich der Wert spürbar geändert hat (z. B. 0,1 °C); bei Stillstand trägt BlueNexus mindestens einmal pro Stunde den aktuellen Wert nach. Für Strom- und Leistungswerte (W, kW, A, kWh, Energie, Geräte-Leistung) wird die Wahl **nicht angeboten**, dort bleibt der feste Takt.
 
