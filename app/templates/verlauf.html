@@ -10,10 +10,17 @@
   .vl-range button + button { border-left: 1px solid var(--border); }
   .vl-range button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .vl-nav { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-  #vl-day.on, .vl-meas.on, .vl-zoomb.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
+  #vl-day.on { background: rgba(60,162,203,.18); border-color: var(--accent); color: var(--accent-t); }
   .vl-chart { margin-top: 14px; }
-  .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; }
-  .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .vl-chart h3 { margin: 0; font-size: 16px; flex: 1; min-width: 120px; }
+  .vl-chart-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .vl-chart-head .tgl-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .tgl { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
+    background: var(--card2); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: .75; }          /* quadratisch wie in Smart Home und Einstellungen */
+  .tgl:hover { opacity: 1; }
+  .tgl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tgl.on { background: var(--on, #2f7fd0); border-color: var(--on, #2f7fd0); color: #fff; opacity: 1; }
+  .tgl.del { color: var(--red, #e5544a); }
   .vl-canvas { position: relative; height: 280px; }
   .vl-empty { color: var(--muted); padding: 40px 0; text-align: center; position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
   .vl-add { margin-top: 4px; padding: 14px 16px; border: 1px solid #4b9be6; border-left-width: 5px; border-radius: 12px; background: rgba(75,155,230,.10); }
@@ -33,11 +40,7 @@
     <div class="vl-range" id="vl-range">
       <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">24 h</button><button data-h="168">7 T</button><button data-h="720">30 T</button><button data-h="8760">1 J</button>
     </div>
-    <span class="vl-nav">
-      <button type="button" class="ghost" id="vl-live" style="display:none" title="Zurück zur aktuellen Zeit">Jetzt</button>
-    </span>
     <button type="button" class="ghost" id="vl-day" title="Einen bestimmten Tag ansehen">📅 Tag wählen</button>
-    <button type="button" class="ghost" id="vl-zoomback" style="display:none" title="Zum vorherigen Zeitraum zurück (oder Doppelklick ins Diagramm)">↩ Zoom zurück</button>
     <button type="button" class="ghost" id="vl-manage" style="display:none" title="Festlegen, welche Messwerte aufgezeichnet werden (Sensoren, Leistung, Preise …)">⚙ Messwerte</button>
     <button type="button" class="ghost" id="vl-add-chart" style="display:none">＋ Diagramm</button>
   </div>
@@ -72,7 +75,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const IS_ADMIN = ({{ user_perms | tojson }} || {}).user_management === 'write' || {{ 'true' if demo_view else 'false' }};
 const APP_NAME = {{ app_display_name | tojson }};
 const COLORS = VLChart.COLORS;
-let SERIES = {}, CHARTS = [], RANGE = { hours: 12 }, INST = {}, CATALOG = null, TIMER = null, ZOOM_STACK = [], LAST = {};     // LAST: zuletzt gezeigte Daten je Diagramm (fuer den PNG-Export)
+let SERIES = {}, CHARTS = [], RANGE = { hours: 12 }, INST = {}, CATALOG = null, TIMER = null, CR = {}, CRS = {}, LAST = {};     // LAST: zuletzt gezeigte Daten je Diagramm (fuer den PNG-Export)
 
 async function api(url, method, body) {
   const r = await fetch(url, { method: method || 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -153,52 +156,55 @@ document.addEventListener('click', async ev => {                       // Farbfe
 }, true);
 
 /* ---------------- Zeitraum ---------------- */
-function rangeMs() {
-  if (RANGE.from) return [RANGE.from, RANGE.to];
+function rangeMs() {                                // gemeinsamer Zeitraum (obere Knoepfe)
   if (RANGE.day) return [RANGE.day, RANGE.day + 86400000];
   const now = Date.now(); return [now - RANGE.hours * 3600000, now];
 }
+/* Jedes Diagramm hat optional einen EIGENEN Zeitraum (Zoom oder Verschieben im Diagramm), unabhaengig von den anderen.
+   CR[id] = { from, to } oder { live: true, span } (bleibt am rechten Rand = jetzt); CRS[id] = Rueckschritte (null = gemeinsamer Zeitraum). */
+function rangeFor(cid) {
+  const o = CR[cid];
+  if (!o) return rangeMs();
+  if (o.live) { const now = Date.now(); return [now - o.span, now]; }
+  return [o.from, o.to];
+}
 const MIN_MS = 60000;
 function markRange() {
-  document.querySelectorAll('#vl-range button').forEach(b => b.classList.toggle('on', !RANGE.day && !RANGE.from && +b.dataset.h === RANGE.hours));
-  $('vl-zoomback').style.display = ZOOM_STACK.length ? '' : 'none';
-  document.querySelectorAll('.vl-zout').forEach(b => { b.style.display = ZOOM_STACK.length ? '' : 'none'; });          // auch an jedem Diagramm
-  $('vl-live').style.display = RANGE.liveHours ? '' : 'none';
+  document.querySelectorAll('#vl-range button').forEach(b => b.classList.toggle('on', !RANGE.day && +b.dataset.h === RANGE.hours));
+  document.querySelectorAll('.vl-zout').forEach(b => { b.style.display = CR[b.dataset.cid] ? '' : 'none'; });          // "-" nur an Diagrammen mit eigenem Zeitraum
   if (!RANGE.day) dayBtnReset();
 }
 function dayBtnReset() { $('vl-day').textContent = '📅 Tag wählen'; $('vl-day').classList.remove('on'); }
 function dayBtnSet(ms) { $('vl-day').textContent = '📅 ' + new Date(ms).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }); $('vl-day').classList.add('on'); }
-function setRange(r) {
-
-  RANGE = r; ZOOM_STACK = [];
+function setRange(r) {                              // obere Knoepfe: gilt fuer alle Diagramme und setzt deren eigene Zeitraeume zurueck
+  RANGE = r; CR = {}; CRS = {};
   if (r.day) dayBtnSet(r.day);
   markRange(); loadAll();
 }
-function zoomTo(t0, t1) {                           // per Ziehen im Diagramm gewaehlter Ausschnitt (gilt fuer alle Diagramme)
+function reload(cid) { markRange(); const c = CHARTS.find(x => x.id === cid); if (c) loadChartData(c); }
+function zoomTo(cid, t0, t1) {                      // per Ziehen im Diagramm gewaehlter Ausschnitt: nur fuer dieses Diagramm
   if (t1 - t0 < 10000) return;
-  ZOOM_STACK.push(RANGE); RANGE = { from: Math.round(t0), to: Math.round(t1), zoom: true };
-  markRange(); loadAll();
+  (CRS[cid] = CRS[cid] || []).push(CR[cid] || null); CR[cid] = { from: Math.round(t0), to: Math.round(t1) };
+  reload(cid);
 }
-function zoomOut() {
-  if (!ZOOM_STACK.length) return;
-  RANGE = ZOOM_STACK.pop(); if (RANGE.day) dayBtnSet(RANGE.day); markRange(); loadAll();
+function zoomOut(cid) {                             // ein Schritt zurueck (bis zum gemeinsamen Zeitraum)
+  const st = CRS[cid]; if (!st || !st.length) { delete CR[cid]; reload(cid); return; }
+  const prev = st.pop(); if (prev) CR[cid] = prev; else { delete CR[cid]; CRS[cid] = []; }
+  reload(cid);
 }
-$('vl-zoomback').addEventListener('click', zoomOut);
 document.querySelectorAll('#vl-range button').forEach(b => b.addEventListener('click', () => setRange({ hours: +b.dataset.h })));
 const isoOf = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 $('vl-day').addEventListener('click', e => openCalendarPicker(e.currentTarget, { value: RANGE.day ? isoOf(RANGE.day) : isoOf(Date.now()), max: isoOf(Date.now()) },
   iso => { const [y, m, d] = iso.split('-').map(Number); setRange({ day: new Date(y, m - 1, d).getTime() }); }));
 
-/* Zeitraum verschieben (Knoepfe und Wischen im Diagramm): Das Fenster behaelt seine Breite und bleibt nie in der Zukunft. */
-function panTo(from, to) {
+/* Zeitraum verschieben (Wischen im Diagramm): nur dieses Diagramm, das Fenster behaelt seine Breite und bleibt nie in der Zukunft. */
+function panTo(cid, from, to) {
   const now = Date.now(), span = to - from;
   if (to > now) { from -= to - now; to = now; }
-  const live = RANGE.liveHours || (!RANGE.from && !RANGE.day ? RANGE.hours : 0);
-  if (to >= now - 2000 && live) { RANGE = { hours: live }; ZOOM_STACK = []; markRange(); loadAll(); return; }
-  RANGE = { from: Math.round(from), to: Math.round(from + span), pan: true, liveHours: live || undefined };
-  markRange(); loadAll();
+  if (!CR[cid]) (CRS[cid] = CRS[cid] || []).push(null);               // erster Eingriff: "-" fuehrt zurueck zum gemeinsamen Zeitraum
+  CR[cid] = to >= now - 2000 ? { live: true, span } : { from: Math.round(from), to: Math.round(from + span) };
+  reload(cid);
 }
-$('vl-live').addEventListener('click', () => { if (RANGE.liveHours) setRange({ hours: RANGE.liveHours }); });
 /* Lupe: nur fuer EINEN Zoom aktiv - danach springt sie zurueck und Wischen gilt wieder. */
 let ZOOM_CID = null, MEAS_CID = null;                          // Lupe und Messen gelten nur fuer das Diagramm, dessen Knopf gedrueckt wurde (der Zoom-Bereich gilt dann fuer alle Diagramme)
 function applyModes() {
@@ -217,13 +223,23 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && (ZOOM_CID 
 /* ---------------- Diagramme ---------------- */
 const { fmtTick, niceTicks, fmtNum } = VLChart;
 
+const svgi = p => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const VI = {
+  zoom: svgi('<circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>'),
+  ruler: svgi('<rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/>'),
+  png: svgi('<path d="M12 4v11"/><polyline points="7 10.5 12 15.5 17 10.5"/><path d="M4 19h16"/>'),
+  edit: svgi('<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><line x1="14" y1="7" x2="17" y2="10"/>'),
+  del: svgi('<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>'),
+  back: svgi('<line x1="5" y1="12" x2="19" y2="12"/>')
+};
 function chartCard(c) {
   return `<div class="card vl-chart" data-sort-id="${esc(c.id)}"><div class="vl-chart-head"><h3>${esc(c.title)}${c.dashboard ? ' <span class="muted" style="font-size:12px;font-weight:normal" title="Wird auch auf dem Dashboard gezeigt">· 🏠 Dashboard</span>' : ''}</h3>
-    <button class="ghost vl-zout" onclick="zoomOut()" style="${ZOOM_STACK.length ? '' : 'display:none'}" title="Zoom zurück: einen Schritt zum vorherigen Ausschnitt (gilt für alle Diagramme)" aria-label="Zoom zurück">−</button>
-    <button class="ghost vl-zoomb${ZOOM_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleZoom('${esc(c.id)}')" title="Lupe: im Diagramm einen Bereich aufziehen und vergrößern (gilt für alle Diagramme). Danach ist wieder Wischen aktiv." aria-label="Zoom">🔍</button>
-    <button class="ghost vl-meas${MEAS_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleMeasure('${esc(c.id)}')" title="Zeit messen: im Diagramm von einem Punkt zum anderen ziehen – BlueNexus zeigt die Dauer dazwischen. Esc oder erneut klicken beendet." aria-label="Zeit messen">📏</button>
-    <button class="ghost" onclick="exportDialog('${esc(c.id)}')" title="Als PNG-Bild speichern">⬇ PNG</button>
-    ${IS_ADMIN ? `<button class="ghost" onclick="editChart('${esc(c.id)}')" title="Diagramm bearbeiten">✎</button><button class="ghost" onclick="deleteChart('${esc(c.id)}')" title="Diagramm löschen">✕</button>` : ''}</div>
+    <div class="tgl-row">
+    <button type="button" class="tgl vl-zout" data-cid="${esc(c.id)}" onclick="zoomOut('${esc(c.id)}')" style="${CR[c.id] ? '' : 'display:none'}" title="Zurück: einen Schritt zum vorherigen Ausschnitt dieses Diagramms (bis zum gemeinsamen Zeitraum)" aria-label="Zoom zurück">${VI.back}</button>
+    <button type="button" class="tgl vl-zoomb${ZOOM_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleZoom('${esc(c.id)}')" title="Lupe: im Diagramm einen Bereich aufziehen und vergrößern (nur dieses Diagramm). Danach ist wieder Wischen aktiv." aria-label="Zoom">${VI.zoom}</button>
+    <button type="button" class="tgl vl-meas${MEAS_CID === c.id ? ' on' : ''}" data-cid="${esc(c.id)}" onclick="toggleMeasure('${esc(c.id)}')" title="Zeit messen: im Diagramm von einem Punkt zum anderen ziehen – BlueNexus zeigt die Dauer dazwischen. Esc oder erneut klicken beendet." aria-label="Zeit messen">${VI.ruler}</button>
+    <button type="button" class="tgl" onclick="exportDialog('${esc(c.id)}')" title="Als PNG-Bild speichern" aria-label="Als PNG speichern">${VI.png}</button>
+    ${IS_ADMIN ? `<button type="button" class="tgl" onclick="editChart('${esc(c.id)}')" title="Diagramm bearbeiten" aria-label="Diagramm bearbeiten">${VI.edit}</button><button type="button" class="tgl del" onclick="deleteChart('${esc(c.id)}')" title="Diagramm löschen" aria-label="Diagramm löschen">${VI.del}</button>` : ''}</div></div>
     <div class="vl-canvas"><canvas id="cv-${esc(c.id)}"></canvas><div class="vl-empty" id="em-${esc(c.id)}"></div></div></div>`;
 }
 function renderCharts() {
@@ -234,7 +250,7 @@ function renderCharts() {
   loadAll(true);
 }
 async function loadChartData(c) {
-  const [t0, t1] = rangeMs(), cv = $('cv-' + c.id); if (!cv) return;
+  const [t0, t1] = rangeFor(c.id), cv = $('cv-' + c.id); if (!cv) return;
   const ids = c.series.filter(i => SERIES[i]);
   const em = $('em-' + c.id);
   if (!ids.length) { em.style.display = 'flex'; em.textContent = 'Keine Reihen gewählt' + (IS_ADMIN ? ' – ✎ drücken.' : '.'); if (INST[c.id]) { INST[c.id].destroy(); delete INST[c.id]; } return; }
@@ -267,7 +283,7 @@ function attachZoom(cid, cv) {
   const endPan = () => {
     const p = pan; pan = null; cv.style.cursor = 'default';
     if (!p) return;
-    if (Math.abs(p.dt) > (p.t1 - p.t0) * 0.01) panTo(p.t0 + p.dt, p.t1 + p.dt);
+    if (Math.abs(p.dt) > (p.t1 - p.t0) * 0.01) panTo(cid, p.t0 + p.dt, p.t1 + p.dt);
     else { const c = ch(); if (c) { c.options.scales.x.min = p.t0; c.options.scales.x.max = p.t1; c.update('none'); } }
   };
   const finish = () => {
@@ -284,7 +300,7 @@ function attachZoom(cid, cv) {
     if (Math.abs(s.x1 - s.x0) > 8) {
       const a = c.scales.x.getValueForPixel(Math.min(s.x0, s.x1)), b = c.scales.x.getValueForPixel(Math.max(s.x0, s.x1));
       setZoomMode(false, cid);                                         // Lupe springt nach dem Zoom wieder heraus
-      zoomTo(a, b);
+      zoomTo(cid, a, b);
     }
   };
   cv.addEventListener('pointerdown', e => {
@@ -305,20 +321,18 @@ function attachZoom(cid, cv) {
   });
   ['pointerup', 'pointercancel'].forEach(ev => cv.addEventListener(ev, finish));
   cv.addEventListener('touchmove', e => { if (ch() && (ch()._sel || pan) && e.cancelable) e.preventDefault(); }, { passive: false });
-  cv.addEventListener('dblclick', zoomOut);
+  cv.addEventListener('dblclick', () => { if (CR[cid]) zoomOut(cid); });
   cv.addEventListener('contextmenu', e => { if (pan || (ch() && ch()._sel)) e.preventDefault(); });
 }
 async function loadAll(first) {
   markRange();
   const [t0, t1] = rangeMs();
   const tf = t => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: t1 - t0 < 7200000 ? '2-digit' : undefined });
-  $('vl-note').textContent = RANGE.pan ? `Zeitraum: ${tf(t0)} – ${tf(t1)}  („Jetzt“ = aktuelle Zeit)`
-    : RANGE.from ? `Ausschnitt: ${tf(t0)} – ${tf(t1)}  (Doppelklick ins Diagramm oder „Zoom zurück“)`
-    : RANGE.day ? new Date(t0).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
-    : 'Tipp: Im Diagramm seitlich wischen verschiebt die Zeit. Mit 🔍 am Diagramm einen Bereich aufziehen und vergrößern.';
+  $('vl-note').textContent = RANGE.day ? new Date(t0).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+    : 'Tipp: Im Diagramm seitlich wischen verschiebt die Zeit, mit 🔍 am Diagramm einen Bereich aufziehen – jedes Diagramm für sich. Die Knöpfe oben gelten für alle.';
   await Promise.all(CHARTS.map(loadChartData));
 }
-setInterval(() => { if (!RANGE.day && !RANGE.from && !document.hidden && !document.querySelector('.vl-modal')) loadAll(); }, 15000);
+setInterval(() => { if (!RANGE.day && !document.hidden && !document.querySelector('.vl-modal')) loadAll(); }, 15000);
 
 /* ---------------- PNG-Export ---------------- */
 /* Bild = Titel + Zeitraum + Diagramm (inkl. Legende) + Fusszeile; wahlweise dunkel (wie am Bildschirm) oder weiss (zum Drucken). */
