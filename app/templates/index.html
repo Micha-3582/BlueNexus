@@ -256,7 +256,7 @@
 
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='calpicker.js') }}"></script>
+<script src="{{ url_for('static', filename='calpicker.js') }}?v={{ asset_v }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='verlauf-chart.js') }}?v={{ asset_v }}"></script>
 <script>

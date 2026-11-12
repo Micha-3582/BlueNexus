@@ -51,7 +51,7 @@
       if (day) { close(); onPick(day.dataset.day); }
     });
     setTimeout(function () {
-      onOutside = function (e) { if (!el.contains(e.target) && !anchor.contains(e.target)) close(); };
+      onOutside = function (e) { var path = e.composedPath ? e.composedPath() : []; if (!el.contains(e.target) && !path.includes(el) && !anchor.contains(e.target)) close(); };       // Monatswechsel zeichnet den Inhalt neu: der angeklickte Pfeil ist dann schon aus dem Fenster entfernt, gehoert aber noch zum Klickpfad
       document.addEventListener('click', onOutside);
     }, 0);
     onEsc = function (e) { if (e.key === 'Escape') close(); };

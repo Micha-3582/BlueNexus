@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.61.1 – 12.11.2026
+- Behoben: Im Kalender („Tag wählen“ bei Verläufen und Dashboard) schloss sich das Fenster, sobald man mit den Pfeilen den Monat wechselte. Jetzt bleibt es offen, und man kann beliebig weit zurückblättern.
+
 ## 1.61.0 – 12.11.2026
 - Neu: **Phasenwerte in den Verläufen.** Zum Aufzeichnen stehen jetzt auch **Netz L1, L2, L3** und **Gesamtverbrauch L1, L2, L3** bereit (wie auf den Live-Kacheln des Dashboards). „Verbrauch Haus“ heißt jetzt **„Gesamtverbrauch Haus“**, damit man es unter dem Namen der Kachel findet; schon angelegte Reihen behalten ihren Namen und ihre Werte.
 
