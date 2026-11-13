@@ -227,13 +227,14 @@ function updateTariffFields() {
 document.querySelectorAll('input[name="tariff_mode"]').forEach(r => r.addEventListener('change', updateTariffFields));
 updateTariffFields();
 
+function escH(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 const initialPvInverters = {{ cfg.pv_inverters | tojson }};
 function pvInverterRow(p = {}) {
   const d = document.createElement('div'); d.className = 'plane-row';
   d.style.gridTemplateColumns = '1.4fr 1fr auto';
   d.innerHTML = `
-    <div><label>Name</label><input class="pvi-name" value="${p.name||''}" placeholder="z.B. PV-1100"></div>
-    <div><label>Geräte-Instanz</label><input class="pvi-unit" value="${p.unit??''}" placeholder="z.B. 80"></div>
+    <div><label>Name</label><input class="pvi-name" value="${escH(p.name||'')}" placeholder="z.B. PV-1100"></div>
+    <div><label>Geräte-Instanz</label><input class="pvi-unit" value="${escH(p.unit??'')}" placeholder="z.B. 80"></div>
     <button class="danger" type="button" onclick="this.parentElement.remove()">✕</button>`;
   return d;
 }

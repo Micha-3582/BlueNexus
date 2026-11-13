@@ -891,7 +891,7 @@ async function load() {
   loadVirtual();
 
   const banner = $('banner');
-  if (d.last_error) banner.innerHTML = `<div class="banner err">Fehler: ${d.last_error}</div>`;
+  if (d.last_error) banner.innerHTML = `<div class="banner err">Fehler: ${escH(d.last_error)}</div>`;
   else if (s.dry_run) banner.innerHTML = `<div class="banner warn">DRY-RUN aktiv – der Cerbo wird NICHT geschaltet. Umstellen unter Einstellungen.</div>`;
   else banner.innerHTML = '';
 
@@ -919,8 +919,8 @@ async function load() {
     const nowLabel = (s.now_slot || '').slice(0, 5);
     const cur = allPrices.find(p => p.label === nowLabel);
     priceEl.style.color = cur ? (LEVEL_COLORS[cur.level] || '') : '';
-    $('mode').innerHTML = `<span class="pill ${s.ess_mode === 9 ? 'green' : 'grey'}">${s.ess_text}</span>`;
-    $('strategy').innerHTML = `<span class="pill amber">${s.strategy}</span>` +
+    $('mode').innerHTML = `<span class="pill ${s.ess_mode === 9 ? 'green' : 'grey'}">${escH(s.ess_text)}</span>`;
+    $('strategy').innerHTML = `<span class="pill amber">${escH(s.strategy)}</span>` +
       (s.ev_active ? ` <span class="pill green">Ladetermin läuft</span>` : '');
     // "Bilanz" als Klartext: reicht der Strom bis zum nächsten Mittag oder fehlt was?
     // Bei festem Tarif ist eine NEGATIVE Bilanz kein Hinweis auf irgendeine Aktion (es
@@ -945,9 +945,9 @@ async function load() {
         ? `<div style="font-size:15px;font-weight:600;color:${ok ? 'var(--cheap)' : 'var(--exp)'}" title="${tip}">`
           + `${ok ? '✓' : '⚠'} ${balTxt} <span style="opacity:.55;font-weight:400;cursor:help">ⓘ</span></div>`
         : '')
-      + `<div class="muted" style="margin-top:4px">Sonne (${s.pv_source || '–'}) heute ${pvRangeTxt(s.pv_today, s.pv_today_range)} / `
+      + `<div class="muted" style="margin-top:4px">Sonne (${escH(s.pv_source || '–')}) heute ${pvRangeTxt(s.pv_today, s.pv_today_range)} / `
       + `morgen ${pvRangeTxt(s.pv_tom, s.pv_tom_range)} kWh · Stand ${d.last_tick || '–'}`
-      + (s.pv_note ? ` · ⚠ ${s.pv_note}` : '') + `</div>`;
+      + (s.pv_note ? ` · ⚠ ${escH(s.pv_note)}` : '') + `</div>`;
     // planline wird tag-genau in applyDay() gesetzt
     if (!overrideBusy) $('override').checked = !!s.override;
     const note = $('override-note');
@@ -955,7 +955,7 @@ async function load() {
     else if (s.override) note.innerHTML = '<span style="color:var(--cheap)">Override aktiv – Cerbo lädt aus dem Netz.</span>';
     else note.textContent = '';
   } else {
-    $('strategy').innerHTML = `<span class="pill grey">${s.reason || '–'}</span>`;
+    $('strategy').innerHTML = `<span class="pill grey">${escH(s.reason || '–')}</span>`;
   }
   renderChart();
   renderEv();
@@ -1010,7 +1010,7 @@ function renderSystem(sys, hasInv, hasMppt, pvSources, batteryUsableKwh) {
     // "Gesamt Solar"-Kachel weiter unten, eine eigene Summenkachel wäre hier
     // nur eine Wiederholung derselben Zahl (bzw. + MPPT-Anteil).
     pvSources.forEach((s, i) => {
-      tile('pvsrc_' + (s.unit ?? i), sun + ' ' + s.name,
+      tile('pvsrc_' + (s.unit ?? i), sun + ' ' + escH(s.name),
         s.power === null ? '–' : Math.round(s.power) + ' W',
         s.power === null ? 'nicht erreichbar' : '', 'var(--timer)');
     });
@@ -1277,7 +1277,7 @@ function renderEv() {
       ? `<button class="danger" onclick="stopEv('${i.id}')">Stop</button>`
       : `<button class="danger" onclick="delEv('${i.id}')">Löschen</button>`;
     return `<tr>
-      <td><b>${fmt(i.start)}</b> → ${fmt(i.end)}${i.note ? '<br><span class="muted">' + i.note + '</span>' : ''}</td>
+      <td><b>${fmt(i.start)}</b> → ${fmt(i.end)}${i.note ? '<br><span class="muted">' + escH(i.note) + '</span>' : ''}</td>
       <td>${evStatus(i)}</td>
       <td>${st.avg != null ? st.avg.toFixed(1) + ' ct' : '–'}</td>
       <td>${st.kwh.toFixed(2)} kWh</td>
@@ -1586,7 +1586,7 @@ setInterval(loadWeek, 300000);  // Wochenrückblick (ändert sich langsam)
 setInterval(loadMonth, 300000); // Monatsüberblick (ändert sich langsam)
 
 /* --- Shelly-Geraete (Auswahl/Symbole in den Einstellungen; hier nur Schalten + Sortieren) --- */
-const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function escH(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }       // als Funktion (wird hochgezogen): gilt damit auch fuer Code, der weiter oben im Skript steht
 let shellyCache = [];
 let shellyDragActive = false;   // waehrend Verschieben: Neuaufbau pausieren
 function shellyTile(d, tid) {

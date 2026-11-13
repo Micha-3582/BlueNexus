@@ -3480,6 +3480,20 @@ def api_config():
             body["scan_networks"] = ", ".join(tuya.parse_networks(body["scan_networks"]))
         except tuya.TuyaError as e:
             return jsonify(error=str(e)), 400
+    if "pv_inverters" in body:                                  # nur [{name: Text bis 40 Zeichen, unit: ganze Zahl}] - nichts anderes in der Konfiguration
+        pv_in = body["pv_inverters"]
+        if not isinstance(pv_in, list) or len(pv_in) > 20:
+            return jsonify(error="PV-Wechselrichter: Liste mit höchstens 20 Einträgen erwartet."), 400
+        clean = []
+        for p_ in pv_in:
+            try:
+                name_, unit_ = str(p_.get("name") or "").strip()[:40], int(p_.get("unit"))
+            except (AttributeError, TypeError, ValueError):
+                return jsonify(error="PV-Wechselrichter: Name und Geräte-Instanz (Zahl) angeben."), 400
+            if not name_ or not 0 <= unit_ <= 65535:
+                return jsonify(error="PV-Wechselrichter: Name und Geräte-Instanz (Zahl) angeben."), 400
+            clean.append({"name": name_, "unit": unit_})
+        body["pv_inverters"] = clean
     if not (isinstance(body.get("tile_order", []), list)
             and all(isinstance(k, str) for k in body.get("tile_order", []))):
         body.pop("tile_order", None)          # Kachelreihenfolge: nur Liste von Textschluesseln

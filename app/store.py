@@ -258,7 +258,11 @@ def list_ev():
     return cleanup_ev()
 
 
+EV_NOTE_MAX = 200
+
+
 def add_ev(start_iso, end_iso, note=""):
+    note = (note if isinstance(note, str) else "").strip()[:EV_NOTE_MAX]            # nur Text, begrenzt
     items = _load_ev()
     entry = {"id": uuid.uuid4().hex[:8], "start": start_iso,
              "end": end_iso, "note": note, "enabled": True}

@@ -1121,8 +1121,8 @@ function pvInverterRow(p = {}) {
   const d = document.createElement('div'); d.className = 'plane-row';
   d.style.gridTemplateColumns = '1.4fr 1fr auto';
   d.innerHTML = `
-    <div><label>Name <span class="qhelp" role="button" tabindex="0" data-help="Anzeigename des Wechselrichters im Dashboard.">?</span></label><input class="pvi-name" value="${p.name||''}" placeholder="z.B. PV-1100"></div>
-    <div><label>Geräte-Instanz <span class="qhelp" role="button" tabindex="0" data-help="Victron Remote Console/VRM → Geräteliste → Wechselrichter → Gerät → Instanz.">?</span></label><input class="pvi-unit" value="${p.unit??''}" placeholder="z.B. 80"></div>
+    <div><label>Name <span class="qhelp" role="button" tabindex="0" data-help="Anzeigename des Wechselrichters im Dashboard.">?</span></label><input class="pvi-name" value="${escH(p.name||'')}" placeholder="z.B. PV-1100"></div>
+    <div><label>Geräte-Instanz <span class="qhelp" role="button" tabindex="0" data-help="Victron Remote Console/VRM → Geräteliste → Wechselrichter → Gerät → Instanz.">?</span></label><input class="pvi-unit" value="${escH(p.unit??'')}" placeholder="z.B. 80"></div>
     <button class="danger" type="button" onclick="this.parentElement.remove()">✕</button>`;
   return d;
 }
@@ -2021,7 +2021,7 @@ function uiForm({ title, message, fields, okText = 'OK' }) {
 }
 
 /* --- Shelly-Geraete + Ueberschuss-Automatik --- */
-const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function escH(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 let shellyIcons = [];
 const isAc = d => d.kind === 'midea' || d.rkind === 'midea';          // Klimaanlage, auch eine von einer fremden Instanz geteilte
 const PRESS_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polygon points="8 5 19 12 8 19 8 5"/></svg>';   // wie PWR_ICON: gleiche Groesse und Strichstaerke, Farbe der Schrift
