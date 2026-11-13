@@ -716,6 +716,8 @@ def seed_favorites(users) -> None:
             cfg["tile_order"] = order
             store.save_config(cfg)
         for u in users.list():
+            if u.get("favorites"):                          # schon vorhanden (z.B. vom Administrator umgestellt): nicht ueberschreiben
+                continue
             try:
                 users.set_favorites(u["username"], refs)
             except Exception:                               # noqa: BLE001

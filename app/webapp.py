@@ -3097,7 +3097,7 @@ def api_favorites():
         if request.args.get("refs") == "1":
             return jsonify(refs=refs)
         return jsonify(refs=refs, items=_fav_items(refs, live=request.args.get("light") != "1"))      # ?light=1: sofort, ohne Live-Abfrage der Geraete
-    if demo.ACTIVE:
+    if demo.ACTIVE and not auth.is_full_admin(g.perms):      # Demo: Besucher nur ansehen, der Administrator darf seine Favoriten pflegen
         return jsonify(error="In der Demo werden keine Favoriten gespeichert."), 403
     body = request.get_json(silent=True) or {}
     if isinstance(body.get("ids"), list):
@@ -3129,7 +3129,7 @@ def api_hidden_items():
     refs = auth.normalize_favorites(user.get("hidden_items"))
     if request.method == "GET":
         return jsonify(refs=refs)
-    if demo.ACTIVE:
+    if demo.ACTIVE and not auth.is_full_admin(g.perms):
         return jsonify(error="In der Demo wird nichts gespeichert."), 403
     ref = (request.get_json(silent=True) or {}).get("ref")
     if not isinstance(ref, str) or ":" not in ref or not auth.normalize_favorites([ref]):
