@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import shutil
 import sqlite3
@@ -100,7 +101,22 @@ def _shift_db(app_dir: str, n: int) -> None:
         con.close()
 
 
-ENERGY_SERIES = {"energy:load_w": "load", "energy:solar_w": "pv", "energy:grid_w": "grid", "energy:soc": "soc"}
+ENERGY_SERIES = {"energy:load_w": "load", "energy:solar_w": "pv", "energy:grid_w": "grid", "energy:soc": "soc", "energy:batt_w": "batt",
+                 "energy:grid_l1": "grid_l1", "energy:grid_l2": "grid_l2", "energy:grid_l3": "grid_l3",
+                 "energy:load_l1": "load_l1", "energy:load_l2": "load_l2", "energy:load_l3": "load_l3",
+                 "energy:price_ct": "price", "energy:cost_ct_h": "cost"}
+BACKFILL_DAYS = 35                                           # so weit zurueck bekommen die Verlaeufe der Demo Werte (Rollup), Rohwerte nur die letzten Tage
+RAW_BACK_DAYS = 3
+
+
+def _synth(unit: str, ts: int, seed: float):
+    """Plausibler Tagesgang fuer eine Reihe ohne Simulation (Temperatur, Luftfeuchte); sonst None."""
+    h = (ts % 86400) / 3600.0
+    if unit == "°C":
+        return round(20.0 + 1.6 * math.sin((h - 9) / 24 * 2 * math.pi) + 0.25 * math.sin(ts / 1700.0 + seed), 1)
+    if unit == "%":
+        return round(48.0 - 7.0 * math.sin((h - 9) / 24 * 2 * math.pi) + 1.2 * math.sin(ts / 2100.0 + seed), 1)
+    return None
 
 
 def _slot(vals, price_ct: float) -> dict:
@@ -129,78 +145,83 @@ def _slot(vals, price_ct: float) -> dict:
 
 
 def fill_today(app_dir: str, now: datetime | None = None) -> None:
-    """Fuellt die Luecke von heute 00:00 bis zur ersten echten Aufzeichnung mit den Werten der Simulation (gleiche Rechnung wie die Live-Anzeige,
-    damit Akku-Ladestand und Leistungen nahtlos in die laufende Aufzeichnung uebergehen). Andere Reihen (z.B. Sensoren) kommen von einem frueheren Tag.
+    """Fuellt die Verlaeufe der Demo aus der Simulation (gleiche Rechnung wie die Live-Anzeige, damit Akku-Ladestand und Leistungen nahtlos in die
+    laufende Aufzeichnung uebergehen): heute von 00:00 bis jetzt (bei jedem Start komplett neu, Luecken inklusive) und die letzten Tage, falls dort
+    noch nichts steht. Gilt fuer die Energie-Historie (history.json) und alle Energie-Reihen in verlauf.db sowie Temperatur-/Feuchte-Reihen ohne Daten.
 
-    Ohne das waere "Heute" nach jedem Neustart der Demo leer (die Historie reicht nur bis gestern)."""
+    Ohne das waere "Heute" nach jedem Neustart der Demo leer und die Verlaeufe zeigten nur leere Linien."""
     import demo
     now = now or datetime.now()
     midnight = datetime(now.year, now.month, now.day)
-    t0, t1 = int(midnight.timestamp()), int(now.timestamp())
-    minutes = {}                                             # Minute (Unix) -> Momentaufnahme, nur bis jetzt
-    m = t0
-    while m + 60 <= t1:
-        minutes[m] = demo.snapshot(datetime.fromtimestamp(m + 30))
-        m += 60
+    t1 = int(now.timestamp())
+    today_snaps = demo.day_snapshots(midnight, t1)
     # Energie-Verlauf (history.json, 15-Minuten-Slots)
     try:
         hot_p = os.path.join(app_dir, "history.json")
         h = _load(hot_p) if os.path.exists(hot_p) else {"hours": {}}
         hours = h.setdefault("hours", {})
-        for k in [k for k in hours if k.startswith(midnight.date().isoformat())]:      # heute komplett neu aus der Simulation (aeltere Staende der Auffuellung koennen abweichen)
+        for k in [k for k in hours if k.startswith(midnight.date().isoformat())]:      # heute komplett neu aus der Simulation
             del hours[k]
-        added = 1
         for q in range(96):
             st = midnight + timedelta(minutes=15 * q)
-            key = st.strftime("%Y-%m-%dT%H:%M")
             if st + timedelta(minutes=15) > now:
                 break
-            if key in hours:                                 # schon aufgezeichnet (auch Luecken waehrend eines Neustarts werden gefuellt)
-                continue
-            vals = [minutes[x] for x in range(int(st.timestamp()), int(st.timestamp()) + 900, 60) if x in minutes]
+            vals = [today_snaps[x] for x in range(int(st.timestamp()), int(st.timestamp()) + 900, 60) if x in today_snaps]
             if vals:
-                hours[key] = _slot(vals, demo._price_ct(st))
-                added += 1
-        if added:
-            _dump(h, hot_p)
+                hours[st.strftime("%Y-%m-%dT%H:%M")] = _slot(vals, demo._price_ct(st))
+        _dump(h, hot_p)
     except Exception:                                       # noqa: BLE001
         log.exception("Demo: heutige Energiewerte konnten nicht aufgefuellt werden")
     # Verlaeufe (verlauf.db)
     path = os.path.join(app_dir, "verlauf.db")
     if not os.path.exists(path):
         return
-    con = sqlite3.connect(path)
+    con = sqlite3.connect(path, timeout=30)
     try:
+        units = {}
+        try:
+            for it in _load(os.path.join(app_dir, "verlauf_series.json")):
+                if isinstance(it, dict) and it.get("id"):
+                    units[it["id"]] = str(it.get("unit") or "")
+        except (OSError, ValueError):
+            pass
         con.execute("BEGIN")
-        for tab in ("samples", "rollup"):
+        have = {r[0] for r in con.execute("SELECT DISTINCT series FROM rollup")} | {r[0] for r in con.execute("SELECT DISTINCT series FROM samples")}
+        ids = set(units) | have | set(ENERGY_SERIES)
+        t0 = int(midnight.timestamp())
+        for tab in ("samples", "rollup"):                    # heute: Energie-Reihen komplett neu
             for ser in ENERGY_SERIES:
                 con.execute(f"DELETE FROM {tab} WHERE series=? AND ts>=?", (ser, t0))
-        for tab, cols in (("samples", "v"), ("rollup", "vsum, n, vmin, vmax")):
-            for (series,) in con.execute(f"SELECT DISTINCT series FROM {tab}").fetchall():
-                key = ENERGY_SERIES.get(series)
-                first = con.execute(f"SELECT MIN(ts) FROM {tab} WHERE series=? AND ts>=?", (series, t0)).fetchone()[0]
-                lim = first if first is not None else t1
-                if lim <= t0 and not key:
+        days = [(0, today_snaps)]
+        for back in range(1, BACKFILL_DAYS + 1):
+            d0 = midnight - timedelta(days=back)
+            days.append((back, demo.day_snapshots(d0, int(d0.timestamp()) + 86400)))
+        total = 0
+        for back, snaps in days:
+            d0 = int((midnight - timedelta(days=back)).timestamp())
+            for ser in sorted(ids):
+                key = ENERGY_SERIES.get(ser)
+                if not key and not (ser.startswith("sensor:") and units.get(ser) in ("°C", "%")):
                     continue
-                if key:                                      # Energie-Reihen: direkt aus der Simulation, fehlende Minuten (eine Minute = ein Wert)
-                    for ts, v in minutes.items():
-                        if tab == "samples" and con.execute("SELECT 1 FROM samples WHERE series=? AND ts>=? AND ts<?", (series, ts, ts + 60)).fetchone():
-                            continue
-                        val = float(v[key])
-                        con.execute("INSERT OR IGNORE INTO samples (series, ts, v) VALUES (?,?,?)" if tab == "samples" else
-                                    "INSERT OR IGNORE INTO rollup (series, ts, vsum, n, vmin, vmax) VALUES (?,?,?,1,?,?)",
-                                    (series, ts, val) if tab == "samples" else (series, ts, val, val, val))
+                if back > 0 and con.execute("SELECT 1 FROM rollup WHERE series=? AND ts>=? AND ts<? LIMIT 1", (ser, d0, d0 + 86400)).fetchone():
+                    continue                                 # dort stehen schon Werte
+                if back == 0 and not key and con.execute("SELECT 1 FROM rollup WHERE series=? AND ts>=? LIMIT 1", (ser, d0)).fetchone():
                     continue
-                for k in (7, 14, 21, 28, 1, 2, 3, 4, 5, 6):  # sonst: erst ganze Wochen zurueck, dann die letzten Tage (Rohwerte werden nur kurz gehalten)
-                    s = k * 86400
-                    cur = con.execute(f"INSERT OR IGNORE INTO {tab} (series, ts, {cols}) SELECT series, ts+?, {cols} FROM {tab} "
-                                      f"WHERE series=? AND ts>=? AND ts<?", (s, series, t0 - s, lim - s))
-                    if cur.rowcount > 0:
-                        break
+                rows = []
+                for ts, v in snaps.items() if key else ((m, None) for m in range(d0, min(d0 + 86400, t1), 60)):
+                    val = float(v[key]) if key else _synth(units.get(ser, ""), ts, float(len(ser)))
+                    if val is not None:
+                        rows.append((ser, ts, val))
+                if rows:
+                    con.executemany("INSERT OR IGNORE INTO rollup (series, ts, vsum, n, vmin, vmax) VALUES (?,?,?,1,?,?)", [(a, b_, c, c, c) for a, b_, c in rows])
+                    if back <= RAW_BACK_DAYS:
+                        con.executemany("INSERT OR IGNORE INTO samples (series, ts, v) VALUES (?,?,?)", rows)
+                    total += len(rows)
         con.commit()
+        log.warning("Demo: Verlaeufe aus der Simulation aufgefuellt (%d Werte)", total)
     except Exception:                                       # noqa: BLE001
         con.rollback()
-        log.exception("Demo: heutige Verlaufswerte konnten nicht aufgefuellt werden")
+        log.exception("Demo: Verlaufswerte konnten nicht aufgefuellt werden")
     finally:
         con.close()
 

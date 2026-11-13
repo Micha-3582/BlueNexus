@@ -121,17 +121,62 @@ def _split(x: float, weights):
     return parts
 
 
-def snapshot(now: datetime) -> dict:
-    """Gleiche Werte wie die Live-Anzeige zu einem Zeitpunkt (Summen): soc, pv (Watt gesamt), load, grid (+ = Bezug), batt (+ = laden)."""
-    soc, pv, load, batt = _simulate(now)
-    t = now.timestamp()
+def _states(day_start: datetime) -> list:
+    """Zustand (soc, pv, load, batt) der Simulation fuer alle 288 Fuenf-Minuten-Schritte eines Tages (gleiche Rechnung wie _simulate)."""
+    soc = 24.0 + 6.0 * _day_factor((day_start - timedelta(days=1)).date())
+    t = day_start
+    step = timedelta(minutes=5)
+    out = []
+    for _ in range(288):
+        pv, load = _solar_w(t), _load_w(t)
+        batt = pv - load
+        if _grid_charge_window(t) and soc < 60.0:
+            batt = CHARGE_W
+        batt = max(-3500.0, min(batt, CHARGE_W if _grid_charge_window(t) else 5000.0))
+        if soc >= MAX_SOC and batt > 0:
+            batt = 0.0
+        if soc <= MIN_SOC and batt < 0:
+            batt = 0.0
+        out.append((soc, pv, load, batt))
+        soc = min(MAX_SOC, max(MIN_SOC, soc + batt * (5 / 60) / (BATT_KWH * 1000) * 100))
+        t += step
+    return out
+
+
+def _snap(state, t: float) -> dict:
+    """Werte der Live-Anzeige (Summen und Phasen) aus einem Zustand der Simulation zur Zeit t (Unix)."""
+    soc, pv, load, batt = state
     pv_ac = _live_pv(pv * 0.8, t)
     pv_dc = _live_pv(pv * 0.2, t + 5.0)
     load = _live_load(load, t)
-    pv_tot = int(round(pv_ac)) + int(round(pv_dc))
-    ld = int(round(load))
-    bt = int(round(batt))
-    return {"soc": soc, "pv": pv_tot, "load": ld, "batt": bt, "grid": ld - pv_tot + bt}
+    ld = _split(load, _phase_w(t, (0.30, 0.39, 0.31), 1.0))
+    pa = _split(pv_ac, _phase_w(t, (0.31, 0.35, 0.34), 2.0)) if pv_ac > 0 else [0, 0, 0]
+    dcs, bts = _split(int(round(pv_dc)), (1, 1, 1)), _split(int(round(batt)), (1, 1, 1))
+    g = [ld[i] - pa[i] - dcs[i] + bts[i] for i in range(3)]
+    price = _price_ct(datetime.fromtimestamp(t))
+    out = {"soc": soc, "pv": sum(pa) + sum(dcs), "load": sum(ld), "batt": sum(bts), "grid": sum(g), "price": price,
+           "cost": max(0.0, sum(g)) * price / 1000.0}
+    for i in range(3):
+        out["grid_l%d" % (i + 1)] = g[i]
+        out["load_l%d" % (i + 1)] = ld[i]
+    return out
+
+
+def snapshot(now: datetime) -> dict:
+    """Gleiche Werte wie die Live-Anzeige zu einem Zeitpunkt: soc, pv (Watt gesamt), load, grid (+ = Bezug), batt (+ = laden), je Phase, Preis."""
+    return _snap(_simulate(now), now.timestamp())
+
+
+def day_snapshots(day_start: datetime, until: float) -> dict:
+    """Minute (Unix) -> snapshot fuer einen ganzen Tag (bis 'until'), ohne die Simulation je Minute neu zu rechnen."""
+    states = _states(day_start)
+    t0 = int(day_start.timestamp())
+    out = {}
+    m = t0
+    while m + 60 <= until and m < t0 + 86400:
+        out[m] = _snap(states[min(287, (m + 30 - t0) // 300)], m + 30)
+        m += 60
+    return out
 
 
 class _Mode:
