@@ -6759,7 +6759,7 @@ def api_shelly_midea(dev_id):
         b = request.get_json(silent=True) or {}
         power = b.get("power")
         res = shelly.midea_set(dev_id, power=(None if power is None else bool(power)), mode=b.get("mode"), target=b.get("target"), fan=b.get("fan"), swing=b.get("swing"),
-                               eco=b.get("eco") if isinstance(b.get("eco"), bool) else None)
+                               eco=b.get("eco") if isinstance(b.get("eco"), bool) else None, remember=True)
     except shelly.ShellyError as e:
         return jsonify(error=str(e)), 400
     rule_engine.note_manual(dev_id, hold_min=rules.settings(store.load_config())["manual_hold_min"])

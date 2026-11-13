@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.62.0 – 13.11.2026
+- Neu: **Klimaanlagen behalten die Einstellungen aus BlueNexus – bei allen Marken gleich (ESPHome und Midea).** Was im Klimafenster zuletzt von Hand eingestellt wurde (Modus, Solltemperatur, Lüfter, Schwenken, Eco), gilt bei **jedem Einschalten über BlueNexus** (Überschuss-Automatik, Regeln, Ein/Aus-Taste), bis es dort wieder geändert wird – auch wenn die Anlage selbst etwas anderes gespeichert hat oder eine Regel kurz einen anderen Wert gesetzt hat. Läuft die Anlage schon, wird nichts umgestellt. Änderungen an der Fernbedienung ändern die Vorgabe nicht. Die erste Vorgabe legt BlueNexus an, sobald es die Anlage laufen sieht; sie wird auf dem Server gespeichert und überlebt Neustarts.
+
 ## 1.61.2 – 13.11.2026
 - Behoben: Beim Zoomen in einem **Balkendiagramm** bis an den rechten Rand kam „Zeitraum ungültig (höchstens 420 Tage)“. Balkendiagramme haben rechts einen Rand über „jetzt“ hinaus; der gewählte Ausschnitt reichte dadurch in die Zukunft. Der Zoom endet jetzt höchstens bei „jetzt“.
 

@@ -34,6 +34,7 @@ import tuya
 log = logging.getLogger("shelly")
 
 DEVICES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shelly_devices.json")
+CLIMATE_PREFS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "climate_prefs.json")     # Vorgaben der Klimaanlagen (alle Marken): was in BlueNexus zuletzt von Hand eingestellt wurde
 _lock = threading.Lock()
 
 # Auswahl fuer die Geraete-Symbole (Einstellungen); Standard = Steckdose
@@ -540,8 +541,81 @@ def midea_details(dev_id: str) -> dict:
         raise
 
 
+# ---------------------------------------------------------------- Vorgaben der Klimaanlagen (gleich fuer ESPHome und Midea)
+# Was in BlueNexus (Klimafenster) zuletzt von Hand eingestellt wurde, gilt bei JEDEM Einschalten ueber BlueNexus (Ueberschuss-Automatik, Regeln, Kachel),
+# bis es im Klimafenster wieder geaendert wird. Eine Aenderung an der Fernbedienung der Anlage aendert die Vorgabe nicht.
+_prefs_lock = threading.Lock()
+PREF_KEYS = ("mode", "target", "fan", "swing", "eco")
+
+
+def _prefs_all() -> dict:
+    try:
+        with open(CLIMATE_PREFS_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def climate_prefs(dev_id: str) -> dict:
+    with _prefs_lock:
+        return dict((_prefs_all().get(dev_id) or {}))
+
+
+def climate_prefs_update(dev_id: str, vals: dict, only_new: bool = False) -> None:
+    keep = {k: v for k, v in vals.items() if k in PREF_KEYS and v is not None and v != ""}
+    if not keep:
+        return
+    with _prefs_lock:
+        allp = _prefs_all()
+        cur = allp.get(dev_id)
+        if only_new and cur:
+            return
+        new = {**(cur or {}), **keep}
+        if new == cur:
+            return
+        allp[dev_id] = new
+        try:
+            tmp = CLIMATE_PREFS_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(allp, f, indent=1)
+            os.replace(tmp, CLIMATE_PREFS_PATH)
+        except OSError as e:
+            log.warning("Klima-Vorgaben nicht gespeichert: %s", e)
+
+
+def _seed_climate(d: dict, st: dict) -> dict:
+    """Die erste Beobachtung einer laufenden Anlage wird zur Vorgabe (so gilt der jetzige Stand sofort, ohne dass man ihn erst neu einstellen muss)."""
+    try:
+        if st.get("on") and st.get("mode"):
+            climate_prefs_update(d["id"], {"mode": st.get("mode"), "target": st.get("target_c"), "fan": st.get("fan"), "swing": st.get("swing"),
+                                           "eco": st.get("eco")}, only_new=True)
+    except Exception as e:                                  # noqa: BLE001 - die Anzeige darf daran nie scheitern
+        log.debug("Klima-Vorgabe nicht angelegt: %s", e)
+    return st
+
+
+def climate_power_on(d: dict, given: dict | None = None) -> dict:
+    """Anlage einschalten: ist sie aus, gilt die Vorgabe (plus die ausdruecklich genannten Werte); laeuft sie schon, wird nichts umgestellt. Gleich fuer ESPHome und Midea."""
+    given = {k: v for k, v in (given or {}).items() if v not in (None, "")}
+    try:
+        st = status(d)
+    except Exception:                                       # noqa: BLE001
+        st = {}
+    vals = dict(given)
+    if st.get("on") is not True:
+        vals = {**climate_prefs(d["id"]), **given}
+    if d.get("kind") == "esphome_ac":
+        with esphome._lock:                                  # eine Vorwahl bei ausgeschalteter Anlage (Klimafenster) gilt vor der gespeicherten Vorgabe
+            pre = dict(esphome._pre.get((str(d.get("ip") or ""), str(d.get("entity") or ""))) or {})
+        vals = {k: v for k, v in vals.items() if k in given or k not in pre}
+        return esphome.climate_set(d, power=True, mode=vals.get("mode"), target=vals.get("target"), fan=vals.get("fan"), swing=vals.get("swing"), eco=vals.get("eco"))
+    return midea.set_params(d, power=True, **vals)
+
+
 def midea_set(dev_id: str, **kw) -> dict:
     """Modus, Solltemperatur, Luefter, Schwenken, Ein/Aus (power) und eco setzen - nur die genannten."""
+    remember = bool(kw.pop("remember", False))                  # nur das Klimafenster in BlueNexus: Einstellung als Vorgabe merken
     d = _midea_dev(dev_id)
     if d.get("switchable") is False:
         raise ShellyError("Dieses Gerät ist nur zur Überwachung eingestellt und nicht schaltbar")
@@ -549,9 +623,13 @@ def midea_set(dev_id: str, **kw) -> dict:
         if d.get("kind") == "remote":
             import share
             return share.ac_set(d, **kw)
+        given = {"mode": kw.get("mode") or None, "target": kw.get("target"), "fan": kw.get("fan") or None, "swing": kw.get("swing") or None, "eco": kw.get("eco")}
+        if remember:
+            climate_prefs_update(dev_id, given)
+        if kw.get("power") is True and not any(v is not None for v in given.values()):
+            return climate_power_on(d)                           # nur "einschalten": mit der Vorgabe (Ueberschuss-Automatik, Regeln, Kachel)
         if d.get("kind") == "esphome_ac":
-            return esphome.climate_set(d, power=kw.get("power"), mode=kw.get("mode") or None, target=kw.get("target"), fan=kw.get("fan") or None,
-                                       swing=kw.get("swing") or None, eco=kw.get("eco"))
+            return esphome.climate_set(d, power=kw.get("power"), mode=given["mode"], target=given["target"], fan=given["fan"], swing=given["swing"], eco=given["eco"])
         return midea.set_params(d, **kw)
     except (midea.MideaError, esphome.EsphomeError) as e:
         raise ShellyError(str(e))
@@ -802,7 +880,7 @@ def status(d: dict) -> dict:
     abgefragt (sonst wartet JEDER Abruf - Dashboard, Geraeteliste, Regeln - jedes Mal die ganze Zeitueberschreitung ab)."""
     key = d.get("id")
     if d.get("kind") == "esphome_ac":                      # Klimaanlage: Zustand kommt aus der gehaltenen Verbindung (esphome.py)
-        st = esphome.climate_status(d)
+        st = _seed_climate(d, esphome.climate_status(d))
         if key is not None:
             _st_cache[key] = (time.time(), dict(st))
         return st
@@ -905,7 +983,7 @@ def _status_live(d: dict) -> dict:
     if d.get("kind") == "wled":
         return wled.status(d)
     if d.get("kind") == "midea":
-        return midea.status(d)
+        return _seed_climate(d, midea.status(d))
     if d.get("kind") == "homematic":
         return homematic.status(d)
     if d.get("kind") == "zigbee":
@@ -956,7 +1034,10 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
         return status(d)
     if d.get("kind") == "esphome_ac":
         try:
-            esphome.climate_set(d, power=bool(on))
+            if on:
+                climate_power_on(d)
+            else:
+                esphome.climate_set(d, power=False)
         except esphome.EsphomeError as e:
             raise ShellyError(str(e))
         return status(d)
@@ -984,7 +1065,10 @@ def set_state(dev_id: str, on: bool, timer_s: int | None = None) -> dict:
             raise ShellyError(str(e))
     if d.get("kind") == "midea":
         try:
-            midea.set_state(d, on, timer_s)
+            if on:
+                climate_power_on(d)
+            else:
+                midea.set_state(d, on, timer_s)
         except midea.MideaError as e:
             raise ShellyError(str(e))
         return status(d)

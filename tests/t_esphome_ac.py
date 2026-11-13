@@ -131,11 +131,17 @@ POSTS.clear()
 r = shelly.midea_set(dev_id, power=True, mode="heat", target=22.5, fan="low", swing="vertical")
 assert POSTS == [("/climate/air_conditioner/set", {"mode": "HEAT", "target_temperature": "22.5", "fan_mode": "LOW", "swing_mode": "VERTICAL"})], POSTS
 assert r["on"] is True and r["mode"] == "heat" and r["target_c"] == 22.5 and r["fan"] == "low" and r["swing"] == "vertical", r
+shelly.status(d)                                                                                              # laufende Anlage beobachtet: Vorgabe wird angelegt
 POSTS.clear(); r = shelly.midea_set(dev_id, power=False)
 assert POSTS[0][1] == {"mode": "OFF"} and r["on"] is False and r["mode"] == "heat" and r["target_c"] == 22.5, (POSTS, r)          # aus: Soll und letzter Modus bleiben sichtbar
 POSTS.clear(); shelly.set_state(dev_id, True)
-assert POSTS[0][1] == {"mode": "HEAT"}, POSTS                                                                                # einschalten ohne Modus: der zuletzt benutzte
+assert POSTS[0][1] == {"mode": "HEAT", "target_temperature": "22.5", "fan_mode": "LOW", "swing_mode": "VERTICAL", "preset": "NONE"}, POSTS      # einschalten: die Vorgabe (beim ersten Beobachten der laufenden Anlage angelegt)
 assert shelly.status(d)["on"] is True
+def noprefs():
+    if os.path.exists(shelly.CLIMATE_PREFS_PATH):
+        os.remove(shelly.CLIMATE_PREFS_PATH)
+
+
 # Vorwahl bei ausgeschalteter Anlage: ein Modus waere bei ESPHome zugleich "einschalten" - es wird nur vorgemerkt und erst beim Einschalten gesendet
 shelly.midea_set(dev_id, power=False)
 POSTS.clear(); r = shelly.midea_set(dev_id, mode="cool", fan="high", target=26.0)
@@ -146,11 +152,12 @@ try:
     shelly.midea_set(dev_id, mode="kaputt"); raise AssertionError("ungueltige Vorwahl muss abgelehnt werden")
 except shelly.ShellyError:
     pass
+noprefs()                                                                                                                  # ab hier ohne gespeicherte Vorgabe pruefen
 POSTS.clear(); shelly.set_state(dev_id, True)
 assert POSTS[0][1] == {"mode": "COOL", "fan_mode": "HIGH", "target_temperature": "26", "swing_mode": "BOTH"}, POSTS          # Vorwahl geht gemeinsam beim Einschalten raus
 assert shelly.status(d)["on"] is True and esphome._pre == {}, esphome._pre
 shelly.midea_set(dev_id, power=False)
-shelly.midea_set(dev_id, mode="dry")
+shelly.midea_set(dev_id, mode="dry"); noprefs()
 POSTS.clear(); shelly.midea_set(dev_id, power=True, target=24.0)                                                           # Einschalten mit eigenen Angaben ergaenzt die Vorwahl
 assert POSTS[0][1] == {"mode": "DRY", "target_temperature": "24"}, POSTS
 shelly.midea_set(dev_id, power=False); POSTS.clear(); shelly.midea_set(dev_id, mode="heat"); shelly.midea_set(dev_id, power=False)
@@ -185,6 +192,24 @@ except shelly.ShellyError as e:
     assert "nicht angenommen" in str(e) and len(POSTS) == 3, (e, POSTS)
 DROP.update(n=0, apply=False)
 
+# ---------------------------------------------------------------- Vorgabe: was in BlueNexus von Hand gesetzt wurde, gilt bei jedem Einschalten
+noprefs(); shelly.midea_set(dev_id, power=False)
+shelly.midea_set(dev_id, mode="heat", target=30.0, fan="high", swing="off", eco=False, remember=True)          # Klimafenster: merken (Anlage aus = Vorwahl)
+assert shelly.climate_prefs(dev_id) == {"mode": "heat", "target": 30.0, "fan": "high", "swing": "off", "eco": False}, shelly.climate_prefs(dev_id)
+shelly.midea_set(dev_id, power=False)
+for who in ("Ueberschuss", "Regel", "Kachel"):
+    POSTS.clear(); shelly.midea_set(dev_id, power=True) if who == "Regel" else shelly.set_state(dev_id, True)
+    assert POSTS[0][1] == {"mode": "HEAT", "target_temperature": "30", "fan_mode": "HIGH", "swing_mode": "OFF", "preset": "NONE"}, (who, POSTS)
+    shelly.midea_set(dev_id, power=False)
+POSTS.clear(); shelly.set_state(dev_id, True); POSTS.clear()
+shelly.set_state(dev_id, True)
+assert POSTS == [], POSTS                                                                                      # laeuft schon: nichts umgestellt
+shelly.midea_set(dev_id, target=18.0)                                                                           # Regel/Fernbedienung aendert den Soll (ohne remember): Vorgabe bleibt
+assert shelly.climate_prefs(dev_id)["target"] == 30.0
+shelly.midea_set(dev_id, power=False); POSTS.clear(); shelly.set_state(dev_id, True)
+assert POSTS[0][1]["target_temperature"] == "30", POSTS                                                         # wieder die Vorgabe, nicht der letzte Regelwert
+shelly.midea_set(dev_id, target=24.5, remember=True)                                                            # im Klimafenster geaendert: neue Vorgabe
+assert shelly.climate_prefs(dev_id)["target"] == 24.5
 # ---------------------------------------------------------------- Regelschritt "Klimaanlage einstellen" nimmt das Geraet an
 base = {"name": "Klima", "mode": "flow", "when": {"mode": "all", "conds": [{"type": "time", "from": "00:00", "to": "24:00"}]}, "else": []}
 n = rules.normalize_rule({**base, "then": [{"type": "ac", "id": dev_id, "power": "on", "mode": "cool", "target": 24}]}, "k1")["then"][0]

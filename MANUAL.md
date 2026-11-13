@@ -760,6 +760,8 @@ Weckt einen PC, ein NAS oder einen Server aus dem Standby/Ruhezustand per „Mag
 
 Klimaanlagen mit Midea-Technik (Apps **MSmartHome** oder **NetHome Plus**, auch Comfee, Inventor, Pioneer u. a.) steuert BlueNexus **lokal im Heimnetz – ohne Cloud**. Sie sind Geräte der normalen Geräteliste: Ein/Aus, Rechte, Sichtbarkeit, PIN, Dashboard, Regeln und Alexa funktionieren wie bei den anderen. Dazu kommen Modus, Solltemperatur, Lüfter und Schwenken.
 
+**Einstellungen bleiben erhalten (alle Klimaanlagen, Midea und ESPHome gleich):** Was du im **Klimafenster** von BlueNexus zuletzt von Hand eingestellt hast (Modus, Solltemperatur, Lüfter, Schwenken, Eco), gilt bei **jedem Einschalten über BlueNexus** – Überschuss-Automatik, Regeln und die Ein/Aus-Taste –, bis du es dort wieder änderst. Das gilt auch, wenn die Anlage zwischendurch etwas anderes gespeichert hat oder eine Regel kurz einen anderen Wert gesetzt hat. Läuft die Anlage schon, wird beim „Einschalten“ nichts umgestellt. Stellst du die Anlage mit der **Fernbedienung** um, ändert das die Vorgabe nicht. Die erste Vorgabe legt BlueNexus an, sobald es die Anlage laufen sieht (der jetzige Stand gilt also sofort); sie wird auf dem Server gespeichert und überlebt Neustarts.
+
 **Voraussetzung:** Auf dem Server muss die Bibliothek **msmart-ng** installiert sein (steht in `requirements.txt`; nach dem Update einmal `venv/bin/pip install -r app/requirements.txt`, dann die App neu starten). Die Klimaanlage ist im selben WLAN/Netz wie der Server. Gib ihr im Router eine **feste IP-Adresse**.
 
 **Der Schlüssel:** Moderne Anlagen (Protokoll V3) brauchen einmalig einen Schlüssel (Token). Midea gibt ihn **nur noch über die App MSmartHome** heraus – nicht mehr über NetHome Plus. Deshalb:

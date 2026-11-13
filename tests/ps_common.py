@@ -22,6 +22,7 @@ def setup(root):
     opslog.EVENTS_PATH = os.path.join(tmp, "events.jsonl")
     import shelly, homematic, tuya
     shelly.DEVICES_PATH = os.path.join(tmp, "shelly_devices.json")
+    shelly.CLIMATE_PREFS_PATH = os.path.join(tmp, "climate_prefs.json")
     homematic.CREDENTIALS_PATH = os.path.join(tmp, "homematic.json")
     homematic.SENSORS_PATH = os.path.join(tmp, "homematic_sensors.json")
     import rules as _rules
