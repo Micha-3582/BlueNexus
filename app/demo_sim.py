@@ -356,6 +356,7 @@ def activate() -> None:
     try:                                                    # Historie mitrutschen lassen (siehe demo_roll.py)
         import demo_roll
         demo_roll.roll(os.path.dirname(os.path.abspath(__file__)))
+        demo_roll.fill_today(os.path.dirname(os.path.abspath(__file__)))     # heute bis jetzt auffuellen (sonst leer nach Neustart)
     except Exception:                                       # noqa: BLE001 - die Demo muss auch ohne Verschiebung starten
         import logging
         logging.getLogger("demo_roll").exception("Historie konnte nicht verschoben werden")

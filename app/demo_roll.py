@@ -100,6 +100,66 @@ def _shift_db(app_dir: str, n: int) -> None:
         con.close()
 
 
+def fill_today(app_dir: str, now: datetime | None = None) -> None:
+    """Fuellt die Luecke von heute 00:00 bis zur ersten echten Aufzeichnung mit den Werten von vor 7 Tagen (gleicher Wochentag).
+
+    Ohne das waere "Heute" nach jedem Neustart der Demo leer (die Historie reicht nur bis gestern)."""
+    now = now or datetime.now()
+    midnight = datetime(now.year, now.month, now.day)
+    week = timedelta(days=7)
+    # Energie-Verlauf (history.json, 15-Minuten-Slots bzw. Archiv)
+    try:
+        hot_p = os.path.join(app_dir, "history.json")
+        h = _load(hot_p) if os.path.exists(hot_p) else {"hours": {}}
+        hours = h.setdefault("hours", {})
+        today = midnight.date().isoformat()
+        have = sorted(k for k in hours if k.startswith(today))
+        limit = have[0] if have else now.strftime("%Y-%m-%dT%H:%M")
+        arc = os.path.join(app_dir, "history_archive", (midnight - week).strftime("%Y-%m") + ".json")
+        old = {}
+        if os.path.exists(arc):
+            old.update(((_load(arc).get("days") or {}).get((midnight - week).date().isoformat())) or {})
+        for k, v in hours.items():
+            if k.startswith((midnight - week).date().isoformat()):
+                old[k] = v
+        added = 0
+        for k, v in old.items():
+            nk = _sd(k, 7)
+            if nk < limit and nk not in hours:
+                hours[nk] = v
+                added += 1
+        if added:
+            _dump(h, hot_p)
+    except Exception:                                       # noqa: BLE001
+        log.exception("Demo: heutige Energiewerte konnten nicht aufgefuellt werden")
+    # Verlaeufe (verlauf.db)
+    path = os.path.join(app_dir, "verlauf.db")
+    if not os.path.exists(path):
+        return
+    t0, t1 = int(midnight.timestamp()), int(now.timestamp())
+    con = sqlite3.connect(path)
+    try:
+        con.execute("BEGIN")
+        for tab, cols in (("samples", "v"), ("rollup", "vsum, n, vmin, vmax")):
+            for (series,) in con.execute(f"SELECT DISTINCT series FROM {tab}").fetchall():
+                first = con.execute(f"SELECT MIN(ts) FROM {tab} WHERE series=? AND ts>=?", (series, t0)).fetchone()[0]
+                lim = first if first is not None else t1
+                if lim <= t0:
+                    continue
+                for k in (7, 14, 21, 28, 1, 2, 3, 4, 5, 6):  # erst ganze Wochen zurueck, sonst die letzten Tage (Rohwerte werden nur kurz gehalten)
+                    s = k * 86400
+                    cur = con.execute(f"INSERT OR IGNORE INTO {tab} (series, ts, {cols}) SELECT series, ts+?, {cols} FROM {tab} "
+                                      f"WHERE series=? AND ts>=? AND ts<?", (s, series, t0 - s, lim - s))
+                    if cur.rowcount > 0:
+                        break
+        con.commit()
+    except Exception:                                       # noqa: BLE001
+        con.rollback()
+        log.exception("Demo: heutige Verlaufswerte konnten nicht aufgefuellt werden")
+    finally:
+        con.close()
+
+
 def roll(app_dir: str | None = None, today: date | None = None) -> int:
     """Verschiebt die Historie, wenn sie mindestens eine volle Woche hinter gestern zurueckliegt. Rueckgabe: Verschiebung in Tagen (0 = nichts)."""
     app_dir = app_dir or os.path.dirname(os.path.abspath(__file__))
