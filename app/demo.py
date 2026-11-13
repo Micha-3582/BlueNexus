@@ -94,6 +94,35 @@ _SNAP_SYSTEM = {
 }
 
 
+def _noise(t: float, seed: float) -> float:
+    """Deterministisches, weich wanderndes Rauschen in [-1, 1] aus der Uhrzeit."""
+    return (math.sin(t / 7.3 + seed) * 0.5 + math.sin(t / 19.1 + seed * 2.1) * 0.3 + math.sin(t / 3.7 + seed * 0.7) * 0.2)
+
+
+def _live_pv(w: float, t: float) -> float:
+    return max(0.0, w * (1.0 + 0.05 * _noise(t, 1.3))) if w > 0 else 0.0
+
+
+def _live_load(w: float, t: float) -> float:
+    return max(120.0, w * (1.0 + 0.07 * _noise(t, 4.1)) + 40.0 * max(0.0, math.sin(t / 53.0)) ** 3 * 4)
+
+
+def _phase_w(t: float, base, seed: float):
+    return [max(0.05, b + 0.05 * _noise(t, seed + i * 1.9)) for i, b in enumerate(base)]
+
+
+def _split(x: float, weights):
+    """Ganzzahlig auf drei Phasen aufteilen, die Summe ist genau round(x)."""
+    total = int(round(x))
+    sw = float(sum(weights))
+    parts = [int(math.floor(total * w / sw)) for w in weights]
+    rest = total - sum(parts)
+    order = sorted(range(3), key=lambda i: -(total * weights[i] / sw - parts[i]))
+    for i in range(abs(rest)):
+        parts[order[i % 3]] += 1 if rest > 0 else -1
+    return parts
+
+
 class _Mode:
     value = 10
 
@@ -120,8 +149,16 @@ def _make_cerbo():
             pv_tot = pv_ac + pv_dc
             batt_eff = batt if (has_pv_inverter or has_mppt or batt <= 0) else 0.0
             grid = load - pv_tot + batt_eff
-            sp = lambda x: [int(round(x / 3.0))] * 3
-            g, ld, pa = sp(grid), sp(load), sp(pv_ac)
+            t = now.timestamp()
+            pv_ac = _live_pv(pv_ac, t)                                    # Live-Werte bewegen sich leicht (Wolken, Verbraucher), alles bleibt rechnerisch stimmig
+            pv_dc = _live_pv(pv_dc, t + 5.0)
+            load = _live_load(load, t)
+            ld = _split(load, _phase_w(t, (0.30, 0.39, 0.31), 1.0))        # Verbrauch je Phase unterschiedlich
+            pa = _split(pv_ac, _phase_w(t, (0.31, 0.35, 0.34), 2.0)) if pv_ac > 0 else [0, 0, 0]
+            dc = int(round(pv_dc))
+            bt = int(round(batt_eff))
+            dcs, bts = _split(dc, (1, 1, 1)), _split(bt, (1, 1, 1))
+            g = [ld[i] - pa[i] - dcs[i] + bts[i] for i in range(3)]      # Netz je Phase = Verbrauch - PV + Batterie, Summe = Gesamtwert
             days = now.toordinal() - 739800
             frac = (now.hour * 3600 + now.minute * 60 + now.second) / 86400.0
             volt = 50.0 + soc * 0.045
@@ -129,7 +166,7 @@ def _make_cerbo():
                 "grid": {"l1": g[0], "l2": g[1], "l3": g[2], "total": sum(g)},
                 "loads": {"l1": ld[0], "l2": ld[1], "l3": ld[2], "total": sum(ld)},
                 "pv_inverter": {"l1": pa[0], "l2": pa[1], "l3": pa[2], "total": sum(pa)},
-                "pv_charger": int(round(pv_dc)),
+                "pv_charger": dc,
                 "pv_charger_current": round(pv_dc / volt, 1),
                 "solar_total": sum(pa) + int(round(pv_dc)),
                 "grid_energy_total": {"import": round(4200 + (days + frac) * 9.0, 2),
@@ -139,7 +176,7 @@ def _make_cerbo():
             }
 
         def read_pvinverter_power(self, unit):
-            return int(round(_solar_w(datetime.now()) * 0.8))
+            return int(round(_live_pv(_solar_w(datetime.now()) * 0.8, datetime.now().timestamp())))
 
         def read_ess_mode(self):
             return _Mode.value
