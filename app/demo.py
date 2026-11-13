@@ -92,21 +92,67 @@ def _now() -> datetime:
     return n.replace(hour=12, minute=40, second=n.second % 30, microsecond=0) if SNAPSHOT else n
 
 
-def _noise(t: float, seed: float) -> float:
-    """Deterministisches, weich wanderndes Rauschen in [-1, 1] aus der Uhrzeit."""
-    return (math.sin(t / 7.3 + seed) * 0.5 + math.sin(t / 19.1 + seed * 2.1) * 0.3 + math.sin(t / 3.7 + seed * 0.7) * 0.2)
+def _h(n: int, seed: int) -> float:
+    """Deterministische Zufallszahl in [0, 1) aus Ganzzahl und Seed (kein random: gleiche Zeit = gleicher Wert, auch fuer die Auffuellung der Historie)."""
+    x = (n * 374761393 + seed * 668265263) & 0xFFFFFFFF
+    x = ((x ^ (x >> 13)) * 1274126177) & 0xFFFFFFFF
+    x ^= x >> 16
+    return x / 4294967296.0
+
+
+def _vn(t: float, period: float, seed: int) -> float:
+    """Weiches Wertrauschen in [-1, 1] mit der Strukturlaenge 'period' Sekunden."""
+    n = int(math.floor(t / period))
+    f = t / period - n
+    f = f * f * (3.0 - 2.0 * f)
+    a, b = _h(n, seed), _h(n + 1, seed)
+    return (a + (b - a) * f) * 2.0 - 1.0
+
+
+def _events(t: float, cell: float, p: float, seed: int, dmin: float, dmax: float):
+    """Zufaellige Ereignisse (Wolke, Geraet, Spitze): je Zelle mit Wahrscheinlichkeit p ein Ereignis. Liefert (Anteil 0..1 im Ereignis, Staerke 0..1) fuer alle gerade laufenden."""
+    k = int(math.floor(t / cell))
+    out = []
+    for c in (k - 1, k):
+        if _h(c, seed) < p:
+            start = c * cell + _h(c, seed + 1) * cell
+            dur = dmin + _h(c, seed + 2) * (dmax - dmin)
+            if start <= t < start + dur:
+                out.append(((t - start) / dur, _h(c, seed + 3), _h(c, seed + 4)))
+    return out
 
 
 def _live_pv(w: float, t: float) -> float:
-    return max(0.0, w * (1.0 + 0.05 * _noise(t, 1.3))) if w > 0 else 0.0
+    """PV mit Wolken: kurze, tiefe Einbrueche, dazu feines Flimmern und langsames Auf und Ab."""
+    if w <= 0:
+        return 0.0
+    day = datetime.fromtimestamp(t).date()
+    p = 0.18 + 0.45 * (1.0 - _day_factor(day))                       # schwacher Tag = mehr Wolken
+    dip = 0.0
+    for x, depth, _r in _events(t, 600.0, p, 11, 25.0, 330.0):
+        dip = max(dip, (0.2 + 0.7 * depth) * math.sin(math.pi * x) ** 0.4)
+    fine = 1.0 + 0.045 * _vn(t, 13, 3) + 0.02 * _vn(t, 4, 4) + 0.06 * _vn(t, 240, 5)
+    return max(0.0, w * fine * (1.0 - dip))
 
 
 def _live_load(w: float, t: float) -> float:
-    return max(120.0, w * (1.0 + 0.07 * _noise(t, 4.1)) + 40.0 * max(0.0, math.sin(t / 53.0)) ** 3 * 4)
+    """Verbrauch mit Stufen (Geraete schalten), seltenen Grosslasten (Wasserkocher, Herd) und feinem Rauschen."""
+    v = w + 35.0 * _vn(t, 22, 8) + 14.0 * _vn(t, 5, 9) + 120.0 * _vn(t, 540, 10)
+    for x, a, b in _events(t, 600.0, 0.10, 31, 120.0, 720.0):
+        v += 500.0 + 1500.0 * a
+    return max(110.0, v)
+
+
+def _grid_noise(t: float) -> float:
+    """Abweichung des Netzwerts von der Rechnung: die Regelung haelt ihn nahe null, mit kleinen Spitzen."""
+    v = 11.0 * _vn(t, 9, 21) + 6.0 * _vn(t, 3, 22)
+    for x, a, b in _events(t, 120.0, 0.08, 41, 12.0, 70.0):
+        v += (140.0 + 800.0 * a) * (1.0 if b > 0.45 else -1.0) * (1.0 - x)
+    return v
 
 
 def _phase_w(t: float, base, seed: float):
-    return [max(0.05, b + 0.05 * _noise(t, seed + i * 1.9)) for i, b in enumerate(base)]
+    return [max(0.05, b + 0.06 * _vn(t, 90, int(seed * 10) + i)) for i, b in enumerate(base)]
 
 
 def _split(x: float, weights):
@@ -143,19 +189,28 @@ def _states(day_start: datetime) -> list:
     return out
 
 
-def _snap(state, t: float) -> dict:
-    """Werte der Live-Anzeige (Summen und Phasen) aus einem Zustand der Simulation zur Zeit t (Unix)."""
+def _snap(state, t: float, has_pv_inverter: bool = True, has_mppt: bool = True) -> dict:
+    """Alle Werte der Live-Anzeige zu einer Zeit t (Unix) aus einem Zustand der Simulation: Summen, Phasen, Preis.
+    Rechnerisch geschlossen: Netz = Verbrauch - Solar + Batterie (in Watt, auch je Phase). Die Batterie gleicht Wolken und Verbraucher aus,
+    so haelt sich das Netz nahe der Rechnung (wie bei einer geregelten Anlage); der Ladestand folgt der glatten Simulation."""
     soc, pv, load, batt = state
-    pv_ac = _live_pv(pv * 0.8, t)
-    pv_dc = _live_pv(pv * 0.2, t + 5.0)
-    load = _live_load(load, t)
-    ld = _split(load, _phase_w(t, (0.30, 0.39, 0.31), 1.0))
+    pv_ac0 = pv * 0.8 if has_pv_inverter else 0.0
+    pv_dc0 = pv * 0.2 if has_mppt else (0.0 if has_pv_inverter else pv)
+    if not has_pv_inverter and not has_mppt:
+        pv_ac0 = pv_dc0 = 0.0
+    batt_eff = batt if (has_pv_inverter or has_mppt or batt <= 0) else 0.0
+    pv_ac, pv_dc = _live_pv(pv_ac0, t), _live_pv(pv_dc0, t + 5.0)
+    load_j = _live_load(load, t)
+    ld = _split(load_j, _phase_w(t, (0.30, 0.39, 0.31), 1.0))
     pa = _split(pv_ac, _phase_w(t, (0.31, 0.35, 0.34), 2.0)) if pv_ac > 0 else [0, 0, 0]
-    dcs, bts = _split(int(round(pv_dc)), (1, 1, 1)), _split(int(round(batt)), (1, 1, 1))
+    dc = int(round(pv_dc))
+    batt_j = batt_eff + (sum(pa) + dc - (pv_ac0 + pv_dc0)) - (sum(ld) - load) + _grid_noise(t)         # Batterie gleicht die Abweichungen aus
+    bts = _split(int(round(batt_j)), (1, 1, 1))
+    dcs = _split(dc, (1, 1, 1))
     g = [ld[i] - pa[i] - dcs[i] + bts[i] for i in range(3)]
     price = _price_ct(datetime.fromtimestamp(t))
-    out = {"soc": soc, "pv": sum(pa) + sum(dcs), "load": sum(ld), "batt": sum(bts), "grid": sum(g), "price": price,
-           "cost": max(0.0, sum(g)) * price / 1000.0}
+    out = {"soc": soc, "pv": sum(pa) + dc, "load": sum(ld), "batt": sum(bts), "grid": sum(g), "price": price,
+           "cost": max(0.0, sum(g)) * price / 1000.0, "ld": ld, "pa": pa, "dc": dc, "g": g, "pv_dc": pv_dc}
     for i in range(3):
         out["grid_l%d" % (i + 1)] = g[i]
         out["load_l%d" % (i + 1)] = ld[i]
@@ -192,24 +247,9 @@ def _make_cerbo():
 
         def read_system(self, has_pv_inverter=True, has_mppt=True):
             now = _now()
-            soc, pv, load, batt = _simulate(now)
-            pv_ac = pv * 0.8 if has_pv_inverter else 0.0
-            pv_dc = pv * 0.2 if has_mppt else (0.0 if has_pv_inverter else pv)
-            if not has_pv_inverter and not has_mppt:
-                pv_ac = pv_dc = 0.0
-            pv_tot = pv_ac + pv_dc
-            batt_eff = batt if (has_pv_inverter or has_mppt or batt <= 0) else 0.0
-            grid = load - pv_tot + batt_eff
-            t = now.timestamp()
-            pv_ac = _live_pv(pv_ac, t)                                    # Live-Werte bewegen sich leicht (Wolken, Verbraucher), alles bleibt rechnerisch stimmig
-            pv_dc = _live_pv(pv_dc, t + 5.0)
-            load = _live_load(load, t)
-            ld = _split(load, _phase_w(t, (0.30, 0.39, 0.31), 1.0))        # Verbrauch je Phase unterschiedlich
-            pa = _split(pv_ac, _phase_w(t, (0.31, 0.35, 0.34), 2.0)) if pv_ac > 0 else [0, 0, 0]
-            dc = int(round(pv_dc))
-            bt = int(round(batt_eff))
-            dcs, bts = _split(dc, (1, 1, 1)), _split(bt, (1, 1, 1))
-            g = [ld[i] - pa[i] - dcs[i] + bts[i] for i in range(3)]      # Netz je Phase = Verbrauch - PV + Batterie, Summe = Gesamtwert
+            state = _simulate(now)
+            sn = _snap(state, now.timestamp(), has_pv_inverter, has_mppt)
+            soc, ld, pa, dc, g, pv_dc, batt = state[0], sn["ld"], sn["pa"], sn["dc"], sn["g"], sn["pv_dc"], sn["batt"]
             days = now.toordinal() - 739800
             frac = (now.hour * 3600 + now.minute * 60 + now.second) / 86400.0
             volt = 50.0 + soc * 0.045
@@ -219,7 +259,7 @@ def _make_cerbo():
                 "pv_inverter": {"l1": pa[0], "l2": pa[1], "l3": pa[2], "total": sum(pa)},
                 "pv_charger": dc,
                 "pv_charger_current": round(pv_dc / volt, 1),
-                "solar_total": sum(pa) + int(round(pv_dc)),
+                "solar_total": sum(pa) + dc,
                 "grid_energy_total": {"import": round(4200 + (days + frac) * 9.0, 2),
                                       "export": round(5100 + (days + frac) * 11.0, 2)},
                 "battery": {"voltage": round(volt, 1), "current": round(batt / volt, 1), "power": int(round(batt)),
