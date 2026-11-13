@@ -147,7 +147,9 @@ def fill_today(app_dir: str, now: datetime | None = None) -> None:
         hot_p = os.path.join(app_dir, "history.json")
         h = _load(hot_p) if os.path.exists(hot_p) else {"hours": {}}
         hours = h.setdefault("hours", {})
-        added = 0
+        for k in [k for k in hours if k.startswith(midnight.date().isoformat())]:      # heute komplett neu aus der Simulation (aeltere Staende der Auffuellung koennen abweichen)
+            del hours[k]
+        added = 1
         for q in range(96):
             st = midnight + timedelta(minutes=15 * q)
             key = st.strftime("%Y-%m-%dT%H:%M")
@@ -170,6 +172,9 @@ def fill_today(app_dir: str, now: datetime | None = None) -> None:
     con = sqlite3.connect(path)
     try:
         con.execute("BEGIN")
+        for tab in ("samples", "rollup"):
+            for ser in ENERGY_SERIES:
+                con.execute(f"DELETE FROM {tab} WHERE series=? AND ts>=?", (ser, t0))
         for tab, cols in (("samples", "v"), ("rollup", "vsum, n, vmin, vmax")):
             for (series,) in con.execute(f"SELECT DISTINCT series FROM {tab}").fetchall():
                 key = ENERGY_SERIES.get(series)
