@@ -394,8 +394,9 @@ class UserStore:
             for u in self._users.values():
                 d = dict(u)
                 d["has_recovery"] = bool(d.get("recovery_hash"))
-                d.pop("pw_hash", None)
-                d.pop("recovery_hash", None)
+                d["twofa"] = bool(d.get("totp_secret"))
+                for k in ("pw_hash", "recovery_hash", "totp_secret", "totp_pending", "totp_last", "recovery2fa"):
+                    d.pop(k, None)
                 d["permissions"] = normalize_permissions(d.get("permissions"))
                 d["dashboard_tiles"] = normalize_tiles(d.get("dashboard_tiles"))
                 d["dashboard_order"] = normalize_tile_order(d.get("dashboard_order"))
@@ -704,6 +705,71 @@ class UserStore:
             h = (user or {}).get("recovery_hash")
             ok = check_password_hash(h or _DUMMY_HASH, _norm_recovery(key) or "x")      # gleich lange Pruefung, auch ohne Konto/Schluessel
             return bool(user and h and ok and not is_expired(user))
+
+    # ---- Zwei-Faktor-Anmeldung (TOTP, siehe totp.py): Geheimnis im Klartext (der Server muss es kennen), Rettungscodes nur als Hash
+    def has_2fa(self, username: str) -> bool:
+        with self._lock:
+            self._sync()
+            return bool((self._users.get(_norm(username)) or {}).get("totp_secret"))
+
+    def set_pending_2fa(self, username: str, secret: str) -> None:
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            user["totp_pending"] = secret
+            self._write()
+
+    def pending_2fa(self, username: str) -> str:
+        with self._lock:
+            self._sync()
+            return str((self._users.get(_norm(username)) or {}).get("totp_pending") or "")
+
+    def enable_2fa(self, username: str, recovery_hashes: list, step: int) -> None:
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            if not user or not user.get("totp_pending"):
+                raise UserError("Keine Einrichtung offen.")
+            user["totp_secret"] = user.pop("totp_pending")
+            user["totp_last"] = int(step)
+            user["recovery2fa"] = list(recovery_hashes)
+            self._write()
+
+    def disable_2fa(self, username: str) -> None:
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            if not user:
+                raise UserError("Benutzer nicht gefunden.")
+            for k in ("totp_secret", "totp_pending", "totp_last", "recovery2fa"):
+                user.pop(k, None)
+            self._write()
+
+    def recovery_left_2fa(self, username: str) -> int:
+        with self._lock:
+            self._sync()
+            return len((self._users.get(_norm(username)) or {}).get("recovery2fa") or [])
+
+    def check_second_factor(self, username: str, code: str, verify_totp, hash_recovery) -> bool:
+        """6-stelliger Code (nur einmal je Zeitschritt) oder einer der Rettungscodes (nur einmal)."""
+        with self._lock:
+            self._sync()
+            user = self._users.get(_norm(username))
+            if not user or not user.get("totp_secret"):
+                return False
+            step = verify_totp(user["totp_secret"], code, int(user.get("totp_last") or 0))
+            if step:
+                user["totp_last"] = step
+                self._write()
+                return True
+            h = hash_recovery(code)
+            if h in (user.get("recovery2fa") or []) and len("".join(c for c in (code or "") if c.isalnum())) == 8:
+                user["recovery2fa"].remove(h)
+                self._write()
+                return True
+            return False
 
     def update_password(self, username: str, password: str) -> dict:
         key = _norm(username)

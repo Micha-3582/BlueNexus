@@ -54,6 +54,7 @@ import autolog
 import notify
 import notify_in
 import pushover
+import totp
 import pwreset
 import tunnel
 import extapi
@@ -173,7 +174,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"api_thermo_ingest", "api_thermo_fw", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"api_thermo_ingest", "api_thermo_fw", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "login_2fa", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -289,7 +290,7 @@ ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
 ENDPOINT_AREA = {
-    "api_update_own_account": "account", "api_modules": "settings_system",
+    "api_update_own_account": "account", "api_2fa_start": "account", "api_2fa_enable": "account", "api_2fa_disable": "account", "api_modules": "settings_system",
     "api_alexa": "smarthome_einrichten", "api_alexa_settings": "smarthome_einrichten", "api_alexa_add": "smarthome_einrichten", "api_alexa_modify": "smarthome_einrichten", "api_alexa_order": "smarthome_einrichten", "api_zigbee_gateways_order": "smarthome_einrichten",
     # Dashboard: Status/Verlauf ansehen (read) - Geraete schalten/Override/Ladetermine (write)
     "index": "dashboard", "solar_log_page": "dashboard", "api_solar_log": "dashboard",
@@ -1014,8 +1015,41 @@ def login():
         _nfc_alert(f"Fehlgeschlagene Anmeldung als „{username[:40]}“", "Anmeldung", ip, "login", "login:alert", "Anmeldung")      # damit man sieht, ob jemand Fremdes es probiert
         return render_template("login.html", error="Benutzername oder Passwort falsch."), 401
 
+    if users.has_2fa(user.get("username") or username):
+        # Passwort stimmt, aber noch NICHT angemeldet: erst der zweite Faktor (Zwischenzustand 5 Minuten, 5 Versuche)
+        session.clear()
+        session["pre2fa"] = {"u": (user.get("username") or "").strip().lower(), "t": time.time(), "r": remember, "n": _safe_next(request.args.get("next")), "f": 0}
+        return render_template("login.html", error=None, step2=True)
     _login_session(user, remember)
     return redirect(_safe_next(request.args.get("next")))
+
+
+@app.route("/login/2fa", methods=["POST"])
+def login_2fa():
+    """Zweiter Schritt der Anmeldung: Code aus der Authenticator-App (oder ein Rettungscode)."""
+    pre = session.get("pre2fa")
+    if not isinstance(pre, dict) or time.time() - float(pre.get("t") or 0) > 300:
+        session.pop("pre2fa", None)
+        return render_template("login.html", error="Die Anmeldung ist abgelaufen. Bitte noch einmal von vorn."), 401
+    ip = client_ip()
+    if too_many_attempts(ip):
+        return render_template("login.html", error="Zu viele Fehlversuche. Bitte einige Minuten warten.", step2=True), 429
+    code = request.form.get("code") or ""
+    if not users.check_second_factor(pre["u"], code, totp.verify, totp.hash_recovery):
+        note_failed_attempt(ip)
+        _nfc_alert(f"Falscher Zwei-Faktor-Code für „{str(pre['u'])[:40]}“", "Anmeldung", ip, "login2fa", "login:alert", "Anmeldung")
+        pre["f"] = int(pre.get("f") or 0) + 1
+        if pre["f"] >= 5:
+            session.pop("pre2fa", None)
+            return render_template("login.html", error="Zu viele falsche Codes. Bitte noch einmal von vorn anmelden."), 401
+        session["pre2fa"] = pre
+        return render_template("login.html", error="Der Code stimmt nicht.", step2=True), 401
+    u = users.get(pre["u"])
+    session.pop("pre2fa", None)
+    if not u or is_expired(u):
+        return render_template("login.html", error="Anmeldung nicht möglich."), 401
+    _login_session(u, bool(pre.get("r")))
+    return redirect(pre.get("n") or url_for("index"))
 
 
 # ---------------------------------------------------------------- Passwort vergessen (Code per Telegram/Pushover oder Wiederherstellungsschluessel)
@@ -1172,6 +1206,68 @@ def manifest():
     return resp
 
 
+def _2fa_password_ok(b: dict) -> bool:
+    return bool(users.verify(g.user, str(b.get("password") or "")))
+
+
+@app.post("/api/account/2fa/start")
+def api_2fa_start():
+    """Einrichtung beginnen (Passwort noetig): neues Geheimnis als QR-Code + Text. Eingeschaltet wird erst nach einem bestaetigten Code."""
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo nicht möglich."), 403
+    b = request.get_json(silent=True) or {}
+    if not _2fa_password_ok(b):
+        return jsonify(error="Passwort ist falsch."), 400
+    if users.has_2fa(g.user):
+        return jsonify(error="Die Zwei-Faktor-Anmeldung ist schon eingeschaltet."), 400
+    secret = totp.new_secret()
+    users.set_pending_2fa(g.user, secret)
+    uri = totp.otpauth_uri(secret, g.user, store.default_app_name())
+    return jsonify(ok=True, secret=" ".join(secret[i:i + 4] for i in range(0, len(secret), 4)), uri=uri, qr=totp.qr_svg(uri))
+
+
+@app.post("/api/account/2fa/enable")
+def api_2fa_enable():
+    """Einschalten, nachdem ein Code aus der Authenticator-App bestaetigt wurde. Liefert EINMALIG die Rettungscodes."""
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo nicht möglich."), 403
+    ip = client_ip()
+    if too_many_attempts(ip):
+        return jsonify(error="Zu viele Versuche. Bitte einige Minuten warten."), 429
+    b = request.get_json(silent=True) or {}
+    secret = users.pending_2fa(g.user)
+    step = totp.verify(secret, str(b.get("code") or "")) if secret else None
+    if not step:
+        note_failed_attempt(ip)
+        return jsonify(error="Der Code stimmt nicht. Prüfe die Uhrzeit am Handy und versuche es mit dem nächsten Code."), 400
+    codes = totp.new_recovery_codes()
+    users.enable_2fa(g.user, [totp.hash_recovery(c) for c in codes], step)
+    opslog.log("rules", f"Zwei-Faktor-Anmeldung für „{g.user}“ eingeschaltet", dry=False)
+    return jsonify(ok=True, recovery=codes)
+
+
+@app.post("/api/account/2fa/disable")
+def api_2fa_disable():
+    """Ausschalten: Passwort UND ein Code (oder Rettungscode) noetig."""
+    if demo.ACTIVE:
+        return jsonify(error="In der Demo nicht möglich."), 403
+    ip = client_ip()
+    if too_many_attempts(ip):
+        return jsonify(error="Zu viele Versuche. Bitte einige Minuten warten."), 429
+    b = request.get_json(silent=True) or {}
+    if not _2fa_password_ok(b) or not users.check_second_factor(g.user, str(b.get("code") or ""), totp.verify, totp.hash_recovery):
+        note_failed_attempt(ip)
+        return jsonify(error="Passwort oder Code stimmt nicht."), 400
+    users.disable_2fa(g.user)
+    opslog.log("rules", f"Zwei-Faktor-Anmeldung für „{g.user}“ ausgeschaltet", dry=False)
+    return jsonify(ok=True)
+
+
+@app.get("/api/account/2fa")
+def api_2fa_state():
+    return jsonify(on=users.has_2fa(g.user), recovery_left=users.recovery_left_2fa(g.user), qr=bool(totp.qr_svg("x")))
+
+
 @app.post("/api/account")
 def api_update_own_account():
     """Eigenen Benutzernamen und/oder Passwort aendern. Beides optional, aber
@@ -1204,7 +1300,7 @@ def _user_out(u: dict) -> dict:
     return {"username": u["username"], "permissions": auth.normalize_permissions(u.get("permissions")),
             "created": u.get("created"), "last_login": u.get("last_login"), "last_active": u.get("last_active"),
             "expires": u.get("expires"), "is_me": u["username"].strip().lower() == g.user,
-            "admin": auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))), "owner": bool(u.get("owner")),
+            "admin": auth.is_full_admin(auth.normalize_permissions(u.get("permissions"))), "owner": bool(u.get("owner")), "twofa": bool(u.get("twofa") or u.get("totp_secret")),
             "dashboard_tiles": auth.normalize_tiles(u.get("dashboard_tiles")),
             "dashboard_order": auth.normalize_tile_order(u.get("dashboard_order"))}
 
@@ -1264,6 +1360,9 @@ def api_users_item(username):
             users.set_dashboard_order(username, body["dashboard_order"])
         if body.get("password"):
             users.update_password(username, body["password"])
+        if body.get("reset_2fa"):
+            users.disable_2fa(username)                  # Handy verloren: der Administrator schaltet die Zwei-Faktor-Anmeldung dieses Kontos aus
+            opslog.log("rules", f"Zwei-Faktor-Anmeldung von „{username}“ durch „{g.user}“ zurückgesetzt", dry=False)
     except UserError as exc:
         return jsonify(error=str(exc)), 400
     u = users.get(username)

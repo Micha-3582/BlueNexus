@@ -1057,6 +1057,20 @@
     <div class="muted" id="rk-state" style="margin:6px 0">…</div>
     <button class="ghost" id="rk-new">Neuen Schlüssel erzeugen</button>
   </div>
+  <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+    <b>Zwei-Faktor-Anmeldung</b> <span class="qhelp" role="button" tabindex="0" data-help="Zusätzlich zum Passwort fragt die Anmeldung einen 6-stelligen Code aus einer Authenticator-App (z. B. Google Authenticator, Microsoft Authenticator, Aegis, 2FAS, Roboform). Ein erratenes Passwort reicht dann nicht mehr. Freiwillig, nur für dein Konto.">?</span>
+    <div class="muted" id="tf-state" style="margin:6px 0">…</div>
+    <div id="tf-setup" style="display:none;margin:8px 0">
+      <div id="tf-qr" style="background:#fff;padding:10px;border-radius:10px;display:inline-block;max-width:230px;line-height:0"></div>
+      <div class="muted" style="margin:8px 0 4px">QR-Code mit der Authenticator-App scannen – oder den Schlüssel von Hand eintragen:</div>
+      <div id="tf-key" style="font-family:ui-monospace,Consolas,monospace;font-size:16px;word-break:break-all;user-select:all"></div>
+      <div style="margin:6px 0"><a id="tf-link" href="#" class="muted">in der Authenticator-App öffnen (wenn du diese Seite am Handy offen hast)</a></div>
+      <input id="tf-code" inputmode="numeric" maxlength="8" placeholder="6-stelliger Code" autocomplete="one-time-code" style="width:170px">
+      <button id="tf-confirm">Bestätigen und einschalten</button>
+      <button class="ghost" id="tf-cancel">Abbrechen</button>
+    </div>
+    <button class="ghost" id="tf-btn">Einrichten</button>
+  </div>
   {% endif %}
 </div>
 
@@ -1493,6 +1507,46 @@ document.getElementById('btn-update').addEventListener('click', async () => {
   } catch (e) { st.textContent = 'Fehler beim Update.'; }
 });
 
+// Zwei-Faktor-Anmeldung (TOTP)
+(function () {
+  const st = document.getElementById('tf-state'), btn = document.getElementById('tf-btn'); if (!st || !btn) return;
+  const box = document.getElementById('tf-setup');
+  let on = false;
+  const info = (title, message, html) => uiDialog({ title, message, html, info: true });
+  const load = async () => {
+    try {
+      const r = await (await fetch('/api/account/2fa')).json(); on = !!r.on;
+      st.textContent = on ? 'Eingeschaltet – bei jeder neuen Anmeldung wird ein Code abgefragt (noch ' + r.recovery_left + ' Rettungscodes).' : 'Aus. Mit einem zweiten Faktor reicht ein erratenes Passwort nicht mehr.';
+      btn.textContent = on ? 'Ausschalten' : 'Einrichten'; btn.style.display = '';
+    } catch (e) { st.textContent = ''; }
+  };
+  const post = async (url, body) => { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return [r.ok, await r.json()]; };
+  btn.addEventListener('click', async () => {
+    if (on) {
+      const pw = await uiDialog({ title: 'Zwei-Faktor ausschalten', message: 'Zur Bestätigung dein Passwort.', label: 'Passwort', type: 'password', okText: 'Weiter' }); if (!pw) return;
+      const code = await uiDialog({ title: 'Zwei-Faktor ausschalten', message: 'Jetzt der aktuelle Code aus der Authenticator-App (oder ein Rettungscode).', label: 'Code', okText: 'Ausschalten' }); if (!code) return;
+      const [ok, j] = await post('/api/account/2fa/disable', { password: pw, code });
+      if (!ok) { await info('Nicht möglich', j.error || 'Fehler'); return; }
+      load(); return;
+    }
+    const pw = await uiDialog({ title: 'Zwei-Faktor einrichten', message: 'Zur Bestätigung dein Passwort.', label: 'Passwort', type: 'password', okText: 'Weiter' }); if (!pw) return;
+    const [ok, j] = await post('/api/account/2fa/start', { password: pw });
+    if (!ok) { await info('Nicht möglich', j.error || 'Fehler'); return; }
+    document.getElementById('tf-qr').innerHTML = j.qr || '<span style="color:#000;font-size:13px;line-height:1.3">QR-Bild nicht verfügbar – bitte den Schlüssel unten eintragen.</span>';
+    const svg = document.querySelector('#tf-qr svg'); if (svg) { svg.style.width = '210px'; svg.style.height = '210px'; }
+    document.getElementById('tf-key').textContent = j.secret; document.getElementById('tf-link').href = j.uri;
+    document.getElementById('tf-code').value = ''; box.style.display = ''; btn.style.display = 'none';
+  });
+  document.getElementById('tf-cancel').addEventListener('click', () => { box.style.display = 'none'; load(); });
+  document.getElementById('tf-confirm').addEventListener('click', async () => {
+    const [ok, j] = await post('/api/account/2fa/enable', { code: document.getElementById('tf-code').value });
+    if (!ok) { await info('Nicht möglich', j.error || 'Fehler'); return; }
+    box.style.display = 'none';
+    await uiDialog({ title: 'Zwei-Faktor ist an – deine Rettungscodes', html: '<div style="font-family:ui-monospace,Consolas,monospace;font-size:16px;columns:2;padding:10px;border:1px dashed var(--accent-t);border-radius:10px;margin:6px 0 10px;user-select:all">' + j.recovery.map(escH).join('<br>') + '</div>Schreib sie jetzt auf und bewahre sie sicher auf (nicht auf dem Handy mit der Authenticator-App). Jeder Code gilt <b>einmal</b>, falls das Handy verloren geht. Sie werden nur dieses eine Mal angezeigt.', info: true, okText: 'Aufgeschrieben' });
+    load();
+  });
+  load();
+})();
 // Wiederherstellungsschluessel (Passwort vergessen)
 (function () {
   const st = document.getElementById('rk-state'), btn = document.getElementById('rk-new'); if (!st || !btn) return;
@@ -1688,7 +1742,7 @@ async function loadUsers() {
       const tr = document.createElement('tr');
       tr.style.borderTop = '1px solid var(--border)';
       tr.innerHTML = `
-        <td style="padding:6px 4px">${escHUsers(u.username)}${u.is_me ? ' <span class="muted">(du)</span>' : ''}</td>
+        <td style="padding:6px 4px">${escHUsers(u.username)}${u.is_me ? ' <span class="muted">(du)</span>' : ''}${u.twofa ? ' <span class="muted" title="Zwei-Faktor-Anmeldung eingeschaltet">🔐 2FA</span>' : ''}</td>
         <td style="padding:6px 4px">${isFullAdmin ? '<b>Administrator</b>' + (u.owner ? ' <span class="muted">· Hauptkonto</span>' : '') : escHUsers(summarizePerms(perms))}</td>
         <td style="padding:6px 4px" class="muted">${fmtLogin(u.last_login)}</td>
         <td style="padding:6px 4px" class="muted">${u.last_active ? fmtLogin(u.last_active) : '–'}</td>
@@ -1698,6 +1752,7 @@ async function loadUsers() {
           ${u.admin ? '' : `<button type="button" class="ghost u-preview" data-u="${escHUsers(u.username)}" title="Vorschau: so sieht dieses Konto die App (nur ansehen)">👁</button>`}
           ${u.admin ? '' : `<button type="button" class="ghost u-copy" data-u="${escHUsers(u.username)}" title="Profil kopieren: neues Konto mit denselben Rechten, Kacheln und sichtbaren Geräten">⧉</button>`}
           ${u.is_me && (window.USER_PERMS || {}).account !== 'write' ? '' : `<button type="button" class="ghost u-pw" data-u="${escHUsers(u.username)}" data-me="${u.is_me ? 1 : 0}" title="${u.is_me ? 'Eigenes Passwort ändern (unter Konto & Zugang, mit aktuellem Passwort)' : 'Neues Passwort setzen'}">🔑</button>`}
+          ${u.twofa && !u.is_me ? `<button type="button" class="ghost u-2fa" data-u="${escHUsers(u.username)}" title="Zwei-Faktor-Anmeldung dieses Kontos zurücksetzen (z. B. Handy verloren)">🔐✕</button>` : ''}
           ${u.is_me || u.owner ? '' : `<button type="button" class="danger u-del" data-u="${escHUsers(u.username)}" title="Löschen">✕</button>`}`}
         </td>`;
       body.appendChild(tr);
@@ -1770,6 +1825,10 @@ async function loadUsers() {
       if (pw === null) return;
       if (pw.length < 8) { msg.textContent = 'Passwort: mind. 8 Zeichen.'; return; }
       patchUser(el.dataset.u, { password: pw });
+    }));
+    body.querySelectorAll('.u-2fa').forEach(el => el.addEventListener('click', async () => {
+      if (!await uiDialog({ title: 'Zwei-Faktor zurücksetzen?', message: `Die Zwei-Faktor-Anmeldung von „${el.dataset.u}“ wird ausgeschaltet. Danach genügt wieder das Passwort; das Konto kann sie neu einrichten.`, okText: 'Zurücksetzen' })) return;
+      patchUser(el.dataset.u, { reset_2fa: true });
     }));
     body.querySelectorAll('.u-del').forEach(el => el.addEventListener('click', async () => {
       if (!await uiDialog({ title: 'Benutzer löschen?', message: `„${el.dataset.u}“ wird gelöscht und kann sich nicht mehr anmelden.`, okText: 'Löschen' })) return;

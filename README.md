@@ -408,6 +408,7 @@ umgekehrter Reihenfolge wieder abgeschaltet. Mit Trockenlauf, Pause nach Handsch
 Die App ist dafür gebaut, auch erreichbar zu sein, wenn man will – deshalb ist Sicherheit eingebaut:
 
 - **Passwort vergessen:** Code per Telegram/Pushover (nur wenn eingerichtet) oder Wiederherstellungsschlüssel, der bei der Kontoanlage einmal angezeigt wird.
+- **Zwei-Faktor-Anmeldung (freiwillig, pro Benutzer):** zusätzlich zum Passwort ein Code aus einer Authenticator-App (TOTP), mit Rettungscodes; Administratoren können sie bei verlorenem Handy zurücksetzen.
 - **Anmeldung** mit gesalzenen Passwort-Hashes, Zugriffssperre (nach 10 falschen Anmeldungen 5 Minuten, bei PINs nach 5), gleiche Rechenzeit bei
   unbekannten Konten (kein Erraten gültiger Benutzernamen).
 - **Rechte nach dem Prinzip „standardmäßig verboten“:** Jede Funktion ist einem Bereich zugeordnet; was keinem

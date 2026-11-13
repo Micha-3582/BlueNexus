@@ -11,6 +11,7 @@ Nutzung:
   python reset_password.py                          # fragt interaktiv ab
   python reset_password.py --password neuesPasswort1234
   python reset_password.py --user admin --password neuesPasswort1234
+  python reset_password.py --user admin --no-2fa    # nur die Zwei-Faktor-Anmeldung dieses Kontos ausschalten (Handy verloren)
 """
 import argparse
 import getpass
@@ -26,6 +27,7 @@ def main():
     ap = argparse.ArgumentParser(description="Passwort fuer BlueNexus zuruecksetzen")
     ap.add_argument("--user", help="Benutzername (bei nur einem Konto nicht noetig)")
     ap.add_argument("--password", help="Neues Passwort (sonst interaktive, versteckte Eingabe)")
+    ap.add_argument("--no-2fa", action="store_true", help="Nur die Zwei-Faktor-Anmeldung des Kontos ausschalten (Passwort bleibt)")
     args = ap.parse_args()
 
     store = UserStore(os.path.join(BASE_DIR, "users.json"))
@@ -45,6 +47,11 @@ def main():
     elif username not in names:
         print(f"Kein Konto mit dem Namen '{username}' gefunden. Vorhanden: {', '.join(names)}")
         sys.exit(1)
+
+    if args.no_2fa:
+        store.disable_2fa(username)
+        print(f"Zwei-Faktor-Anmeldung fuer '{username}' ist ausgeschaltet.")
+        return
 
     password = args.password
     if not password:

@@ -54,6 +54,20 @@
 </head>
 <body>
   {% if demo %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🎬 <b>DEMO</b> – alle Daten, Geräte und Kameras sind erfunden. Es wird nichts geschaltet und nichts gesendet.</div>{% elif sandbox %}<div style="position:fixed;top:0;left:0;right:0;z-index:3100;background:#7c3aed;color:#fff;padding:8px 14px;font-size:14px;text-align:center">🧪 <b>TESTMODUS</b> – diese App darf nichts nach außen senden: kein Schalten, keine Nachrichten, kein Zugriff auf Cerbo, Geräte oder Kameras.</div>{% endif %}
+  {% if step2 %}
+  <form class="card" method="post" action="/login/2fa" autocomplete="off">
+    <div class="brand">
+      <img class="sun" src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="28" height="28" style="border-radius:7px;flex:none">
+      <h1>{{ app_display_name }}</h1>
+    </div>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <label>Zwei-Faktor-Code</label>
+    <input type="text" name="code" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" autocapitalize="off" spellcheck="false" required autofocus>
+    <div style="font-size:13px;color:var(--muted);margin-top:8px">6-stelliger Code aus der Authenticator-App – oder ein Rettungscode.</div>
+    <button type="submit">Bestätigen</button>
+    <a href="/login" style="display:block;margin-top:14px;text-align:center;color:var(--accent-t);font-size:14px;text-decoration:none">Abbrechen</a>
+  </form>
+  {% else %}
   <form class="card" method="post" autocomplete="on">
     <div class="brand">
       <img class="sun" src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="28" height="28" style="border-radius:7px;flex:none">
@@ -87,8 +101,10 @@
     <button type="submit">Anmelden</button>
     {% if not demo %}<a href="/forgot" style="display:block;margin-top:14px;text-align:center;color:var(--accent-t);font-size:14px;text-decoration:none">Passwort vergessen?</a>{% endif %}
   </form>
+  {% endif %}
   <script>
-    document.getElementById('pw-toggle').addEventListener('click', function () {
+    var _t = document.getElementById('pw-toggle');
+    if (_t) _t.addEventListener('click', function () {
       var pw = document.getElementById('pw');
       var showing = pw.type === 'text';
       pw.type = showing ? 'password' : 'text';
