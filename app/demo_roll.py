@@ -100,33 +100,64 @@ def _shift_db(app_dir: str, n: int) -> None:
         con.close()
 
 
+ENERGY_SERIES = {"energy:load_w": "load", "energy:solar_w": "pv", "energy:grid_w": "grid", "energy:soc": "soc"}
+
+
+def _slot(vals, price_ct: float) -> dict:
+    """Ein 15-Minuten-Eintrag der Energie-Historie aus Minutenwerten (je Minute dict aus demo.snapshot)."""
+    n = len(vals)
+    k = 1.0 / 60.0 / 1000.0                                  # Watt-Minute -> kWh
+    out = {"verbrauch": 0.0, "solar": 0.0, "s_load": 0.0, "s_batt": 0.0, "s_grid": 0.0, "b_load": 0.0, "b_grid": 0.0, "g_load": 0.0, "g_batt": 0.0}
+    for v in vals:
+        pv, load, batt = float(v["pv"]), float(v["load"]), float(v["batt"])
+        s_load = min(pv, load)
+        pv_rest, load_rest = pv - s_load, load - s_load
+        s_batt = min(pv_rest, max(batt, 0.0))
+        b_load = min(load_rest, max(-batt, 0.0))
+        out["verbrauch"] += load * k
+        out["solar"] += pv * k
+        out["s_load"] += s_load * k
+        out["s_batt"] += s_batt * k
+        out["s_grid"] += (pv_rest - s_batt) * k
+        out["b_load"] += b_load * k
+        out["g_load"] += (load_rest - b_load) * k
+        out["g_batt"] += (max(batt, 0.0) - s_batt) * k
+    socs = [float(v["soc"]) for v in vals]
+    out.update({"soc_min": min(socs), "soc_max": max(socs), "soc_sum": sum(socs), "soc_n": n,
+                "grid_cost_ct": (out["g_load"] + out["g_batt"]) * price_ct})
+    return out
+
+
 def fill_today(app_dir: str, now: datetime | None = None) -> None:
-    """Fuellt die Luecke von heute 00:00 bis zur ersten echten Aufzeichnung mit den Werten von vor 7 Tagen (gleicher Wochentag).
+    """Fuellt die Luecke von heute 00:00 bis zur ersten echten Aufzeichnung mit den Werten der Simulation (gleiche Rechnung wie die Live-Anzeige,
+    damit Akku-Ladestand und Leistungen nahtlos in die laufende Aufzeichnung uebergehen). Andere Reihen (z.B. Sensoren) kommen von einem frueheren Tag.
 
     Ohne das waere "Heute" nach jedem Neustart der Demo leer (die Historie reicht nur bis gestern)."""
+    import demo
     now = now or datetime.now()
     midnight = datetime(now.year, now.month, now.day)
-    week = timedelta(days=7)
-    # Energie-Verlauf (history.json, 15-Minuten-Slots bzw. Archiv)
+    t0, t1 = int(midnight.timestamp()), int(now.timestamp())
+    minutes = {}                                             # Minute (Unix) -> Momentaufnahme, nur bis jetzt
+    m = t0
+    while m + 60 <= t1:
+        minutes[m] = demo.snapshot(datetime.fromtimestamp(m + 30))
+        m += 60
+    # Energie-Verlauf (history.json, 15-Minuten-Slots)
     try:
         hot_p = os.path.join(app_dir, "history.json")
         h = _load(hot_p) if os.path.exists(hot_p) else {"hours": {}}
         hours = h.setdefault("hours", {})
-        today = midnight.date().isoformat()
-        have = sorted(k for k in hours if k.startswith(today))
-        limit = have[0] if have else now.strftime("%Y-%m-%dT%H:%M")
-        arc = os.path.join(app_dir, "history_archive", (midnight - week).strftime("%Y-%m") + ".json")
-        old = {}
-        if os.path.exists(arc):
-            old.update(((_load(arc).get("days") or {}).get((midnight - week).date().isoformat())) or {})
-        for k, v in hours.items():
-            if k.startswith((midnight - week).date().isoformat()):
-                old[k] = v
         added = 0
-        for k, v in old.items():
-            nk = _sd(k, 7)
-            if nk < limit and nk not in hours:
-                hours[nk] = v
+        for q in range(96):
+            st = midnight + timedelta(minutes=15 * q)
+            key = st.strftime("%Y-%m-%dT%H:%M")
+            if st + timedelta(minutes=15) > now:
+                break
+            if key in hours:                                 # schon aufgezeichnet (auch Luecken waehrend eines Neustarts werden gefuellt)
+                continue
+            vals = [minutes[x] for x in range(int(st.timestamp()), int(st.timestamp()) + 900, 60) if x in minutes]
+            if vals:
+                hours[key] = _slot(vals, demo._price_ct(st))
                 added += 1
         if added:
             _dump(h, hot_p)
@@ -136,17 +167,26 @@ def fill_today(app_dir: str, now: datetime | None = None) -> None:
     path = os.path.join(app_dir, "verlauf.db")
     if not os.path.exists(path):
         return
-    t0, t1 = int(midnight.timestamp()), int(now.timestamp())
     con = sqlite3.connect(path)
     try:
         con.execute("BEGIN")
         for tab, cols in (("samples", "v"), ("rollup", "vsum, n, vmin, vmax")):
             for (series,) in con.execute(f"SELECT DISTINCT series FROM {tab}").fetchall():
+                key = ENERGY_SERIES.get(series)
                 first = con.execute(f"SELECT MIN(ts) FROM {tab} WHERE series=? AND ts>=?", (series, t0)).fetchone()[0]
                 lim = first if first is not None else t1
-                if lim <= t0:
+                if lim <= t0 and not key:
                     continue
-                for k in (7, 14, 21, 28, 1, 2, 3, 4, 5, 6):  # erst ganze Wochen zurueck, sonst die letzten Tage (Rohwerte werden nur kurz gehalten)
+                if key:                                      # Energie-Reihen: direkt aus der Simulation, fehlende Minuten (eine Minute = ein Wert)
+                    for ts, v in minutes.items():
+                        if tab == "samples" and con.execute("SELECT 1 FROM samples WHERE series=? AND ts>=? AND ts<?", (series, ts, ts + 60)).fetchone():
+                            continue
+                        val = float(v[key])
+                        con.execute("INSERT OR IGNORE INTO samples (series, ts, v) VALUES (?,?,?)" if tab == "samples" else
+                                    "INSERT OR IGNORE INTO rollup (series, ts, vsum, n, vmin, vmax) VALUES (?,?,?,1,?,?)",
+                                    (series, ts, val) if tab == "samples" else (series, ts, val, val, val))
+                    continue
+                for k in (7, 14, 21, 28, 1, 2, 3, 4, 5, 6):  # sonst: erst ganze Wochen zurueck, dann die letzten Tage (Rohwerte werden nur kurz gehalten)
                     s = k * 86400
                     cur = con.execute(f"INSERT OR IGNORE INTO {tab} (series, ts, {cols}) SELECT series, ts+?, {cols} FROM {tab} "
                                       f"WHERE series=? AND ts>=? AND ts<?", (s, series, t0 - s, lim - s))

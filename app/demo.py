@@ -123,6 +123,19 @@ def _split(x: float, weights):
     return parts
 
 
+def snapshot(now: datetime) -> dict:
+    """Gleiche Werte wie die Live-Anzeige zu einem Zeitpunkt (Summen): soc, pv (Watt gesamt), load, grid (+ = Bezug), batt (+ = laden)."""
+    soc, pv, load, batt = _simulate(now)
+    t = now.timestamp()
+    pv_ac = _live_pv(pv * 0.8, t)
+    pv_dc = _live_pv(pv * 0.2, t + 5.0)
+    load = _live_load(load, t)
+    pv_tot = int(round(pv_ac)) + int(round(pv_dc))
+    ld = int(round(load))
+    bt = int(round(batt))
+    return {"soc": soc, "pv": pv_tot, "load": ld, "batt": bt, "grid": ld - pv_tot + bt}
+
+
 class _Mode:
     value = 10
 
