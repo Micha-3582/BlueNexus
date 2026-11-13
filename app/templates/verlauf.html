@@ -183,6 +183,7 @@ function setRange(r) {                              // obere Knoepfe: gilt fuer 
 }
 function reload(cid) { markRange(); const c = CHARTS.find(x => x.id === cid); if (c) loadChartData(c); }
 function zoomTo(cid, t0, t1) {                      // per Ziehen im Diagramm gewaehlter Ausschnitt: nur fuer dieses Diagramm
+  t1 = Math.min(t1, Date.now());                      // Balkendiagramme haben rechts einen Rand ueber "jetzt" hinaus: nie in die Zukunft zoomen (der Server lehnt das ab)
   if (t1 - t0 < 10000) return;
   (CRS[cid] = CRS[cid] || []).push(CR[cid] || null); CR[cid] = { from: Math.round(t0), to: Math.round(t1) };
   reload(cid);

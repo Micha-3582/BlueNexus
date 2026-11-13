@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.61.2 – 13.11.2026
+- Behoben: Beim Zoomen in einem **Balkendiagramm** bis an den rechten Rand kam „Zeitraum ungültig (höchstens 420 Tage)“. Balkendiagramme haben rechts einen Rand über „jetzt“ hinaus; der gewählte Ausschnitt reichte dadurch in die Zukunft. Der Zoom endet jetzt höchstens bei „jetzt“.
+
 ## 1.61.1 – 12.11.2026
 - Behoben: Im Kalender („Tag wählen“ bei Verläufen und Dashboard) schloss sich das Fenster, sobald man mit den Pfeilen den Monat wechselte. Jetzt bleibt es offen, und man kann beliebig weit zurückblättern.
 
