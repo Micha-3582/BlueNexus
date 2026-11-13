@@ -817,7 +817,8 @@ def seed_thermo() -> None:
     tid = "t-demo0001"
     now = time.time()
     dev = {"id": tid, "name": "Gartenthermometer", "token_hash": hashlib.sha256(b"demo").hexdigest(), "interval": 15, "created": now - 19 * 86400,
-           "last_seen": now, "fw": "1.1.1", "last": {}, "interval_ack": 15, "meta": {"n": 1830, "rr": 8, "ap": "aa:bb:cc:12:34:56"}}
+           "last_seen": now, "fw": "2.0.9", "last": {}, "interval_ack": 15, "paired": True,
+           "meta": {"n": 1830, "rr": 8, "ap": "aa:bb:cc:12:34:56", "pa": 580, "pa_avg": 610, "pr": "S", "st": {"n": 1820, "retry": 3}}}      # aktuelle Firmware: zeigt Aktivzeit und Sendefehler wie ein echtes Geraet
 
     def values():
         t = datetime.now()
