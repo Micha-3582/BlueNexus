@@ -561,7 +561,7 @@ def _require_login():
         return _deny("Das richtet nur ein Administrator ein (Zugänge, Fernzugriff, Update, Telegram/Pushover, Thermometer, Module).")
     area = ENDPOINT_AREA.get(request.endpoint)
     if area is None:
-        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last", "api_inventory")):      # Demo: Schnittstellen-Karte nur ansehen
+        if not auth.is_full_admin(g.perms) and not (demo.ACTIVE and request.method == "GET" and request.endpoint in ("api_apikeys", "api_apikeys_info", "api_devicelog", "api_devicelog_last", "api_inventory", "api_2fa_state")):      # Demo: Schnittstellen-Karte und Zwei-Faktor-Karte nur ansehen
             return _deny("Kein Zugriff mit diesem Konto.")
         return None
     need = "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write"

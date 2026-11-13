@@ -1051,7 +1051,7 @@
     <button id="btn-pw">Speichern</button>
     <span id="pw-msg" class="muted" style="margin-left:12px"></span>
   </div>
-  {% if user_perms.account == 'write' %}
+  {% if user_perms.account == 'write' or demo_view %}
   <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
     <b>Wiederherstellungsschlüssel</b> <span class="qhelp" role="button" tabindex="0" data-help="Mit dem Schlüssel setzt du dein Passwort zurück, falls du es vergisst (Anmeldeseite → „Passwort vergessen?“). Er wird nur einmal angezeigt und nur als Prüfwert gespeichert. Ein neuer Schlüssel macht den alten ungültig.">?</span>
     <div class="muted" id="rk-state" style="margin:6px 0">…</div>
