@@ -10,6 +10,7 @@ nur die Tuya-Funktionen melden einen verstaendlichen Fehler.
 from __future__ import annotations
 
 import ipaddress
+import lanip
 import json
 import logging
 import os
@@ -76,7 +77,7 @@ def parse_networks(text: str) -> list[str]:
             net = ipaddress.ip_network(tok, strict=False)
         except ValueError:
             raise TuyaError(f"Ungültiges Netz: {tok} (Beispiel: 192.168.178.0/24)")
-        if net.version != 4 or not net.is_private or net.prefixlen < 20:
+        if not lanip.is_lan_network(net) or net.prefixlen < 20:
             raise TuyaError(f"{tok}: nur private IPv4-Netze bis /20 (max. 4096 Adressen) erlaubt")
         out.append(str(net))
     return out
@@ -138,7 +139,7 @@ def _own_net() -> str | None:
         s.connect(("192.0.2.1", 9))
         ip = s.getsockname()[0]
         a = ipaddress.ip_address(ip)
-        return str(ipaddress.ip_network(ip + "/24", strict=False)) if a.is_private else None
+        return str(ipaddress.ip_network(ip + "/24", strict=False)) if lanip.is_lan_ipv4(a) else None
     except OSError:
         return None
     finally:
@@ -204,7 +205,7 @@ def build_entry(dev_id: str, ip: str = "") -> dict:
             addr = ipaddress.ip_address(ip.strip())
         except ValueError:
             raise TuyaError("Ungültige IP-Adresse")
-        if addr.version != 4 or not addr.is_private or addr.is_loopback:
+        if not lanip.is_lan_ipv4(addr):
             raise TuyaError("Nur IP-Adressen aus dem lokalen Netz erlaubt")
         cand = {**cand, "ip": str(addr), "version": ""}
     if not cand["ip"]:

@@ -3410,6 +3410,7 @@ def api_ess_grid_setpoint():
 # Zugangs-Token (nie im Klartext an einen reinen Leser) und interne IP-Adressen (Nutzerwunsch:
 # "man soll sehen dass da eine IP reinkommt, aber nicht meine internen IPs gelistet").
 SECRET_FIELDS = {"tibber_token", "cerbo_host"}
+CONTRACT_COST_FIELDS = ("contract_fee_month_eur", "grid_fee_day_eur", "meter_fee_day_eur", "section14a_credit_day_eur", "vat_percent")
 
 
 def _masked(d: dict, area: str, fields) -> dict:
@@ -3447,6 +3448,12 @@ def api_config():
             cfg[f + "_set"] = bool(cfg.get(f))
             if not has_write:
                 cfg[f] = ""
+        if not auth.has_level(g.perms, "smarthome_einrichten", "write"):         # IP-Bereiche fuer die Geraetesuche: wie bei Tuya nur fuer den, der Geraete einrichten darf
+            cfg["scan_networks_set"] = bool(cfg.get("scan_networks"))
+            cfg["scan_networks"] = ""
+        if not auth.has_level(g.perms, "settings_tarif", "read"):                # Vertragskosten nur mit Recht auf den Bereich Tarif
+            for f in CONTRACT_COST_FIELDS:
+                cfg.pop(f, None)
         return jsonify(cfg)
     body = request.get_json(silent=True) or {}
     try:

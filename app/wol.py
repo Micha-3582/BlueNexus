@@ -10,6 +10,7 @@ Eigenes Register (wol.json). Reine Logik + ein UDP-Socket.
 from __future__ import annotations
 
 import ipaddress
+import lanip
 import re
 import socket
 import subprocess
@@ -68,7 +69,10 @@ def _ip(value: str, what: str, allow_broadcast: bool = False) -> str:
         raise WolError(f"{what}: ungültige IP-Adresse")
     if a.version != 4:
         raise WolError(f"{what}: nur IPv4")
-    if not (a.is_private or (allow_broadcast and str(a) == "255.255.255.255")) or a.is_loopback:
+    if str(a) == "255.255.255.255":
+        if not allow_broadcast:
+            raise WolError(f"{what}: nur Adressen aus dem lokalen Netz")
+    elif not lanip.is_lan_ipv4(a):
         raise WolError(f"{what}: nur Adressen aus dem lokalen Netz")
     return str(a)
 

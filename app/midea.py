@@ -462,7 +462,8 @@ def _check_target(target: str | None) -> str | None:
         a = ipaddress.ip_address(target.strip())
     except ValueError:
         raise MideaError("Ungültige IP-Adresse")
-    if a.version != 4 or not (a.is_private and not a.is_loopback):
+    import lanip
+    if not lanip.is_lan_ipv4(a):
         raise MideaError("Nur IP-Adressen aus dem lokalen Netz erlaubt")
     return str(a)
 

@@ -8,6 +8,7 @@ Jeder Schaltkanal ist ein eigener Eintrag (id = "<mac>-<kanal>").
 from __future__ import annotations
 
 import ipaddress
+import lanip
 import json
 import logging
 import os
@@ -108,7 +109,7 @@ def check_ip(ip: str) -> str:
         addr = ipaddress.ip_address((ip or "").strip())
     except ValueError:
         raise ShellyError("Ungültige IP-Adresse")
-    if addr.version != 4 or not (addr.is_private and not addr.is_loopback):
+    if not lanip.is_lan_ipv4(addr):
         raise ShellyError("Nur IP-Adressen aus dem lokalen Netz erlaubt")
     return str(addr)
 

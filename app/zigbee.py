@@ -13,6 +13,7 @@ damit Dashboard, Regeln und Abläufe sie gleich behandeln. Werte werden 1 s zwis
 from __future__ import annotations
 
 import ipaddress
+import lanip
 import idsafe
 import json
 import logging
@@ -105,7 +106,7 @@ def _split_host(host: str) -> tuple[str, int]:
         addr = ipaddress.ip_address(raw)
     except ValueError:
         raise ZigbeeError("Ungültige Adresse – bitte die IP des Gateways eintragen, z. B. 192.168.2.66")
-    if addr.version != 4 or not (addr.is_private and not addr.is_loopback):
+    if not lanip.is_lan_ipv4(addr):
         raise ZigbeeError("Nur IP-Adressen aus dem lokalen Netz erlaubt")
     return str(addr), port
 
