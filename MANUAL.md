@@ -1103,6 +1103,15 @@ Geräte und Schalter liefern `on`/`off`, Knöpfe `button`.
 
 Unter *Einstellungen → System → Geräteübersicht (IP-Adressen)* – nur für Administratoren – steht eine Liste **aller Geräte mit IP-Adresse**, die in BlueNexus eingetragen sind: Steckdosen und Schalter (Shelly, Tasmota, WLED, Tuya), Klimaanlagen, Kameras, Zigbee-Gateways, die Homematic-Zentrale, Wake-on-LAN-Rechner, der Cerbo GX und die Funkthermometer (ohne feste Adresse). Zigbee- und Homematic-Geräte haben keine eigene IP-Adresse; sie stehen am Ende der Liste mit dem Hinweis, über welches Gateway bzw. welche CCU sie laufen. Sinn: Nach einem Ausfall oder beim Umbau des Netzes ist klar, **was alles dazugehörte**. Die Liste öffnet sich per Knopf **Geräteübersicht öffnen** in einem eigenen Fenster (schließen mit ✕ oder Esc). Ein Klick auf eine Spaltenüberschrift sortiert auf- bzw. absteigend (IP-Adressen nach Zahlen, Einträge ohne IP am Ende). Dazu gibt es ein Suchfeld, **Kopieren** und **Als CSV speichern** (beides mit aktueller Suche und Sortierung). Sie wird aus den Einstellungen gelesen – es wird nichts im Netz abgefragt, und es stehen nie Passwörter oder Schlüssel darin. Kommt eine IP-Adresse **doppelt** vor, ist die Zeile rot markiert und trägt ein ⚠.
 
+### Schutzregel der Seiten (Meldemodus)
+
+Unter *Einstellungen → System → Schutzregel der Seiten (Meldemodus)* – nur für Administratoren – sammelt BlueNexus Meldungen der Browser zur **Content-Security-Policy**. Das ist eine Schutzregel, die dem Browser sagt, woher eine Seite Skripte, Bilder und Verbindungen laden darf; sie begrenzt, was ein eingeschleustes Skript anrichten kann. Sie läuft **nur im Meldemodus: Der Browser blockiert nichts, er meldet nur**, was blockiert worden wäre. Zwei Regeln laufen parallel:
+
+- **Schutz:** die Regel, die später erzwungen werden könnte (nur Dateien und Verbindungen dieser Seite sowie das Diagramm-Skript von `cdnjs.cloudflare.com`, keine Plugins, keine fremden Formularziele). Inline-Code bleibt hier erlaubt, damit alles wie bisher läuft.
+- **Streng:** nur Skripte aus Dateien. Die Meldungen zeigen, wie viel Inline-Code (Skript-Blöcke und Klick-Handler) noch umzubauen wäre, bevor sich diese Regel erzwingen ließe.
+
+Die Anzeige zählt die Meldungen je Stelle (Seite, Quelle, Zeile). Gespeichert werden weder Adressen mit Parametern noch die Adresse der Besucher noch die Werte aus dem Code, nur der Name der betroffenen Funktion. **Aktualisieren** lädt neu, **Zurücksetzen** löscht alles. Sinnvoll: einige Tage normal benutzen und danach nachsehen, ob die Regel „Schutz“ etwas meldet (dann steht dort, was blockiert würde). Meldet sie nichts, lässt sie sich später gefahrlos erzwingen.
+
 ## 14. Kosten, Tarife und Tarifwechsel
 
 **Vertragskosten** (optional): Wer die festen Posten der Stromrechnung einträgt, bekommt in Telegram-Tagesbilanz und Monatsübersicht zusätzlich eine geschätzte **Gesamtsumme inkl. Gebühren**. Zwei Vorgehen, je nach Rechnung:

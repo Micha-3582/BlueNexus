@@ -224,6 +224,15 @@
 </div>
 {% endif %}
 
+{% if user_role == 'admin' and not demo_view %}
+<div class="card" id="csp-card" data-tab="system" data-area="user_management">
+  <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Schutzregel der Seiten (Meldemodus) <span class="qhelp" role="button" tabindex="0" data-help="Der Browser meldet hier, was eine strenge Content-Security-Policy blockieren würde. Es wird nichts blockiert. „Schutz“ ist die Regel, die später erzwungen werden könnte; „Streng“ zeigt, wie viel Inline-Code (Skript-Blöcke und Klick-Handler) noch umzubauen wäre.">?</span></h2>
+  <div class="sub">Meldungen der Browser, nur für Administratoren. Es wird nichts blockiert.</div>
+  <div id="csp-body" style="margin-top:8px">…</div>
+  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button id="csp-refresh" class="ghost" type="button">Aktualisieren</button><button id="csp-clear" class="ghost" type="button">Zurücksetzen</button></div>
+</div>
+{% endif %}
+
 <div class="card" id="api-card" data-tab="system" data-area="user_management">
   <h2><svg class="h2i" style="color:var(--accent)" viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg>Schnittstelle (API) für andere Programme <span class="qhelp" role="button" tabindex="0" data-help="Andere Programme im selben Netzwerk – ein Info-Monitor, ein Skript, ein anderes Smart-Home-System, ein eigenes Projekt – können hier Zustände von BlueNexus <b>lesen</b>. Jedes Programm bekommt einen eigenen Schlüssel. Es geht nur lesen (nichts schalten), nur aus dem lokalen Netz (nie über den Fernzugriff/Tunnel) und nur für die Sensoren, Geräte und Schalter, die du dem Schlüssel freigibst. Das Teilen mit anderen BlueNexus-Anlagen ist davon getrennt und bleibt unverändert.">?</span></h2>
   <div class="sub">Zustände für andere Programme im Heimnetz – nur lesen, nur im lokalen Netz.</div>
@@ -1115,6 +1124,7 @@
 {% block scripts %}
 {% if modules.smarthome %}<script src="{{ url_for('static', filename='thermo-flash.js') }}?v={{ asset_v }}" defer></script>{% endif %}
 <script src="{{ url_for('static', filename='inventar.js') }}?v={{ asset_v }}" defer></script>
+<script src="{{ url_for('static', filename='csp-info.js') }}?v={{ asset_v }}" defer></script>
 <script>
 let cfg = {};
 function pvInverterRow(p = {}) {

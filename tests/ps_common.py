@@ -23,6 +23,8 @@ def setup(root):
     import shelly, homematic, tuya
     shelly.DEVICES_PATH = os.path.join(tmp, "shelly_devices.json")
     shelly.CLIMATE_PREFS_PATH = os.path.join(tmp, "climate_prefs.json")
+    import csp as _csp
+    _csp.PATH = os.path.join(tmp, "csp_reports.json"); _csp._data = None
     homematic.CREDENTIALS_PATH = os.path.join(tmp, "homematic.json")
     homematic.SENSORS_PATH = os.path.join(tmp, "homematic_sensors.json")
     import rules as _rules

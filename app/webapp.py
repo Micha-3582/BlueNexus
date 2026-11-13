@@ -55,6 +55,7 @@ import notify
 import notify_in
 import pushover
 import totp
+import csp
 import pwreset
 import tunnel
 import extapi
@@ -156,6 +157,9 @@ def _security_headers(resp):
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     if request_is_https():
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")      # 180 Tage, nur diese Adresse
+    if resp.mimetype == "text/html" and not resp.direct_passthrough:
+        for v in csp.header_values():                                                  # Content-Security-Policy NUR im Meldemodus (blockiert nichts), siehe csp.py
+            resp.headers.add("Content-Security-Policy-Report-Only", v)
     return resp
 
 users = UserStore(os.path.join(BASE_DIR, "users.json"))
@@ -174,7 +178,7 @@ def inject_preview():
     return {"preview_user": getattr(g, "preview", None)}
 
 
-PUBLIC_ENDPOINTS = {"api_thermo_ingest", "api_thermo_fw", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "login_2fa", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
+PUBLIC_ENDPOINTS = {"api_thermo_ingest", "api_thermo_fw", "share_items", "share_act", "share_ac", "api_v1_info", "api_v1_items", "api_v1_item", "login", "login_2fa", "api_csp_report", "forgot", "api_forgot_send", "api_forgot_reset", "create_account", "restore", "nfc_tag", "nfc_pair", "tas_hook", "nfc_index", "logout", "static", "service_worker", "manifest"}
 
 _attempts: dict[str, list] = {}
 _attempts_lock = threading.Lock()
@@ -4579,6 +4583,27 @@ def api_thermo_update(tid):
         return jsonify(error=err), 400
     opslog.log("thermo", f"Funk-Update auf Firmware {fw['version']} für Thermometer {tid} vorgemerkt", dry=False)
     return jsonify(ok=True, version=fw["version"])
+
+
+@app.route("/api/csp-report", methods=["POST"])
+def api_csp_report():
+    """Meldung des Browsers zur Content-Security-Policy (Meldemodus). Ohne Anmeldung (auch die Anmeldeseite meldet), gezaehlt statt gespeichert,
+    begrenzt in Groesse und Anzahl, immer dieselbe leere Antwort."""
+    if (request.content_length or 0) <= csp.MAX_BODY and not csp.rate_limited(client_ip()):
+        data = request.get_json(force=True, silent=True)
+        csp.record(request.args.get("p", "a"), data.get("csp-report") if isinstance(data, dict) else None)
+    return "", 204
+
+
+@app.route("/api/csp-reports", methods=["GET", "DELETE"])
+def api_csp_reports():
+    """Gesammelte Meldungen ansehen oder zuruecksetzen. Ohne Bereichszuordnung: nur Administratoren."""
+    if request.method == "DELETE":
+        csp.clear()
+        return jsonify(ok=True)
+    r = jsonify(csp.summary())
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 @app.route("/api/inventory", methods=["GET"])
