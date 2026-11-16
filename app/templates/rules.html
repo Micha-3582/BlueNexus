@@ -312,7 +312,9 @@ function condRow(c, mode) {                       // mode: 'on' | 'off' = was DA
     const pick = sel('c-sensor', c.sensor_id, opts).replace('onchange="ruleEdited(this)"', 'onchange="sensorChanged(this)"');
     if ('is' in c) {                               // Ja/Nein-Sensor: TRUE / FALSE
       let w = BIN_WORDS[sen && sen.kind] || ['wahr', 'falsch']; if (sen && sen.invert && BIN_WORDS[sen.kind]) w = [w[1], w[0]];
-      body = `${pick} ist ${sel('c-is', c.is ? '1' : '0', [['1', 'TRUE – ' + w[0]], ['0', 'FALSE – ' + w[1]]])}`;
+      const flipped = !!(sen && sen.invert && sen.kind !== 'contact');             // Fenster/Tueren sind von Haus aus umgekehrt: dort kein Vermerk
+      body = `${pick} ist ${sel('c-is', c.is ? '1' : '0', [['1', 'TRUE – ' + w[0]], ['0', 'FALSE – ' + w[1]]])}`
+        + (flipped ? ` <span class="muted" style="white-space:nowrap">⇄ Wert umgekehrt <span class="qhelp" role="button" tabindex="0" data-help="Bei diesem Sensor ist „Wert umkehren“ eingeschaltet: TRUE und FALSE sind vertauscht. Wird die Umkehr später geändert, meint diese Bedingung das Gegenteil – dann den Zustand hier prüfen.">?</span></span>` : '');
     } else body = `${pick} ${cmp('c-op', c.op)} ${num('c-val', c.value, 80)} ${escH(sen ? sen.unit : '')}`;
   } else if (c.type === 'change') {
     const list = (S.sensors || []).filter(x => !x.binary || x.id === c.sensor_id), sen = list.find(x => x.id === c.sensor_id);
@@ -709,7 +711,7 @@ function condSummary(c) {
   if (c.type === 'sun_tomorrow') return `Sonne morgen ${cmp} ${c.kwh} kWh`;
   if (c.type === 'sensor') {
     const sen = (S.sensors || []).find(x => x.id === c.sensor_id), n = sen ? sen.name : '(Sensor fehlt)';
-    return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
+    return 'is' in c ? `${n} ist ${c.is ? 'TRUE' : 'FALSE'}${sen && sen.invert && sen.kind !== 'contact' ? ' (⇄ umgekehrt)' : ''}` : `${n} ${cmp} ${c.value}${sen && sen.unit ? ' ' + sen.unit : ''}`;
   }
   if (c.type === 'change') { const sen = (S.sensors || []).find(x => x.id === c.sensor_id); return `${sen ? sen.name : '(Sensor fehlt)'} ${c.dir === 'up' ? 'steigt' : c.dir === 'down' ? 'fällt' : 'ändert sich'} um ${c.step}${sen && sen.unit ? ' ' + sen.unit : ''}`; }
   if (c.type === 'virtual') { const v = (S.virtual || []).find(x => x.id === c.id), n = v ? v.name : '(Schalter fehlt)'; return (c.is === 'pressed' ? `${n} wird gedrückt` : `${n} ist ${c.is === 'on' ? 'an' : 'aus'}`) + byText(c); }

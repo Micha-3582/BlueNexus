@@ -662,7 +662,7 @@ Mehrere Bedingungen lassen sich mit **alle (UND)** oder **eine davon (ODER)** ve
 | **Laufzeit pro Tag** | Das Gerät soll pro Tag x Minuten laufen, und zwar **zu den günstigsten Zeiten** innerhalb eines Zeitfensters (von–bis). Nur bei „Zustand halten“ und dynamischem Tarif. |
 | **Akkustand** | SOC über/unter einem Wert. |
 | **Sonne morgen (Prognose)** | PV-Prognose für morgen über/unter einem Wert. |
-| **Sensor** | Homematic-/Zigbee-Sensor wahr/falsch bzw. Messwert unter/über. |
+| **Sensor** | Homematic-/Zigbee-Sensor wahr/falsch bzw. Messwert unter/über. Ist beim Sensor **„Wert umkehren“** (Pfeile-Symbol) eingeschaltet, steht neben dem Zustand der Vermerk **⇄ Wert umgekehrt** und im Text der Bedingung „Sensor umgekehrt“ (bei Fenstern und Türen nicht, dort ist die Umkehr der Standard). Beispiel: Bei einem umgekehrten Bewegungsmelder ist **FALSE = Bewegung erkannt**. Wird die Umkehr nachträglich ein- oder ausgeschaltet, meinen bestehende Regeln mit diesem Sensor das Gegenteil – dann den Zustand in der Regel prüfen. |
 | **Meine Aktoren** | Einer deiner Aktoren (Geräte aus der Liste „Meine Aktoren“) ist an/aus, oder seine Leistung liegt über/unter einem Wert. |
 | **Eigener Schalter / Knopf** | Schalter ist an/aus, oder Knopf wurde gedrückt. |
 | **Telegram-Wort** | Jemand schreibt dem Telegram-Bot ein bestimmtes Wort (z. B. „Tor“). Nur bei Regeln der Art **Ablauf**, es ist ein Impuls wie „Knopf wird gedrückt“. Wahlweise nur von bestimmten Empfängern und wahlweise **mit Rückfrage** („ja“). Siehe Kapitel 13a. |
