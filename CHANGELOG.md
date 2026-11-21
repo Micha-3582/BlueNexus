@@ -4,6 +4,9 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.63.5 – 21.11.2026
+- Neu: **Klingelton probehören im Regel-Editor.** Bei der Aktion **„Chime läuten“** steht neben dem Klingelton der Knopf **▶ Probehören**. Ein Klick läutet den gewählten Ton sofort an der Türklingel (auch bevor die Regel gespeichert ist), so hörst du, was du einstellst. Rückmeldung als kurze Meldung („🔔 Guten Tag ✓“ bzw. die Fehlermeldung der Kamera). Erneutes Läuten ist frühestens nach 3 Sekunden möglich. Es genügt das Recht „Regeln: Schreiben“, es zählen nur Türklingeln, die das Konto sehen darf.
+
 ## 1.63.4 – 16.11.2026
 - Neu: **Hinweis „Wert umgekehrt“ in der Regel-Anzeige.** Ist bei einem Sensor **„Wert umkehren“** eingeschaltet, steht im Regel-Editor neben dem Zustand der Vermerk **⇄ Wert umgekehrt** (mit Erklärung), in der Kurzfassung der Regel **⇄ umgekehrt** und im Text der Bedingung (Regelliste und Regel-Logbuch) **„Sensor umgekehrt“**, z. B. „Bewegung: keine Bewegung (TRUE, Sensor umgekehrt)“. Bei umgekehrten Sensoren sind TRUE und FALSE vertauscht; wird die Umkehr nachträglich geändert, meint eine bestehende Bedingung das Gegenteil. Der Hinweis macht das sichtbar (ein Bewegungsmelder löste dadurch erst nach seiner Nachlaufzeit aus). Bei Fenstern und Türen erscheint er nicht, dort ist die Umkehr der Standard.
 

@@ -294,7 +294,7 @@ ADMIN_ONLY_CHANGES = {"api_update", "api_system_testmode", "api_tunnel_token", "
 LOGBOOK_ENDPOINTS = {"rules_log_page", "automation_log_page", "api_automation_log", "api_automation_unread", "api_automation_log_read", "api_automation_log_clear",
                      "solar_log_page", "api_solar_log", "report_page", "api_report", "api_hardware", "watchdog_page", "api_watchdog", "api_tunnel_log"}
 ENDPOINT_AREA = {
-    "api_update_own_account": "account", "api_2fa_start": "account", "api_2fa_enable": "account", "api_2fa_disable": "account", "api_modules": "settings_system",
+    "api_update_own_account": "account", "api_rules_chime_test": "rules", "api_2fa_start": "account", "api_2fa_enable": "account", "api_2fa_disable": "account", "api_modules": "settings_system",
     "api_alexa": "smarthome_einrichten", "api_alexa_settings": "smarthome_einrichten", "api_alexa_add": "smarthome_einrichten", "api_alexa_modify": "smarthome_einrichten", "api_alexa_order": "smarthome_einrichten", "api_zigbee_gateways_order": "smarthome_einrichten",
     # Dashboard: Status/Verlauf ansehen (read) - Geraete schalten/Override/Ladetermine (write)
     "index": "dashboard", "solar_log_page": "dashboard", "api_solar_log": "dashboard",
@@ -5201,6 +5201,35 @@ def api_camera_chimes(cid):
         return jsonify(error=str(e)), 503
     return jsonify(chimes=chimes, tones=[{"id": k, "name": v} for k, v in camera.CHIME_TONES.items()],
                    volumes=[{"id": k, "name": v} for k, v in camera.CHIME_VOLUMES.items()])
+
+
+_chime_test_last: dict = {}
+
+
+@app.route("/api/rules/chime-test", methods=["POST"])
+def api_rules_chime_test():
+    """Klingelton zur Probe spielen (Regel-Editor, Aktion "Chime laeuten"): laeutet jetzt die Chimes der gewaehlten Tuerklingel. Wer die Regel anlegen darf
+    (Recht "Regeln: Schreiben"), darf auch probehoeren - aber nur an Kameras, die das Konto sehen darf. Hoechstens alle 3 Sekunden je Tuerklingel."""
+    b = request.get_json(silent=True) or {}
+    cam = camera.get(str(b.get("camera") or ""))
+    if not cam or not _visible(cam) or cam.get("kind", "reolink") != "reolink" or not camera.public(cam)["doorbell"]:
+        return jsonify(error="Türklingel nicht gefunden."), 404
+    try:
+        tone = int(b.get("tone"))
+    except (TypeError, ValueError):
+        return jsonify(error="Klingelton: ungültig"), 400
+    if tone not in camera.CHIME_TONES:
+        return jsonify(error="Klingelton: ungültig"), 400
+    now = time.time()
+    if now - _chime_test_last.get(cam["id"], 0.0) < 3.0:
+        return jsonify(error="Einen Moment – der Klingelton läuft noch."), 429
+    _chime_test_last[cam["id"]] = now
+    try:
+        n = camera.chime_ring_all(cam, tone)
+    except camera.CameraError as e:
+        return jsonify(error=str(e)), 503
+    opslog.log("rules", f"Klingelton „{camera.CHIME_TONES[tone]}“ an „{cam.get('name', '')}“ zur Probe gespielt (von {g.user})", dry=False)
+    return jsonify(ok=True, chimes=n, tone=camera.CHIME_TONES[tone])
 
 
 @app.route("/api/cameras/<cid>/chime", methods=["POST"])

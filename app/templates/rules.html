@@ -76,6 +76,15 @@ const RULES_LEVEL = {{ (user_perms.rules or 'none') | tojson }};   // 'none' | '
 const $ = id => document.getElementById(id);
 const helpQ = t => `<span class="qhelp" role="button" tabindex="0" data-help="${String(t).replace(/"/g, '&quot;')}">?</span>`;
 const escH = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.addEventListener('click', async ev => {                          // Klingelton probehören (Aktion "Chime läuten")
+  const btn = ev.target.closest && ev.target.closest('.a-chime-test'); if (!btn) return;
+  const row = btn.closest('.act') || btn.parentElement, cam = row.querySelector('.a-cid'), tone = row.querySelector('.a-tone');
+  if (!cam || !tone || !cam.value || btn.disabled) return;
+  const label = btn.textContent; btn.disabled = true; btn.textContent = '… läutet';
+  try { const j = await api('/api/rules/chime-test', 'POST', { camera: cam.value, tone: +tone.value }); savedToast('🔔 ' + j.tone + ' ✓'); }
+  catch (e) { savedToast('⚠ ' + e.message, true); }
+  finally { setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1500); }
+});
 async function api(url, method, body) {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
@@ -83,15 +92,15 @@ async function api(url, method, body) {
   return j;
 }
 let toastTimer = null;
-function savedToast(text = 'Gespeichert ✓') {
+function savedToast(text = 'Gespeichert ✓', bad = false) {
   let el = $('save-toast');
   if (!el) {
     el = document.createElement('div'); el.id = 'save-toast';
     el.style.cssText = 'position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:1100;background:var(--green);color:#0b1f14;font-weight:600;padding:9px 18px;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.45);transition:opacity .3s;pointer-events:none';
     document.body.appendChild(el);
   }
-  el.textContent = text; el.style.opacity = '1';
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+  el.textContent = text; el.style.opacity = '1'; el.style.background = bad ? '#e5544a' : 'var(--green)'; el.style.color = bad ? '#fff' : '#0b1f14';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.style.opacity = '0'; }, bad ? 4500 : 1800);
 }
 function uiConfirm(title, message, okText) {
   return new Promise(resolve => {
@@ -480,7 +489,7 @@ function actRow(a, branch, flow) {
     body = `<b>⚙ Regel</b> ${sel('a-rid', a.id, opts)} ${sel('a-rst', a.state || 'off', [['off', 'ausschalten'], ['on', 'einschalten'], ['toggle', 'umschalten']])} ${helpQ('Schaltet eine andere Regel ein oder aus, als würdest du den Schalter in der Regelliste bedienen. Der Zustand bleibt auch nach einem Neustart erhalten, in der Liste steht „geschaltet von Regel …“. Eine ausgeschaltete Ablauf-Regel startet erst wieder, wenn ihr Auslöser neu eintritt.')}${selfHit ? ' <span style="color:var(--exp)">⚠ schaltet diese Regel selbst</span>' : ''}${list.length ? '' : '<span class="muted">Noch keine gespeicherte Regel.</span>'}`;
   } else if (t === 'chime') {
     const list = chimeCams(), opts = list.map(x => [escH(x.id), '🔔 ' + escH(x.name)]); if (!list.some(x => x.id === a.id)) opts.unshift([escH(a.id), '(Türklingel fehlt)']);
-    body = `<b>🔔 Chime läuten</b> ${sel('a-cid', a.id, opts)} ${sel('a-tone', String(a.tone ?? 1), CHIME_TONES.map((n, i) => [String(i), n]))} ${helpQ('Lässt alle mit der Türklingel verbundenen Chimes mit dem gewählten Klingelton läuten (z. B. als Gong bei einem Ereignis). Die Lautstärke stellst du unter Kameras → Stift → Chime ein.')}${list.length ? '' : '<span class="muted">Noch keine Reolink-Türklingel angelegt – Kameras → Kamera hinzufügen.</span>'}`;
+    body = `<b>🔔 Chime läuten</b> ${sel('a-cid', a.id, opts)} ${sel('a-tone', String(a.tone ?? 1), CHIME_TONES.map((n, i) => [String(i), n]))} ${list.length ? '<button type="button" class="ghost a-chime-test" title="Klingelton probehören – läutet jetzt den Chime der Türklingel">▶ Probehören</button>' : ''} ${helpQ('Lässt alle mit der Türklingel verbundenen Chimes mit dem gewählten Klingelton läuten (z. B. als Gong bei einem Ereignis). Die Lautstärke stellst du unter Kameras → Stift → Chime ein.')}${list.length ? '' : '<span class="muted">Noch keine Reolink-Türklingel angelegt – Kameras → Kamera hinzufügen.</span>'}`;
   } else if (t === 'pushover') {
     const cams = S.cameras || [], camOpts = [['', '— kein Bild —'], ...cams.map(x => [escH(x.id), '📷 ' + escH(x.name)])];
     if (a.camera && !cams.some(x => x.id === a.camera)) camOpts.push([escH(a.camera), '(Kamera fehlt)']);
