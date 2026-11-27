@@ -1337,11 +1337,13 @@ def tasmota_hook_set(dev_id: str, base: str | None) -> dict:
     return {"hook": base is not None}
 
 
-def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None, deadline: float | None = None) -> list[dict]:
+def list_with_status(only_shown: bool = False, ids: set | None = None, live: bool = True, max_age: float | None = None, deadline: float | None = None, pending_ok: bool = False) -> list[dict]:
     """Angelegte Geraete inkl. Live-Status (parallel abgefragt). Ohne Passwort.
     only_shown: nur die fuers Dashboard freigegebenen (Reihenfolge wie gespeichert).
     live=False: keine Abfrage der Geraete (nur Stammdaten - sofort da, z. B. fuer den Regel-Editor).
     max_age: fuer die Oberflaeche - letzter bekannter Zustand (hoechstens so alt) statt auf jedes Geraet zu warten, siehe status_cached.
+    pending_ok: (mit deadline, fuer die Oberflaeche) ein Geraet, das bis dahin nicht geantwortet hat UND noch nie gefragt wurde, kommt ohne Zustand zurueck
+    (Anzeige "wird abgefragt ..."), statt die ganze Antwort aufzuhalten; die Abfrage laeuft im Hintergrund weiter, die naechste Anzeige hat den Stand.
     deadline: fuer die Regelrunde - hoechstens so viele Sekunden auf die Geraete warten; wer bis dahin nicht geantwortet hat, zaehlt mit seinem letzten
     bekannten Zustand (die Abfrage laeuft im Hintergrund weiter und aktualisiert ihn). Sonst bestimmt das langsamste WLAN-Geraet, wie schnell eine Regel reagiert."""
     items = [d for d in load_devices() if d.get("show")] if only_shown else load_devices()
@@ -1351,7 +1353,8 @@ def list_with_status(only_shown: bool = False, ids: set | None = None, live: boo
         return []
     if live and deadline is not None:
         ex = ThreadPoolExecutor(max_workers=min(16, len(items)))
-        futs = [ex.submit(status, d) for d in items]
+        fn = status if max_age is None else (lambda d: status_cached(d, max_age))
+        futs = [ex.submit(fn, d) for d in items]
         end = time.time() + deadline
         states = []
         for d, f in zip(items, futs):
@@ -1363,6 +1366,8 @@ def list_with_status(only_shown: bool = False, ids: set | None = None, live: boo
                     st = dict(hit[1])
                     st["stale"] = True
                     states.append(st)
+                elif pending_ok:
+                    states.append({})
                 else:                                          # noch nie gefragt: dann bleibt nur das Warten
                     states.append(f.result())
         ex.shutdown(wait=False)

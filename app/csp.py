@@ -37,8 +37,11 @@ _rate: dict = {}
 
 
 def header_values() -> list:
-    """Werte fuer die Kopfzeile Content-Security-Policy-Report-Only (je Regel eine Zeile)."""
-    return ["%s; report-uri /api/csp-report?p=%s" % (v, k) for k, (_, v) in POLICIES.items()]
+    """Werte fuer die Kopfzeile Content-Security-Policy-Report-Only (je Regel eine Zeile).
+    Die strenge Regel "b" (jeder Inline-Klick-Handler = eine Meldung, auf grossen Seiten Hunderte POSTs pro Seitenaufruf) steht nur bei
+    BLUENEXUS_CSP_PROBE=1 in der Kopfzeile: sie hat ihre Messaufgabe erfuellt und bremste die Seiten (1.63.6)."""
+    probe = os.environ.get("BLUENEXUS_CSP_PROBE") == "1"
+    return ["%s; report-uri /api/csp-report?p=%s" % (v, k) for k, (_, v) in POLICIES.items() if probe or k != "b"]
 
 
 def _load_locked() -> dict:

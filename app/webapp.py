@@ -3827,11 +3827,12 @@ def api_shelly_list():
     """?dashboard=1: nur die in den Einstellungen fuers Dashboard freigegebenen."""
     if not store.module_on("smarthome"):
         return jsonify([])                                   # Modul Smart Home aus (Geraete bleiben gespeichert)
-    return jsonify(_shelly_payload(request.args.get("dashboard") == "1" and auth.is_full_admin(g.perms), request.args.get("light") != "1"))      # ?light=1: ohne Live-Abfrage (schnell)
+    return jsonify(_shelly_payload(request.args.get("dashboard") == "1" and auth.is_full_admin(g.perms), request.args.get("light") != "1", None, request.args.get("soft") == "1"))      # ?soft=1: Smart-Home-Seite, wartet nicht auf langsame Geraete; ?light=1: ohne Live-Abfrage (schnell)
 
 
-def _shelly_payload(only_shown: bool, live: bool, ids: "set | None" = None) -> list:
-    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids, max_age=4.0))        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
+def _shelly_payload(only_shown: bool, live: bool, ids: "set | None" = None, soft: bool = False) -> list:
+    extra = {"deadline": 2.5, "pending_ok": True} if soft and live else {}
+    devs = _vis_filter(shelly.list_with_status(only_shown=only_shown, live=live, ids=ids, max_age=4.0, **extra))      # soft (Smart-Home-Seite): hoechstens 2,5 s auf langsame/ausgeschaltete Geraete warten, die Anzeige zeigt "wird abgefragt ..."        # ids: nur diese Geraete abfragen (Favoriten) - nicht alle
     ruled = {i for r in rules.list_rules() if r.get("enabled", True) for i in rules.devices_of(r)} if rules.enabled(store.load_config()) else set()
     show_ip = auth.has_level(g.perms, "settings_geraete", "write")
     for d in devs:

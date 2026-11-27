@@ -26,11 +26,16 @@ r = anon.get("/login")
 assert r.status_code == 200
 assert "Content-Security-Policy" not in r.headers, "es darf KEINE erzwingende Regel geben"
 rep = r.headers.getlist("Content-Security-Policy-Report-Only")
-assert len(rep) == 2 and any("report-uri /api/csp-report?p=a" in v for v in rep) and any("report-uri /api/csp-report?p=b" in v for v in rep), rep
+assert len(rep) == 1 and "report-uri /api/csp-report?p=a" in rep[0], rep                  # ab 1.63.6 nur die ruhige Regel "Schutz"; die strenge (hunderte Meldungen je Seite) nur mit BLUENEXUS_CSP_PROBE=1
+os.environ["BLUENEXUS_CSP_PROBE"] = "1"
+probe = csp.header_values()
+assert len(probe) == 2 and any("?p=b" in v for v in probe), probe
+del os.environ["BLUENEXUS_CSP_PROBE"]
+assert len(csp.header_values()) == 1
 a = next(v for v in rep if "?p=a" in v)
 for frag in ("default-src 'self'", "connect-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "https://cdnjs.cloudflare.com"):
     assert frag in a, frag
-b = next(v for v in rep if "?p=b" in v)
+b = next(v for v in probe if "?p=b" in v)
 assert "script-src 'self'" in b and "'unsafe-inline'" not in b                     # streng: kein Inline-Code
 A = login("admin", "adminpass1")
 assert A.get("/api/config").headers.get("Content-Security-Policy-Report-Only") is None   # nicht auf JSON

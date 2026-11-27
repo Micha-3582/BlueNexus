@@ -94,7 +94,8 @@
   .pw-toggle svg { width: 20px; height: 20px; }
 </style>
 
-<script>window.PAGE_MODE = {{ page_mode|default('admin')|tojson }};</script>
+<script>window.PAGE_MODE = {{ page_mode|default('admin')|tojson }}; document.documentElement.classList.add('tabs-pending'); setTimeout(function () { document.documentElement.classList.remove('tabs-pending'); }, 4000);</script>
+<style>html.tabs-pending .card { display: none; }</style>   {# alle Karten ausgeblendet, bis die Reiter stehen: sonst erscheint erst die ganze Seite und springt dann auf den Reiter #}
 {% if page_mode == 'smarthome' %}{% set sh_active = '' %}{% include '_sh_nav.html' %}{% else %}<div class="tabbar" id="tabbar"></div>{% endif %}
 
 <div id="tab-settings">
@@ -2090,8 +2091,14 @@ function shellyStatText(d) {
   return !d.online ? 'nicht erreichbar' + (d.error ? ' – ' + d.error : '') : (d.on ? 'an' : 'aus') + (d.power != null ? ` · ${Math.round(d.power)} W` : '') + (d.info ? ' · ' + d.info : '');
 }
 /* Nur Status/Watt/Knopffarbe aktualisieren - Eingabefelder und offene Symbolauswahl bleiben unangetastet */
-async function refreshShellyStatus() {
-  let list; try { list = await (await fetch('/api/shelly')).json(); } catch (e) { return; }
+let shellyBusy = false, shellyAgain = false;
+function refreshShellyStatus() {                       // nie zwei Abfragen gleichzeitig: bei vielen (auch ausgeschalteten) Geraeten dauert eine Abfrage Sekunden - alle 5 s eine neue stapelte sich sonst auf (Seite zaeh)
+  if (shellyBusy) { shellyAgain = true; return Promise.resolve(); }
+  shellyBusy = true;
+  return refreshShellyStatusNow().finally(() => { shellyBusy = false; if (shellyAgain) { shellyAgain = false; refreshShellyStatus(); } });
+}
+async function refreshShellyStatusNow() {
+  let list; try { list = await (await fetch('/api/shelly?soft=1')).json(); } catch (e) { return; }
   if (!Array.isArray(list)) return;
   for (const d of list) {
     document.querySelectorAll('#shelly-devs [data-dev], #ac-devs [data-dev], #surplus-devs [data-dev]').forEach(row => {
@@ -4467,7 +4474,7 @@ document.getElementById('vrm-restore-apply').addEventListener('click', async () 
 });
 
 loadShellyAdmin(true).then(refreshShellyStatus);                         // erst die Liste, dann die Live-Werte
-if (window.PAGE_MODE === 'smarthome') setInterval(refreshShellyStatus, 5000);
+if (window.PAGE_MODE === 'smarthome') setInterval(() => { if (!document.hidden) refreshShellyStatus(); }, 5000);
 
 /* --- Reiter: jede Karte gehoert zu genau einem Reiter (Zuordnung ueber die Ueberschrift) --- */
 (function () {                                   // Darstellung (hell/dunkel): gilt pro Geraet (localStorage), siehe static/theme.js
@@ -4572,6 +4579,7 @@ const ADMIN_TABS = [
   if (!IS_SH && start === 'geraete') { location.replace('/smarthome'); return; }                            // alte Lesezeichen (#geraete in der Adresse)
   if (!IS_SH && !start) { try { start = localStorage.getItem('adminTab') || ''; if (start === 'geraete') { start = ''; localStorage.removeItem('adminTab'); } } catch (e) { /* egal */ } }   // Smart Home startet immer bei "Aktoren"
   show(start);
+  document.documentElement.classList.remove('tabs-pending');
 })();
 
 init();

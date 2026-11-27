@@ -4,6 +4,14 @@ Hier steht, was sich in welcher Version geändert hat. Die Versionsnummer steht 
 
 **Zählweise:** `1.x.0` = neue Funktionen, `1.x.y` = Fehlerbehebungen und Kleinigkeiten. Die genauen Einzeländerungen stehen im Verlauf der Commits.
 
+## 1.63.6 – 27.11.2026
+- Behoben: **Smart-Home-Seite war bei vielen Geräten träge und sprang beim Laden.** Drei Ursachen:
+  - Die Seite fragte alle 5 Sekunden den Live-Zustand aller Geräte ab, **auch wenn die vorige Abfrage noch lief**. Bei vielen (auch ausgeschalteten oder nicht erreichbaren) Geräten dauert eine Abfrage mehrere Sekunden, die Abfragen stapelten sich auf und belegten Verbindungen und Server-Threads. Jetzt läuft immer nur **eine** Abfrage; bei ausgeblendeter Seite (anderer Tab, Handy gesperrt) ruht sie.
+  - Die Seite wartet höchstens **2,5 Sekunden** auf langsame Geräte, die noch nie abgefragt wurden (Anzeige „wird abgefragt …“); die Abfrage läuft im Hintergrund zu Ende, der Stand kommt beim nächsten Auffrischen. Dashboard und Regeln sind unverändert.
+  - Die **strenge Schutzregel** (Meldemodus, 1.63.3) löste pro Inline-Klick-Handler eine Meldung aus, auf großen Seiten **Hunderte Meldungen je Seitenaufruf**, die mit den echten Abrufen um die Verbindungen konkurrierten. Sie ist jetzt ausgeschaltet (zuschaltbar mit `BLUENEXUS_CSP_PROBE=1`); die Regel „Schutz“ bleibt und ist ruhig.
+  - Außerdem sind die Einstellungs-Karten bis zum Aufbau der Reiter ausgeblendet, damit nicht erst die ganze Seite erscheint und dann auf den Reiter springt.
+- Messung (70 Geräte, davon keines erreichbar, Handy-Ansicht): Seitenaufruf vorher 219 Abrufe und bis zu 15 s Wartezeit auf den ersten Gerätestand, jetzt 66 Abrufe und 2,5 s.
+
 ## 1.63.5 – 21.11.2026
 - Neu: **Klingelton probehören im Regel-Editor.** Bei der Aktion **„Chime läuten“** steht neben dem Klingelton der Knopf **▶ Probehören**. Ein Klick läutet den gewählten Ton sofort an der Türklingel (auch bevor die Regel gespeichert ist), so hörst du, was du einstellst. Rückmeldung als kurze Meldung („🔔 Guten Tag ✓“ bzw. die Fehlermeldung der Kamera). Erneutes Läuten ist frühestens nach 3 Sekunden möglich. Es genügt das Recht „Regeln: Schreiben“, es zählen nur Türklingeln, die das Konto sehen darf.
 
